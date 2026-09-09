@@ -1,0 +1,1303 @@
+﻿@model IEnumerable<Radar_CRM.Models.Lead>
+
+@{
+    ViewData["Title"] = "Leads Master";
+
+    // Dynamically get all properties of the Lead model, EXCLUDING lists (like Notes and PaymentRows) so they don't break the table
+    var tableProps = Model != null && Model.Any() ?
+        Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => !p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>))
+        .ToArray()
+        : Array.Empty<System.Reflection.PropertyInfo>();
+}
+
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Radar CRM</title>
+  
+<style>
+    /* Premium Enterprise SaaS Theme */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --bg-body: #f8fafc;
+        --bg-surface: #ffffff;
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --text-dark: #0f172a;
+        --text-main: #334155;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --btn-depth: 2px;
+    }
+
+    /* Fixed Body - No extra padding to prevent white borders */
+    body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-family: 'Inter', -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        background: var(--bg-surface);
+        padding: 20px 28px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        letter-spacing: -0.02em;
+    }
+
+        .page-title i {
+            color: var(--primary-blue);
+        }
+
+    /* Action Buttons (3D SaaS Style) */
+    .btn-saas {
+        background-color: var(--bg-surface);
+        color: var(--text-dark);
+        border: 1px solid #cbd5e1;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
+        transform: translateY(0);
+    }
+
+        .btn-saas:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+    .btn-saas-primary {
+        background-color: var(--primary-blue);
+        color: white;
+        font-weight: 600;
+        border: 1px solid var(--primary-hover);
+        border-radius: var(--radius-md);
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+    }
+
+        .btn-saas-primary:hover {
+            color: white;
+            background-color: var(--primary-hover);
+        }
+
+        .btn-saas-primary:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
+        }
+
+    .btn-saas-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
+    }
+
+        .btn-saas-danger:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
+        }
+
+    /* Layout Grid */
+    .crm-container {
+        display: flex;
+        height: calc(100vh - 160px);
+        gap: 24px;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Fixed Sidebar Filter */
+    .filter-sidebar {
+        width: 320px;
+        min-width: 320px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-sm);
+        height: 100%;
+    }
+
+    .filter-header {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+        .filter-header h6 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+    .filter-search-box {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        background-color: #f8fafc;
+    }
+
+    .filter-body {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 0;
+    }
+
+    .filter-field-item {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.2s;
+    }
+
+        .filter-field-item:hover {
+            background-color: #f8fafc;
+        }
+
+    .filter-expanded-area {
+        display: none;
+        margin-top: 12px;
+        padding-left: 28px;
+    }
+
+    .filter-field-item.active .filter-expanded-area {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .form-select, .form-control {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+            outline: none;
+        }
+
+    /* Main Table Container */
+    .table-container {
+        flex: 1;
+        min-width: 0;
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    /* Table Toolbar */
+    .table-toolbar {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
+
+    /* The Table */
+    .table-responsive {
+        overflow: auto;
+        flex-grow: 1;
+        width: 100%;
+    }
+
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table thead th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-soft);
+            padding: 14px 16px;
+        }
+
+    /* Flex Layout for Header Content */
+    .th-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        gap: 12px;
+    }
+
+    .table tbody td {
+        padding: 16px;
+        vertical-align: middle;
+        color: var(--text-dark);
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-bottom: 1px solid #f1f5f9;
+        background-color: var(--bg-surface);
+    }
+
+    .table tbody tr {
+        cursor: pointer;
+    }
+
+        .table tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+
+    /* Sticky Columns (Checkboxes & Actions) */
+    .sticky-cb {
+        position: sticky;
+        left: 0;
+        width: 40px;
+        text-align: center;
+        z-index: 11;
+        border-right: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
+
+    .sticky-actions {
+        position: sticky;
+        right: 0;
+        width: 100px;
+        text-align: center;
+        z-index: 11;
+        border-left: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
+
+    .table thead th.sticky-cb, .table thead th.sticky-actions {
+        z-index: 12;
+        background-color: #f8fafc;
+    }
+
+    /* Drag and Drop Manage Columns Styles */
+    .draggable-col-item {
+        transition: background-color 0.2s;
+    }
+
+        .draggable-col-item.dragging {
+            opacity: 0.4;
+            background-color: #f1f5f9;
+        }
+
+        .draggable-col-item.over {
+            border-top: 2px solid var(--primary-blue);
+        }
+
+    .drag-handle {
+        cursor: grab;
+        padding: 4px;
+        color: #94a3b8;
+    }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+    /* -------------------------------------
+           LEAD SPECIFIC STYLES (Icons/Badges)
+           ------------------------------------- */
+
+    .row-action-icon {
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: color 0.2s;
+        padding: 4px 8px;
+    }
+
+        .row-action-icon:hover {
+            color: var(--primary-blue);
+        }
+
+    .btn-notes-pill {
+        background: #eff6ff;
+        color: var(--primary-blue);
+        border: 1px solid #bfdbfe;
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+        .btn-notes-pill:hover {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+    .badge-soft-success {
+        background: #dcfce3;
+        color: #166534;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    .badge-soft-danger {
+        background: #fee2e2;
+        color: #b91c1c;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    .badge-soft-warning {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    /* Pagination */
+    .pagination-container {
+        padding: 14px 24px;
+        border-top: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
+
+    /* Notes Timeline */
+    .timeline-container {
+        border-left: 2px solid var(--border-soft);
+        margin-left: 15px;
+        padding-left: 20px;
+        margin-top: 20px;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .timeline-icon {
+        position: absolute;
+        left: -32px;
+        top: 0;
+        background: var(--bg-surface);
+        border: 2px solid var(--primary-blue);
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-blue);
+        font-size: 10px;
+    }
+
+    /* Mobile Friendly Adjustments */
+    @@media (max-width: 992px) {
+        .crm-container {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .filter-sidebar {
+            width: 100%;
+            height: 400px;
+        }
+
+        .table-container {
+            height: 600px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+    <!-- Hidden Input for Files -->
+    <input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+
+    <!-- Top Action Header -->
+    <div class="page-header">
+        <h1 class="page-title"><i class="fa-solid fa-users-viewfinder"></i> Leads Master</h1>
+
+        <div class="d-flex gap-3 align-items-center">
+            <!-- Bulk Action Container -->
+            <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+                <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
+                    <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
+                </button>
+                <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
+                    <i class="fa-solid fa-layer-group"></i> Mass Update
+                </button>
+                <button class="btn-saas" onclick="alert('Task Creation Module Opened')">
+                    <i class="fa-solid fa-list-check"></i> Create Task
+                </button>
+                <div class="vr mx-2"></div>
+            </div>
+
+            <button class="btn-saas" onclick="exportTableToCSV('Leads_Export.csv')">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
+            </button>
+            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
+            </button>
+            <a href="@Url.Action("Create", "Leads")" class="btn-saas-primary">
+                <i class="fa-solid fa-plus"></i> Create Lead
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Table Container -->
+    <div class="crm-container">
+
+        <!-- Fixed Sidebar Filter -->
+        <div class="filter-sidebar">
+            <div class="filter-header">
+                <h6 class="m-0 text-dark fw-bold"><i class="fa-solid fa-filter text-muted me-2"></i> Filter Leads</h6>
+            </div>
+            <div class="filter-search-box">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0 fw-semibold" placeholder="Search fields..." id="sidebarSearch" onkeyup="filterSidebarItems()">
+                </div>
+            </div>
+
+            <div class="filter-body" id="sidebarList">
+                @foreach (var prop in tableProps)
+                {
+                    <div class="filter-field-item field-item-row">
+                        <div class="form-check m-0 d-flex align-items-center">
+                            <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
+                            <label class="form-check-label flex-grow-1 fw-semibold" for="chk_@prop.Name">@prop.Name</label>
+                        </div>
+                        <div class="filter-expanded-area">
+                            <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                <option value="contains" selected>contains</option>
+                                <option value="is">is exactly</option>
+                                <option value="is_not">is not</option>
+                                <option value="starts_with">starts with</option>
+                                <option value="is_empty">is empty</option>
+                            </select>
+
+                            <!-- Search & Select Auto-Complete -->
+                            <input type="text" class="form-control form-control-sm condition-val" placeholder="Type or select..." list="dl_@prop.Name" />
+                            <datalist id="dl_@prop.Name">
+                                @if (Model != null && Model.Any())
+                                {
+                                    var uniqueValues = Model.Select(m => prop.GetValue(m)?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Distinct().Take(50);
+                                    foreach (var val in uniqueValues)
+                                    {
+                                        <option value="@val"></option>
+                                    }
+                                }
+                            </datalist>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="filter-footer p-3 border-top d-flex gap-2 bg-white">
+                <button class="btn-saas w-100 justify-content-center" onclick="clearFilters()">Clear</button>
+                <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply</button>
+            </div>
+        </div>
+
+        <!-- Table Area -->
+        <div class="table-container">
+            <!-- Top Toolbar -->
+            <div class="table-toolbar">
+                <div class="d-flex ms-auto gap-2">
+
+                    <!-- Global Sort Dropdown UI -->
+                    <div class="dropdown">
+                        <button class="btn-saas" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i class="fa-solid fa-arrow-up-wide-short text-muted me-1"></i> Sort
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="width: 320px; border-radius: 12px;">
+                            <h6 class="mb-3 text-dark fw-bold">Sort By</h6>
+                            <div class="d-flex gap-2 mb-3">
+                                <select id="globalSortField" class="form-select form-select-sm">
+                                    <option value="" selected>None</option>
+                                    @if (tableProps.Length > 0)
+                                    {
+                                        int colIndex = 0;
+                                        foreach (var prop in tableProps)
+                                        {
+                                            <option value="@colIndex">@prop.Name</option>
+                                            colIndex++;
+                                        }
+                                    }
+                                </select>
+                                <select id="globalSortDir" class="form-select form-select-sm" style="width: 140px;">
+                                    <option value="asc" selected>Ascending</option>
+                                    <option value="desc">Descending</option>
+                                </select>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn-saas border" data-bs-dismiss="dropdown" style="padding: 4px 12px;">Cancel</button>
+                                <button type="button" class="btn-saas-primary" onclick="applyGlobalSort()" style="background-color: #84b679; border-color: #84b679; padding: 4px 16px;">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manage Columns Drag & Drop -->
+                    <div class="dropdown">
+                        <button class="btn-saas" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i class="fa-solid fa-table-columns text-muted me-1"></i> Manage Columns
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
+                            <!-- Populated via JS for Drag & Drop -->
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+            <!-- The Data Table -->
+            <div class="table-responsive" id="tableWrapper">
+                <table class="table" id="leadsTable">
+                    <thead>
+                        <tr>
+                            <th class="sticky-cb">
+                                <input class="form-check-input m-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                            </th>
+
+                            @if (tableProps.Length > 0)
+                            {
+                                int colIndex = 0;
+                                foreach (var prop in tableProps)
+                                {
+                                    <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                                        <div class="th-content">
+                                            <span>@prop.Name</span>
+                                            <!-- INLINE ARROWS REMOVED AS REQUESTED -->
+                                        </div>
+                                    </th>
+                                    colIndex++;
+                                }
+                            }
+
+                            <!-- Actions Column -->
+                            <th class="sticky-actions text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                // Entire row is clickable to enter Edit Mode
+                                <tr class="lead-row" data-id="@item.Id" onclick="window.location.href='@Url.Action("Edit", "Leads", new { id = item.Id })'">
+
+                                    <!-- Stop Propagation so clicking checkbox doesn't open the record -->
+                                    <td class="sticky-cb" onclick="event.stopPropagation()">
+                                        <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                    </td>
+
+                                    @{
+                                        int tdIndex = 0;
+                                        foreach (var prop in tableProps)
+                                        {
+                                            var value = prop.GetValue(item, null)?.ToString() ?? "";
+                                            <td data-col-index="@tdIndex">
+                                                @if (prop.Name == "LeadName")
+                                                {
+                                                    <a href="@Url.Action("Edit", "Leads", new { id = item.Id })" class="text-primary fw-semibold text-decoration-none" onclick="event.stopPropagation()">@value</a>
+                                                }
+                                                else if (prop.Name == "LeadStatus" || prop.Name == "Stage" || prop.Name == "CurrentStatus")
+                                                {
+                                                    @if (value.ToLower() == "won" || value.ToLower() == "user" || value.ToLower() == "hot" || value.ToLower() == "active")
+                                                    {
+                                                        <span class="badge-soft-success">@value</span>
+                                                    }
+                                                    else if (value.ToLower() == "lost" || value.ToLower() == "not interested" || value.ToLower() == "non-user")
+                                                    {
+                                                        <span class="badge-soft-danger">@value</span>
+                                                    }
+                                                    else if (!string.IsNullOrEmpty(value))
+                                                    {
+                                                        <span class="badge-soft-warning">@value</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @value
+                                                }
+                                            </td>
+                                            tdIndex++;
+                                        }
+                                    }
+
+                                    <!-- Row Actions -->
+                                    <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                        <div class="d-flex align-items-center justify-content-center gap-2">
+                                            <!-- Notes Pill Button UI -->
+                                            <button class="btn-notes-pill" title="View/Add Notes" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')">
+                                                <i class="fa-regular fa-note-sticky"></i> Note
+                                            </button>
+
+                                            <!-- Dropdown Actions (3 dots) -->
+                                            <div class="dropdown">
+                                                <i class="fa-solid fa-ellipsis-vertical row-action-icon" data-bs-toggle="dropdown"></i>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                    <!-- UPDATED: Quick Communication Actions -->
+                                                    <li><a class="dropdown-item" href="#" onclick="alert('Initiating Call...')"><i class="fa-solid fa-phone text-primary me-2"></i> Call</a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="alert('Scheduling Meeting...')"><i class="fa-solid fa-video text-success me-2"></i> Meeting</a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="alert('Task Creation for ID: @item.Id')"><i class="fa-solid fa-list-check text-warning me-2"></i> Create Task</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="alert('Converting Lead ID @item.Id to Contact...')"><i class="fa-solid fa-user-plus text-muted me-2"></i> Convert to Contact</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteSingleRecord(this, '@item.Id')"><i class="fa-solid fa-trash text-danger me-2"></i> Delete</a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr id="noRecordsRow">
+                                <td colspan="50" class="text-center py-5 text-muted">
+                                    <i class="fa-regular fa-folder-open mb-3" style="font-size:2.5rem; color:#d1d5db;"></i>
+                                    <br /><span class="fw-semibold">No records found.</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container">
+                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">Showing 0 records</span>
+                <div class="d-flex gap-2">
+                    <button id="prevBtn" class="btn-saas" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="nextBtn" class="btn-saas" onclick="changePage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mass Update Modal -->
+    <div class="modal fade" id="massUpdateModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update Leads</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
+                    <div class="d-flex gap-3 align-items-center">
+                        <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
+                            <option value="" disabled selected>Select a field...</option>
+                            @foreach (var prop in tableProps)
+                            {
+                                <option value="@prop.Name">@prop.Name</option>
+                            }
+                        </select>
+                        <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0 rounded-bottom">
+                    <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Offcanvas Panel -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid var(--border-soft);">
+        <div class="offcanvas-header border-bottom bg-light">
+            <h5 class="offcanvas-title fw-bold">
+                <i class="fa-regular fa-comments text-primary me-2"></i> Notes: <span id="noteLeadName" class="text-dark"></span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <!-- Add Note Box -->
+            <div class="mb-4">
+                <textarea id="newNoteText" class="form-control mb-2" rows="3" placeholder="Add a note..."></textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <input type="file" id="noteAttachment" class="form-control form-control-sm w-50" />
+                    <button class="btn-saas-primary" onclick="saveNote()">Save Note</button>
+                </div>
+            </div>
+
+            <!-- Notes Timeline -->
+            <h6 class="text-muted fw-bold mb-3" style="font-size: 0.8rem; text-transform: uppercase;">Recent Notes</h6>
+            <div class="timeline-container" id="notesTimelineList">
+                <!-- Notes dynamically appended here via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // System Variables
+        const defaultVisibleColumns = ["LeadName", "MobileNumber", "LeadStatus", "Stage", "LeadOwner", "CreatedDateAndTime"];
+        let currentPage = 1;
+        let rowsPerPage = 15;
+        let currentNoteLeadId = null;
+
+        document.addEventListener("DOMContentLoaded", function () {
+        setupColumnToggles();
+        setupFilterInteractions();
+        applyPagination();
+        });
+
+        // ==========================================
+        // SIDEBAR FILTERING LOGIC
+        // ==========================================
+        function setupFilterInteractions() {
+        document.querySelectorAll('.condition-select').forEach(sel => {
+        sel.addEventListener('change', function() {
+        const input = this.nextElementSibling;
+        if(this.value === 'is_empty' || this.value === 'is_not_empty') {
+        input.style.display = 'none';
+        } else {
+        input.style.display = 'block';
+        }
+        });
+        });
+
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+        cb.addEventListener('change', function() {
+        const parentDiv = this.closest('.filter-field-item');
+        const valueInput = parentDiv.querySelector('.condition-val');
+        if(this.checked) {
+        parentDiv.classList.add('active');
+        setTimeout(() => valueInput.focus(), 100);
+        } else {
+        parentDiv.classList.remove('active');
+        valueInput.value = '';
+        }
+        });
+        });
+        }
+
+        function filterSidebarItems() {
+        const filter = document.getElementById('sidebarSearch').value.toLowerCase();
+        document.querySelectorAll('.field-item-row').forEach(row => {
+        const label = row.querySelector('label').innerText.toLowerCase();
+        row.style.display = label.includes(filter) ? "" : "none";
+        });
+        }
+
+        function applyFilters() {
+        const activeFilters = [];
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+        const colName = item.querySelector('.field-checkbox').value;
+        const condition = item.querySelector('.condition-select').value;
+        const val = item.querySelector('.condition-val').value.trim().toLowerCase();
+
+        const table = document.getElementById("leadsTable");
+        const th = table.querySelector(`th[data-col-name="${colName}"]`);
+        if(th) {
+        activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
+        }
+        });
+
+        document.querySelectorAll('tbody tr.lead-row').forEach(row => {
+        let isMatch = true;
+
+        for (let f of activeFilters) {
+        const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+        const cellText = td ? td.innerText.trim().toLowerCase() : '';
+
+        if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
+        if (f.condition === 'starts_with' && !cellText.startsWith(f.val)) isMatch = false;
+        if (f.condition === 'is' && cellText !== f.val) isMatch = false;
+        if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
+        if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
+        }
+
+        if (isMatch) {
+        row.classList.remove('filtered-out');
+        } else {
+        row.classList.add('filtered-out');
+        }
+        });
+
+        currentPage = 1;
+        applyPagination();
+
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        }
+
+        function clearFilters() {
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+        item.querySelector('.field-checkbox').checked = false;
+        item.querySelector('.condition-val').value = '';
+        item.classList.remove('active');
+        });
+        document.querySelectorAll('tbody tr.lead-row').forEach(row => row.classList.remove('filtered-out'));
+
+        currentPage = 1;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        }
+
+        // ==========================================
+        // SORTING LOGIC (GLOBAL UI)
+        // ==========================================
+        function applyGlobalSort() {
+        const colIndex = document.getElementById('globalSortField').value;
+        const direction = document.getElementById('globalSortDir').value;
+
+        if (colIndex === "") {
+        alert("Please select a field to sort by.");
+        return;
+        }
+
+        sortTableByCol(colIndex, direction);
+
+        // Close the dropdown after applying
+        const sortBtn = document.querySelector('.table-toolbar .dropdown button');
+        const bsDropdown = bootstrap.Dropdown.getInstance(sortBtn) || new bootstrap.Dropdown(sortBtn);
+        if(bsDropdown) bsDropdown.hide();
+        }
+
+        function sortTableByCol(colIndex, direction) {
+        const tbody = document.getElementById("tableBody");
+        const rows = Array.from(tbody.querySelectorAll("tr.lead-row"));
+
+        if (rows.length === 0) return;
+
+        rows.sort((a, b) => {
+        const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+        const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+
+        const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
+        const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
+
+        const isNumA = aText !== '' && !isNaN(aText);
+        const isNumB = bText !== '' && !isNaN(bText);
+
+        if (isNumA && isNumB) {
+        return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+        }
+
+        if (aText < bText) return direction === 'asc' ? -1 : 1;
+        if (aText > bText) return direction === 'asc' ? 1 : -1;
+        return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        applyPagination();
+        }
+        // ==========================================
+        // COLUMN MANAGEMENT (WITH DRAG & DROP)
+        // ==========================================
+        let draggedItem = null;
+
+        function setupColumnToggles() {
+        const table = document.getElementById("leadsTable");
+        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
+        const columnMenu = document.getElementById("columnToggleMenu");
+
+        columnMenu.innerHTML = '';
+
+        theadRows.forEach((th) => {
+        const colIndex = th.getAttribute("data-col-index");
+        const colName = th.getAttribute("data-col-name");
+
+        if(colName) {
+        const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+
+        const li = document.createElement("li");
+        li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
+        li.draggable = true;
+        li.dataset.colIndex = colIndex;
+
+        li.innerHTML = `
+        <i class="fa-solid fa-grip-vertical drag-handle"></i>
+        <div class="form-check m-0 w-100 d-flex align-items-center">
+        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+        </div>`;
+
+        li.addEventListener('click', function(e) { e.stopPropagation(); });
+        li.addEventListener('dragstart', handleDragStart);
+        li.addEventListener('dragover', handleDragOver);
+        li.addEventListener('dragenter', handleDragEnter);
+        li.addEventListener('dragleave', handleDragLeave);
+        li.addEventListener('drop', handleDrop);
+        li.addEventListener('dragend', handleDragEnd);
+
+        columnMenu.appendChild(li);
+
+        if(!isDefault) toggleColumnVisibility(colIndex, false);
+        }
+        });
+
+        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+        toggleColumnVisibility(this.value, this.checked);
+        });
+        });
+        }
+
+        function toggleColumnVisibility(idx, isVisible) {
+        const table = document.getElementById("leadsTable");
+        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
+        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
+        }
+
+        // DRAG AND DROP HANDLERS
+        function handleDragStart(e) {
+        draggedItem = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
+        setTimeout(() => this.classList.add('dragging'), 0);
+        }
+
+        function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+        }
+
+        function handleDragEnter(e) { this.classList.add('over'); }
+        function handleDragLeave(e) { this.classList.remove('over'); }
+
+        function handleDrop(e) {
+        e.stopPropagation();
+        this.classList.remove('over');
+
+        if (draggedItem !== this) {
+        let parent = this.parentNode;
+        let siblings = Array.from(parent.children);
+        let draggedIdx = siblings.indexOf(draggedItem);
+        let targetIdx = siblings.indexOf(this);
+        let insertAfter = draggedIdx < targetIdx;
+
+        if (insertAfter) this.after(draggedItem);
+        else this.before(draggedItem);
+
+        reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+        }
+        return false;
+        }
+
+        function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+        }
+
+        function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
+        const table = document.getElementById("leadsTable");
+        const theadRow = table.querySelector("thead tr");
+        const tbodyRows = table.querySelectorAll("tbody tr");
+
+        const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
+        const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
+
+        if (insertAfter) targetTh.after(draggedTh);
+        else targetTh.before(draggedTh);
+
+        tbodyRows.forEach(row => {
+        const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
+        const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
+        if(draggedTd && targetTd) {
+        if (insertAfter) targetTd.after(draggedTd);
+        else targetTd.before(draggedTd);
+        }
+        });
+        }
+
+        // ==========================================
+        // SELECTION, MASS ACTIONS & DELETE
+        // ==========================================
+        function toggleAllRowCheckboxes(sourceCb) {
+        const visibleRows = document.querySelectorAll('tbody tr.lead-row:not([style*="display: none"]) .row-cb');
+        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
+        updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
+        document.getElementById('selCount').innerText = selected;
+
+        const bulkContainer = document.getElementById('bulkActionsContainer');
+        bulkContainer.style.display = selected > 0 ? 'flex' : 'none';
+
+        const totalVisible = document.querySelectorAll('tbody tr.lead-row:not([style*="display: none"]) .row-cb').length;
+        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
+        }
+
+        function executeMassUpdate() {
+        const field = document.getElementById('massUpdateField').value;
+        const val = document.getElementById('massUpdateValue').value;
+        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
+
+        if(!field || selectedIds.length === 0) {
+        alert("Please select a field and ensure records are checked.");
+        return;
+        }
+
+        alert(`Initiating Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
+        modal.hide();
+        document.getElementById('selectAllCb').click();
+        }
+
+        function deleteSelected() {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        if(selectedCbs.length === 0) return;
+
+        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+        let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+        fetch('/Leads/BulkDelete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selectedIds)
+        })
+        .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+        })
+        .then(data => {
+        if (data.success) {
+        selectedCbs.forEach(cb => cb.closest('tr').remove());
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        applyPagination();
+        } else {
+        alert("Database Error: " + data.message);
+        }
+        })
+        .catch(error => {
+        console.error("Fetch Error:", error);
+        alert("Network error occurred. Please check the browser console.");
+        });
+        }
+        }
+
+        function deleteSingleRecord(element, id) {
+        if(confirm('Are you sure you want to delete this record?')) {
+        fetch('/Leads/BulkDelete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([parseInt(id)])
+        })
+        .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+        })
+        .then(data => {
+        if (data.success) {
+        const row = element.closest('tr');
+        if(row) row.remove();
+        updateSelectedCount();
+        applyPagination();
+        } else {
+        alert("Database Error: " + data.message);
+        }
+        })
+        .catch(error => {
+        console.error("Fetch Error:", error);
+        alert("Network error occurred. Please check the browser console.");
+        });
+        }
+        }
+
+        // ==========================================
+        // NOTES & TIMELINE SYSTEM
+        // ==========================================
+        function openNotesPanel(leadId, leadName) {
+        currentNoteLeadId = leadId;
+        document.getElementById('noteLeadName').innerText = leadName;
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+        document.getElementById('notesTimelineList').innerHTML = '';
+
+        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
+        offcanvas.show();
+        }
+
+        function saveNote() {
+        const text = document.getElementById('newNoteText').value;
+        const attachment = document.getElementById('noteAttachment').files[0];
+
+        if (!text.trim() && !attachment) return;
+
+        const now = new Date();
+        const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const ownerName = "System User";
+
+        let attachmentHtml = '';
+        if(attachment) {
+        attachmentHtml = `<div class="mt-2 p-2 bg-light rounded border"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${attachment.name}</span></div>`;
+        }
+
+        const noteHtml = `
+        <div class="timeline-item">
+        <div class="timeline-icon"><i class="fa-solid fa-user"></i></div>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
+        <small class="text-muted"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
+        </div>
+        <div class="text-main" style="font-size:0.85rem; line-height: 1.4;">${text.replace(/\n/g, '<br>')}</div>
+        ${attachmentHtml}
+        </div>
+        `;
+
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+        }
+
+        // ==========================================
+        // EXPORT TO CSV
+        // ==========================================
+        function exportTableToCSV(filename) {
+        const table = document.getElementById("leadsTable");
+        let csv = [];
+
+        // Get Headers
+        let headerRow = [];
+        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+        if(th.style.display !== 'none') headerRow.push(`"${th.innerText.trim()}"`);
+        });
+        csv.push(headerRow.join(","));
+
+        let targetRows = [];
+        const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
+
+        if (checkedCbs.length > 0) {
+        checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+        } else {
+        table.querySelectorAll("tbody tr.lead-row").forEach(tr => {
+        if(!tr.classList.contains('filtered-out')) {
+        targetRows.push(tr);
+        }
+        });
+        }
+
+        targetRows.forEach(tr => {
+        let rowData = [];
+        tr.querySelectorAll("td[data-col-index]").forEach(td => {
+        if(td.style.display !== 'none') {
+        let text = td.innerText.trim().replace(/"/g, '""');
+        rowData.push(`"${text}"`);
+        }
+        });
+        csv.push(rowData.join(","));
+        });
+
+        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+        let downloadLink = document.createElement("a");
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        }
+
+        // ==========================================
+        // PAGINATION
+        // ==========================================
+        function applyPagination() {
+        const rows = Array.from(document.querySelectorAll('tbody tr.lead-row:not(.filtered-out)'));
+        const totalRows = rows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        document.querySelectorAll('tbody tr.lead-row').forEach(r => {
+        if(!r.classList.contains('filtered-out')) r.style.display = 'none';
+        });
+
+        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
+        rows[i].style.display = '';
+        }
+
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+        }
+
+        function changePage(step) {
+        currentPage += step;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        }
+    </script>

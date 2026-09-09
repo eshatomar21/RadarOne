@@ -1,0 +1,1058 @@
+﻿@model IEnumerable<Radar_CRM.Models.Task>
+
+@{
+    ViewData["Title"] = "Tasks Master";
+
+    // Dynamically get all properties of the Task model, EXCLUDING lists
+    var tableProps = Model != null && Model.Any() ?
+        Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => !p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>))
+        .ToArray()
+        : Array.Empty<System.Reflection.PropertyInfo>();
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Radar CRM</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+            /* Premium Enterprise SaaS Theme */
+            :root {
+                --bg-body: #f4f5f8;
+                --bg-surface: #ffffff;
+                --primary-blue: #2563eb;
+                --primary-hover: #1d4ed8;
+                --text-dark: #111827;
+                --text-main: #374151;
+                --text-muted: #6b7280;
+                --border-soft: #d1d5db;
+                --radius-md: 6px;
+                --radius-lg: 10px;
+                --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                --btn-depth: 3px;
+            }
+
+            /* Top Page Header */
+            .page-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                background: var(--bg-surface);
+                padding: 16px 24px;
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow-sm);
+                border: 1px solid var(--border-soft);
+            }
+
+            .page-title {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin: 0;
+                font-weight: 700;
+                font-size: 1.35rem;
+                color: var(--text-dark);
+            }
+
+                .page-title i {
+                    color: var(--primary-blue);
+                }
+
+            /* Action Buttons */
+            .btn-saas {
+                background-color: var(--bg-surface);
+                color: var(--text-dark);
+                border: 1px solid var(--border-soft);
+                font-weight: 600;
+                border-radius: var(--radius-md);
+                padding: 8px 16px;
+                font-size: 0.85rem;
+                transition: all 0.15s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                cursor: pointer;
+                box-shadow: 0 var(--btn-depth) 0 #e5e7eb, 0 4px 6px rgba(0,0,0,0.05);
+                transform: translateY(0);
+            }
+
+                .btn-saas:active {
+                    transform: translateY(var(--btn-depth));
+                    box-shadow: 0 0 0 #e5e7eb, 0 1px 2px rgba(0,0,0,0.05);
+                }
+
+            .btn-saas-primary {
+                background-color: var(--primary-blue);
+                color: white;
+                font-weight: 600;
+                border: 1px solid #1e40af;
+                border-radius: var(--radius-md);
+                padding: 8px 18px;
+                font-size: 0.85rem;
+                transition: all 0.15s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                text-decoration: none;
+                box-shadow: 0 var(--btn-depth) 0 #1e40af, 0 4px 6px rgba(37,99,235,0.2);
+                transform: translateY(0);
+            }
+
+                .btn-saas-primary:active {
+                    transform: translateY(var(--btn-depth));
+                    box-shadow: 0 0 0 #1e40af, 0 1px 2px rgba(37,99,235,0.2);
+                }
+
+                .btn-saas-primary:hover {
+                    color: white;
+                    background-color: var(--primary-hover);
+                }
+
+            .btn-saas-danger {
+                background-color: #fee2e2;
+                color: #b91c1c;
+                border: 1px solid #ef4444;
+                box-shadow: 0 var(--btn-depth) 0 #ef4444, 0 4px 6px rgba(220,38,38,0.1);
+            }
+
+                .btn-saas-danger:active {
+                    transform: translateY(var(--btn-depth));
+                    box-shadow: 0 0 0 #ef4444, 0 1px 2px rgba(220,38,38,0.1);
+                }
+
+            /* Layout Grid */
+            .crm-container {
+                display: flex;
+                height: calc(100vh - 120px);
+                gap: 20px;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            /* Fixed Sidebar Filter */
+            .filter-sidebar {
+                width: 300px;
+                min-width: 300px;
+                background: var(--bg-surface);
+                border: 1px solid var(--border-soft);
+                border-radius: var(--radius-lg);
+                display: flex;
+                flex-direction: column;
+                box-shadow: var(--shadow-sm);
+                height: 100%;
+            }
+
+            .filter-header {
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border-soft);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .filter-search-box {
+                padding: 12px 20px;
+                border-bottom: 1px solid var(--border-soft);
+                background-color: #f9fafb;
+            }
+
+            .filter-body {
+                overflow-y: auto;
+                flex-grow: 1;
+                padding: 0;
+            }
+
+            .filter-field-item {
+                padding: 12px 20px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+
+            .filter-expanded-area {
+                display: none;
+                margin-top: 12px;
+                padding-left: 24px;
+            }
+
+            .filter-field-item.active .filter-expanded-area {
+                display: block;
+            }
+
+            .form-select, .form-control {
+                border: 1px solid var(--border-soft);
+                border-radius: var(--radius-md);
+                font-size: 0.85rem;
+                padding: 8px 12px;
+            }
+
+                .form-control:focus, .form-select:focus {
+                    border-color: var(--primary-blue);
+                    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+                    outline: none;
+                }
+
+            /* Main Table Container */
+            .table-container {
+                flex: 1;
+                min-width: 0;
+                background: var(--bg-surface);
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow-sm);
+                border: 1px solid var(--border-soft);
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            /* Table Toolbar */
+            .table-toolbar {
+                padding: 12px 20px;
+                border-bottom: 1px solid var(--border-soft);
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                background-color: #f9fafb;
+            }
+
+            /* The Table */
+            .table-responsive {
+                overflow: auto;
+                flex-grow: 1;
+                width: 100%;
+            }
+
+            .table {
+                margin-bottom: 0;
+                white-space: nowrap;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+                .table thead th {
+                    background-color: var(--bg-surface);
+                    color: var(--text-main);
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    border-bottom: 1px solid var(--border-soft);
+                    padding: 12px 16px;
+                    transition: background-color 0.2s;
+                }
+
+            .th-content {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                gap: 12px;
+            }
+
+            .header-menu-btn {
+                color: #4b5563;
+                background: transparent;
+                border: 1px solid transparent;
+                cursor: pointer;
+                width: 22px;
+                height: 22px;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            }
+
+                .header-menu-btn:hover {
+                    background: #e5e7eb;
+                    color: var(--text-dark);
+                }
+
+            .dropdown-menu.saas-menu {
+                font-size: 0.85rem;
+                border-radius: 8px;
+                box-shadow: var(--shadow-md);
+                border: 1px solid var(--border-soft);
+                padding: 8px 0;
+                min-width: 180px;
+            }
+
+                .dropdown-menu.saas-menu .dropdown-item {
+                    padding: 8px 16px;
+                    font-weight: 500;
+                    color: var(--text-main);
+                }
+
+                    .dropdown-menu.saas-menu .dropdown-item:hover {
+                        background-color: #f3f4f6;
+                        color: var(--primary-blue);
+                    }
+
+            .table tbody td {
+                padding: 14px 16px;
+                vertical-align: middle;
+                color: var(--text-dark);
+                font-size: 0.85rem;
+                border-bottom: 1px solid var(--border-soft);
+                background-color: var(--bg-surface);
+            }
+
+            .table tbody tr {
+                cursor: pointer;
+            }
+
+                .table tbody tr:hover td {
+                    background-color: #f9fafb;
+                }
+
+            /* Sticky Columns */
+            .sticky-cb {
+                position: sticky;
+                left: 0;
+                width: 60px;
+                text-align: center;
+                z-index: 11;
+                border-right: 1px solid var(--border-soft);
+                background-color: var(--bg-surface);
+            }
+
+            .sticky-actions {
+                position: sticky;
+                right: 0;
+                width: 60px;
+                text-align: center;
+                z-index: 11;
+                border-left: 1px solid var(--border-soft);
+                background-color: var(--bg-surface);
+            }
+
+            .table thead th.sticky-cb, .table thead th.sticky-actions {
+                z-index: 12;
+            }
+
+            .row-action-icon {
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 1.1rem;
+                transition: color 0.2s;
+                padding: 4px 8px;
+            }
+
+                .row-action-icon:hover {
+                    color: var(--primary-blue);
+                }
+
+            /* Badges */
+            .badge-soft-success {
+                background: #dcfce3;
+                color: #166534;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 0.75rem;
+            }
+
+            .badge-soft-danger {
+                background: #fee2e2;
+                color: #b91c1c;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 0.75rem;
+            }
+
+            .badge-soft-warning {
+                background: #fef3c7;
+                color: #92400e;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 0.75rem;
+            }
+
+            /* Pagination */
+            .pagination-container {
+                padding: 12px 24px;
+                border-top: 1px solid var(--border-soft);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background-color: var(--bg-surface);
+            }
+    </style>
+</head>
+<body>
+
+    <!-- Hidden Input for Files -->
+    <input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+
+    <!-- Top Action Header -->
+    <div class="page-header">
+        <h1 class="page-title"><i class="fa-solid fa-list-check"></i> Tasks Master</h1>
+
+        <div class="d-flex gap-3 align-items-center">
+            <!-- Bulk Action Container -->
+            <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+                <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
+                    <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
+                </button>
+                <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
+                    <i class="fa-solid fa-layer-group"></i> Mass Update
+                </button>
+                <div class="vr mx-2"></div>
+            </div>
+
+            <button class="btn-saas" onclick="exportTableToCSV('Tasks_Export.csv')">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
+            </button>
+            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
+            </button>
+            <a href="@Url.Action("Create", "Tasks")" class="btn-saas-primary">
+                <i class="fa-solid fa-plus"></i> Create Task
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Table Container -->
+    <div class="crm-container">
+
+        <!-- Fixed Sidebar Filter -->
+        <div class="filter-sidebar">
+            <div class="filter-header">
+                <h6 class="m-0 text-dark fw-bold"><i class="fa-solid fa-filter text-muted me-2"></i> Filter Tasks</h6>
+            </div>
+            <div class="filter-search-box">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-0 fw-semibold" placeholder="Search fields..." id="sidebarSearch" onkeyup="filterSidebarItems()">
+                </div>
+            </div>
+
+            <div class="filter-body" id="sidebarList">
+                @foreach (var prop in tableProps)
+                {
+                    <div class="filter-field-item field-item-row">
+                        <div class="form-check m-0 d-flex align-items-center">
+                            <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
+                            <label class="form-check-label flex-grow-1 fw-semibold" for="chk_@prop.Name">@prop.Name</label>
+                        </div>
+                        <div class="filter-expanded-area">
+                            <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                <option value="contains" selected>contains</option>
+                                <option value="is">is exactly</option>
+                                <option value="is_not">is not</option>
+                                <option value="starts_with">starts with</option>
+                                <option value="is_empty">is empty</option>
+                            </select>
+
+                            <!-- Search & Select Auto-Complete -->
+                            <input type="text" class="form-control form-control-sm condition-val" placeholder="Type or select..." list="dl_@prop.Name" />
+                            <datalist id="dl_@prop.Name">
+                                @if (Model != null && Model.Any())
+                                {
+                                    var uniqueValues = Model.Select(m => prop.GetValue(m)?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Distinct().Take(50);
+                                    foreach (var val in uniqueValues)
+                                    {
+                                        <option value="@val"></option>
+                                    }
+                                }
+                            </datalist>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="filter-footer p-3 border-top d-flex gap-2 bg-white">
+                <button class="btn-saas w-100 justify-content-center" onclick="clearFilters()">Clear</button>
+                <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply</button>
+            </div>
+        </div>
+
+        <!-- Table Area -->
+        <div class="table-container">
+            <!-- Top Toolbar -->
+            <div class="table-toolbar">
+                <div class="dropdown ms-auto">
+                    <button class="btn-saas" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                        <i class="fa-solid fa-table-columns text-muted"></i> Manage Columns
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Checkboxes populated via JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- The Data Table -->
+            <div class="table-responsive" id="tableWrapper">
+                <table class="table" id="tasksTable">
+                    <thead>
+                        <tr>
+                            <th class="sticky-cb">
+                                <input class="form-check-input m-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                            </th>
+
+                            @if (tableProps.Length > 0)
+                            {
+                                int colIndex = 0;
+                                foreach (var prop in tableProps)
+                                {
+                                    <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                                        <div class="th-content">
+                                            <span>@prop.Name</span>
+
+                                            <!-- Column Dropdown (Sort/Filter) -->
+                                            <div class="dropdown">
+                                                <button class="header-menu-btn" type="button" data-bs-toggle="dropdown">
+                                                    <i class="fa-solid fa-chevron-down" style="font-size: 0.65rem;"></i>
+                                                </button>
+                                                <ul class="dropdown-menu saas-menu">
+                                                    <li><a class="dropdown-item" href="#" onclick="sortTableByCol(@colIndex, 'asc')">Sort Asc</a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="sortTableByCol(@colIndex, 'desc')">Sort Desc</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="openFilterFor('@prop.Name')">Advanced Filter</a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </th>
+                                    colIndex++;
+                                }
+                            }
+
+                            <!-- Actions Column -->
+                            <th class="sticky-actions text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                // Entire row is clickable to enter Edit Mode
+                                <tr class="task-row" data-id="@item.Id" onclick="window.location.href='@Url.Action("Edit", "Tasks", new { id = item.Id })'">
+
+                                    <!-- Checkbox & Notes Icon -->
+                                    <td class="sticky-cb" onclick="event.stopPropagation()">
+                                        <div class="d-flex align-items-center justify-content-center gap-2">
+                                            <input class="form-check-input m-0 row-cb" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                            <i class="fa-regular fa-comment-dots text-primary" style="cursor:pointer;" onclick="openNoteModal('@item.Id')" title="Add Note"></i>
+                                        </div>
+                                    </td>
+
+                                    @{
+                                        int tdIndex = 0;
+                                        foreach (var prop in tableProps)
+                                        {
+                                            var value = prop.GetValue(item, null)?.ToString() ?? "";
+                                            <td data-col-index="@tdIndex">
+                                                @if (prop.Name == "Subject")
+                                                {
+                                                    <span class="text-primary fw-semibold">@value</span>
+                                                }
+                                                else if (prop.Name == "Status")
+                                                {
+                                                    @if (value.ToLower() == "completed")
+                                                    {
+                                                        <span class="badge-soft-success">@value</span>
+                                                    }
+                                                    else if (value.ToLower() == "in progress")
+                                                    {
+
+                                                        <span class="badge-soft-warning">@value</span>
+                                                    }
+                                                    else
+                                                    {
+
+                                                        <span class="badge-soft-danger">@value</span>
+                                                    }
+                                                }
+                                                else if (prop.Name == "Priority")
+                                                {
+                                                    @if (value.ToLower().Contains("high"))
+                                                    {
+                                                        <span class="badge-soft-danger">@value</span>
+                                                    }
+                                                    else if (value.ToLower() == "normal")
+                                                    {
+
+                                                        <span class="badge-soft-success">@value</span>
+                                                    }
+                                                    else
+                                                    {
+
+                                                        <span class="badge-soft-warning">@value</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @value
+                                                }
+                                            </td>
+                                            tdIndex++;
+                                        }
+                                    }
+
+                                    <!-- Row Actions -->
+                                    <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                        <div class="dropdown">
+                                            <i class="fa-solid fa-ellipsis-vertical row-action-icon" data-bs-toggle="dropdown"></i>
+                                            <ul class="dropdown-menu dropdown-menu-end saas-menu">
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteSingleRecord(this, '@item.Id')">Delete</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr id="noRecordsRow">
+                                <td colspan="50" class="text-center py-5 text-muted">
+                                    <i class="fa-regular fa-folder-open mb-3" style="font-size:2.5rem; color:#d1d5db;"></i>
+                                    <br /><span class="fw-semibold">No records found.</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container">
+                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">Showing 0 records</span>
+                <div class="d-flex gap-2">
+                    <button id="prevBtn" class="btn-saas" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="nextBtn" class="btn-saas" onclick="changePage(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mass Update Modal -->
+    <div class="modal fade" id="massUpdateModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update Tasks</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
+                    <div class="d-flex gap-3 align-items-center">
+                        <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
+                            <option value="" disabled selected>Select a field...</option>
+                            @foreach (var prop in tableProps)
+                            {
+                                <option value="@prop.Name">@prop.Name</option>
+                            }
+                        </select>
+                        <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0 rounded-bottom">
+                    <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Modal (Centered Pop-Up) -->
+    <div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg" style="border: none; border-radius: 12px;">
+
+                <!-- Modal Header -->
+                <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid var(--border-soft); border-radius: 12px 12px 0 0; padding: 20px 24px;">
+                    <h5 class="modal-title fw-bold" id="noteModalLabel" style="color: var(--text-dark); font-size: 1.15rem;">
+                        <i class="fa-regular fa-pen-to-square text-primary me-2"></i> Add New Note
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Modal Body (Input Fields) -->
+                <div class="modal-body" style="padding: 24px;">
+                    <div class="row">
+                        <input type="hidden" id="modalNoteTargetId" />
+
+                        <div class="col-md-6 form-group mb-3">
+                            <label class="form-label" style="font-size: 0.85rem; font-weight: 600;">Note Owner</label>
+                            <select id="modalNoteOwner" class="form-select">
+                                <option value="System User">System User</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 form-group mb-3">
+                            <label class="form-label" style="font-size: 0.85rem; font-weight: 600;">Date & Time</label>
+                            <input type="text" id="modalNoteDateTime" class="form-control" style="background-color: #f1f5f9; color: var(--text-muted);" readonly />
+                        </div>
+
+                        <div class="col-md-12 form-group mb-3">
+                            <label class="form-label" style="font-size: 0.85rem; font-weight: 600;">Attachment</label>
+                            <input type="file" id="modalNoteFile" class="form-control" />
+                        </div>
+
+                        <div class="col-md-12 form-group m-0">
+                            <label class="form-label" style="font-size: 0.85rem; font-weight: 600;">Note Description</label>
+                            <textarea id="modalNoteDesc" class="form-control" style="height: auto; resize: vertical;" rows="4" placeholder="Write your note details here..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid var(--border-soft); border-radius: 0 0 12px 12px; padding: 16px 24px;">
+                    <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn-saas-primary" onclick="saveNoteViaAjax()">Save Note</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Set visible columns specific to the Task model
+        const defaultVisibleColumns = ["Subject", "TaskOwner", "Status", "Priority", "DueDate", "RelatedTo"];
+        let currentPage = 1;
+        let rowsPerPage = 15;
+
+        document.addEventListener("DOMContentLoaded", function () {
+        setupColumnToggles();
+        applyPagination();
+        setupSidebarLogic();
+        });
+
+        // ==========================================
+        // COLUMN MANAGEMENT
+        // ==========================================
+        function setupColumnToggles() {
+        const table = document.getElementById("tasksTable");
+        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
+        const columnMenu = document.getElementById("columnToggleMenu");
+
+        theadRows.forEach((th) => {
+        const colIndex = th.getAttribute("data-col-index");
+        const colName = th.getAttribute("data-col-name");
+
+        if(colName) {
+        const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+        const li = document.createElement("li");
+        li.className = "dropdown-item px-3 py-1";
+        li.innerHTML = `
+        <div class="form-check m-0 w-100">
+        <input class="form-check-input col-toggle-cb" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer;">${colName}</label>
+        </div>`;
+
+        li.addEventListener('click', function(e) { e.stopPropagation(); });
+        columnMenu.appendChild(li);
+
+        if(!isDefault) toggleColumnVisibility(colIndex, false);
+        }
+        });
+
+        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+        toggleColumnVisibility(this.value, this.checked);
+        });
+        });
+        }
+
+        function toggleColumnVisibility(idx, isVisible) {
+        const table = document.getElementById("tasksTable");
+        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
+        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
+        }
+
+        // ==========================================
+        // SELECTION, MASS ACTIONS & DELETE
+        // ==========================================
+        function toggleAllRowCheckboxes(sourceCb) {
+        const visibleRows = document.querySelectorAll('tbody tr.task-row:not([style*="display: none"]) .row-cb');
+        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
+        updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
+        document.getElementById('selCount').innerText = selected;
+
+        const bulkContainer = document.getElementById('bulkActionsContainer');
+        bulkContainer.style.display = selected > 0 ? 'flex' : 'none';
+
+        const totalVisible = document.querySelectorAll('tbody tr.task-row:not([style*="display: none"]) .row-cb').length;
+        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
+        }
+
+        function executeMassUpdate() {
+        const field = document.getElementById('massUpdateField').value;
+        const val = document.getElementById('massUpdateValue').value;
+        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
+
+        if(!field || selectedIds.length === 0) {
+        alert("Please select a field and ensure records are checked.");
+        return;
+        }
+
+        alert(`Initiating Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
+        modal.hide();
+        document.getElementById('selectAllCb').click();
+        }
+
+        function deleteSelected() {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        if(selectedCbs.length === 0) return;
+
+        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+        const ids = Array.from(selectedCbs).map(cb => cb.value);
+        selectedCbs.forEach(cb => cb.closest('tr').remove());
+
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        applyPagination();
+        console.log("Deleted record IDs:", ids.join(', '));
+        }
+        }
+
+        function deleteSingleRecord(element, id) {
+        if(confirm('Are you sure you want to delete this record?')) {
+        const row = element.closest('tr.task-row');
+        if(row) {
+        row.remove();
+        updateSelectedCount();
+        applyPagination();
+        }
+        console.log("Deleted record ID:", id);
+        }
+        }
+
+        // ==========================================
+        // SIDEBAR FILTERING
+        // ==========================================
+        function setupSidebarLogic() {
+        document.querySelectorAll('.condition-select').forEach(sel => {
+        sel.addEventListener('change', function() {
+        const input = this.nextElementSibling;
+        if(this.value === 'is_empty' || this.value === 'is_not_empty') {
+        input.style.display = 'none';
+        } else {
+        input.style.display = 'block';
+        }
+        });
+        });
+
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+        cb.addEventListener('change', function() {
+        const parentDiv = this.closest('.filter-field-item');
+        const valueInput = parentDiv.querySelector('.condition-val');
+        if(this.checked) {
+        parentDiv.classList.add('active');
+        setTimeout(() => valueInput.focus(), 100);
+        } else {
+        parentDiv.classList.remove('active');
+        valueInput.value = '';
+        }
+        });
+        });
+        }
+
+        function filterSidebarItems() {
+        const filter = document.getElementById('sidebarSearch').value.toLowerCase();
+        document.querySelectorAll('.field-item-row').forEach(row => {
+        const label = row.querySelector('label').innerText.toLowerCase();
+        row.style.display = label.includes(filter) ? "" : "none";
+        });
+        }
+
+        function openFilterFor(colName) {
+        const cb = document.getElementById('chk_' + colName);
+        if(cb) {
+        if(!cb.checked) cb.click();
+        setTimeout(() => {
+        cb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cb.closest('.filter-field-item').querySelector('.condition-val').focus();
+        }, 100);
+        }
+        }
+
+        function applyFilters() {
+        const table = document.getElementById("tasksTable");
+        const rows = table.querySelectorAll('tbody tr.task-row');
+
+        const sidebarFilters = [];
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+        const colName = item.querySelector('.field-checkbox').value;
+        const condition = item.querySelector('.condition-select').value;
+        const val = item.querySelector('.condition-val').value.trim().toLowerCase();
+        const th = table.querySelector(`th[data-col-name="${colName}"]`);
+        if (th) sidebarFilters.push({ index: th.getAttribute('data-col-index'), condition: condition, val: val });
+        });
+
+        rows.forEach(row => {
+        let showRow = true;
+
+        if(showRow) {
+        for (let f of sidebarFilters) {
+        const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+        if (td) {
+        const cellText = td.innerText.trim().toLowerCase();
+        let pass = false;
+        switch(f.condition) {
+        case 'is': pass = (cellText === f.val); break;
+        case 'is_not': pass = (cellText !== f.val); break;
+        case 'contains': pass = cellText.includes(f.val); break;
+        case 'starts_with': pass = cellText.startsWith(f.val); break;
+        case 'is_empty': pass = (cellText === ''); break;
+        case 'is_not_empty': pass = (cellText !== ''); break;
+        }
+        if (!pass) { showRow = false; break; }
+        }
+        }
+        }
+
+        if(showRow) row.classList.remove('filtered-out');
+        else row.classList.add('filtered-out');
+        });
+
+        currentPage = 1;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        }
+
+        function clearFilters() {
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+        item.querySelector('.field-checkbox').checked = false;
+        item.querySelector('.condition-val').value = '';
+        item.classList.remove('active');
+        });
+        document.querySelectorAll('tbody tr.task-row').forEach(row => row.classList.remove('filtered-out'));
+        currentPage = 1;
+        applyPagination();
+        }
+
+        // ==========================================
+        // SORTING
+        // ==========================================
+        function sortTableByCol(colIdx, dir) {
+        const tableBody = document.getElementById("tableBody");
+        const rows = Array.from(tableBody.querySelectorAll('tr.task-row'));
+
+        rows.sort((a, b) => {
+        const aCol = a.querySelector(`td[data-col-index="${colIdx}"]`).innerText.trim().toLowerCase();
+        const bCol = b.querySelector(`td[data-col-index="${colIdx}"]`).innerText.trim().toLowerCase();
+        if (aCol < bCol) return dir === 'asc' ? -1 : 1;
+        if (aCol > bCol) return dir === 'asc' ? 1 : -1;
+        return 0;
+        });
+
+        rows.forEach(row => tableBody.appendChild(row));
+        applyPagination();
+        }
+
+        // ==========================================
+        // NOTES MODAL SYSTEM
+        // ==========================================
+        function openNoteModal(taskId) {
+        document.getElementById('modalNoteTargetId').value = taskId;
+        const now = new Date();
+        document.getElementById('modalNoteDateTime').value = now.toLocaleString();
+
+        document.getElementById('modalNoteFile').value = '';
+        document.getElementById('modalNoteDesc').value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+        modal.show();
+        }
+
+        function saveNoteViaAjax() {
+        const taskId = document.getElementById('modalNoteTargetId').value;
+        const owner = document.getElementById('modalNoteOwner').value;
+        const desc = document.getElementById('modalNoteDesc').value;
+        const fileInput = document.getElementById('modalNoteFile');
+
+        if (!desc.trim() && fileInput.files.length === 0) {
+        alert('Please enter a description or attach a file.');
+        return;
+        }
+
+        alert(`Note saved to database for Task ID: ${taskId}\nContent: ${desc}`);
+
+        const modalEl = document.getElementById('noteModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+        }
+
+        // ==========================================
+        // EXPORT & PAGINATION
+        // ==========================================
+        function exportTableToCSV(filename) {
+        const table = document.getElementById("tasksTable");
+        let csv = [];
+
+        let headerRow = [];
+        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+        if(th.style.display !== 'none') headerRow.push(`"${th.innerText.trim()}"`);
+        });
+        csv.push(headerRow.join(","));
+
+        table.querySelectorAll("tbody tr.task-row").forEach(tr => {
+        if(tr.style.display !== 'none') {
+        let rowData = [];
+        tr.querySelectorAll("td[data-col-index]").forEach(td => {
+        if(td.style.display !== 'none') {
+        let text = td.innerText.trim().replace(/"/g, '""');
+        rowData.push(`"${text}"`);
+        }
+        });
+        csv.push(rowData.join(","));
+        }
+        });
+
+        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+        let downloadLink = document.createElement("a");
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        }
+
+        function applyPagination() {
+        const rows = Array.from(document.querySelectorAll('tbody tr.task-row:not(.filtered-out)'));
+        const totalRows = rows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        document.querySelectorAll('tbody tr.task-row').forEach(r => r.style.display = 'none');
+        for(let i = startIdx; i < endIdx && i < totalRows; i++) { rows[i].style.display = ''; }
+
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+        }
+
+        function changePage(step) {
+        currentPage += step;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+        }
+    </script>
+</body>
+</html>

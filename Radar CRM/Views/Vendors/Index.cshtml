@@ -1,0 +1,874 @@
+﻿@model IEnumerable<Radar_CRM.Models.Vendor>
+
+@{
+    ViewData["Title"] = "Vendors Master";
+    var tableProps = Model != null && Model.Any() ?
+        Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => p.Name != "Description" && p.Name != "RecordId" && !p.Name.EndsWith("Id"))
+        .ToArray()
+        : Array.Empty<System.Reflection.PropertyInfo>();
+}
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --bg-body: #f8fafc;
+        --bg-surface: #ffffff;
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --text-dark: #0f172a;
+        --text-main: #334155;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        --btn-depth: 2px;
+    }
+
+
+    /* Standard Header & Buttons */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        background: var(--bg-surface);
+        padding: 20px 28px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        letter-spacing: -0.02em;
+    }
+
+        .page-title i {
+            color: var(--primary-blue);
+        }
+
+    .btn-saas {
+        background-color: var(--bg-surface);
+        color: var(--text-dark);
+        border: 1px solid #cbd5e1;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .btn-saas-primary {
+        background-color: var(--primary-blue);
+        color: white;
+        font-weight: 600;
+        border: 1px solid var(--primary-hover);
+        border-radius: var(--radius-md);
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+    }
+
+        .btn-saas-primary:hover {
+            color: white;
+            background-color: var(--primary-hover);
+        }
+
+    .btn-saas-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
+    }
+
+    /* Layout */
+    .crm-container {
+        display: flex;
+        height: calc(100vh - 160px);
+        gap: 24px;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .filter-sidebar {
+        width: 320px;
+        min-width: 320px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-sm);
+        height: 100%;
+    }
+
+    .table-container {
+        flex: 1;
+        min-width: 0;
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    /* Filter Sidebar */
+    .filter-header {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .filter-search-box {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        background-color: #f8fafc;
+    }
+
+    .filter-body {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 0;
+    }
+
+    .filter-field-item {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .filter-expanded-area {
+        display: none;
+        margin-top: 12px;
+        padding-left: 28px;
+    }
+
+    .filter-field-item.active .filter-expanded-area {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .form-select, .form-control {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+    /* Table UI */
+    .table-toolbar {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
+
+    .table-responsive {
+        overflow: auto;
+        flex-grow: 1;
+        width: 100%;
+    }
+
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table thead th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-soft);
+            padding: 14px 16px;
+        }
+
+    .th-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        gap: 12px;
+    }
+
+    .header-menu-btn {
+        color: var(--text-muted);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .header-menu-btn:hover {
+            background: #e2e8f0;
+            color: var(--text-dark);
+        }
+
+    .table tbody td {
+        padding: 16px;
+        vertical-align: middle;
+        color: var(--text-dark);
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-bottom: 1px solid #f1f5f9;
+        background-color: var(--bg-surface);
+    }
+
+    .table tbody tr {
+        cursor: pointer;
+    }
+
+        .table tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+
+    /* Utilities */
+    .sticky-cb {
+        position: sticky;
+        left: 0;
+        width: 40px;
+        text-align: center;
+        z-index: 11;
+        border-right: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
+
+    .sticky-actions {
+        position: sticky;
+        right: 0;
+        width: 100px;
+        text-align: center;
+        z-index: 11;
+        border-left: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
+
+    .table thead th.sticky-cb, .table thead th.sticky-actions {
+        z-index: 12;
+        background-color: #f8fafc;
+    }
+
+    .draggable-col-item.dragging {
+        opacity: 0.4;
+        background-color: #f1f5f9;
+    }
+
+    .draggable-col-item.over {
+        border-top: 2px solid var(--primary-blue);
+    }
+
+    .drag-handle {
+        cursor: grab;
+        padding: 4px;
+        color: #94a3b8;
+    }
+
+    .row-action-icon {
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 4px 8px;
+    }
+
+        .row-action-icon:hover {
+            color: var(--primary-blue);
+        }
+
+    .pagination-container {
+        padding: 14px 24px;
+        border-top: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
+</style>
+
+<input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+
+<!-- Top Action Header -->
+<div class="page-header">
+    <h1 class="page-title"><i class="fa-solid fa-truck-fast"></i> Vendors Master</h1>
+
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+            <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
+                <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
+            </button>
+            <div class="vr mx-2 d-none d-md-block"></div>
+        </div>
+
+        <button class="btn-saas" onclick="exportTableToCSV('Vendors_Export.csv')">
+            <i class="fa-solid fa-file-csv"></i> Export
+        </button>
+        <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+        </button>
+        <a href="@Url.Action("Create", "Vendors")" class="btn-saas-primary">
+            <i class="fa-solid fa-plus"></i> Create Vendor
+        </a>
+    </div>
+</div>
+
+<div class="crm-container">
+    <!-- Fixed Sidebar Filter -->
+    <div class="filter-sidebar">
+        <div class="filter-header">
+            <h6><i class="fa-solid fa-filter text-muted me-2"></i> Filters</h6>
+            <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
+        </div>
+        <div class="filter-search-box">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0 fw-medium" placeholder="Find filter..." id="sidebarSearch" onkeyup="filterSidebarItems()">
+            </div>
+        </div>
+
+        <div class="filter-body" id="sidebarList">
+            @foreach (var prop in tableProps)
+            {
+                <div class="filter-field-item field-item-row">
+                    <div class="form-check m-0 d-flex align-items-center">
+                        <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
+                        <label class="form-check-label flex-grow-1 fw-semibold text-dark" for="chk_@prop.Name">@prop.Name</label>
+                    </div>
+                    <div class="filter-expanded-area">
+                        <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                            <option value="contains" selected>contains</option>
+                            <option value="is">is exactly</option>
+                            <option value="is_not">is not</option>
+                            <option value="is_empty">is empty</option>
+                        </select>
+                        <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
+                        <datalist id="dl_@prop.Name"></datalist>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto">
+            <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
+        </div>
+    </div>
+
+    <!-- Table Area -->
+    <div class="table-container">
+        <div class="table-toolbar">
+            <div class="dropdown">
+                <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
+                </ul>
+            </div>
+        </div>
+
+        <div class="table-responsive" id="tableWrapper">
+            <table class="table" id="vendorsTable">
+                <thead>
+                    <tr>
+                        <th class="sticky-cb">
+                            <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        </th>
+
+                        @if (tableProps.Length > 0)
+                        {
+                            int colIndex = 0;
+                            foreach (var prop in tableProps)
+                            {
+                                <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                                    <div class="th-content">
+                                        <span>@prop.Name</span>
+                                        <div class="dropdown">
+                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fa-solid fa-filter" style="font-size: 11px;"></i>
+                                            </button>
+                                            <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
+                                                <li><input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)"></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'asc')"><i class="fa-solid fa-arrow-down-a-z text-muted me-2"></i> Sort A to Z</a></li>
+                                                <li><a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'desc')"><i class="fa-solid fa-arrow-up-z-a text-muted me-2"></i> Sort Z to A</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </th>
+                                colIndex++;
+                            }
+                        }
+                        <th class="sticky-actions text-center"><i class="fa-solid fa-bolt text-muted me-1"></i> Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var item in Model)
+                        {
+                            <tr class="vendor-row" data-id="@item.Id" onclick="window.location.href='@Url.Action("Edit", "Vendors", new { id = item.Id })'">
+                                <td class="sticky-cb" onclick="event.stopPropagation()">
+                                    <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                </td>
+                                @{
+                                    int tdIndex = 0;
+                                    foreach (var prop in tableProps)
+                                    {
+                                        var value = prop.GetValue(item, null)?.ToString() ?? "";
+                                        <td data-col-index="@tdIndex">
+                                            @if (prop.Name == "VendorName")
+                                            {
+                                                <a href="@Url.Action("Edit", "Vendors", new { id = item.Id })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value</a>
+                                            }
+                                            else
+                                            {
+
+                                                @value
+                                            }
+                                        </td>
+                                        tdIndex++;
+                                    }
+                                }
+                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                    <div class="d-flex align-items-center justify-content-center gap-3">
+                                        <div class="dropdown">
+                                            <i class="fa-solid fa-ellipsis-vertical row-action-icon" data-bs-toggle="dropdown"></i>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteSingleRecord(this, '@item.Id')"><i class="fa-solid fa-trash text-danger me-2"></i> Delete</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr id="noRecordsRow">
+                            <td colspan="50" class="text-center py-5 text-muted">
+                                <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                                <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-container">
+            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">Showing 0 records</span>
+            <div class="d-flex gap-2">
+                <button id="prevBtn" class="btn-saas" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                <button id="nextBtn" class="btn-saas" onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const defaultVisibleColumns = ["VendorName", "Phone", "Email", "Category", "VendorType", "VendorOwner"];
+    let currentPage = 1;
+    let rowsPerPage = 15;
+
+    document.addEventListener("DOMContentLoaded", function () {
+        setupColumnToggles();
+        setupFilterInteractions();
+        populateDatalists();
+        applyPagination();
+    });
+
+    // --- UPLOAD CSV SCRIPT (Connected to VendorsController UploadFile) ---
+    document.getElementById('fileUploadInput').addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("uploadedFile", file); // Must match C# parameter name
+
+        try {
+            alert("Uploading vendor data, please wait...");
+            const response = await fetch('/Vendors/UploadFile', { method: 'POST', body: formData });
+            if (response.ok) {
+                alert("Vendor data uploaded successfully!");
+                window.location.reload();
+            } else {
+                const errorText = await response.text();
+                alert("Upload failed: " + (errorText || "Server error"));
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("A network error occurred while uploading.");
+        } finally {
+            this.value = '';
+        }
+    });
+
+    function populateDatalists() {
+        const table = document.getElementById("vendorsTable");
+        const headers = table.querySelectorAll("thead th[data-col-name]");
+        headers.forEach(th => {
+            const colIndex = th.getAttribute("data-col-index");
+            const colName = th.getAttribute("data-col-name");
+            const datalist = document.getElementById(`dl_${colName}`);
+            if (datalist) {
+                let uniqueValues = new Set();
+                table.querySelectorAll(`tbody tr.vendor-row td[data-col-index="${colIndex}"]`).forEach(td => {
+                    const text = td.innerText.trim();
+                    if(text) uniqueValues.add(text);
+                });
+                uniqueValues.forEach(val => {
+                    let option = document.createElement("option");
+                    option.value = val;
+                    datalist.appendChild(option);
+                });
+            }
+        });
+    }
+
+    function setupFilterInteractions() {
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const item = this.closest('.filter-field-item');
+                if(this.checked) item.classList.add('active');
+                else {
+                    item.classList.remove('active');
+                    item.querySelector('.condition-val').value = '';
+                }
+            });
+        });
+    }
+
+    function filterSidebarItems() {
+        const q = document.getElementById('sidebarSearch').value.toLowerCase();
+        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            item.style.display = label.includes(q) ? '' : 'none';
+        });
+    }
+
+    function applyFilters() {
+        const activeFilters = [];
+        document.querySelectorAll('.filter-field-item').forEach(item => {
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                const colName = cb.value;
+                const condition = item.querySelector('.condition-select').value;
+                const val = item.querySelector('.condition-val').value.toLowerCase().trim();
+                const th = document.querySelector(`th[data-col-name="${colName}"]`);
+                if(th) activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
+            }
+        });
+
+        document.querySelectorAll('tbody tr.vendor-row').forEach(row => {
+            let isMatch = true;
+            for (let f of activeFilters) {
+                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+                const cellText = td ? td.innerText.trim().toLowerCase() : '';
+
+                if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
+                if (f.condition === 'is' && cellText !== f.val) isMatch = false;
+                if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
+                if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
+            }
+            row.classList.toggle('filtered-out', !isMatch);
+        });
+
+        currentPage = 1;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+    }
+
+    function clearFilters() {
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.filter-field-item').classList.remove('active');
+        });
+        document.querySelectorAll('.condition-val').forEach(input => input.value = '');
+        applyFilters();
+    }
+
+    function filterSingleColumn(inputEl, colIndex) {
+        const filterValue = inputEl.value.toLowerCase().trim();
+        document.querySelectorAll('tbody tr.vendor-row').forEach(row => {
+            if(row.classList.contains('filtered-out')) return;
+            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+            if (td) {
+                const text = td.innerText.trim().toLowerCase();
+                row.style.display = text.includes(filterValue) ? '' : 'none';
+            }
+        });
+    }
+
+    function sortTableByCol(colIndex, direction) {
+        const tbody = document.getElementById("tableBody");
+        const rows = Array.from(tbody.querySelectorAll("tr.vendor-row"));
+
+        rows.sort((a, b) => {
+            const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+            const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+            const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
+            const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
+
+            if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
+                return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+            }
+
+            if (aText < bText) return direction === 'asc' ? -1 : 1;
+            if (aText > bText) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        applyPagination();
+    }
+
+    let draggedItem = null;
+
+    function setupColumnToggles() {
+        const table = document.querySelector(".table-responsive table");
+        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
+        const columnMenu = document.getElementById("columnToggleMenu");
+
+        columnMenu.innerHTML = '';
+
+        theadRows.forEach((th) => {
+            const colIndex = th.getAttribute("data-col-index");
+            const colName = th.getAttribute("data-col-name");
+
+            if(colName) {
+                const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+                const li = document.createElement("li");
+                li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
+                li.draggable = true;
+                li.dataset.colIndex = colIndex;
+
+                li.innerHTML = `
+                    <i class="fa-solid fa-grip-vertical drag-handle"></i>
+                    <div class="form-check m-0 w-100 d-flex align-items-center">
+                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+                    </div>`;
+
+                li.addEventListener('click', function(e) { e.stopPropagation(); });
+                li.addEventListener('dragstart', handleDragStart);
+                li.addEventListener('dragover', handleDragOver);
+                li.addEventListener('dragenter', handleDragEnter);
+                li.addEventListener('dragleave', handleDragLeave);
+                li.addEventListener('drop', handleDrop);
+                li.addEventListener('dragend', handleDragEnd);
+
+                columnMenu.appendChild(li);
+                if(!isDefault) toggleColumnVisibility(colIndex, false);
+            }
+        });
+
+        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                toggleColumnVisibility(this.value, this.checked);
+            });
+        });
+    }
+
+    function toggleColumnVisibility(idx, isVisible) {
+        const table = document.getElementById("vendorsTable");
+        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
+        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
+    }
+
+    function handleDragStart(e) {
+        draggedItem = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
+        setTimeout(() => this.classList.add('dragging'), 0);
+    }
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+    function handleDragEnter(e) { this.classList.add('over'); }
+    function handleDragLeave(e) { this.classList.remove('over'); }
+    function handleDrop(e) {
+        e.stopPropagation();
+        this.classList.remove('over');
+        if (draggedItem !== this) {
+            let parent = this.parentNode;
+            let siblings = Array.from(parent.children);
+            let draggedIdx = siblings.indexOf(draggedItem);
+            let targetIdx = siblings.indexOf(this);
+            let insertAfter = draggedIdx < targetIdx;
+
+            if (insertAfter) this.after(draggedItem);
+            else this.before(draggedItem);
+            reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+        }
+        return false;
+    }
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+    }
+
+    function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
+        const table = document.querySelector(".table-responsive table");
+        const theadRow = table.querySelector("thead tr");
+        const tbodyRows = table.querySelectorAll("tbody tr");
+
+        const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
+        const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
+
+        if (insertAfter) targetTh.after(draggedTh);
+        else targetTh.before(draggedTh);
+
+        tbodyRows.forEach(row => {
+            const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
+            const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
+            if(draggedTd && targetTd) {
+                if (insertAfter) targetTd.after(draggedTd);
+                else targetTd.before(draggedTd);
+            }
+        });
+    }
+
+    function toggleAllRowCheckboxes(sourceCb) {
+        const visibleRows = document.querySelectorAll('tbody tr.vendor-row:not([style*="display: none"]):not(.filtered-out) .row-cb');
+        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
+        document.getElementById('selCount').innerText = selected;
+        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+
+        const totalVisible = document.querySelectorAll('tbody tr.vendor-row:not([style*="display: none"]):not(.filtered-out) .row-cb').length;
+        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
+    }
+
+    function applyPagination() {
+        const rows = Array.from(document.querySelectorAll('tbody tr.vendor-row:not(.filtered-out)'));
+        const totalRows = rows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        document.querySelectorAll('tbody tr.vendor-row').forEach(r => { r.style.display = 'none'; });
+
+        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
+            rows[i].style.display = '';
+        }
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+    }
+
+    function changePage(step) {
+        currentPage += step;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+    }
+
+    function exportTableToCSV(filename) {
+        const table = document.getElementById("vendorsTable");
+        let csv = [];
+        let headerRow = [];
+        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+            if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
+        });
+        csv.push(headerRow.join(","));
+
+        let targetRows = [];
+        const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
+        if (checkedCbs.length > 0) {
+            checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+        } else {
+            table.querySelectorAll("tbody tr.vendor-row").forEach(tr => {
+                if(!tr.classList.contains('filtered-out')) targetRows.push(tr);
+            });
+        }
+
+        targetRows.forEach(tr => {
+            let rowData = [];
+            tr.querySelectorAll("td[data-col-index]").forEach(td => {
+                if(td.style.display !== 'none') {
+                    let text = td.innerText.trim().replace(/"/g, '""');
+                    rowData.push(`"${text}"`);
+                }
+            });
+            csv.push(rowData.join(","));
+        });
+
+        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+        let downloadLink = document.createElement("a");
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    }
+
+    function deleteSingleRecord(element, id) {
+        if(confirm('Are you sure you want to delete this Vendor?')) {
+            // Add real ajax delete call here
+            element.closest('tr.vendor-row').remove();
+            updateSelectedCount();
+            applyPagination();
+        }
+    }
+
+    function deleteSelected() {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        if(selectedCbs.length === 0) return;
+        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected vendor(s)?`)) {
+            selectedCbs.forEach(cb => cb.closest('tr').remove());
+            document.getElementById('selectAllCb').checked = false;
+            updateSelectedCount();
+            applyPagination();
+        }
+    }
+</script>

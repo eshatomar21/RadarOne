@@ -1,0 +1,1200 @@
+﻿@model Radar_CRM.Models.Account
+
+@{
+    ViewData["Title"] = "Create Account";
+}
+
+<!-- Bootstrap 5 -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+<!-- FontAwesome for Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+<style>
+    /* Premium Enterprise CRM Typography & Base - Navy & Cream Theme */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --theme-bg-cream: #Fdfbf7; /* Soft cream background */
+        --theme-surface: #ffffff; /* Pure white for cards/modals */
+        --theme-navy-primary: #1e3a8a; /* Deep Navy Blue */
+        --theme-navy-hover: #1e40af; /* Slightly lighter Navy for hover */
+        --theme-navy-light: #eff6ff; /* Very pale blue/cream hybrid for accents */
+        --theme-text-main: #1f2937;
+        --theme-text-muted: #64748b;
+        --theme-border: #e2e8f0;
+        --theme-shadow-float: 0 20px 40px -10px rgba(30, 58, 138, 0.08); /* Navy-tinted shadow */
+    }
+
+    body {
+        background-color: var(--theme-bg-cream);
+        font-family: 'Inter', -apple-system, sans-serif;
+        color: var(--theme-text-main);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Main Modal/Drawer Container - Floating Document Vibe */
+    .sf-container {
+        background-color: var(--theme-surface);
+        width: 98%;
+        max-width: 1800px;
+        margin: 30px auto;
+        min-height: 90vh;
+        border-radius: 16px;
+        box-shadow: var(--theme-shadow-float);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(255, 255, 255, 0.5); /* Seamless edge */
+        overflow: hidden;
+    }
+
+    /* 1. Header Area */
+    .sf-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 40px;
+        background-color: var(--theme-surface);
+        border-bottom: 1px solid var(--theme-border);
+    }
+
+    .sf-header-title {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+        .sf-header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--theme-navy-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .sf-header-title .entity-type {
+            color: var(--theme-navy-primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: var(--theme-navy-light);
+            padding: 6px 14px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+    .sf-close-btn {
+        background: transparent;
+        border: 1px solid var(--theme-border);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--theme-text-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .sf-close-btn:hover {
+            background: var(--theme-navy-light);
+            color: var(--theme-navy-primary);
+            border-color: var(--theme-navy-light);
+            transform: rotate(90deg);
+        }
+
+    /* Primary Button */
+    .btn-sf-primary {
+        background-color: var(--theme-navy-primary);
+        color: var(--theme-surface);
+        border: none;
+        padding: 10px 28px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+    }
+
+        .btn-sf-primary:hover {
+            background-color: var(--theme-navy-hover);
+            box-shadow: 0 6px 16px rgba(30, 58, 138, 0.25);
+            transform: translateY(-1px);
+        }
+
+    /* 2. Tabs - Minimalist like the reference image */
+    .sf-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--theme-border);
+        padding: 0 40px;
+        background-color: var(--theme-surface);
+        gap: 40px;
+        margin: 0;
+    }
+
+    .sf-tab {
+        background: none;
+        border: none;
+        padding: 20px 0;
+        color: var(--theme-text-muted);
+        font-weight: 500;
+        font-size: 0.95rem;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+
+        .sf-tab:hover {
+            color: var(--theme-navy-primary);
+        }
+
+        .sf-tab.active {
+            color: var(--theme-navy-primary);
+            border-bottom: 3px solid var(--theme-navy-primary);
+            font-weight: 600;
+        }
+
+    /* Form Inputs - Clean, airy layout */
+    .form-group {
+        margin-bottom: 28px;
+    }
+
+    .sf-label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--theme-text-muted);
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .sf-input, .sf-select {
+        width: 100%;
+        border: 1px solid var(--theme-border);
+        border-radius: 6px; /* Slightly smaller radius to match the thinner profile */
+        padding: 6px 12px; /* Reduced vertical padding to thin out the box */
+        height: 36px; /* Fixed thinner height */
+        font-size: 0.85rem; /* Adjusted font size to fit the compact box perfectly */
+        color: var(--theme-text-main);
+        background-color: #fafaf9;
+        transition: all 0.2s ease-in-out;
+    }
+
+        .sf-input:hover, .sf-select:hover {
+            border-color: #cbd5e1;
+            background-color: var(--theme-surface);
+        }
+
+        .sf-input:focus, .sf-select:focus {
+            outline: none;
+            border-color: var(--theme-navy-primary);
+            background-color: var(--theme-surface);
+            box-shadow: 0 0 0 3px var(--theme-navy-light); /* Slightly thinner shadow */
+        }
+
+        .sf-input[readonly] {
+            background-color: transparent;
+            border-color: transparent;
+            border-bottom: 1px dashed var(--theme-border);
+            border-radius: 0;
+            padding-left: 0;
+            color: var(--theme-text-main);
+            font-weight: 500;
+            cursor: default;
+            height: auto; /* Allow readonly fields to rest naturally */
+        }
+
+            .sf-input[readonly]:focus {
+                box-shadow: none;
+            }
+    /* Section Headers */
+    .pane-section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--theme-navy-primary);
+        margin-bottom: 24px;
+        margin-top: 16px;
+        padding-bottom: 0;
+        border-bottom: none;
+        letter-spacing: -0.01em;
+    }
+
+    /* Cards - Layered effect */
+    .sf-card {
+        border: 1px solid var(--theme-border);
+        border-radius: 12px;
+        padding: 32px;
+        margin-bottom: 24px;
+        background-color: var(--theme-surface);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        transition: box-shadow 0.3s ease;
+    }
+
+        .sf-card:hover {
+            box-shadow: var(--theme-shadow-float);
+        }
+
+    .sf-card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--theme-navy-primary);
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--theme-border);
+        padding-bottom: 16px;
+    }
+
+    /* Input Group for Verify Buttons */
+    .verify-group {
+        display: flex;
+        position: relative;
+    }
+
+        .verify-group .sf-input {
+            padding-right: 90px; /* Space for the button inside */
+        }
+
+        .verify-group .btn-verify {
+            position: absolute;
+            right: 4px;
+            top: 4px;
+            bottom: 4px;
+            border: none;
+            background: var(--theme-navy-light);
+            color: var(--theme-navy-primary);
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 0 16px;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+            .verify-group .btn-verify:hover {
+                background: var(--theme-navy-primary);
+                color: var(--theme-surface);
+            }
+</style>
+<form asp-action="Edit" method="post" id="accountForm" enctype="multipart/form-data">
+    <!-- CRITICAL: Hidden ID field to bind the existing record -->
+    <input type="hidden" asp-for="Id" />
+    <div class="sf-container">
+        <!-- 1. Header -->
+        <div class="sf-header">
+            <div class="sf-header-title">
+                <button type="button" class="sf-close-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <h1><span class="entity-type">Account</span> New Account</h1>
+            </div>
+        </div>
+
+        <!-- 2. Tabs -->
+        <ul class="nav sf-tabs" id="accountTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="sf-tab active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab">Main Details</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="sf-tab" id="address-tab" data-bs-toggle="tab" data-bs-target="#address" type="button" role="tab">Address Info</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="sf-tab" id="professional-tab" data-bs-toggle="tab" data-bs-target="#professional" type="button" role="tab">Professional & Software</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="sf-tab" id="purchase-tab" data-bs-toggle="tab" data-bs-target="#purchase" type="button" role="tab">Purchases & Tracking</button>
+            </li>
+        </ul>
+
+        <!-- 4. Tab Content Area -->
+        <div class="tab-content" id="accountTabsContent" style="flex-grow: 1; display: flex; flex-direction: column;">
+
+            <!-- MAIN TAB -->
+            <div class="tab-pane fade show active" id="main" role="tabpanel" style="padding: 32px 40px;">
+
+                <!-- Master Details -->
+                <h3 class="pane-section-title">Master Details</h3>
+                <div class="row">
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Data Source <span class="text-danger">*</span></label>
+                        <select asp-for="DataSource" class="sf-select" id="DataSource" required>
+                            <option value="">-None-</option>
+                            <option value="InboundCall">-InboundCall-</option>
+                            <option value="Referral/Dealer">-Referral/Dealer-</option>
+                            <option value="Meta Ads">Meta Ads</option>
+                            <option value="Google AdWords">-Google AdWords-</option>
+                            <option value="Outreach">-Outreach-</option>
+                            <option value="Group Lead">-Group Lead-</option>
+                            <option value="Institutiona">-Institutional-</option>
+                            <option value="Webinar">Webinar</option>
+                            <option value="KOMMO">KOMMO</option>
+                            <option value="Google Organic SEO">Google Organic SEO</option>
+                            <option value="Website Direct">Website Direct</option>
+                            <option value="YouTube">YouTube</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Instagram Organic">Instagram Organic</option>
+                            <option value="Zoho Webinar">Zoho Webinar</option>
+                            <option value="Reference Doctor">Reference Doctor</option>
+                            <option value="Reference Dealer Partner">Reference Dealer Partner</option>
+                            <option value="Free Trial Self Register">Free Trial Self Register</option>
+                            <option value="Seminar Conference">Seminar Conference</option>
+                            <option value="Cold Calling">Cold Calling</option>
+                            <option value="WhatsApp Campaign">WhatsApp Campaign</option>
+                            <option value="Email Campaign">Email Campaign</option>
+                            <option value="Data Import Old DB">Data Import Old DB</option>
+                            <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Co-Owner</label>
+                        <select asp-for="CoOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
+                            <option value="">- Select Co-Owner -</option>
+                        </select>
+                    </div>
+
+
+                    <!-- Conditional Fields (Hidden by default) -->
+                    <div class="col-md-6 form-group" id="divMetaCampaign" style="display:none;">
+                        <label class="sf-label">Meta Campaign Name</label>
+                        <input name="MetaCampaignName" class="sf-input" placeholder="Enter campaign name..." />
+                    </div>
+                    <div class="col-md-6 form-group" id="divSeminarName" style="display:none;">
+                        <label class="sf-label">Seminar Name</label>
+                        <input name="SeminarName" class="sf-input" placeholder="Enter seminar name..." />
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Account Type</label>
+                        <select asp-for="AccountType" class="sf-select">
+                            <option value="None">None</option>
+                            <option value="Individual">Individual</option>
+                            <option value="Group">Group</option>
+                            <option value="Institution">Institution</option>
+                            <option value="Government Organisation">Government Organisation</option>
+                        </select>
+                    </div>
+
+             
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Current Status</label>
+                        <select asp-for="CurrentStatus" class="sf-select">
+                            <option value="None">None</option>
+                            <option value="User">User</option>
+                            <option value="Non-User">Non-User</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Account Owner</label>
+                        <select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
+                            <option value="">- Select Account Owner -</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 form-group" id="LeadStatus">
+                        <label class="sf-label">LeadStatus</label>
+                        <input name="LeadStatus" class="sf-input" placeholder="Enter seminar name..." readonly />
+                    </div>
+
+
+
+                    <!-- Hidden Date of Entry field -->
+                    <div class="col-md-6 form-group" style="display: none;">
+                        <label class="sf-label">Date of Entry</label>
+                        <input asp-for="DateOfEntry" class="sf-input" type="datetime-local" />
+                    </div>
+                </div>
+
+                <!-- Primary Details -->
+                <h3 class="pane-section-title" style="margin-top: 12px;">Primary Details</h3>
+                <div class="row">
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Account Name <span class="text-danger">*</span></label>
+                        <input asp-for="AccountName" class="sf-input" style="font-weight: 600;" placeholder="Enter account name..." required />
+                    </div>
+
+
+                  
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Contact Person Name</label>
+                        <input asp-for="ContactPersonName" class="sf-input" placeholder="Enter full name" />
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Mobile Phone <span class="text-danger">*</span></label>
+                        <div class="verify-group">
+                            <input asp-for="MobileNumber" class="sf-input" id="MobileNumber" placeholder="+1 202-555-0117" required />
+                            <button type="button" class="btn-verify" onclick="verifyPhone('MobileNumber')">Verify</button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Email</label>
+                        <input asp-for="Email" class="sf-input" style="color: #1a56db;" placeholder="email@example.com" />
+                    </div>
+
+                    <!-- Removed the duplicate <div class="col-md-6"> that was breaking your grid here! -->
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Alternate Mobile</label>
+                        <div class="verify-group">
+                            <input asp-for="AlternateMobile" class="sf-input" id="AlternateMobile" placeholder="Optional..." />
+                            <button type="button" class="btn-verify" onclick="verifyPhone('AlternateMobile')">Verify</button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Alternate Email ID</label>
+                        <input asp-for="AlternateEmailID" class="sf-input" placeholder="Optional..." />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Profile Pending Reason</label>
+                            <select asp-for="ProfilePendingReason" class="sf-select">
+                                <option value="">-None-</option>
+                                <option value="Connected">Connected</option>
+                                <option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option>
+                                <option value="Ringing">Ringing</option>
+                                <option value="Switched Off">Switched Off</option>
+                                <option value="Busy-Call Back Later">Busy-Call Back Later</option>
+                                <option value="Not-Interested">Not-Interested</option>
+                                <option value="Not a Doctor">Not a Doctor</option>
+                                <option value="Student">Student</option>
+                                <option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Qualification Status</label>
+                            <select asp-for="QualificationStatus" class="sf-select">
+                                <option value="">-None-</option>
+                                <option value="Qualified">Qualified</option>
+                                <option value="Notqualified">Notqualified</option>
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label class="sf-label">Profile Status</label>
+                                <select asp-for="Profilestatus" class="sf-select">
+                                    <option value="">-None-</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Strongly Completed">Strongly Completed</option>
+                                    <option value="Not Completed">Not Completed</option>
+                                    <option value="Not-Qualified">Not-Qualified</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 form-group">
+                                <label class="sf-label">Profile Rate</label>
+                                <!-- Readonly because the backend calculates this automatically -->
+                                <input asp-for="ProfileRate" type="number" class="sf-input" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted);" />
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                     NEW MODAL-BASED NOTES & ATTACHMENTS UI
+                     ========================================== -->
+                <div class="d-flex justify-content-between align-items-center mt-4 border-bottom pb-2 mb-3">
+                    <h3 class="pane-section-title border-0 m-0 p-0">Notes & Attachments</h3>
+                    <button type="button" class="btn btn-sm" onclick="openNoteModal()" style="background-color: #e0e7ff; color: #1a56db; font-weight: 600; border-radius: 6px; font-size: 0.85rem; padding: 6px 14px;">
+                        <i class="fa-solid fa-plus me-1"></i> Add Note
+                    </button>
+                </div>
+
+                <!-- Container where saved notes will dynamically appear -->
+                <div id="savedNotesContainer" class="mb-4">
+                    @if (ViewBag.ExistingNotes != null)
+                    {
+                        foreach (var note in (IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes)
+                        {
+                            <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid var(--theme-border); border-left: 4px solid var(--theme-navy-primary); border-radius: 8px; background: var(--theme-surface);">
+
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold" style="font-size: 0.9rem; color: var(--theme-text-main);">
+                                        <i class="fa-solid fa-circle-user text-muted me-2"></i>@note.NoteOwner
+                                    </span>
+                                    <span class="text-muted" style="font-size: 0.8rem;">
+                                        <i class="fa-regular fa-clock me-1"></i> @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
+                                    </span>
+                                </div>
+
+                                <div style="font-size: 0.9rem; color: var(--theme-text-muted); white-space: pre-wrap;">@note.Description</div>
+
+                                @if (!string.IsNullOrEmpty(note.AttachmentFileName))
+                                {
+                                    <div class="mt-2">
+                                        <a href="@Url.Action("DownloadNoteFile", "Accounts", new { noteId = note.Id })" target="_blank" class="text-primary text-decoration-none" style="font-size: 0.85rem; background: var(--theme-navy-light); padding: 4px 12px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #bfdbfe; transition: 0.2s;">
+                                            <i class="fa-solid fa-download me-2"></i> Download: @note.AttachmentFileName
+                                        </a>
+                                    </div>
+                                }
+
+                            </div>
+                        }
+                    }
+                </div>
+
+                <!-- Duplication Checkbox -->
+                <div class="row">
+                    <div class="col-md-12 form-group pt-2 m-0">
+                        <div class="form-check d-flex align-items-center gap-2">
+                            <input asp-for="IsDuplicated" class="form-check-input m-0" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
+                            <label class="form-check-label m-0" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c; font-weight: 600;">Mark as Duplicated Account</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADDRESS TAB -->
+            <div class="tab-pane fade" id="address" role="tabpanel" style="padding: 32px 40px;">
+                <div class="row">
+
+                    <!-- Address 1 Card -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="sf-card h-100">
+                            <div class="sf-card-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                                Primary Address
+                            </div>
+
+                            <div class="row">
+                                <!-- Group 1: Country & State -->
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">Country</label>
+                                    <select asp-for="Addr1_Country" class="sf-select" id="Addr1_Country">
+                                        <option value="">- Select Country -</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">State <span class="text-danger">*</span></label>
+                                    <select asp-for="Addr1_State" class="sf-select" id="Addr1_State" required>
+                                        <option value="">- Select State -</option>
+                                    </select>
+                                </div>
+
+                                <!-- Group 2: City & Zip Code -->
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">City</label>
+                                    <input asp-for="Addr1_City" class="sf-input" placeholder="Enter city" />
+                                </div>
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">Zip / Postal Code</label>
+                                    <input asp-for="Addr1_Zip" class="sf-input" placeholder="e.g. 10001" />
+                                </div>
+
+                                <!-- Group 3: Street Details (Proportional Widths) -->
+                                <div class="col-md-4 form-group mb-3">
+                                    <label class="sf-label">Flat / House No.</label>
+                                    <input asp-for="Addr1_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
+                                </div>
+                                <div class="col-md-8 form-group mb-3">
+                                    <label class="sf-label">Street Address</label>
+                                    <input asp-for="Addr1_Street" class="sf-input" placeholder="Street name and number" />
+                                </div>
+
+                                <!-- Group 4: Map Coordinates -->
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="sf-label">Latitude</label>
+                                    <input asp-for="Addr1_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="sf-label">Longitude</label>
+                                    <input asp-for="Addr1_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Address 2 Card -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="sf-card h-100">
+                            <div class="sf-card-title" style="color: #6b7280; border-bottom-color: #e5e7eb;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                                Secondary Address
+                            </div>
+
+                            <div class="row">
+                                <!-- Group 1: Country & State -->
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">Country</label>
+                                    <select asp-for="Addr2_Country" class="sf-select" id="Addr2_Country">
+                                        <option value="">- Select Country -</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">State</label>
+                                    <select asp-for="Addr2_State" class="sf-select" id="Addr2_State">
+                                        <option value="">- Select State -</option>
+                                    </select>
+                                </div>
+
+                                <!-- Group 2: City & Zip Code -->
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">City</label>
+                                    <input asp-for="Addr2_City" class="sf-input" placeholder="Enter city" />
+                                </div>
+                                <div class="col-md-6 form-group mb-3">
+                                    <label class="sf-label">Zip / Postal Code</label>
+                                    <input asp-for="Addr2_Zip" class="sf-input" placeholder="e.g. 10001" />
+                                </div>
+
+                                <!-- Group 3: Street Details (Proportional Widths) -->
+                                <div class="col-md-4 form-group mb-3">
+                                    <label class="sf-label">Flat / House No.</label>
+                                    <input asp-for="Addr2_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
+                                </div>
+                                <div class="col-md-8 form-group mb-3">
+                                    <label class="sf-label">Street Address</label>
+                                    <input asp-for="Addr2_Street" class="sf-input" placeholder="Street name and number" />
+                                </div>
+
+                                <!-- Group 4: Map Coordinates -->
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="sf-label">Latitude</label>
+                                    <input asp-for="Addr2_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
+                                </div>
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="sf-label">Longitude</label>
+                                    <input asp-for="Addr2_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div> <!-- THIS CLOSES THE MAIN ROW -->
+            </div> <!-- THIS CLOSES THE ADDRESS TAB -->
+            <!-- Professional tab can now safely start below this! -->
+            <!-- PROFESSIONAL TAB -->
+            <div class="tab-pane fade" id="professional" role="tabpanel" style="padding: 32px 40px;">
+                <h3 class="pane-section-title">Professional Profile</h3>
+                <div class="row">
+                    <div class="col-md-3 form-group">
+                        <label class="sf-label">Homeopathic Doctor</label>
+                        <select asp-for="IsHomeopathicDoctor" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option>
+                            <option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option>
+                            <option value="हां- बीएचएमएस">हां- बीएचएमएस</option>
+                            <option value="नहीं">नहीं</option>
+                            <option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option>
+                            <option value="Yes - BHMS">Yes - BHMS</option>
+                            <option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option>
+                            <option value="Pursuing BHMS">Pursuing BHMS</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 form-group">
+                        <label class="sf-label">Work Type</label>
+                        <select asp-for="WorkType" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="Practicing">Practicing</option>
+                            <option value="Job">Job</option>
+                            <option value="Research">Research</option>
+                            <option value="others">others</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 form-group">
+                        <label class="sf-label">Clinic Type</label>
+                        <select asp-for="ClinicType" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="Own">Own</option>
+                            <option value="Visiting">Visiting</option>
+                            <option value="Hospital Attached">Hospital Attached</option>
+                            <option value="Govt.service">Govt.service</option>
+                            <option value="Chain Clinics">Chain Clinics</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 form-group"><label class="sf-label">Has Computer</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Years of Practice</label><input asp-for="YearsOfPractice" type="number" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Patients per Day</label><input asp-for="PatientsPerDay" type="number" class="sf-input" /></div>
+                    <div class="col-md-3 form-group">
+                        <label class="sf-label">Qualification</label>
+                        <select asp-for="Qualification" class="sf-select">
+                            <option value="">-Select-</option>
+                            <option value="BHMS">BHMS</option>
+                            <option value="MD">MD</option>
+                            <option value="BAMS">BAMS</option>
+                            <option value="Student">Student</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 form-group"><label class="sf-label">College Name</label><input asp-for="CollegeName" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Year of Passing</label><input asp-for="YearOfPassing" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Total Experience</label><input asp-for="TotalExperience" type="number" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Average Patient Fee (₹)</label><input asp-for="AveragePatientFee" type="number" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Number of Clinics</label><input asp-for="NumberOfClinics" type="number" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Date of Birth</label><input asp-for="DateOfBirth" type="date" class="sf-input" /></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Age</label><input asp-for="Age" type="number" class="sf-input" /></div>
+
+                  
+            
+
+                
+                </div>
+
+                <h3 class="pane-section-title" style="margin-top: 12px;">Software Details</h3>
+                <div class="row">
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Currently Using Software?</label>
+                        <select asp-for="CurrentlyUsingSoftware" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select>
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Current Software Name</label>
+                        <input asp-for="CurrentSoftwareName" class="sf-input" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- PURCHASES & TRACKING TAB -->
+            <div class="tab-pane fade" id="purchase" role="tabpanel" style="padding: 32px 40px;">
+                <h3 class="pane-section-title">Product & Purchase Details</h3>
+                <div class="row">
+                    <div class="col-md-4 form-group"><label class="sf-label">Product Purchased</label><input asp-for="ProductPurchased" class="sf-input" /></div>
+                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Date</label><input asp-for="PurchaseDate" type="date" class="sf-input" /></div>
+                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Value (₹)</label><input asp-for="PurchaseValue" type="number" class="sf-input" /></div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Payment Type</label>
+                        <select asp-for="PaymentType" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="Upfront">Upfront</option>
+                            <option value="EMI - 3Months">EMI - 3Months</option>
+                            <option value="EMI - 6Months">EMI - 6Months</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Payment Status</label>
+                        <select asp-for="PaymentStatus" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Refunded">Refunded</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3 class="pane-section-title" style="margin-top: 12px;">Profile Completion Tracking</h3>
+                <div class="row">
+                    <div class="col-md-4 form-group"><label class="sf-label">Profile Completion (%)</label><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="sf-input" /></div>
+                    <div class="col-md-4 form-group"><label class="sf-label">Referral Source</label><input asp-for="ReferralSource" class="sf-input" /></div>
+                    <div class="col-md-4 form-group"><label class="sf-label">Invoice Number</label><input asp-for="InvoiceNumber" class="sf-input" /></div>
+                </div>
+
+                <h3 class="pane-section-title" style="margin-top: 12px;">Additional Contacts</h3>
+                <div class="row">
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact Person 1</label>
+                        <input asp-for="ContactPerson1" class="sf-input" />
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact 1 Phone</label>
+                        <input asp-for="Contact1Phone" class="sf-input" />
+                    </div>
+                    <div class="col-md-4"></div> <!-- Spacer -->
+
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact Person 2</label>
+                        <input asp-for="ContactPerson2" class="sf-input" />
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact 2 Phone</label>
+                        <input asp-for="Contact2Phone" class="sf-input" />
+                    </div>
+                    <div class="col-md-4"></div> <!-- Spacer -->
+
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact Person 3</label>
+                        <input asp-for="ContactPerson3" class="sf-input" />
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Contact 3 Phone</label>
+                        <input asp-for="Contact3Phone" class="sf-input" />
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- End of Tab Content -->
+        <!-- 5. Footer Area (Save Button) -->
+        <div style="padding: 20px 32px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; justify-content: flex-end; gap: 16px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+            <a asp-action="Index" class="btn" style="background: white; border: 1px solid #d1d5db; color: #374151; font-weight: 500; font-size: 0.9rem; padding: 10px 24px; border-radius: 6px; text-decoration: none;">Cancel</a>
+
+            <button type="submit" class="btn-sf-primary">
+                Save Account
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:6px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+        </div>
+
+    </div>
+</form>
+
+<!-- ========================================================
+     THE NEW MODAL FOR CREATING NOTES
+     ======================================================== -->
+<div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px;">
+
+            <!-- Modal Header -->
+            <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 20px 24px;">
+                <h5 class="modal-title fw-bold" id="noteModalLabel" style="color: #1e293b; font-size: 1.15rem;">
+                    <i class="fa-regular fa-pen-to-square text-primary me-2"></i> Add New Note
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Modal Body (Input Fields) -->
+            <div class="modal-body" style="padding: 24px;">
+                <div class="row">
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Note Owner</label>
+                        <select id="modalNoteOwner" class="sf-select">
+                            <option value="System User">System User</option>
+                            <!-- If you want the full user list here, you can add it just like the main form: -->
+                            <!-- <option value="User 1">User 1</option> -->
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Date & Time</label>
+                        <!-- This is automatically populated by JS when the pop-up opens -->
+                        <input type="text" id="modalNoteDateTime" class="sf-input" style="background-color: #f1f5f9; color: #64748b;" readonly />
+                    </div>
+
+                    <div class="col-md-12 form-group">
+                        <label class="sf-label">Attachment</label>
+                        <input type="file" id="modalNoteFile" class="sf-input" style="padding: 7px 12px;" />
+                    </div>
+
+                    <div class="col-md-12 form-group m-0">
+                        <label class="sf-label">Note Description</label>
+                        <textarea id="modalNoteDesc" class="sf-input" rows="4" placeholder="Write your note details here..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer (Save/Cancel) -->
+            <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; padding: 16px 24px;">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500; font-size: 0.9rem;">Cancel</button>
+                <button type="button" class="btn-sf-primary" onclick="saveNote()" style="font-weight: 600; font-size: 0.9rem;">Save Note</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!-- Bootstrap JS bundle required for Tab switching & Modals -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // ==========================================
+    // 1. NOTES POP-UP LOGIC
+    // ==========================================
+
+    function openNoteModal() {
+    // Automatically fetch the current system date and time
+    const now = new Date();
+    document.getElementById('modalNoteDateTime').value = now.toLocaleString();
+
+    // Clear old inputs out of the pop-up
+    document.getElementById('modalNoteFile').value = '';
+    document.getElementById('modalNoteDesc').value = '';
+
+    // Open the pop-up modal
+    const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+    modal.show();
+    }
+
+    function saveNote() {
+    // Grab all data from the pop-up
+    const owner = document.getElementById('modalNoteOwner').value;
+    const dateTime = document.getElementById('modalNoteDateTime').value;
+    const desc = document.getElementById('modalNoteDesc').value;
+
+    const fileInput = document.getElementById('modalNoteFile');
+    const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : '';
+
+    // Verify the user actually wrote a note or attached a file
+    if (!desc.trim() && !fileName) {
+    alert('Please enter a description or attach a file.');
+    return;
+    }
+
+    // Build the HTML snippet to display the saved note nicely on the main page
+    let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
+
+    const noteHtml = `
+    <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid #e5e7eb; border-left: 4px solid #1a56db; border-radius: 8px; background: #fff;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="fw-bold" style="font-size: 0.9rem; color: #111827;">
+    <i class="fa-solid fa-circle-user text-muted me-2"></i>${owner}
+    </span>
+    <span class="text-muted" style="font-size: 0.8rem;">
+    <i class="fa-regular fa-clock me-1"></i> ${dateTime}
+    </span>
+    </div>
+    <div style="font-size: 0.9rem; color: #374151; white-space: pre-wrap;">${desc}</div>
+    ${fileHtml}
+
+    <!-- Hidden inputs so the data is sent to the server on Form Submit -->
+    <input type="hidden" name="SavedNoteOwner[]" value="${owner}" />
+    <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
+    <input type="hidden" name="SavedNoteDesc[]" value="${desc}" />
+    </div>
+    `;
+
+    // Add this beautifully formatted note card to the list container
+    document.getElementById('savedNotesContainer').insertAdjacentHTML('beforeend', noteHtml);
+
+    // Hide the pop-up modal
+    const modalEl = document.getElementById('noteModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    modalInstance.hide();
+    }
+
+    // ==========================================
+    // AUTO-CALCULATE PROFILE RATE & STATUS
+    // ==========================================
+    // The 14 exact fields from your Deluge script
+    const profileFields = [
+    'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
+    'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
+    'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
+    'DateOfBirth', 'Age', 'PatientsPerDay'
+    ];
+
+    function calculateProfileMetrics() {
+    let filledFieldsCount = 0;
+
+    // 1. Calculate Rate: Count how many of the 14 fields actually have a value
+    profileFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value.trim() !== '') {
+    filledFieldsCount++;
+    }
+    });
+
+    // 2. Fetch Field 1 and Field 3 for Status Logic
+    const isHomeopath = document.getElementById('IsHomeopathicDoctor')?.value || '';
+    const hasComputer = document.getElementById('HasComputer')?.value || '';
+
+    // Adjusting for the specific "No" values in your dropdown
+    const isHomeopathNo = (isHomeopath === 'No' || isHomeopath === 'नहीं' || isHomeopath === 'Not a Homeopath Doctor' || isHomeopath === 'Not a Homeopathy Doctor');
+    const hasComputerNo = (hasComputer === 'No');
+
+    // 3. Determine Profile Status matching the Deluge logic
+    let calculatedStatus = "Not Completed";
+
+    if (filledFieldsCount > 4 && !hasComputerNo && !isHomeopathNo) {
+    calculatedStatus = "Strongly Completed";
+    }
+    else if (filledFieldsCount === 4 && !hasComputerNo && !isHomeopathNo) {
+    calculatedStatus = "Completed";
+    }
+    else if (filledFieldsCount >= 4 && (hasComputerNo || isHomeopathNo)) {
+    calculatedStatus = "Not-Qualified";
+    }
+
+    // 4. Inject the calculated Rate and Status automatically into the UI
+    const statusField = document.getElementById('Profilestatus');
+    const rateField = document.getElementById('ProfileRate');
+
+    if (statusField) statusField.value = calculatedStatus;
+    if (rateField) rateField.value = filledFieldsCount;
+    }
+
+    // 5. Attach listeners to trigger automatically on user input
+    profileFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+    el.addEventListener('change', calculateProfileMetrics);
+    if (el.tagName === 'INPUT') {
+    el.addEventListener('input', calculateProfileMetrics); // Captures typing in real-time
+    }
+    }
+    });
+    // ==========================================
+    // 2. EXISTING PAGE LOGIC (Untouched)
+    // ==========================================
+
+    // Show/Hide Conditional Fields based on DataSource
+    document.getElementById('DataSource').addEventListener('change', function () {
+    const val = this.value;
+    document.getElementById('divMetaCampaign').style.display = (val === 'Meta Ads') ? 'block' : 'none';
+    document.getElementById('divSeminarName').style.display = (val === 'Seminar Conference') ? 'block' : 'none';
+    });
+
+    // Cross-record and Same-record Phone Verification
+    function verifyPhone(fieldId) {
+    const phone = document.getElementById(fieldId).value.trim();
+    const mainMobile = document.getElementById('MobileNumber').value.trim();
+    const altMobile = document.getElementById('AlternateMobile').value.trim();
+
+    if (!phone) {
+    alert('Please enter a phone number first before verifying.');
+    return;
+    }
+
+    if (mainMobile && altMobile && mainMobile === altMobile) {
+    alert('❌ Mobile Number and Alternate Mobile cannot be the exact same!');
+    return;
+    }
+
+    fetch('/Accounts/CheckDuplicatePhone?phone=' + encodeURIComponent(phone))
+    .then(response => response.json())
+    .then(data => {
+    if (data.isDuplicate) {
+    alert('⚠️ WARNING: This phone number already exists in another account record!');
+    } else {
+    alert('✅ This number is valid and unique in the system.');
+    }
+    })
+    .catch(error => {
+    console.error("Error verifying phone:", error);
+    alert("Could not connect to the database to verify.");
+    });
+    }
+
+    // 1. Global variable to store the API data
+    let globalRegionData = [];
+
+    // 2. Fetch data from the free API as soon as the page loads
+    document.addEventListener("DOMContentLoaded", async function () {
+    try {
+    const response = await fetch('https://countriesnow.space/api/v0.1/countries/states');
+    const result = await response.json();
+
+    if (!result.error) {
+    globalRegionData = result.data;
+    populateCountryDropdown();
+    }
+    } catch (error) {
+    console.error("Failed to load country data from API:", error);
+    }
+    });
+
+    // 3. Populate BOTH Country dropdowns dynamically
+    function populateCountryDropdown() {
+    const country1 = document.getElementById('Addr1_Country');
+    const country2 = document.getElementById('Addr2_Country');
+
+    const existingCountry1 = '@(Model?.Addr1_Country ?? "")';
+    const existingCountry2 = '@(Model?.Addr2_Country ?? "")';
+
+    if (country1) country1.innerHTML = '<option value="">-None-</option>';
+    if (country2) country2.innerHTML = '<option value="">-None-</option>';
+
+    globalRegionData.forEach(countryObj => {
+    // Populate Address 1
+    if (country1) {
+    const opt1 = document.createElement('option');
+    opt1.value = countryObj.name;
+    opt1.textContent = countryObj.name;
+    if (countryObj.name === existingCountry1) opt1.selected = true;
+    country1.appendChild(opt1);
+    }
+
+    // Populate Address 2
+    if (country2) {
+    const opt2 = document.createElement('option');
+    opt2.value = countryObj.name;
+    opt2.textContent = countryObj.name;
+    if (countryObj.name === existingCountry2) opt2.selected = true;
+    country2.appendChild(opt2);
+    }
+    });
+
+    // If editing, trigger the state population automatically
+    if (existingCountry1) updateStateDropdown(existingCountry1, '@(Model?.Addr1_State ?? "")', 'Addr1_State');
+    if (existingCountry2) updateStateDropdown(existingCountry2, '@(Model?.Addr2_State ?? "")', 'Addr2_State');
+    }
+
+    // 4. Listen for BOTH Country dropdowns changing
+    const c1 = document.getElementById('Addr1_Country');
+    if (c1) {
+    c1.addEventListener('change', function() {
+    updateStateDropdown(this.value, "", 'Addr1_State');
+    });
+    }
+
+    const c2 = document.getElementById('Addr2_Country');
+    if (c2) {
+    c2.addEventListener('change', function() {
+    updateStateDropdown(this.value, "", 'Addr2_State');
+    });
+    }
+
+    // ==========================================
+    // 5. PROFILE PENDING REASON POPUP VALIDATION
+    // ==========================================
+    document.getElementById('accountForm').addEventListener('submit', function (e) {
+    // Bulletproof value extractor
+    function getFieldValue(fieldName) {
+    const el = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+    return el ? el.value.trim() : "";
+    }
+
+    // 1. Safely get all field values
+    const q1 = getFieldValue('IsHomeopathicDoctor');
+    const q2 = getFieldValue('WorkType');
+    const q3 = getFieldValue('ClinicType');
+    const q4 = getFieldValue('HasComputer');
+    const reasonValue = getFieldValue('ProfilePendingReason');
+
+    // 2. Evaluate if the profile is incomplete
+    const isProfileIncomplete = (
+    q1 === "" || q1 === "-None-" || q1 === "false" ||
+    q2 === "" || q2 === "-None-" || q2 === "false" ||
+    q3 === "" || q3 === "-None-" || q3 === "false" ||
+    q4 === "" || q4 === "-None-" || q4 === "false"
+    );
+
+    // 3. Stop submission and show popup if incomplete with no reason
+    if (isProfileIncomplete && (reasonValue === "" || reasonValue === "-None-")) {
+    e.preventDefault(); // 🛑 THIS STOPS THE FORM SUBMISSION
+
+    // Trigger the Bootstrap Modal
+    const modalEl = document.getElementById('pendingReasonModal');
+    if (modalEl) {
+    const myModal = new bootstrap.Modal(modalEl);
+    myModal.show();
+    } else {
+    alert("Your profile is incomplete! Please select a Profile Pending Reason.");
+    }
+
+    // Auto-switch to the Main Tab
+    const mainTab = document.getElementById('main-tab');
+    if (mainTab) {
+    new bootstrap.Tab(mainTab).show();
+    }
+
+    // Highlight the Reason field in red
+    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
+    if (reasonField) {
+    reasonField.focus();
+    reasonField.style.boxShadow = "0 0 0 3px #ef4444";
+    setTimeout(() => reasonField.style.boxShadow = "none", 3500);
+    }
+    }
+    });
+
+    // Placeholder for account lookup logic
+    function openAccountLookup() {
+    alert("Lookup UI would open here!");
+    }
+</script>

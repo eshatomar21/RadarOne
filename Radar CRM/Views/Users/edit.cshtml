@@ -1,0 +1,484 @@
+﻿@model Radar_CRM.Models.User
+
+@{
+    ViewData["Title"] = "Edit User";
+    Layout = "~/Views/Shared/_Layout.cshtml"; // Ensure this matches your layout path
+}
+
+<!-- Safely importing fonts without Razor syntax conflicts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+    /* Premium Enterprise CRM Typography & Base */
+    body {
+        background-color: #f3f4f6;
+        font-family: 'Inter', -apple-system, sans-serif;
+        color: #111827;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Full-Screen Main Container */
+    .sf-container {
+        background-color: #ffffff;
+        width: 100%;
+        max-width: 100%; /* Expanded to full screen width */
+        margin: 0;
+        min-height: 85vh;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
+
+    /* 1. Header Area */
+    .sf-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 32px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .sf-header-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+        .sf-header-title h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+        }
+
+        .sf-header-title .entity-type {
+            color: #6b7280;
+            font-weight: 500;
+            font-size: 1.15rem;
+        }
+
+    .btn-sf-primary {
+        background-color: #1a56db;
+        color: #ffffff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+        .btn-sf-primary:hover {
+            background-color: #1e40af;
+            box-shadow: 0 4px 6px rgba(26, 86, 219, 0.2);
+        }
+
+    /* 2. Tabs */
+    .sf-tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0 32px;
+        background-color: #f9fafb;
+        gap: 32px;
+    }
+
+    .sf-tab {
+        background: none;
+        border: none;
+        padding: 16px 0;
+        color: #6b7280;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+
+        .sf-tab:hover {
+            color: #374151;
+        }
+
+        .sf-tab.active {
+            color: #111827;
+            border-bottom: 2px solid #1a56db;
+            font-weight: 600;
+        }
+
+    /* 3. Main Content Area (Replaces Split Pane) */
+    .sf-content-pane {
+        padding: 32px 40px;
+        background-color: #ffffff;
+        flex-grow: 1;
+    }
+
+    /* Form Inputs */
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .sf-label {
+        display: block;
+        font-size: 0.8rem;
+        color: #4b5563;
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+
+    .sf-input, .sf-select {
+        width: 100%;
+        border: 1px solid transparent;
+        border-bottom: 1px solid #d1d5db;
+        padding: 8px 0;
+        font-size: 0.9rem;
+        color: #111827;
+        background-color: transparent;
+        transition: all 0.2s;
+    }
+
+        .sf-input:focus, .sf-select:focus {
+            outline: none;
+            border: 1px solid #1a56db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+            background-color: #ffffff;
+        }
+
+    .text-danger {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: 6px;
+        display: block;
+        font-weight: 500;
+    }
+
+    /* Section Headers */
+    .pane-section-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 20px;
+        margin-top: 32px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+        .pane-section-title:first-child {
+            margin-top: 0;
+        }
+
+    /* Grids for Full-Screen Layout */
+    .sf-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 48px;
+    }
+
+    /* 3-column grid for better full-screen spacing */
+    .sf-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0 48px;
+    }
+
+    /* Tab Content Logic */
+    .tab-content {
+        display: none;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+        .tab-content.active {
+            display: block;
+        }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<form asp-action="Edit" method="post">
+    <!-- CRITICAL: Hidden input for the Primary Key -->
+    <input type="hidden" asp-for="Id" />
+
+    <div class="sf-container">
+
+        <!-- Header -->
+        <div class="sf-header">
+            <div class="sf-header-title">
+                <span class="entity-type">User</span>
+                <h1>Edit User</h1>
+            </div>
+            <div>
+                <button type="submit" class="btn-sf-primary">Update User</button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="sf-tabs">
+            <button type="button" class="sf-tab active" onclick="switchTab('main-details', this)">Main Details</button>
+            <button type="button" class="sf-tab" onclick="switchTab('address-info', this)">Address Info</button>
+            <button type="button" class="sf-tab" onclick="switchTab('preferences', this)">Preferences & Settings</button>
+        </div>
+
+        <!-- Full Width Content Area -->
+        <div class="sf-content-pane">
+
+            <!-- TAB 1: Main Details (Now includes Core Fields at the top) -->
+            <div id="main-details" class="tab-content active">
+
+                <!-- Core Information -->
+                <h3 class="pane-section-title">Core Information</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="FirstName">First Name</label>
+                        <input class="sf-input" asp-for="FirstName" placeholder="Enter first name..." />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="LastName">Last Name</label>
+                        <input class="sf-input" asp-for="LastName" placeholder="Enter last name..." />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Email">Email</label>
+                        <input class="sf-input" asp-for="Email" type="email" placeholder="email@example.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="fullName">full Name</label>
+                        <input class="sf-input" asp-for="fullName" placeholder="Enter last name..." />
+                        <span asp-validation-for="fullName" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Mobile">Mobile Phone</label>
+                        <input class="sf-input" asp-for="Mobile" placeholder="+1 202-555-0117" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Profile">Profile <span style="color:red">*</span></label>
+                        <select class="sf-select" asp-for="Profile">
+                            <option value="">- Select Profile -</option>
+                            <option value="Administrator">Administrator</option>
+                            <option value="Standard">Standard</option>
+                        </select>
+                        <span asp-validation-for="Profile" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="RoleId">Role (Hierarchy)</label>
+                        <!-- Note: Add asp-items="ViewBag.Roles" once your controller passes it -->
+                        <select class="sf-select" asp-for="RoleId">
+                            <option value="">- Select Role -</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Password">Password</label>
+                        <input class="sf-input" asp-for="Password" type="password" placeholder="Enter password (leave blank to keep current)..." />
+                    </div>
+                </div>
+
+                <!-- Master Details -->
+                <h3 class="pane-section-title">Master Details</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="DateOfBirth">Date of Birth</label>
+                        <input class="sf-input" asp-for="DateOfBirth" type="date" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Phone">Phone</label>
+                        <input class="sf-input" asp-for="Phone" placeholder="Enter phone..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Website">Website</label>
+                        <input class="sf-input" asp-for="Website" placeholder="https://..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Fax">Fax</label>
+                        <input class="sf-input" asp-for="Fax" placeholder="Enter fax..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Type">User Type</label>
+                        <input class="sf-input" asp-for="Type" placeholder="- None -" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="SalesCallAssign">Sales Call Assign</label>
+                        <input class="sf-input" asp-for="SalesCallAssign" placeholder="Assign..." />
+                    </div>
+                </div>
+
+                <!-- Status & Tracking -->
+                <h3 class="pane-section-title">Status & Tracking</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="UserStatus">User Status</label>
+                        <select class="sf-select" asp-for="UserStatus">
+                            <option value="">- None -</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="StatusReason">Status Reason</label>
+                        <input class="sf-input" asp-for="StatusReason" placeholder="Enter reason..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Source">Source</label>
+                        <input class="sf-input" asp-for="Source" placeholder="e.g. Organic, Referral" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ReportingToId">Reporting To</label>
+                        <select class="sf-select" asp-for="ReportingToId">
+                            <option value="">- Select Manager -</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Address Info -->
+            <div id="address-info" class="tab-content">
+                <h3 class="pane-section-title">Location Details</h3>
+                <div class="sf-grid-2">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Street">Street Address</label>
+                        <input class="sf-input" asp-for="Street" placeholder="Enter street address..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="City">City</label>
+                        <input class="sf-input" asp-for="City" placeholder="Enter city..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="State">State / Province</label>
+                        <input class="sf-input" asp-for="State" placeholder="Enter state..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ZipCode">Zip / Postal Code</label>
+                        <input class="sf-input" asp-for="ZipCode" placeholder="Enter zip code..." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Country">Country</label>
+                        <input class="sf-input" asp-for="Country" placeholder="Enter country..." />
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Preferences & Settings -->
+            <div id="preferences" class="tab-content">
+                <h3 class="pane-section-title">Localization & Formats</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Language">Language</label>
+                        <input class="sf-input" asp-for="Language" placeholder="e.g. English" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CountryLocale">Country Locale</label>
+                        <input class="sf-input" asp-for="CountryLocale" placeholder="e.g. en-US" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="TimeZone">Time Zone</label>
+                        <input class="sf-input" asp-for="TimeZone" placeholder="e.g. UTC-5" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="TimeFormat">Time Format</label>
+                        <select class="sf-select" asp-for="TimeFormat">
+                            <option value="12">12 Hour</option>
+                            <option value="24">24 Hour</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="DateFormat">Date Format</label>
+                        <input class="sf-input" asp-for="DateFormat" placeholder="dd-MM-yyyy" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Currency">Currency</label>
+                        <input class="sf-input" asp-for="Currency" placeholder="e.g. USD" />
+                    </div>
+                </div>
+
+                <h3 class="pane-section-title">System Preferences</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Decimal">Decimal Separator</label>
+                        <input class="sf-input" asp-for="Decimal" placeholder="." />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="Grouping">Digit Grouping</label>
+                        <input class="sf-input" asp-for="Grouping" placeholder="," />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="NameFormat">Name Format</label>
+                        <input class="sf-input" asp-for="NameFormat" placeholder="Salutation First Last" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="SortOrderPreference">Sort Order</label>
+                        <input class="sf-input" asp-for="SortOrderPreference" placeholder="Ascending" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="PreferredUnitForDistance">Distance Unit</label>
+                        <select class="sf-select" asp-for="PreferredUnitForDistance">
+                            <option value="Miles">Miles</option>
+                            <option value="Kilometers">Kilometers</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3 class="pane-section-title">Shift Information</h3>
+                <div class="sf-grid-3">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CurrentShiftId">Current Shift ID</label>
+                        <input class="sf-input" asp-for="CurrentShiftId" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="NextShiftId">Next Shift ID</label>
+                        <input class="sf-input" asp-for="NextShiftId" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ShiftEffectiveFrom">Shift Effective From</label>
+                        <input class="sf-input" asp-for="ShiftEffectiveFrom" type="date" />
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        // Tab switching logic
+        function switchTab(tabId, element) {
+            // Remove active state from all tabs
+            document.querySelectorAll('.sf-tab').forEach(t => t.classList.remove('active'));
+            // Remove active state from all content areas
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            // Add active state to clicked tab and target content
+            element.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+    </script>
+}

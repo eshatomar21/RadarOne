@@ -1,0 +1,635 @@
+﻿@model IEnumerable<Radar_CRM.Models.User>
+
+@{
+    ViewData["Title"] = "Users Master";
+    // Layout = null; <-- REMOVED so it uses your _Layout.cshtml
+}
+
+<style>
+    /* Light Enterprise Theme */
+    :root {
+        --bg-body: #f8f9fa;
+        --bg-surface: #ffffff;
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --text-dark: #1e293b;
+        --text-main: #334155;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
+        --radius-md: 6px;
+        --radius-lg: 10px;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* Top Header */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        background-color: var(--bg-surface);
+        padding: 16px 24px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+    }
+
+    .header-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .header-icon {
+        color: var(--primary-blue);
+        font-size: 1.5rem;
+    }
+
+    .header-container h3 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--text-dark);
+    }
+
+    /* Buttons */
+    .btn-soft {
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+        border: 1px solid var(--border-soft);
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+        .btn-soft:hover {
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+        }
+
+    .btn-primary-custom {
+        background-color: var(--primary-blue);
+        color: white;
+        font-weight: 500;
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 8px 18px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+        .btn-primary-custom:hover {
+            background-color: var(--primary-hover);
+            color: white;
+        }
+
+    .btn-dark-dropdown {
+        background-color: #64748b;
+        color: white;
+        font-weight: 500;
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.875rem;
+    }
+
+        .btn-dark-dropdown:hover {
+            background-color: #475569;
+            color: white;
+        }
+
+    /* Layout Grid */
+    .crm-container {
+        display: flex;
+        height: calc(100vh - 160px);
+        gap: 24px;
+        width: 100%;
+        max-width: 100%; /* Prevents stretching past the screen */
+    }
+
+    /* Sidebar Styling */
+    .filter-sidebar {
+        width: 300px;
+        min-width: 300px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-sm);
+        height: 100%; /* Allows flexbox to push footer down */
+    }
+
+    .filter-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+        .filter-header h6 {
+            font-size: 1rem;
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+    .filter-search-box {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    .filter-body {
+        overflow-y: auto;
+        flex-grow: 1; /* Pushes the footer to the bottom */
+        padding: 0;
+    }
+
+    .filter-field-item {
+        padding: 12px 20px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+        .filter-field-item label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--text-dark);
+        }
+
+    .filter-expanded-area {
+        display: none;
+        margin-top: 12px;
+        padding-left: 24px;
+    }
+
+    .filter-field-item.active .filter-expanded-area {
+        display: block;
+    }
+
+    .form-select, .form-control {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        padding: 6px 12px;
+    }
+
+    .filter-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border-soft);
+        background: var(--bg-surface);
+        /* Flexbox guarantees this stays fixed at the bottom of the sidebar */
+    }
+
+    /* Table Area */
+    .table-container {
+        flex: 1; /* Takes remaining space */
+        min-width: 0; /* CRITICAL: Forces flexbox to allow inner scrolling */
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .table-toolbar {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table-responsive {
+        overflow-x: auto; /* Forces horizontal scrollbar */
+        overflow-y: auto;
+        flex-grow: 1;
+        width: 100%;
+    }
+
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: collapse;
+    }
+
+        .table thead th {
+            background-color: var(--bg-surface);
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 0.85rem;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            border-bottom: none;
+            padding: 12px 24px;
+        }
+
+        .table thead tr.inline-filters th {
+            top: 45px;
+            padding: 8px 24px 16px 24px;
+            border-bottom: 1px solid var(--border-soft);
+            background-color: var(--bg-surface);
+            z-index: 1;
+        }
+
+        .table tbody td {
+            padding: 14px 24px;
+            vertical-align: middle;
+            color: var(--text-dark);
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+
+    .primary-col-link {
+        color: var(--primary-blue);
+        font-weight: 500;
+        text-decoration: none;
+    }
+</style>
+
+<!-- Hidden Input for File Upload -->
+<input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+
+<div class="header-container">
+    <div class="header-title">
+        <i class="fa-regular fa-building header-icon"></i>
+        <h3>Users Master</h3>
+    </div>
+    <div>
+        <a href="@Url.Action("Index", "Home")" class="btn btn-soft me-2 text-decoration-none">
+            <i class="fa-solid fa-arrow-left text-muted me-1"></i> Back to Dashboard
+        </a>
+        <button class="btn btn-soft me-2" onclick="document.getElementById('fileUploadInput').click();">
+            <i class="fa-solid fa-cloud-arrow-up text-muted me-1"></i> Upload Data
+        </button>
+        <a href="@Url.Action("Create", "Users")" class="btn btn-primary-custom text-decoration-none">
+            <i class="fa-solid fa-plus me-1"></i> Create User
+        </a>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="crm-container">
+
+    <!-- Sidebar styling -->
+    <div class="filter-sidebar">
+        <div class="filter-header">
+            <h6 class="m-0"><i class="fa-solid fa-filter text-muted me-2"></i> Filter By Fields</h6>
+        </div>
+        <div class="filter-search-box">
+            <input type="text" class="form-control form-control-sm" placeholder="Search fields... (e.g. Status, Owner)" id="sidebarSearch" onkeyup="filterSidebarItems()">
+        </div>
+
+        <div class="filter-body" id="sidebarList">
+            @if (Model != null && Model.Any())
+            {
+                var properties = Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                foreach (var prop in properties)
+                {
+                    if (prop.Name != "Roles")
+                    {
+                        <div class="filter-field-item field-item-row">
+                            <div class="form-check m-0 d-flex align-items-center">
+                                <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
+                                <label class="form-check-label flex-grow-1" for="chk_@prop.Name">
+                                    @prop.Name
+                                </label>
+                            </div>
+                            <div class="filter-expanded-area">
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select">
+                                    <option value="is">is</option>
+                                    <option value="isnt">isn't</option>
+                                    <option value="contains" selected>contains</option>
+                                    <option value="doesnt_contain">doesn't contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
+                                </select>
+                                <input type="text" class="form-control form-control-sm condition-val" placeholder="Enter value..." />
+                            </div>
+                        </div>
+                    }
+                }
+            }
+        </div>
+
+        <!-- Sticky Footer for Apply Button -->
+        <div class="filter-footer d-flex gap-2">
+            <button class="btn btn-soft flex-grow-1" onclick="clearFilters()">Clear</button>
+            <button class="btn btn-primary-custom flex-grow-1" onclick="applyFilters()">Apply Filters</button>
+        </div>
+    </div>
+
+    <!-- Table Area -->
+    <div class="table-container">
+        <div class="table-toolbar">
+            <div class="d-flex align-items-center text-muted" style="font-size: 0.875rem;">
+                <span class="me-2">Show</span>
+                <select class="form-select form-select-sm d-inline-block w-auto me-2">
+                    <option>10</option>
+                    <option>25</option>
+                    <option>50</option>
+                </select>
+                <span>entries</span>
+            </div>
+            <div>
+                <!-- Show/Hide Dropdown menu -->
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-dark-dropdown dropdown-toggle" type="button" id="columnsDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                        <i class="fa-solid fa-table-columns me-1"></i> Show/Hide Columns
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2" id="columnToggleMenu" style="min-width: 200px; max-height: 400px; overflow-y: auto; z-index: 9999;">
+                        <!-- Checkboxes populated via JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table" id="usersTable">
+                <thead>
+                    <tr>
+                        @if (Model != null && Model.Any())
+                        {
+                            int colIndex = 0;
+                            var properties = Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            foreach (var prop in properties)
+                            {
+                                if (prop.Name != "Roles")
+                                {
+                                    <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                                        @prop.Name <i class="fa-solid fa-arrows-up-down sort-icon"></i>
+                                    </th>
+                                }
+                                colIndex++;
+                            }
+                        }
+                    </tr>
+                    <tr class="inline-filters">
+                        @if (Model != null && Model.Any())
+                        {
+                            int colIndex = 0;
+                            var properties = Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            foreach (var prop in properties)
+                            {
+                                if (prop.Name != "Roles")
+                                {
+                                    <th data-col-index="@colIndex">
+                                        <input type="text" class="form-control form-control-sm table-inline-search" placeholder="Filter @prop.Name" />
+                                    </th>
+                                }
+                                colIndex++;
+                            }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var item in Model)
+                        {
+                            <tr style="cursor:pointer;" onclick="window.location.href='@Url.Action("Edit", "Users", new { id = item.Id })'">
+                                @{
+                                    int tdIndex = 0;
+                                    var properties = item.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                    foreach (var prop in properties)
+                                    {
+                                        if (prop.Name != "Roles")
+                                        {
+                                            var value = prop.GetValue(item, null);
+                                            if (prop.Name == "FirstName")
+                                            {
+                                                <td data-col-index="@tdIndex"><span class="primary-col-link">@value</span></td>
+                                            }
+                                            else
+                                            {
+                                                <td data-col-index="@tdIndex">@value</td>
+                                            }
+                                        }
+                                        tdIndex++;
+                                    }
+                                }
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr id="noRecordsRow"><td colspan="50" class="text-center py-5 text-muted">No records found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Define the default columns you want Ticked initially
+    const defaultVisibleColumns = ["FirstName", "LastName", "Email", "Role", "Profile", "UserStatus"];
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // --- 1. Sidebar Expand/Collapse Logic ---
+        const checkboxes = document.querySelectorAll('.field-checkbox');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const parentDiv = this.closest('.filter-field-item');
+                const valueInput = parentDiv.querySelector('.condition-val');
+
+                if(this.checked) {
+                    parentDiv.classList.add('active');
+                } else {
+                    parentDiv.classList.remove('active');
+                    valueInput.value = '';
+                }
+            });
+        });
+
+        const conditionSelects = document.querySelectorAll('.condition-select');
+        conditionSelects.forEach(select => {
+            select.addEventListener('change', function() {
+                const valInput = this.nextElementSibling;
+                if(this.value === 'is_empty' || this.value === 'is_not_empty') {
+                    valInput.style.display = 'none';
+                } else {
+                    valInput.style.display = 'block';
+                }
+            });
+        });
+
+        // --- 2. Dynamic Show/Hide Columns Logic ---
+        const table = document.getElementById("usersTable");
+        const theadRows = table.querySelectorAll("thead tr:first-child th");
+        const columnMenu = document.getElementById("columnToggleMenu");
+
+        theadRows.forEach((th) => {
+            const colIndex = th.getAttribute("data-col-index");
+            const colName = th.getAttribute("data-col-name");
+
+            if(colName) {
+                const isDefault = defaultVisibleColumns.includes(colName);
+
+                const li = document.createElement("li");
+                li.className = "dropdown-item px-3 py-2";
+                li.innerHTML = `
+                    <div class="form-check m-0">
+                        <input class="form-check-input col-toggle-cb" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+                        <label class="form-check-label ms-2" for="colToggle${colIndex}" style="cursor:pointer; width:100%;">
+                            ${th.innerText.trim()}
+                        </label>
+                    </div>
+                `;
+                columnMenu.appendChild(li);
+                toggleColumnVisibility(colIndex, isDefault);
+            }
+        });
+
+        const toggles = document.querySelectorAll('.col-toggle-cb');
+        toggles.forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                toggleColumnVisibility(this.value, this.checked);
+            });
+        });
+
+        function toggleColumnVisibility(idx, isVisible) {
+            const headers = table.querySelectorAll(`th[data-col-index="${idx}"]`);
+            headers.forEach(th => th.style.display = isVisible ? '' : 'none');
+
+            const cells = table.querySelectorAll(`td[data-col-index="${idx}"]`);
+            cells.forEach(td => td.style.display = isVisible ? '' : 'none');
+        }
+
+        // --- 3. Inline Table Filters ---
+        const inlineInputs = document.querySelectorAll('.table-inline-search');
+        inlineInputs.forEach(input => {
+            input.addEventListener('input', filterTable);
+        });
+
+        // --- 4. File Upload Logic ---
+        const fileInput = document.getElementById('fileUploadInput');
+        if (fileInput) {
+            fileInput.addEventListener('change', async function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    const formData = new FormData();
+                    formData.append('uploadedFile', file);
+
+                    try {
+                        document.body.style.cursor = 'wait';
+                        const response = await fetch('@Url.Action("UploadFile", "Users")', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Upload failed. Check backend console errors.");
+                        }
+                    } catch (error) {
+                        alert("An error occurred during upload.");
+                    } finally {
+                        document.body.style.cursor = 'default';
+                        this.value = '';
+                    }
+                }
+            });
+        }
+    });
+
+    // --- 5. Data Searching & Filter Functions ---
+    function filterTable() {
+        const table = document.getElementById("usersTable");
+        const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+
+        const inlineFilters = [];
+        const inlineInputs = document.querySelectorAll('.table-inline-search');
+        inlineInputs.forEach(input => {
+            const val = input.value.trim().toLowerCase();
+            if (val) {
+                const colIndex = input.closest('th').getAttribute('data-col-index');
+                inlineFilters.push({ index: colIndex, val: val });
+            }
+        });
+
+        const sidebarFilters = [];
+        const activeSidebarItems = document.querySelectorAll('.filter-field-item.active');
+        activeSidebarItems.forEach(item => {
+            const colName = item.querySelector('.field-checkbox').value;
+            const condition = item.querySelector('.condition-select').value;
+            const val = item.querySelector('.condition-val').value.trim().toLowerCase();
+
+            const th = table.querySelector(`th[data-col-name="${colName}"]`);
+            if (th) {
+                const colIndex = th.getAttribute('data-col-index');
+                sidebarFilters.push({ index: colIndex, condition: condition, val: val });
+            }
+        });
+
+        rows.forEach(row => {
+            let showRow = true;
+
+            for (let f of inlineFilters) {
+                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+                if (td && !td.innerText.trim().toLowerCase().includes(f.val)) {
+                    showRow = false; break;
+                }
+            }
+
+            if (showRow) {
+                for (let f of sidebarFilters) {
+                    const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+                    if (td) {
+                        const cellText = td.innerText.trim().toLowerCase();
+                        let pass = false;
+                        switch(f.condition) {
+                            case 'is': pass = (cellText === f.val); break;
+                            case 'isnt': pass = (cellText !== f.val); break;
+                            case 'contains': pass = cellText.includes(f.val); break;
+                            case 'doesnt_contain': pass = !cellText.includes(f.val); break;
+                            case 'starts_with': pass = cellText.startsWith(f.val); break;
+                            case 'ends_with': pass = cellText.endsWith(f.val); break;
+                            case 'is_empty': pass = (cellText === ''); break;
+                            case 'is_not_empty': pass = (cellText !== ''); break;
+                        }
+                        if (!pass) { showRow = false; break; }
+                    }
+                }
+            }
+            row.style.display = showRow ? '' : 'none';
+        });
+    }
+
+    function applyFilters() { filterTable(); }
+
+    function clearFilters() {
+        const activeItems = document.querySelectorAll('.filter-field-item.active');
+        activeItems.forEach(item => {
+            item.querySelector('.field-checkbox').checked = false;
+            item.querySelector('.condition-val').value = '';
+            item.classList.remove('active');
+        });
+        filterTable();
+    }
+
+    function filterSidebarItems() {
+        const input = document.getElementById('sidebarSearch');
+        if (!input) return;
+        const filter = input.value.toLowerCase();
+        const rows = document.querySelectorAll('.field-item-row');
+
+        rows.forEach(row => {
+            const label = row.querySelector('label').innerText.toLowerCase();
+            if (label.includes(filter)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+</script>
