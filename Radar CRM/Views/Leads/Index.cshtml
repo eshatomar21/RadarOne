@@ -1269,6 +1269,48 @@
         document.body.removeChild(downloadLink);
         }
 
+    // ==========================================
+    // FILE UPLOAD HANDLER
+    // ==========================================
+    document.getElementById('fileUploadInput').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        // 1. Prepare the file to be sent to the backend
+        var formData = new FormData();
+        formData.append("uploadedFile", file); // "uploadedFile" exactly matches your controller parameter
+
+        // 2. Alert the user that processing has started
+        alert("Uploading data, please wait... This might take a few moments for 1000+ rows.");
+
+        // 3. Send the file to your LeadsController -> UploadFile method
+        fetch('/Leads/UploadFile', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            // Check if the backend threw a 500 error (like a database crash)
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text) });
+            }
+            return response;
+        })
+        .then(data => {
+            // 4. Success!
+            alert("Upload successful! The page will now reload to show your data.");
+            window.location.reload();
+        })
+        .catch(error => {
+            // 5. THIS IS YOUR LOG: It will print the exact Row number and Error message we built in the backend
+            console.error("Upload Error:", error);
+            alert(error.message);
+        })
+        .finally(() => {
+            // Clear the file input so you can upload the same file again if it failed
+            document.getElementById('fileUploadInput').value = '';
+        });
+    });
+
         // ==========================================
         // PAGINATION
         // ==========================================

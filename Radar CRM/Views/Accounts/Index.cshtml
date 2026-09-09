@@ -694,15 +694,59 @@
     document.addEventListener("DOMContentLoaded", function () {
         setupColumnToggles();
         setupFilterInteractions();
-        populateDatalists(); // Populate the auto-suggest lists
+        populateDatalists();
         applyPagination();
+        setupFileUpload(); // Initializes the upload logic safely
     });
+
+    // ==========================================
+    // FILE UPLOAD LOGIC
+    // ==========================================
+    function setupFileUpload() {
+        const fileInput = document.getElementById('fileUploadInput');
+        if(!fileInput) return;
+
+        fileInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('uploadedFile', file);
+
+            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+            const originalHtml = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+            uploadBtn.disabled = true;
+
+            fetch('@Url.Action("UploadFile", "Accounts")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                if (response.ok) {
+                    alert("Data uploaded successfully!");
+                    window.location.reload();
+                } else {
+                    const errorText = await response.text();
+                    alert("Upload Failed: " + errorText);
+                    uploadBtn.innerHTML = originalHtml;
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("Network error during upload.");
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            });
+
+            this.value = ''; // Clear input
+        });
+    }
 
     // ==========================================
     // SIDEBAR FILTERING & SUGGESTIONS LOGIC
     // ==========================================
-
-    // Populates the <datalist> for each sidebar filter based on existing table data
     function populateDatalists() {
         const table = document.getElementById("accountsTable");
         const headers = table.querySelectorAll("thead th[data-col-name]");
@@ -713,14 +757,12 @@
             const datalist = document.getElementById(`dl_${colName}`);
 
             if (datalist) {
-                // Get unique values from the column
                 let uniqueValues = new Set();
                 table.querySelectorAll(`tbody tr.account-row td[data-col-index="${colIndex}"]`).forEach(td => {
                     const text = td.innerText.trim();
                     if(text) uniqueValues.add(text);
                 });
 
-                // Append options to datalist
                 uniqueValues.forEach(val => {
                     let option = document.createElement("option");
                     option.value = val;
@@ -797,15 +839,10 @@
         applyFilters();
     }
 
-    // Single Column Search (from Funnel Dropdown)
     function filterSingleColumn(inputEl, colIndex) {
         const filterValue = inputEl.value.toLowerCase().trim();
-
         document.querySelectorAll('tbody tr.account-row').forEach(row => {
-            // Respect existing sidebar filters by not overriding 'filtered-out' if it was hidden by sidebar
-            // We'll handle inline filtering via inline display styles for quick searching
             if(row.classList.contains('filtered-out')) return;
-
             const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
             if (td) {
                 const text = td.innerText.trim().toLowerCase();
@@ -815,7 +852,7 @@
     }
 
     // ==========================================
-    // SORTING LOGIC
+    // SORTING & PAGINATION
     // ==========================================
     function sortTableByCol(colIndex, direction) {
         const tbody = document.getElementById("tableBody");
@@ -840,48 +877,37 @@
         applyPagination();
     }
 
-    function deleteSelected() {
-        // Gather all checked checkboxes (Change '.row-checkbox' if your class is different)
-        let selectedIds = [];
-        document.querySelectorAll('.row-checkbox:checked').forEach(cb => {
-            selectedIds.push(parseInt(cb.value));
+    function applyPagination() {
+        const rows = Array.from(document.querySelectorAll('tbody tr.account-row:not(.filtered-out)'));
+        const totalRows = rows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        document.querySelectorAll('tbody tr.account-row').forEach(r => {
+            r.style.display = 'none';
         });
 
-        if (selectedIds.length === 0) {
-            alert("Please select at least one record.");
-            return;
+        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
+            rows[i].style.display = '';
         }
 
-        if (confirm(`Are you sure you want to delete ${selectedIds.length} selected record(s)?`)) {
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+    }
 
-            // Send the IDs to the Controller via AJAX
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                    // If you are enforcing AntiForgeryTokens globally, you may need to add it here:
-                    // 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                },
-                body: JSON.stringify(selectedIds)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Reload the page to reflect the deleted records
-                    window.location.reload();
-                } else {
-                    alert(data.message || "Error deleting records.");
-                }
-            })
-            .catch(error => {
-                console.error("Error:", error);
-                alert("Something went wrong during deletion.");
-            });
-        }
+    function changePage(step) {
+        currentPage += step;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
     }
 
     // ==========================================
-    // COLUMN MANAGEMENT & DRAG-AND-DROP
+    // COLUMN MANAGEMENT
     // ==========================================
     let draggedItem = null;
 
@@ -942,20 +968,12 @@
         e.dataTransfer.setData('text/plain', this.dataset.colIndex);
         setTimeout(() => this.classList.add('dragging'), 0);
     }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        return false;
-    }
-
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
     function handleDragEnter(e) { this.classList.add('over'); }
     function handleDragLeave(e) { this.classList.remove('over'); }
-
     function handleDrop(e) {
         e.stopPropagation();
         this.classList.remove('over');
-
         if (draggedItem !== this) {
             let parent = this.parentNode;
             let siblings = Array.from(parent.children);
@@ -970,12 +988,10 @@
         }
         return false;
     }
-
     function handleDragEnd(e) {
         this.classList.remove('dragging');
         document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
     }
-
     function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
         const table = document.querySelector(".table-responsive table");
         const theadRow = table.querySelector("thead tr");
@@ -998,7 +1014,7 @@
     }
 
     // ==========================================
-    // SELECTION & MASS ACTIONS
+    // SELECTION & DELETE LOGIC
     // ==========================================
     function toggleAllRowCheckboxes(sourceCb) {
         const visibleRows = document.querySelectorAll('tbody tr.account-row:not([style*="display: none"]):not(.filtered-out) .row-cb');
@@ -1026,124 +1042,62 @@
         }
 
         alert(`Initiating ZDK Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
-
         const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
         modal.hide();
         document.getElementById('selectAllCb').click();
     }
 
-    // ==========================================
-    // DATABASE NOTES AJAX SYSTEM
-    // ==========================================
-    async function openNotesPanel(accountId, accountName) {
-        currentNoteAccountId = accountId;
-        document.getElementById('noteAccountName').innerText = accountName;
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-        const list = document.getElementById('notesTimelineList');
-        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
-        offcanvas.show();
-
-        // [BACKEND INTEGRATION]
-        // Replace with your actual controller endpoint that returns JSON notes for this ID
-        try {
-            /* Example Fetch Request:
-            const response = await fetch(`/Accounts/GetNotes?accountId=${accountId}`);
-            if(response.ok) {
-                const notes = await response.json();
-                list.innerHTML = ''; // Clear loader
-                notes.forEach(note => appendNoteToUI(note.Owner, note.DateTime, note.Description, note.FileName));
-            }
-            */
-
-            // Fallback for visual testing if endpoint doesn't exist yet
-            setTimeout(() => {
-                list.innerHTML = '<p class="text-muted text-center mt-3" style="font-size:0.85rem;">No historical notes found.</p>';
-            }, 600);
-        } catch(e) {
-            list.innerHTML = '<p class="text-danger">Failed to load notes.</p>';
-        }
-    }
-
-    async function saveNote() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-        const btn = document.getElementById('btnSaveNote');
-
-        if (!text.trim() && !attachment) return;
-
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
-        btn.disabled = true;
-
-        // [BACKEND INTEGRATION]
-        // You will need a method in your AccountsController like:
-        // [HttpPost] public async Task<IActionResult> AddNote(int AccountId, string Text, IFormFile File)
-        const formData = new FormData();
-        formData.append("AccountId", currentNoteAccountId);
-        formData.append("Text", text);
-        if(attachment) formData.append("File", attachment);
-
-        try {
-            /* Example Fetch Request:
-            const response = await fetch('/Accounts/AddNote', {
+    function deleteSingleRecord(element, id) {
+        if(confirm('Are you sure you want to delete this record?')) {
+            fetch('/Accounts/BulkDelete', {
                 method: 'POST',
-                body: formData
-            });
-            if(response.ok) {
-                const now = new Date();
-                const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
-            }
-            */
-
-            // Immediate UI update for visual confirmation assuming success
-            setTimeout(() => {
-                const now = new Date();
-                const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                // Remove the "No historical notes" placeholder if it exists
-                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-                if(fallbackMsg) fallbackMsg.remove();
-
-                appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
-
-                document.getElementById('newNoteText').value = '';
-                document.getElementById('noteAttachment').value = '';
-                btn.innerHTML = 'Save Note';
-                btn.disabled = false;
-            }, 500);
-
-        } catch(e) {
-            alert("Error saving note to database.");
-            btn.innerHTML = 'Save Note';
-            btn.disabled = false;
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([parseInt(id)])
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const row = element.closest('tr.account-row');
+                    if(row) row.remove();
+                    updateSelectedCount();
+                    applyPagination();
+                } else {
+                    alert("Database Error: " + data.message);
+                }
+            })
+            .catch(error => alert("Network error occurred."));
         }
     }
 
-    function appendNoteToUI(ownerName, timeString, text, fileName) {
-        let attachmentHtml = '';
-        if(fileName) {
-            attachmentHtml = `<div class="mt-2 p-2 bg-white rounded border border-secondary shadow-sm d-inline-block"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${fileName}</span></div>`;
-        }
+    function deleteSelected() {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        if(selectedCbs.length === 0) return;
 
-        const noteHtml = `
-            <div class="timeline-item pb-3">
-                <div class="timeline-icon bg-primary text-white" style="border-color: #bfdbfe;"><i class="fa-solid fa-user" style="font-size: 10px;"></i></div>
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
-                    <small class="text-muted fw-medium"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
-                </div>
-                <div class="text-main bg-white p-3 rounded border border-soft shadow-sm mt-2" style="font-size:0.85rem; line-height: 1.5;">${text.replace(/\n/g, '<br>')}</div>
-                ${attachmentHtml}
-            </div>
-        `;
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+            fetch('/Accounts/BulkDelete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedIds)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    selectedCbs.forEach(cb => cb.closest('tr').remove());
+                    document.getElementById('selectAllCb').checked = false;
+                    updateSelectedCount();
+                    applyPagination();
+                } else {
+                    alert("Database Error: " + data.message);
+                }
+            })
+            .catch(error => alert("Network error occurred."));
+        }
     }
 
     // ==========================================
-    // EXPORT & PAGINATION
+    // EXPORT TO CSV
     // ==========================================
     function exportTableToCSV(filename) {
         const table = document.getElementById("accountsTable");
@@ -1185,93 +1139,72 @@
         document.body.removeChild(downloadLink);
     }
 
-    function applyPagination() {
-        const rows = Array.from(document.querySelectorAll('tbody tr.account-row:not(.filtered-out)'));
-        const totalRows = rows.length;
-        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+    // ==========================================
+    // NOTES AJAX SYSTEM
+    // ==========================================
+    async function openNotesPanel(accountId, accountName) {
+        currentNoteAccountId = accountId;
+        document.getElementById('noteAccountName').innerText = accountName;
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+        const list = document.getElementById('notesTimelineList');
+        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
 
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
+        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
+        offcanvas.show();
 
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
-
-        // Reset inline display searches if they exist, to prevent pagination conflicts
-        document.querySelectorAll('tbody tr.account-row').forEach(r => {
-            r.style.display = 'none';
-        });
-
-        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
-            rows[i].style.display = '';
-        }
-
-        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+        setTimeout(() => {
+            list.innerHTML = '<p class="text-muted text-center mt-3" style="font-size:0.85rem;">No historical notes found.</p>';
+        }, 600);
     }
 
-    function changePage(step) {
-        currentPage += step;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
+    async function saveNote() {
+        const text = document.getElementById('newNoteText').value;
+        const attachment = document.getElementById('noteAttachment').files[0];
+        const btn = document.getElementById('btnSaveNote');
+
+        if (!text.trim() && !attachment) return;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append("AccountId", currentNoteAccountId);
+        formData.append("Text", text);
+        if(attachment) formData.append("File", attachment);
+
+        setTimeout(() => {
+            const now = new Date();
+            const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+            if(fallbackMsg) fallbackMsg.remove();
+
+            appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
+
+            document.getElementById('newNoteText').value = '';
+            document.getElementById('noteAttachment').value = '';
+            btn.innerHTML = 'Save Note';
+            btn.disabled = false;
+        }, 500);
     }
 
-    // ==========================================
-    // DELETE SINGLE RECORD (Triggers DB Delete)
-    // ==========================================
-    function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-            // Send the single ID to the BulkDelete controller as an array
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([parseInt(id)])
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Remove from screen only AFTER database confirms success
-                    const row = element.closest('tr.account-row');
-                    if(row) row.remove();
-                    updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => alert("Network error occurred."));
+    function appendNoteToUI(ownerName, timeString, text, fileName) {
+        let attachmentHtml = '';
+        if(fileName) {
+            attachmentHtml = `<div class="mt-2 p-2 bg-white rounded border border-secondary shadow-sm d-inline-block"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${fileName}</span></div>`;
         }
-    }
-
-    // ==========================================
-    // DELETE BULK RECORDS (Triggers DB Delete)
-    // ==========================================
-    function deleteSelected() {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        if(selectedCbs.length === 0) return;
-
-        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
-            // Extract IDs from checked boxes
-            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-            // Send IDs to the Controller
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(selectedIds)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Remove from screen only AFTER database confirms success
-                    selectedCbs.forEach(cb => cb.closest('tr').remove());
-                    document.getElementById('selectAllCb').checked = false;
-                    updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => alert("Network error occurred."));
-        }
+        const noteHtml = `
+            <div class="timeline-item pb-3">
+                <div class="timeline-icon bg-primary text-white" style="border-color: #bfdbfe;"><i class="fa-solid fa-user" style="font-size: 10px;"></i></div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
+                    <small class="text-muted fw-medium"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
+                </div>
+                <div class="text-main bg-white p-3 rounded border border-soft shadow-sm mt-2" style="font-size:0.85rem; line-height: 1.5;">${text.replace(/\n/g, '<br>')}</div>
+                ${attachmentHtml}
+            </div>
+        `;
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
 </script>

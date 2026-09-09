@@ -289,6 +289,8 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
+
+
                     // =========================================================
                     // PAYMENT ROWS SYNCHRONIZATION
                     // =========================================================
@@ -353,7 +355,7 @@ namespace Radar_CRM.Controllers
                                 ContactPersonName = lead.ContactName,
                                 LeadName = lead.LeadName,
                                 LeadSource = lead.DataSources,
-                                DealOwnerId=lead.LeadOwnerId,
+                                DealOwnerId = lead.LeadOwnerId,
                                 AccountOwner = lead.AccountOwnerId,
                                 DemoOwner = lead.DemoOwnerId,
                                 AccountType = lead.AccountType,
@@ -406,5 +408,215 @@ namespace Radar_CRM.Controllers
         {
             return _context.Leads.Any(e => e.Id == id);
         }
+   
+
+    // ==========================================
+        // BULK UPLOAD EXCEL/CSV (HIGH PERFORMANCE)
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
+        {
+            if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
+
+            var leadsToInsert = new List<Lead>();
+            int currentRow = 1;
+
+            // 🚀 HIGH PERFORMANCE CACHE: Get valid IDs into memory so we don't query the DB 1000 times
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
+            var validAccountIds = new HashSet<int>(_context.Accounts.Select(a => a.Id));
+
+            try
+            {
+                using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
+                {
+                    var headerLine = await reader.ReadLineAsync(); // Skip header
+
+                    while (!reader.EndOfStream)
+                    {
+                        currentRow++;
+                        var line = await reader.ReadLineAsync();
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        var values = ParseCsvLine(line);
+
+                        if (values.Length >= 5)
+                        {
+                            // 🚀 SAFE ID EXTRACTION: Validate against the database before assigning to prevent crashes
+                            string rawLeadOwnerId = GetVal(values, 1);
+                            string rawCoOwnerId = GetVal(values, 52);
+                            string rawAccountOwnerId = GetVal(values, 126);
+                            string rawDemoOwnerId = GetVal(values, 128);
+
+                            int? parsedAccountId = int.TryParse(GetVal(values, 100), out int accId) ? accId : null;
+
+                            var newLead = new Lead
+                            {
+                                // --- Relational IDs ---
+                                LeadOwnerId = validUserIds.Contains(rawLeadOwnerId) ? rawLeadOwnerId : null,
+                                CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null,
+                                AccountOwnerId = validUserIds.Contains(rawAccountOwnerId) ? rawAccountOwnerId : null,
+                                DemoOwnerId = validUserIds.Contains(rawDemoOwnerId) ? rawDemoOwnerId : null,
+                                AccountId = parsedAccountId.HasValue && validAccountIds.Contains(parsedAccountId.Value) ? parsedAccountId.Value : null,
+
+                                // --- Basic Info ---
+                                LeadName = GetVal(values, 4),
+                                MobileNumber = GetVal(values, 71),
+                                EmailID = GetVal(values, 74),
+                                SocialLeadID = GetVal(values, 28),
+                                DataSources = GetVal(values, 8),
+                                CampaignSource = GetVal(values, 10),
+                                CurrentStatus = GetVal(values, 116),
+                                MetaCampaignName = GetVal(values, 50),
+                                Pipeline = GetVal(values, 23),
+                                ContactName = GetVal(values, 94),
+                                GroupName = GetVal(values, 124),
+                                AlternateMobile = GetVal(values, 73),
+                                AlternateEmailID = GetVal(values, 125),
+                                Description = GetVal(values, 22),
+                                AccountType = GetVal(values, 114),
+
+                                // --- Status & Financials ---
+                                Stage = GetVal(values, 5),
+                                LeadStatus = GetVal(values, 115),
+                                Budget = decimal.TryParse(GetVal(values, 3), out decimal budget) ? budget : null,
+                                ExpectedRevenue = decimal.TryParse(GetVal(values, 7), out decimal expRev) ? expRev : null,
+                                Probability = decimal.TryParse(GetVal(values, 6), out decimal prob) ? prob : null,
+                                TimePeriodToBuy = GetVal(values, 60),
+
+                                // --- Professional Info ---
+                                IsHomeopathicDoctor = GetVal(values, 102),
+                                ClinicType = GetVal(values, 82),
+                                WorkType = GetVal(values, 81),
+                                HasComputer = GetVal(values, 63),
+                                Qualification = GetVal(values, 83),
+                                YearOfPassing = GetVal(values, 76),
+                                CollegeName = GetVal(values, 72),
+                                Age = int.TryParse(GetVal(values, 69), out int age) ? age : null,
+                                YearOfPractice = int.TryParse(GetVal(values, 97), out int yop) ? yop : null,
+                                TotalExperience = int.TryParse(GetVal(values, 68), out int tExp) ? tExp : null,
+                                AveragePatientFee = decimal.TryParse(GetVal(values, 77), out decimal apf) ? apf : null,
+                                NumberOfClinics = int.TryParse(GetVal(values, 70), out int noc) ? noc : null,
+                                PatientsPerDay = int.TryParse(GetVal(values, 75), out int ppd) ? ppd : null,
+
+                                // --- Dates ---
+                                DateOfBirth = DateTime.TryParse(GetVal(values, 67), out DateTime dob) ? dob : null,
+                                CreatedDateAndTime = DateTime.TryParse(GetVal(values, 54), out DateTime cdt) ? cdt : DateTime.Now,
+                                LeadCreatedTime = DateTime.TryParse(GetVal(values, 51), out DateTime lct) ? lct : DateTime.Now,
+                                DemoScheduledDate = DateTime.TryParse(GetVal(values, 56), out DateTime demo) ? demo : null,
+                                FirstCallDate = DateTime.TryParse(GetVal(values, 55), out DateTime fcd) ? fcd : null,
+                                NextFollowUpDate = DateTime.TryParse(GetVal(values, 57), out DateTime nfd) ? nfd : null,
+                                LastContactDate = DateTime.TryParse(GetVal(values, 58), out DateTime lcd) ? lcd : null,
+                                PurchaseDate = DateTime.TryParse(GetVal(values, 65), out DateTime pd) ? pd : null,
+
+                                TrialStartDate = DateOnly.TryParse(GetVal(values, 109), out DateOnly tsd) ? tsd : null,
+                                TrialEndDate = DateOnly.TryParse(GetVal(values, 110), out DateOnly ted) ? ted : null,
+
+                                // --- Software & Purchasing ---
+                                CurrentlyUsingSoftware = GetVal(values, 78),
+                                CurrentSoftwareName = GetVal(values, 64),
+                                RadarOpusVersion = GetVal(values, 112),
+                                RadarOpusLicenseNo = GetVal(values, 111),
+                                ProductPackage = GetVal(values, 96),
+                                PurchaseValue = decimal.TryParse(GetVal(values, 66), out decimal pVal) ? pVal : null,
+                                PaymentStatus = GetVal(values, 79),
+                                CustomerStatus = GetVal(values, 80),
+
+                                // --- Deals/Payments ---
+                                DealType = GetVal(values, 107),
+                                DealValue = decimal.TryParse(GetVal(values, 105), out decimal dVal) ? dVal : null,
+                                PackageSelected = GetVal(values, 106),
+                                Discount = decimal.TryParse(GetVal(values, 104), out decimal disc) ? disc : null,
+                                PaymentMode = GetVal(values, 108),
+                                Remarks = GetVal(values, 103),
+                                PaymentType = GetVal(values, 113),
+                                SubTotal = decimal.TryParse(GetVal(values, 130), out decimal subTot) ? subTot : null,
+                                Adjustment = decimal.TryParse(GetVal(values, 131), out decimal adj) ? adj : null,
+                                Taxes = decimal.TryParse(GetVal(values, 132), out decimal tax) ? tax : null,
+                                GrandTotal = decimal.TryParse(GetVal(values, 133), out decimal grandTot) ? grandTot : null,
+
+                                // --- Address 1 ---
+                                Addr1_Country = GetVal(values, 135),
+                                Addr1_FlatHouse = GetVal(values, 136),
+                                Addr1_Street = GetVal(values, 137),
+                                Addr1_City = GetVal(values, 138),
+                                Addr1_State = GetVal(values, 139),
+                                Addr1_Zip = GetVal(values, 140),
+                                Addr1_Coordinates = GetVal(values, 141) + " " + GetVal(values, 142), // Combines Lat/Long
+
+                                // --- Address 2 ---
+                                Addr2_Country = GetVal(values, 143),
+                                Addr2_FlatHouse = GetVal(values, 144),
+                                Addr2_Street = GetVal(values, 145),
+                                Addr2_City = GetVal(values, 146),
+                                Addr2_State = GetVal(values, 147),
+                                Addr2_Zip = GetVal(values, 148),
+                                Addr2_Coordinates = GetVal(values, 149) + " " + GetVal(values, 150),
+
+                                // --- Secondary Contacts ---
+                                ContactPerson1 = GetVal(values, 117),
+                                ContactPerson2 = GetVal(values, 118),
+                                ContactPerson3 = GetVal(values, 120),
+                                Contact1Phone = GetVal(values, 119),
+                                Contact2Phone = GetVal(values, 121),
+                                Contact3Phone = GetVal(values, 122),
+
+                                // --- Other Remarks ---
+                                ConversationRemarks = GetVal(values, 59),
+                                InterestedPackage = GetVal(values, 62),
+                                LostReason = GetVal(values, 61),
+                                LeadProfile = GetVal(values, 95)
+                            };
+
+                            leadsToInsert.Add(newLead);
+                        }
+                    }
+                }
+
+                // 🚀 MASSIVE SPEED BOOST: Turn off tracking during bulk insert to stop Entity Framework from hanging
+                _context.ChangeTracker.AutoDetectChangesEnabled = false;
+
+                await _context.Leads.AddRangeAsync(leadsToInsert);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
+            }
+            finally
+            {
+                // Always turn tracking back on when finished
+                _context.ChangeTracker.AutoDetectChangesEnabled = true;
+            }
+
+            return Ok();
+        }
+
+        // --- Helper Methods to parse CSV properly ---
+        private string GetVal(string[] values, int index)
+        {
+            if (index < values.Length) return values[index]?.Trim() ?? "";
+            return "";
+        }
+
+        private string[] ParseCsvLine(string line)
+        {
+            var result = new List<string>();
+            bool inQuotes = false;
+            var currentField = new System.Text.StringBuilder();
+
+            foreach (char c in line)
+            {
+                if (c == '\"') inQuotes = !inQuotes;
+                else if (c == ',' && !inQuotes)
+                {
+                    result.Add(currentField.ToString());
+                    currentField.Clear();
+                }
+                else currentField.Append(c);
+            }
+            result.Add(currentField.ToString());
+            return result.ToArray();
+        }
     }
-}
+    }

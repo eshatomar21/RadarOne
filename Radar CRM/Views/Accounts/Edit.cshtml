@@ -262,6 +262,92 @@
             padding-right: 90px; /* Space for the button inside */
         }
 
+    /* --- NEW SIDEBAR LAYOUT STYLES --- */
+    .page-wrapper {
+        display: flex;
+        gap: 24px;
+        max-width: 1800px;
+        margin: 30px auto;
+        width: 98%;
+        align-items: flex-start;
+    }
+
+        /* Override your existing sf-container margin to fit inside the wrapper */
+        .page-wrapper .sf-container {
+            margin: 0;
+            width: 100%;
+            flex-grow: 1;
+        }
+
+    .sf-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        background-color: var(--theme-surface);
+        border-radius: 16px;
+        box-shadow: var(--theme-shadow-float);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        padding: 24px 16px;
+        position: sticky;
+        top: 30px; /* Keeps sidebar in view when scrolling down */
+    }
+
+    .sidebar-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--theme-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 16px;
+        padding-left: 8px;
+    }
+
+    .rl-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        border-radius: 10px;
+        color: var(--theme-text-main);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.95rem;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+        background: transparent;
+        cursor: pointer;
+        width: 100%;
+        text-align: left;
+    }
+
+        .rl-item i {
+            color: var(--theme-text-muted);
+            width: 24px;
+            transition: all 0.2s;
+        }
+
+        .rl-item:hover {
+            background-color: var(--theme-navy-light);
+            border-color: #dbeafe;
+            color: var(--theme-navy-primary);
+            transform: translateX(4px);
+        }
+
+            .rl-item:hover i {
+                color: var(--theme-navy-primary);
+            }
+
+    .rl-badge {
+        background: var(--theme-navy-primary);
+        color: #ffffff;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 12px;
+        min-width: 24px;
+        text-align: center;
+    }
+
         .verify-group .btn-verify {
             position: absolute;
             right: 4px;

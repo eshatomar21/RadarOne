@@ -415,16 +415,39 @@ namespace Radar_CRM.Controllers
             var account = await _context.Accounts.FindAsync(id);
             if (account != null)
             {
+                // 🚀 FIX: Find and delete related DEALS first to clear the database constraint
+                var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId == id).ToListAsync();
+                if (relatedDeals.Any())
+                {
+                    _context.Set<Deal>().RemoveRange(relatedDeals);
+                }
+
+                // 🚀 FIX: Find and delete related Leads
+                if (_context.Leads != null)
+                {
+                    var relatedLeads = await _context.Leads.Where(l => l.AccountId == id).ToListAsync();
+                    if (relatedLeads.Any())
+                    {
+                        _context.Leads.RemoveRange(relatedLeads);
+                    }
+                }
+
+                // 🚀 FIX: Find and delete related Notes
+                if (_context.Note != null)
+                {
+                    var relatedNotes = await _context.Note.Where(n => n.AccountId == id).ToListAsync();
+                    if (relatedNotes.Any())
+                    {
+                        _context.Note.RemoveRange(relatedNotes);
+                    }
+                }
+
+                // Now it's safe to remove the account!
                 _context.Accounts.Remove(account);
-
-                // Optional: You may also want to delete associated notes/files here 
-                // before deleting the account to prevent orphaned records in the DB.
-
                 await _context.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
         }
-
         // ==========================================
         // BULK DELETE: AJAX POST
         // ==========================================
@@ -445,12 +468,34 @@ namespace Radar_CRM.Controllers
 
                 if (accountsToDelete != null && accountsToDelete.Any())
                 {
-                    // Safely remove associated notes if the table exists
+                    // 🚀 FIX: Safely remove associated DEALS first to clear the database constraint
+                    var relatedDeals = await _context.Set<Deal>()
+                        .Where(d => d.AccountId != null && ids.Contains((int)d.AccountId))
+                        .ToListAsync();
+
+                    if (relatedDeals.Any())
+                    {
+                        _context.Set<Deal>().RemoveRange(relatedDeals);
+                    }
+
+                    // Safely remove associated LEADS 
+                    if (_context.Leads != null)
+                    {
+                        var relatedLeads = await _context.Leads
+                            .Where(l => l.AccountId != null && ids.Contains((int)l.AccountId))
+                            .ToListAsync();
+
+                        if (relatedLeads != null && relatedLeads.Any())
+                        {
+                            _context.Leads.RemoveRange(relatedLeads);
+                        }
+                    }
+
+                    // Safely remove associated NOTES
                     if (_context.Note != null)
                     {
-                        // 🚀 Check against the AccountId foreign key instead of ModuleName
                         var relatedNotes = await _context.Note
-                            .Where(n => n.AccountId != null && ids.Contains(n.AccountId.Value))
+                            .Where(n => n.AccountId != null && ids.Contains((int)n.AccountId))
                             .ToListAsync();
 
                         if (relatedNotes != null && relatedNotes.Any())
@@ -459,7 +504,7 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
-                    // Remove the Accounts
+                    // Finally, remove the Accounts!
                     _context.Accounts.RemoveRange(accountsToDelete);
                     await _context.SaveChangesAsync();
                 }
@@ -468,8 +513,11 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                string errorMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return Json(new { success = false, message = "Error: " + errorMsg });
+                // This grabs the deepest, most specific database error
+                var errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                Console.WriteLine("DELETE ERROR: " + errorMessage);
+
+                return StatusCode(500, errorMessage);
             }
         }
         // ==========================================
@@ -486,21 +534,27 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // UPLOAD FILE
+        // UPLOAD FILE (With Advanced Error Tracking)
         // ==========================================
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
+            var accountsToInsert = new List<Account>();
+            int currentRow = 1; // Start at 1 for the header
+            // NEW: Fetch all valid User IDs into a super-fast lookup list
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
+
             try
             {
                 using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    var headerLine = await reader.ReadLineAsync(); // Skip the header
+                    var headerLine = await reader.ReadLineAsync(); // Skip header
 
                     while (!reader.EndOfStream)
                     {
+                        currentRow++;
                         var line = await reader.ReadLineAsync();
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
@@ -508,9 +562,14 @@ namespace Radar_CRM.Controllers
 
                         if (values.Length >= 4)
                         {
+                            // 🚀 FIX: Used indexes 1 and 64 to get the actual ID, not the Name string
+                            string rawOwnerId = GetVal(values, 1);
+                            string rawCoOwnerId = GetVal(values, 64);
+
                             var newAccount = new Account
                             {
-                                AccountOwnerId = GetVal(values, 2),
+                                // --- Existing Fields ---
+                                AccountOwnerId = validUserIds.Contains(rawOwnerId) ? rawOwnerId : null,
                                 AccountName = GetVal(values, 3),
                                 Email = GetVal(values, 5),
                                 AlternateMobile = GetVal(values, 6),
@@ -519,7 +578,7 @@ namespace Radar_CRM.Controllers
                                 Description = GetVal(values, 17),
                                 IsDuplicated = bool.TryParse(GetVal(values, 62), out bool isDup) && isDup,
                                 MetaCampaignName = GetVal(values, 63),
-                                CoOwnerId = GetVal(values, 65),
+                                CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null,
                                 CurrentStatus = GetVal(values, 112),
                                 AccountType = GetVal(values, 113),
                                 ContactPersonName = GetVal(values, 114),
@@ -528,20 +587,97 @@ namespace Radar_CRM.Controllers
                                 QualificationStatus = GetVal(values, 129),
                                 SeminarName = GetVal(values, 88),
                                 DateOfEntry = DateTime.TryParse(GetVal(values, 95), out DateTime doe) ? doe : DateTime.Now,
+                                LeadStatus = GetVal(values, 127),
+
+                                // 🚀 NEW: Address 1 Mapping
+                                Addr1_Country = GetVal(values, 96),
+                                Addr1_FlatHouse = GetVal(values, 97),
+                                Addr1_Street = GetVal(values, 98),
+                                Addr1_City = GetVal(values, 99),
+                                Addr1_State = GetVal(values, 100),
+                                Addr1_Zip = GetVal(values, 101),
+                                Addr1_Latitude = GetVal(values, 102),
+                                Addr1_Longitude = GetVal(values, 103),
+
+                                // 🚀 NEW: Address 2 Mapping
+                                Addr2_Country = GetVal(values, 67),
+                                Addr2_FlatHouse = GetVal(values, 68),
+                                Addr2_Street = GetVal(values, 69),
+                                Addr2_City = GetVal(values, 70),
+                                Addr2_State = GetVal(values, 71),
+                                Addr2_Zip = GetVal(values, 72),
+                                Addr2_Latitude = GetVal(values, 73),
+                                Addr2_Longitude = GetVal(values, 74),
+
+                                // 🚀 NEW: Professional Profile (Strings)
+                                IsHomeopathicDoctor = GetVal(values, 124),
+                                ClinicType = GetVal(values, 110),
+                                Qualification = GetVal(values, 86),
+                                YearOfPassing = GetVal(values, 77),
+                                WorkType = GetVal(values, 123),
+                                HasComputer = GetVal(values, 122),
+                                CollegeName = GetVal(values, 78),
+
+                                // 🚀 NEW: Professional Profile (Numbers/Dates)
+                                YearsOfPractice = int.TryParse(GetVal(values, 75), out int yop) ? yop : null,
+                                AveragePatientFee = decimal.TryParse(GetVal(values, 79), out decimal fee) ? fee : null,
+                                DateOfBirth = DateTime.TryParse(GetVal(values, 76), out DateTime dob) ? dob : null,
+                                PatientsPerDay = int.TryParse(GetVal(values, 104), out int ppd) ? ppd : null,
+                                TotalExperience = int.TryParse(GetVal(values, 92), out int exp) ? exp : null,
+                                NumberOfClinics = int.TryParse(GetVal(values, 83), out int noc) ? noc : null,
+                                Age = int.TryParse(GetVal(values, 82), out int age) ? age : null,
+
+                                // 🚀 NEW: Software & Purchases
+                                CurrentlyUsingSoftware = GetVal(values, 111),
+                                CurrentSoftwareName = GetVal(values, 85),
+                                ProductPurchased = GetVal(values, 106),
+                                PurchaseDate = DateTime.TryParse(GetVal(values, 105), out DateTime pDate) ? pDate : null,
+                                PurchaseValue = decimal.TryParse(GetVal(values, 107), out decimal pVal) ? pVal : null,
+                                PaymentType = GetVal(values, 108),
+                                PaymentStatus = GetVal(values, 109),
+
+                                // 🚀 NEW: Additional Contact Persons
+                                ContactPerson1 = GetVal(values, 116),
+                                ContactPerson2 = GetVal(values, 117),
+                                ContactPerson3 = GetVal(values, 119),
+                                Contact1Phone = GetVal(values, 118),
+                                Contact2Phone = GetVal(values, 120),
+                                Contact3Phone = GetVal(values, 121),
+
+                                // 🚀 NEW: Profile Tracking
+                                ProfileCompletionPercentage = int.TryParse(GetVal(values, 89), out int pc) ? pc : null,
+                                ReferralSource = GetVal(values, 90),
+                                InvoiceNumber = GetVal(values, 91),
+                                Profilestatus = GetVal(values, 125),
+                                ProfileRate = int.TryParse(GetVal(values, 93), out int pr) ? pr : null
                             };
 
-                            _context.Add(newAccount);
+                            accountsToInsert.Add(newAccount);
                         }
                     }
-                    await _context.SaveChangesAsync();
                 }
-                return Ok();
+
+                // Turn off change tracking for fast bulk insert
+                _context.ChangeTracker.AutoDetectChangesEnabled = false;
+
+                await _context.Accounts.AddRangeAsync(accountsToInsert);
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                return StatusCode(500, "An error occurred while processing the file.");
+                // This digs into the database to find the EXACT error message
+                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                // Returns the row number and the exact error to your JavaScript popup
+                return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
             }
+            finally
+            {
+                // Always turn tracking back on safely
+                _context.ChangeTracker.AutoDetectChangesEnabled = true;
+            }
+
+            return Ok();
         }
 
         private string GetVal(string[] values, int index)

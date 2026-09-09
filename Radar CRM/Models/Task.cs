@@ -9,6 +9,7 @@ namespace Radar_CRM.Models
 
         // Ownership
         public string TaskOwnerId { get; set; }
+
         public string TaskOwner { get; set; }
 
         // Primary Info
