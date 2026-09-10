@@ -20,11 +20,54 @@ namespace Radar_CRM.Controllers
             _context = context;
         }
 
-        // GET: Leads/Index
-        public async Task<IActionResult> Index()
+        // ==========================================
+        // GET: Leads/Index (Paginated, Sorted, Filtered)
+        // ==========================================
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
         {
-            // Fetch all leads from the database
-            var leads = await _context.Leads.ToListAsync();
+            int pageSize = 100;
+            var query = _context.Leads.AsQueryable();
+
+            // 1. Server-Side Filtering
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(l =>
+                    (l.LeadName != null && l.LeadName.Contains(search)) ||
+                    (l.MobileNumber != null && l.MobileNumber.Contains(search)) ||
+                    (l.EmailID != null && l.EmailID.Contains(search))
+                );
+            }
+
+            // 2. Server-Side Sorting (Defaults to Id descending so newest are on top)
+            if (sortDir == "desc")
+            {
+                query = sortCol switch
+                {
+                    "LeadName" => query.OrderByDescending(l => l.LeadName),
+                    "MobileNumber" => query.OrderByDescending(l => l.MobileNumber),
+                    "CurrentStatus" => query.OrderByDescending(l => l.CurrentStatus),
+                    _ => query.OrderByDescending(l => l.Id)
+                };
+            }
+            else
+            {
+                query = sortCol switch
+                {
+                    "LeadName" => query.OrderBy(l => l.LeadName),
+                    "MobileNumber" => query.OrderBy(l => l.MobileNumber),
+                    "CurrentStatus" => query.OrderBy(l => l.CurrentStatus),
+                    _ => query.OrderBy(l => l.Id)
+                };
+            }
+
+            // 3. Server-Side Pagination
+            var totalRecords = await query.CountAsync();
+            var leads = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            ViewBag.TotalRecords = totalRecords;
+
             return View(leads);
         }
 

@@ -691,16 +691,338 @@
     let rowsPerPage = 15;
     let currentNoteAccountId = null;
 
+    // 🚀 CACHE MEMORY: Store all rows in memory once so we don't query the DOM thousands of times
+    let allRows = [];
+    let currentVisibleRows = [];
+    let hiddenCols = new Set(); // For instant CSS toggling
+
     document.addEventListener("DOMContentLoaded", function () {
+        allRows = Array.from(document.querySelectorAll('tbody tr.account-row'));
+
+        // 🚀 Create a dynamic style tag for instant column hiding
+        const style = document.createElement('style');
+        style.id = 'dynamic-col-styles';
+        document.head.appendChild(style);
+
+        // Hide all rows initially to prevent huge layout shifts
+        allRows.forEach(r => r.style.display = 'none');
+
         setupColumnToggles();
         setupFilterInteractions();
-        populateDatalists();
+        setupLazyDatalists(); // 🚀 Lazy load fixes the page-load freezing
         applyPagination();
-        setupFileUpload(); // Initializes the upload logic safely
+        setupFileUpload();
     });
 
     // ==========================================
-    // FILE UPLOAD LOGIC
+    // 1. LAZY LOAD DATALISTS (Fixes Page Freeze on Load)
+    // ==========================================
+    function setupLazyDatalists() {
+        document.querySelectorAll('.condition-val').forEach(input => {
+            input.addEventListener('focus', function() {
+                const listId = this.getAttribute('list');
+                const datalist = document.getElementById(listId);
+
+                // Only scan rows if the datalist hasn't been populated yet
+                if(datalist && datalist.children.length === 0) {
+                    const colName = listId.replace('dl_', '');
+                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+                    if(th) {
+                        const colIndex = th.getAttribute('data-col-index');
+                        let uniqueValues = new Set();
+
+                        allRows.forEach(row => {
+                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                            if(td) {
+                                const text = td.innerText.trim();
+                                if(text) uniqueValues.add(text);
+                            }
+                        });
+
+                        let fragment = document.createDocumentFragment();
+                        uniqueValues.forEach(val => {
+                            let option = document.createElement("option");
+                            option.value = val;
+                            fragment.appendChild(option);
+                        });
+                        datalist.appendChild(fragment);
+                    }
+                }
+            });
+        });
+    }
+
+    // ==========================================
+    // 2. INSTANT COLUMN MANAGEMENT & DRAG-DROP
+    // ==========================================
+    function toggleColumnVisibility(idx, isVisible) {
+        // 🚀 CSS-BASED HIDING: Instant speed, no loops!
+        if(isVisible) hiddenCols.delete(idx);
+        else hiddenCols.add(idx);
+
+        let css = '';
+        hiddenCols.forEach(colIdx => {
+            css += `table#accountsTable th[data-col-index="${colIdx}"], table#accountsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
+        });
+        document.getElementById('dynamic-col-styles').innerHTML = css;
+    }
+
+    function setupColumnToggles() {
+        const table = document.querySelector("#accountsTable");
+        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
+        const columnMenu = document.getElementById("columnToggleMenu");
+        columnMenu.innerHTML = '';
+
+        theadRows.forEach((th) => {
+            const colIndex = th.getAttribute("data-col-index");
+            const colName = th.getAttribute("data-col-name");
+
+            if(colName) {
+                const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+                const li = document.createElement("li");
+                li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
+                li.draggable = true;
+                li.dataset.colIndex = colIndex;
+
+                li.innerHTML = `
+                    <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
+                    <div class="form-check m-0 w-100 d-flex align-items-center">
+                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+                    </div>`;
+
+                li.addEventListener('click', function(e) { e.stopPropagation(); });
+                li.addEventListener('dragstart', handleDragStart);
+                li.addEventListener('dragover', handleDragOver);
+                li.addEventListener('dragenter', handleDragEnter);
+                li.addEventListener('dragleave', handleDragLeave);
+                li.addEventListener('drop', handleDrop);
+                li.addEventListener('dragend', handleDragEnd);
+
+                columnMenu.appendChild(li);
+
+                if(!isDefault) toggleColumnVisibility(colIndex, false);
+            }
+        });
+
+        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                toggleColumnVisibility(this.value, this.checked);
+            });
+        });
+    }
+
+    let draggedItem = null;
+    function handleDragStart(e) {
+        draggedItem = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
+        setTimeout(() => this.classList.add('dragging'), 0);
+    }
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+    function handleDragEnter(e) { this.classList.add('over'); }
+    function handleDragLeave(e) { this.classList.remove('over'); }
+    function handleDrop(e) {
+        e.stopPropagation();
+        this.classList.remove('over');
+        if (draggedItem !== this) {
+            let parent = this.parentNode;
+            let siblings = Array.from(parent.children);
+            let draggedIdx = siblings.indexOf(draggedItem);
+            let targetIdx = siblings.indexOf(this);
+            let insertAfter = draggedIdx < targetIdx;
+
+            if (insertAfter) this.after(draggedItem);
+            else this.before(draggedItem);
+
+            reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+        }
+        return false;
+    }
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+    }
+
+    function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
+        document.body.style.cursor = 'wait'; // Show processing cursor
+
+        setTimeout(() => {
+            const table = document.querySelector("#accountsTable");
+            const theadRow = table.querySelector("thead tr");
+
+            const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
+            const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
+
+            if (insertAfter) targetTh.after(draggedTh);
+            else targetTh.before(draggedTh);
+
+            // 🚀 CHUNKED PROCESSING: Processes 1000s of rows in batches so the browser doesn't freeze
+            const chunkSize = 150;
+            let i = 0;
+
+            function processChunk() {
+                const end = Math.min(i + chunkSize, allRows.length);
+                for(; i < end; i++) {
+                    const row = allRows[i];
+                    const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
+                    const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
+                    if(draggedTd && targetTd) {
+                        if (insertAfter) targetTd.after(draggedTd);
+                        else targetTd.before(draggedTd);
+                    }
+                }
+                if (i < allRows.length) {
+                    requestAnimationFrame(processChunk);
+                } else {
+                    document.body.style.cursor = 'default';
+                }
+            }
+            requestAnimationFrame(processChunk);
+        }, 10);
+    }
+
+    // ==========================================
+    // 3. OPTIMIZED PAGINATION & FILTERING
+    // ==========================================
+    function applyPagination() {
+        const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
+        const totalRows = filteredRows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        // Only hide previously visible rows (Massive speed boost)
+        currentVisibleRows.forEach(r => r.style.display = 'none');
+        currentVisibleRows = [];
+
+        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
+            filteredRows[i].style.display = '';
+            currentVisibleRows.push(filteredRows[i]);
+        }
+
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+    }
+
+    function changePage(step) {
+        currentPage += step;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+    }
+
+    function setupFilterInteractions() {
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const item = this.closest('.filter-field-item');
+                if(this.checked) item.classList.add('active');
+                else {
+                    item.classList.remove('active');
+                    item.querySelector('.condition-val').value = '';
+                }
+            });
+        });
+    }
+
+    function filterSidebarItems() {
+        const q = document.getElementById('sidebarSearch').value.toLowerCase();
+        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            item.style.display = label.includes(q) ? '' : 'none';
+        });
+    }
+
+    function applyFilters() {
+        const activeFilters = [];
+        document.querySelectorAll('.filter-field-item').forEach(item => {
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                const colName = cb.value;
+                const condition = item.querySelector('.condition-select').value;
+                const val = item.querySelector('.condition-val').value.toLowerCase().trim();
+                const th = document.querySelector(`th[data-col-name="${colName}"]`);
+                if(th) activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
+            }
+        });
+
+        allRows.forEach(row => {
+            let isMatch = true;
+            for (let f of activeFilters) {
+                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+                const cellText = td ? td.innerText.trim().toLowerCase() : '';
+
+                if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
+                if (f.condition === 'is' && cellText !== f.val) isMatch = false;
+                if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
+                if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
+            }
+            row.classList.toggle('filtered-out', !isMatch);
+        });
+
+        currentPage = 1;
+        applyPagination();
+        document.getElementById('selectAllCb').checked = false;
+        updateSelectedCount();
+    }
+
+    function clearFilters() {
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.filter-field-item').classList.remove('active');
+        });
+        document.querySelectorAll('.condition-val').forEach(input => input.value = '');
+        allRows.forEach(row => row.classList.remove('filtered-out'));
+        currentPage = 1;
+        applyPagination();
+    }
+
+    function filterSingleColumn(inputEl, colIndex) {
+        const filterValue = inputEl.value.toLowerCase().trim();
+        allRows.forEach(row => {
+            if(!row.classList.contains('filtered-out')) {
+                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                if (td) {
+                    const text = td.innerText.trim().toLowerCase();
+                    row.style.display = text.includes(filterValue) ? '' : 'none';
+                }
+            }
+        });
+    }
+
+    function sortTableByCol(colIndex, direction) {
+        document.body.style.cursor = 'wait';
+        setTimeout(() => {
+            const tbody = document.getElementById("tableBody");
+
+            allRows.sort((a, b) => {
+                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+                const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
+                const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
+
+                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
+                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+                }
+
+                if (aText < bText) return direction === 'asc' ? -1 : 1;
+                if (aText > bText) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Re-append sorted rows to DOM
+            allRows.forEach(row => tbody.appendChild(row));
+            applyPagination();
+            document.body.style.cursor = 'default';
+        }, 10);
+    }
+
+    // ==========================================
+    // 4. FILE UPLOAD LOGIC
     // ==========================================
     function setupFileUpload() {
         const fileInput = document.getElementById('fileUploadInput');
@@ -739,286 +1061,18 @@
                 uploadBtn.innerHTML = originalHtml;
                 uploadBtn.disabled = false;
             });
-
-            this.value = ''; // Clear input
+            this.value = '';
         });
     }
 
     // ==========================================
-    // SIDEBAR FILTERING & SUGGESTIONS LOGIC
-    // ==========================================
-    function populateDatalists() {
-        const table = document.getElementById("accountsTable");
-        const headers = table.querySelectorAll("thead th[data-col-name]");
-
-        headers.forEach(th => {
-            const colIndex = th.getAttribute("data-col-index");
-            const colName = th.getAttribute("data-col-name");
-            const datalist = document.getElementById(`dl_${colName}`);
-
-            if (datalist) {
-                let uniqueValues = new Set();
-                table.querySelectorAll(`tbody tr.account-row td[data-col-index="${colIndex}"]`).forEach(td => {
-                    const text = td.innerText.trim();
-                    if(text) uniqueValues.add(text);
-                });
-
-                uniqueValues.forEach(val => {
-                    let option = document.createElement("option");
-                    option.value = val;
-                    datalist.appendChild(option);
-                });
-            }
-        });
-    }
-
-    function setupFilterInteractions() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-            cb.addEventListener('change', function() {
-                const item = this.closest('.filter-field-item');
-                if(this.checked) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                    item.querySelector('.condition-val').value = '';
-                }
-            });
-        });
-    }
-
-    function filterSidebarItems() {
-        const q = document.getElementById('sidebarSearch').value.toLowerCase();
-        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
-            const label = item.querySelector('label').innerText.toLowerCase();
-            item.style.display = label.includes(q) ? '' : 'none';
-        });
-    }
-
-    function applyFilters() {
-        const activeFilters = [];
-        document.querySelectorAll('.filter-field-item').forEach(item => {
-            const cb = item.querySelector('.field-checkbox');
-            if (cb && cb.checked) {
-                const colName = cb.value;
-                const condition = item.querySelector('.condition-select').value;
-                const val = item.querySelector('.condition-val').value.toLowerCase().trim();
-
-                const th = document.querySelector(`th[data-col-name="${colName}"]`);
-                if(th) {
-                    activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
-                }
-            }
-        });
-
-        document.querySelectorAll('tbody tr.account-row').forEach(row => {
-            let isMatch = true;
-            for (let f of activeFilters) {
-                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
-                const cellText = td ? td.innerText.trim().toLowerCase() : '';
-
-                if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
-                if (f.condition === 'is' && cellText !== f.val) isMatch = false;
-                if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
-                if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
-            }
-            row.classList.toggle('filtered-out', !isMatch);
-        });
-
-        currentPage = 1;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    function clearFilters() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-            cb.checked = false;
-            cb.closest('.filter-field-item').classList.remove('active');
-        });
-        document.querySelectorAll('.condition-val').forEach(input => input.value = '');
-        applyFilters();
-    }
-
-    function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase().trim();
-        document.querySelectorAll('tbody tr.account-row').forEach(row => {
-            if(row.classList.contains('filtered-out')) return;
-            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-            if (td) {
-                const text = td.innerText.trim().toLowerCase();
-                row.style.display = text.includes(filterValue) ? '' : 'none';
-            }
-        });
-    }
-
-    // ==========================================
-    // SORTING & PAGINATION
-    // ==========================================
-    function sortTableByCol(colIndex, direction) {
-        const tbody = document.getElementById("tableBody");
-        const rows = Array.from(tbody.querySelectorAll("tr.account-row"));
-
-        rows.sort((a, b) => {
-            const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-            const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
-            const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
-            const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
-
-            if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-                return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-            }
-
-            if (aText < bText) return direction === 'asc' ? -1 : 1;
-            if (aText > bText) return direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        rows.forEach(row => tbody.appendChild(row));
-        applyPagination();
-    }
-
-    function applyPagination() {
-        const rows = Array.from(document.querySelectorAll('tbody tr.account-row:not(.filtered-out)'));
-        const totalRows = rows.length;
-        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
-
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
-
-        document.querySelectorAll('tbody tr.account-row').forEach(r => {
-            r.style.display = 'none';
-        });
-
-        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
-            rows[i].style.display = '';
-        }
-
-        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
-    }
-
-    function changePage(step) {
-        currentPage += step;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    // ==========================================
-    // COLUMN MANAGEMENT
-    // ==========================================
-    let draggedItem = null;
-
-    function setupColumnToggles() {
-        const table = document.querySelector(".table-responsive table");
-        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
-        const columnMenu = document.getElementById("columnToggleMenu");
-
-        columnMenu.innerHTML = '';
-
-        theadRows.forEach((th) => {
-            const colIndex = th.getAttribute("data-col-index");
-            const colName = th.getAttribute("data-col-name");
-
-            if(colName) {
-                const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
-                const li = document.createElement("li");
-                li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
-                li.draggable = true;
-                li.dataset.colIndex = colIndex;
-
-                li.innerHTML = `
-                    <i class="fa-solid fa-grip-vertical drag-handle"></i>
-                    <div class="form-check m-0 w-100 d-flex align-items-center">
-                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
-                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
-                    </div>`;
-
-                li.addEventListener('click', function(e) { e.stopPropagation(); });
-                li.addEventListener('dragstart', handleDragStart);
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('dragenter', handleDragEnter);
-                li.addEventListener('dragleave', handleDragLeave);
-                li.addEventListener('drop', handleDrop);
-                li.addEventListener('dragend', handleDragEnd);
-
-                columnMenu.appendChild(li);
-                if(!isDefault) toggleColumnVisibility(colIndex, false);
-            }
-        });
-
-        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
-            toggle.addEventListener('change', function() {
-                toggleColumnVisibility(this.value, this.checked);
-            });
-        });
-    }
-
-    function toggleColumnVisibility(idx, isVisible) {
-        const table = document.getElementById("accountsTable");
-        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
-        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
-    }
-
-    function handleDragStart(e) {
-        draggedItem = this;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
-        setTimeout(() => this.classList.add('dragging'), 0);
-    }
-    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
-    function handleDragEnter(e) { this.classList.add('over'); }
-    function handleDragLeave(e) { this.classList.remove('over'); }
-    function handleDrop(e) {
-        e.stopPropagation();
-        this.classList.remove('over');
-        if (draggedItem !== this) {
-            let parent = this.parentNode;
-            let siblings = Array.from(parent.children);
-            let draggedIdx = siblings.indexOf(draggedItem);
-            let targetIdx = siblings.indexOf(this);
-            let insertAfter = draggedIdx < targetIdx;
-
-            if (insertAfter) this.after(draggedItem);
-            else this.before(draggedItem);
-
-            reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
-        }
-        return false;
-    }
-    function handleDragEnd(e) {
-        this.classList.remove('dragging');
-        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
-    }
-    function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
-        const table = document.querySelector(".table-responsive table");
-        const theadRow = table.querySelector("thead tr");
-        const tbodyRows = table.querySelectorAll("tbody tr");
-
-        const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
-        const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
-
-        if (insertAfter) targetTh.after(draggedTh);
-        else targetTh.before(draggedTh);
-
-        tbodyRows.forEach(row => {
-            const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
-            const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
-            if(draggedTd && targetTd) {
-                if (insertAfter) targetTd.after(draggedTd);
-                else targetTd.before(draggedTd);
-            }
-        });
-    }
-
-    // ==========================================
-    // SELECTION & DELETE LOGIC
+    // 5. BULK ACTIONS & EXPORT
     // ==========================================
     function toggleAllRowCheckboxes(sourceCb) {
-        const visibleRows = document.querySelectorAll('tbody tr.account-row:not([style*="display: none"]):not(.filtered-out) .row-cb');
-        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
+        currentVisibleRows.forEach(row => {
+            const cb = row.querySelector('.row-cb');
+            if(cb) cb.checked = sourceCb.checked;
+        });
         updateSelectedCount();
     }
 
@@ -1027,8 +1081,58 @@
         document.getElementById('selCount').innerText = selected;
         document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
 
-        const totalVisible = document.querySelectorAll('tbody tr.account-row:not([style*="display: none"]):not(.filtered-out) .row-cb').length;
+        const totalVisible = currentVisibleRows.length;
         document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
+    }
+
+    function deleteSelected() {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        if(selectedCbs.length === 0) return;
+
+        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+            fetch('/Accounts/BulkDelete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedIds)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    selectedCbs.forEach(cb => {
+                        const tr = cb.closest('tr');
+                        tr.remove();
+                        allRows = allRows.filter(r => r !== tr); // Remove from cache
+                    });
+                    document.getElementById('selectAllCb').checked = false;
+                    updateSelectedCount();
+                    applyPagination();
+                } else alert("Database Error: " + data.message);
+            }).catch(error => alert("Network error occurred."));
+        }
+    }
+
+    function deleteSingleRecord(element, id) {
+        if(confirm('Are you sure you want to delete this record?')) {
+            fetch('/Accounts/BulkDelete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([parseInt(id)])
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const row = element.closest('tr.account-row');
+                    if(row) {
+                        row.remove();
+                        allRows = allRows.filter(r => r !== row); // Remove from cache
+                    }
+                    updateSelectedCount();
+                    applyPagination();
+                } else alert("Database Error: " + data.message);
+            }).catch(error => alert("Network error occurred."));
+        }
     }
 
     function executeMassUpdate() {
@@ -1047,75 +1151,21 @@
         document.getElementById('selectAllCb').click();
     }
 
-    function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([parseInt(id)])
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const row = element.closest('tr.account-row');
-                    if(row) row.remove();
-                    updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => alert("Network error occurred."));
-        }
-    }
-
-    function deleteSelected() {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        if(selectedCbs.length === 0) return;
-
-        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
-            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(selectedIds)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    selectedCbs.forEach(cb => cb.closest('tr').remove());
-                    document.getElementById('selectAllCb').checked = false;
-                    updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => alert("Network error occurred."));
-        }
-    }
-
-    // ==========================================
-    // EXPORT TO CSV
-    // ==========================================
     function exportTableToCSV(filename) {
-        const table = document.getElementById("accountsTable");
         let csv = [];
         let headerRow = [];
+        const table = document.getElementById("accountsTable");
         table.querySelectorAll("thead th[data-col-name]").forEach(th => {
             if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
         });
         csv.push(headerRow.join(","));
 
         let targetRows = [];
-        const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
+        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
         if (checkedCbs.length > 0) {
             checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
         } else {
-            table.querySelectorAll("tbody tr.account-row").forEach(tr => {
-                if(!tr.classList.contains('filtered-out')) targetRows.push(tr);
-            });
+            targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
         }
 
         targetRows.forEach(tr => {
@@ -1140,7 +1190,7 @@
     }
 
     // ==========================================
-    // NOTES AJAX SYSTEM
+    // 6. NOTES PANEL
     // ==========================================
     async function openNotesPanel(accountId, accountName) {
         currentNoteAccountId = accountId;
@@ -1168,15 +1218,9 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
         btn.disabled = true;
 
-        const formData = new FormData();
-        formData.append("AccountId", currentNoteAccountId);
-        formData.append("Text", text);
-        if(attachment) formData.append("File", attachment);
-
         setTimeout(() => {
             const now = new Date();
             const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
             const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
             if(fallbackMsg) fallbackMsg.remove();
 

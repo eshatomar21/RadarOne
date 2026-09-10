@@ -24,9 +24,51 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // INDEX: Shows all records in the database
         // ==========================================
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
         {
-            var accounts = await _context.Accounts.ToListAsync();
+            int pageSize = 100;
+            var query = _context.Accounts.AsQueryable();
+
+            // 1. Server-Side Filtering
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(a =>
+                    (a.AccountName != null && a.AccountName.Contains(search)) ||
+                    (a.MobileNumber != null && a.MobileNumber.Contains(search)) ||
+                    (a.Email != null && a.Email.Contains(search))
+                );
+            }
+
+            // 2. Server-Side Sorting (Defaults to Id descending so newest are on top)
+            if (sortDir == "desc")
+            {
+                query = sortCol switch
+                {
+                    "AccountName" => query.OrderByDescending(a => a.AccountName),
+                    "MobileNumber" => query.OrderByDescending(a => a.MobileNumber),
+                    "CurrentStatus" => query.OrderByDescending(a => a.CurrentStatus),
+                    _ => query.OrderByDescending(a => a.Id)
+                };
+            }
+            else
+            {
+                query = sortCol switch
+                {
+                    "AccountName" => query.OrderBy(a => a.AccountName),
+                    "MobileNumber" => query.OrderBy(a => a.MobileNumber),
+                    "CurrentStatus" => query.OrderBy(a => a.CurrentStatus),
+                    _ => query.OrderBy(a => a.Id)
+                };
+            }
+
+            // 3. Server-Side Pagination
+            var totalRecords = await query.CountAsync();
+            var accounts = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            ViewBag.TotalRecords = totalRecords;
+
             return View(accounts);
         }
 
