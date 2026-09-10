@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Radar CRM")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6059bb6e098b9a8b4c1198dc47cb7a9a34e383d4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e39fe9c8e453c49f79f39547030be55ad8803e15")]
 [assembly: System.Reflection.AssemblyProductAttribute("Radar CRM")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Radar CRM")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
