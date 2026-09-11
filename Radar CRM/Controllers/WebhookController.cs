@@ -18,12 +18,13 @@ namespace Radar_CRM.Controllers
         }
 
         [HttpPost("WordpressContact")]
-        public async Task<IActionResult> ReceiveWordpressContact([FromBody] WordpressLeadDto formData, [FromHeader(Name = "X-API-KEY")] string apiKey)
+        // FIX: Removed the [FromHeader] attribute from the parentheses
+        public async Task<IActionResult> ReceiveWordpressContact([FromBody] WordpressLeadDto formData)
         {
-            // 1. SECURITY CHECK: Ensures only your WordPress site can create records
+            // 1. SECURITY CHECK: Read the header manually to prevent the 400 Validation Error
             string mySecretKey = "RADAR_CRM_SECURE_KEY_2026";
 
-            if (string.IsNullOrEmpty(apiKey) || apiKey != mySecretKey)
+            if (!Request.Headers.TryGetValue("X-API-KEY", out var extractedApiKey) || extractedApiKey != mySecretKey)
             {
                 return Unauthorized(new { message = "Invalid or missing API Key." });
             }
@@ -54,15 +55,13 @@ namespace Radar_CRM.Controllers
                                   $"GCLID: {formData.Gclid}",
 
                     // Mapping UTMs to specific fields if they exist in your model
-                    
                     MetaCampaignName = formData.UtmCampaign,
 
                     // Default system values for website leads
                     DataSource = "Website Direct",
                     CurrentStatus = "Non-User",
-                  
+
                     DateOfEntry = DateTime.Now,
-                   
                 };
 
                 // 3. SAVE TO DATABASE
