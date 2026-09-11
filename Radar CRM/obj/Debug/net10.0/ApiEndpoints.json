@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "ContainingType": "Radar_CRM.Controllers.WebhookController",
+    "Method": "ReceiveWordpressContact",
+    "RelativePath": "api/Webhook/WordpressContact",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "formData",
+        "Type": "Radar_CRM.Models.WordpressLeadDto",
+        "IsRequired": true
+      },
+      {
+        "Name": "X-API-KEY",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  }
+]

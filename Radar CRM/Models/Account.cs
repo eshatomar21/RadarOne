@@ -131,7 +131,7 @@ namespace Radar_CRM.Models
         // --- Navigation Properties ---
         // Entity Framework will now map Notes, Tasks, Leads, and Contacts directly to this Account
 
-        public virtual ICollection<Deal> Contacts { get; set; } = new List<Deal>();
+        public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>();
         public virtual ICollection<Lead> Leads { get; set; } = new List<Lead>();
         public virtual ICollection<Notes> Note { get; set; } = new List<Notes>();
         public virtual ICollection<Task> Tasks { get; set; } = new List<Task>();

@@ -2,8 +2,23 @@
 
 @{
     ViewData["Title"] = "Accounts Master";
-    // Using reflection to get table properties dynamically
-    var tableProps = Model != null && Model.Any() ? Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance) : Array.Empty<System.Reflection.PropertyInfo>();
+
+    // --- NEW: Catch pagination & state values from Controller ---
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    int totalRecords = ViewBag.TotalRecords ?? 0;
+    string currentSearch = Context.Request.Query["search"];
+    string currentSortCol = Context.Request.Query["sortCol"];
+    string currentSortDir = Context.Request.Query["sortDir"];
+
+    // EXCLUSION LIST: Removed ZohoRecordId, AccountOwnerId, and CoOwnerId as requested
+    var excludedFields = new[] { "ZohoRecordId", "AccountOwnerId", "CoOwnerId" };
+
+    // Using reflection to get table properties dynamically, excluding the specified fields
+    var tableProps = Model != null && Model.Any() ?
+        Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => !excludedFields.Contains(p.Name))
+        .ToArray() : Array.Empty<System.Reflection.PropertyInfo>();
 }
 
 <style>
@@ -443,7 +458,10 @@
     <!-- Fixed Sidebar Filter -->
     <div class="filter-sidebar">
         <div class="filter-header">
-            <h6><i class="fa-solid fa-filter text-muted me-2"></i> Filters</h6>
+            <h6>
+                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
+                Filters
+            </h6>
             <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
         </div>
         <div class="filter-search-box">
@@ -453,39 +471,108 @@
             </div>
         </div>
 
-        <div class="filter-body" id="sidebarList">
-            @foreach (var prop in tableProps)
-            {
-                <div class="filter-field-item field-item-row">
-                    <div class="form-check m-0 d-flex align-items-center">
-                        <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
-                        <label class="form-check-label flex-grow-1 fw-semibold text-dark" for="chk_@prop.Name">@prop.Name</label>
-                    </div>
-                    <div class="filter-expanded-area">
-                        <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                            <option value="contains" selected>contains</option>
-                            <option value="is">is exactly</option>
-                            <option value="is_not">is not</option>
-                            <option value="is_empty">is empty</option>
-                        </select>
-                        <!-- Native HTML5 Datalist for Dropdown Suggestions matching the image -->
-                        <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
-                        <datalist id="dl_@prop.Name">
-                            <!-- Populated dynamically via JS on load -->
-                        </datalist>
-                    </div>
+        <!-- ONE UNIFIED SCROLLING BODY -->
+        <div class="filter-body">
+
+            <!-- FREQUENTLY USED SECTION -->
+            <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
+                <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857" style="width: 12px; height: 12px; margin-right: 6px;" alt="Star">
+                    FREQUENTLY USED
                 </div>
-            }
+                <div id="pinnedItemsContainer">
+                    <!-- Pinned filters will be dynamically moved here -->
+                </div>
+            </div>
+
+            <!-- UNPINNED LIST -->
+            <div id="sidebarList">
+                @foreach (var prop in tableProps)
+                {
+                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date");
+
+                    <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
+
+                        <!-- OVERLAP FIX: Removed 'form-check', using clean Flexbox layout -->
+                        <div class="d-flex align-items-center m-0 w-100">
+
+                            <!-- Custom Star Image -->
+                            <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857"
+                                 class="pin-filter-btn unpinned-star flex-shrink-0"
+                                 style="width: 15px; height: 15px; cursor: pointer; filter: grayscale(100%) opacity(0.3); transition: all 0.2s;"
+                                 onclick="togglePinFilter(this)" title="Pin this filter" alt="Pin">
+
+                            <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
+
+                            <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
+                                @prop.Name
+                            </label>
+                        </div>
+
+                        <div class="filter-expanded-area">
+                            @if (isDate)
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="on" selected>On</option>
+                                    <option value="before">before</option>
+                                    <option value="after">after</option>
+                                    <option value="not_between">not between</option>
+                                    <option value="today">Today</option>
+                                    <option value="tomorrow">Tomorrow</option>
+                                    <option value="this_month">This Month</option>
+                                    <option value="current_fq">Current FQ</option>
+                                </select>
+                                <input type="date" class="form-control form-control-sm condition-val date-val" />
+                            }
+                            else if (prop.Name == "Id")
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is" selected>is exactly</option>
+                                    <option value="contains">contains</option>
+                                    <option value="is_not">is not</option>
+                                </select>
+                                <input type="text" class="form-control form-control-sm condition-val" placeholder="Enter ID..." />
+                            }
+                            else if (prop.Name == "AccountOwner" || prop.Name == "CurrentStatus" || prop.Name == "DataSource")
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is" selected>is exactly</option>
+                                    <option value="contains">contains</option>
+                                    <option value="is_not">is not</option>
+                                </select>
+                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Select or type..." />
+                                <datalist id="dl_@prop.Name"></datalist>
+                            }
+                            else
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="contains" selected>contains</option>
+                                    <option value="is">is exactly</option>
+                                    <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                </select>
+                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
+                                <datalist id="dl_@prop.Name"></datalist>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
         <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto">
             <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
         </div>
     </div>
-
     <!-- Table Area -->
     <div class="table-container">
         <!-- Top Toolbar -->
         <div class="table-toolbar">
+            <!-- ADD THIS NEW BLOCK FOR THE TOTAL COUNTER -->
+            <div class="me-auto d-flex align-items-center">
+                <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
+                    <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
+                </span>
+            </div>
             <div class="dropdown">
                 <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                     <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
@@ -514,13 +601,11 @@
                                     <div class="th-content">
                                         <span>@prop.Name</span>
 
-                                        <!-- Funnel Menu inside Column Header -->
                                         <div class="dropdown">
-                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="fa-solid fa-filter" style="font-size: 11px;"></i>
+                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort" style="background: transparent; border: none; padding: 0;">
+                                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
                                             </button>
                                             <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
-                                                <!-- Internal Column Search -->
                                                 <li>
                                                     <input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)">
                                                 </li>
@@ -543,7 +628,6 @@
                             }
                         }
 
-                        <!-- Actions Column -->
                         <th class="sticky-actions text-center">
                             <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
                         </th>
@@ -617,638 +701,679 @@
                     }
                 </tbody>
             </table>
-        </div>
 
-        <!-- Pagination -->
-        <div class="pagination-container">
-            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">Showing 0 records</span>
-            <div class="d-flex gap-2">
-                <button id="prevBtn" class="btn-saas" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                <button id="nextBtn" class="btn-saas" onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
-            </div>
-        </div>
-    </div>
-</div>
+            <!-- Pagination (Server-Side Integration) -->
+            <div class="pagination-container">
+                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
+                    Showing page @currentPage of @totalPages (@totalRecords total records)
+                </span>
+                <div class="d-flex gap-2">
+                    @if (currentPage > 1)
+                    {
+                        <a href="@Url.Action("Index", new { page = currentPage - 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
+                            <i class="fa-solid fa-chevron-left"></i> Prev
+                        </a>
+                    }
+                    else
+                    {
+                        <button class="btn-saas" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                    }
 
-<!-- Mass Update Modal -->
-<div class="modal fade" id="massUpdateModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body py-4">
-                <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
-                <div class="d-flex gap-3 align-items-center">
-                    <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
-                        <option value="" disabled selected>Select a field...</option>
-                        @foreach (var prop in tableProps)
-                        {
-                            <option value="@prop.Name">@prop.Name</option>
-                        }
-                    </select>
-                    <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+                    @if (currentPage < totalPages)
+                    {
+                        <a href="@Url.Action("Index", new { page = currentPage + 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    }
+                    else
+                    {
+                        <button class="btn-saas" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                    }
                 </div>
             </div>
-            <div class="modal-footer bg-light border-top-0 rounded-bottom">
-                <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
-            </div>
         </div>
     </div>
-</div>
 
-<!-- Notes Offcanvas Panel -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid var(--border-soft);">
-    <div class="offcanvas-header border-bottom bg-light">
-        <h5 class="offcanvas-title fw-bold">
-            <i class="fa-regular fa-comments text-primary me-2"></i> <span id="noteAccountName" class="text-dark"></span>
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-    </div>
-    <div class="offcanvas-body">
-        <!-- Add Note Box -->
-        <div class="mb-4">
-            <textarea id="newNoteText" class="form-control mb-2 fw-medium text-dark" rows="3" placeholder="Write a note..."></textarea>
-            <div class="d-flex justify-content-between align-items-center">
-                <input type="file" id="noteAttachment" class="form-control form-control-sm w-50" />
-                <button class="btn-saas-primary" id="btnSaveNote" onclick="saveNote()">Save Note</button>
-            </div>
-        </div>
-
-        <!-- Notes Timeline -->
-        <h6 class="text-muted fw-bold mb-3" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Timeline Log</h6>
-        <div class="timeline-container" id="notesTimelineList">
-            <!-- Notes dynamically appended here via JS -->
-        </div>
-    </div>
-</div>
-
-<script>
-    const defaultVisibleColumns = ["AccountName", "MobileNumber", "EmailID", "AccountOwner", "CurrentStatus", "DateOfEntry"];
-    let currentPage = 1;
-    let rowsPerPage = 15;
-    let currentNoteAccountId = null;
-
-    // 🚀 CACHE MEMORY: Store all rows in memory once so we don't query the DOM thousands of times
-    let allRows = [];
-    let currentVisibleRows = [];
-    let hiddenCols = new Set(); // For instant CSS toggling
-
-    document.addEventListener("DOMContentLoaded", function () {
-        allRows = Array.from(document.querySelectorAll('tbody tr.account-row'));
-
-        // 🚀 Create a dynamic style tag for instant column hiding
-        const style = document.createElement('style');
-        style.id = 'dynamic-col-styles';
-        document.head.appendChild(style);
-
-        // Hide all rows initially to prevent huge layout shifts
-        allRows.forEach(r => r.style.display = 'none');
-
-        setupColumnToggles();
-        setupFilterInteractions();
-        setupLazyDatalists(); // 🚀 Lazy load fixes the page-load freezing
-        applyPagination();
-        setupFileUpload();
-    });
-
-    // ==========================================
-    // 1. LAZY LOAD DATALISTS (Fixes Page Freeze on Load)
-    // ==========================================
-    function setupLazyDatalists() {
-        document.querySelectorAll('.condition-val').forEach(input => {
-            input.addEventListener('focus', function() {
-                const listId = this.getAttribute('list');
-                const datalist = document.getElementById(listId);
-
-                // Only scan rows if the datalist hasn't been populated yet
-                if(datalist && datalist.children.length === 0) {
-                    const colName = listId.replace('dl_', '');
-                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
-
-                    if(th) {
-                        const colIndex = th.getAttribute('data-col-index');
-                        let uniqueValues = new Set();
-
-                        allRows.forEach(row => {
-                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                            if(td) {
-                                const text = td.innerText.trim();
-                                if(text) uniqueValues.add(text);
+    <!-- Mass Update Modal -->
+    <div class="modal fade" id="massUpdateModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
+                    <div class="d-flex gap-3 align-items-center">
+                        <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
+                            <option value="" disabled selected>Select a field...</option>
+                            @foreach (var prop in tableProps)
+                            {
+                                <option value="@prop.Name">@prop.Name</option>
                             }
-                        });
-
-                        let fragment = document.createDocumentFragment();
-                        uniqueValues.forEach(val => {
-                            let option = document.createElement("option");
-                            option.value = val;
-                            fragment.appendChild(option);
-                        });
-                        datalist.appendChild(fragment);
-                    }
-                }
-            });
-        });
-    }
-
-    // ==========================================
-    // 2. INSTANT COLUMN MANAGEMENT & DRAG-DROP
-    // ==========================================
-    function toggleColumnVisibility(idx, isVisible) {
-        // 🚀 CSS-BASED HIDING: Instant speed, no loops!
-        if(isVisible) hiddenCols.delete(idx);
-        else hiddenCols.add(idx);
-
-        let css = '';
-        hiddenCols.forEach(colIdx => {
-            css += `table#accountsTable th[data-col-index="${colIdx}"], table#accountsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
-        });
-        document.getElementById('dynamic-col-styles').innerHTML = css;
-    }
-
-    function setupColumnToggles() {
-        const table = document.querySelector("#accountsTable");
-        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
-        const columnMenu = document.getElementById("columnToggleMenu");
-        columnMenu.innerHTML = '';
-
-        theadRows.forEach((th) => {
-            const colIndex = th.getAttribute("data-col-index");
-            const colName = th.getAttribute("data-col-name");
-
-            if(colName) {
-                const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
-                const li = document.createElement("li");
-                li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
-                li.draggable = true;
-                li.dataset.colIndex = colIndex;
-
-                li.innerHTML = `
-                    <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
-                    <div class="form-check m-0 w-100 d-flex align-items-center">
-                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
-                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
-                    </div>`;
-
-                li.addEventListener('click', function(e) { e.stopPropagation(); });
-                li.addEventListener('dragstart', handleDragStart);
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('dragenter', handleDragEnter);
-                li.addEventListener('dragleave', handleDragLeave);
-                li.addEventListener('drop', handleDrop);
-                li.addEventListener('dragend', handleDragEnd);
-
-                columnMenu.appendChild(li);
-
-                if(!isDefault) toggleColumnVisibility(colIndex, false);
-            }
-        });
-
-        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
-            toggle.addEventListener('change', function() {
-                toggleColumnVisibility(this.value, this.checked);
-            });
-        });
-    }
-
-    let draggedItem = null;
-    function handleDragStart(e) {
-        draggedItem = this;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
-        setTimeout(() => this.classList.add('dragging'), 0);
-    }
-    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
-    function handleDragEnter(e) { this.classList.add('over'); }
-    function handleDragLeave(e) { this.classList.remove('over'); }
-    function handleDrop(e) {
-        e.stopPropagation();
-        this.classList.remove('over');
-        if (draggedItem !== this) {
-            let parent = this.parentNode;
-            let siblings = Array.from(parent.children);
-            let draggedIdx = siblings.indexOf(draggedItem);
-            let targetIdx = siblings.indexOf(this);
-            let insertAfter = draggedIdx < targetIdx;
-
-            if (insertAfter) this.after(draggedItem);
-            else this.before(draggedItem);
-
-            reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
-        }
-        return false;
-    }
-    function handleDragEnd(e) {
-        this.classList.remove('dragging');
-        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
-    }
-
-    function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
-        document.body.style.cursor = 'wait'; // Show processing cursor
-
-        setTimeout(() => {
-            const table = document.querySelector("#accountsTable");
-            const theadRow = table.querySelector("thead tr");
-
-            const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
-            const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
-
-            if (insertAfter) targetTh.after(draggedTh);
-            else targetTh.before(draggedTh);
-
-            // 🚀 CHUNKED PROCESSING: Processes 1000s of rows in batches so the browser doesn't freeze
-            const chunkSize = 150;
-            let i = 0;
-
-            function processChunk() {
-                const end = Math.min(i + chunkSize, allRows.length);
-                for(; i < end; i++) {
-                    const row = allRows[i];
-                    const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
-                    const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
-                    if(draggedTd && targetTd) {
-                        if (insertAfter) targetTd.after(draggedTd);
-                        else targetTd.before(draggedTd);
-                    }
-                }
-                if (i < allRows.length) {
-                    requestAnimationFrame(processChunk);
-                } else {
-                    document.body.style.cursor = 'default';
-                }
-            }
-            requestAnimationFrame(processChunk);
-        }, 10);
-    }
-
-    // ==========================================
-    // 3. OPTIMIZED PAGINATION & FILTERING
-    // ==========================================
-    function applyPagination() {
-        const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
-        const totalRows = filteredRows.length;
-        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
-
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
-
-        // Only hide previously visible rows (Massive speed boost)
-        currentVisibleRows.forEach(r => r.style.display = 'none');
-        currentVisibleRows = [];
-
-        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
-            filteredRows[i].style.display = '';
-            currentVisibleRows.push(filteredRows[i]);
-        }
-
-        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
-    }
-
-    function changePage(step) {
-        currentPage += step;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    function setupFilterInteractions() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-            cb.addEventListener('change', function() {
-                const item = this.closest('.filter-field-item');
-                if(this.checked) item.classList.add('active');
-                else {
-                    item.classList.remove('active');
-                    item.querySelector('.condition-val').value = '';
-                }
-            });
-        });
-    }
-
-    function filterSidebarItems() {
-        const q = document.getElementById('sidebarSearch').value.toLowerCase();
-        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
-            const label = item.querySelector('label').innerText.toLowerCase();
-            item.style.display = label.includes(q) ? '' : 'none';
-        });
-    }
-
-    function applyFilters() {
-        const activeFilters = [];
-        document.querySelectorAll('.filter-field-item').forEach(item => {
-            const cb = item.querySelector('.field-checkbox');
-            if (cb && cb.checked) {
-                const colName = cb.value;
-                const condition = item.querySelector('.condition-select').value;
-                const val = item.querySelector('.condition-val').value.toLowerCase().trim();
-                const th = document.querySelector(`th[data-col-name="${colName}"]`);
-                if(th) activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
-            }
-        });
-
-        allRows.forEach(row => {
-            let isMatch = true;
-            for (let f of activeFilters) {
-                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
-                const cellText = td ? td.innerText.trim().toLowerCase() : '';
-
-                if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
-                if (f.condition === 'is' && cellText !== f.val) isMatch = false;
-                if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
-                if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
-            }
-            row.classList.toggle('filtered-out', !isMatch);
-        });
-
-        currentPage = 1;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    function clearFilters() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-            cb.checked = false;
-            cb.closest('.filter-field-item').classList.remove('active');
-        });
-        document.querySelectorAll('.condition-val').forEach(input => input.value = '');
-        allRows.forEach(row => row.classList.remove('filtered-out'));
-        currentPage = 1;
-        applyPagination();
-    }
-
-    function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase().trim();
-        allRows.forEach(row => {
-            if(!row.classList.contains('filtered-out')) {
-                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                if (td) {
-                    const text = td.innerText.trim().toLowerCase();
-                    row.style.display = text.includes(filterValue) ? '' : 'none';
-                }
-            }
-        });
-    }
-
-    function sortTableByCol(colIndex, direction) {
-        document.body.style.cursor = 'wait';
-        setTimeout(() => {
-            const tbody = document.getElementById("tableBody");
-
-            allRows.sort((a, b) => {
-                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
-                const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
-                const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
-
-                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-                }
-
-                if (aText < bText) return direction === 'asc' ? -1 : 1;
-                if (aText > bText) return direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            // Re-append sorted rows to DOM
-            allRows.forEach(row => tbody.appendChild(row));
-            applyPagination();
-            document.body.style.cursor = 'default';
-        }, 10);
-    }
-
-    // ==========================================
-    // 4. FILE UPLOAD LOGIC
-    // ==========================================
-    function setupFileUpload() {
-        const fileInput = document.getElementById('fileUploadInput');
-        if(!fileInput) return;
-
-        fileInput.addEventListener('change', function () {
-            const file = this.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('uploadedFile', file);
-
-            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
-            const originalHtml = uploadBtn.innerHTML;
-            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
-            uploadBtn.disabled = true;
-
-            fetch('@Url.Action("UploadFile", "Accounts")', {
-                method: 'POST',
-                body: formData
-            })
-            .then(async response => {
-                if (response.ok) {
-                    alert("Data uploaded successfully!");
-                    window.location.reload();
-                } else {
-                    const errorText = await response.text();
-                    alert("Upload Failed: " + errorText);
-                    uploadBtn.innerHTML = originalHtml;
-                    uploadBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert("Network error during upload.");
-                uploadBtn.innerHTML = originalHtml;
-                uploadBtn.disabled = false;
-            });
-            this.value = '';
-        });
-    }
-
-    // ==========================================
-    // 5. BULK ACTIONS & EXPORT
-    // ==========================================
-    function toggleAllRowCheckboxes(sourceCb) {
-        currentVisibleRows.forEach(row => {
-            const cb = row.querySelector('.row-cb');
-            if(cb) cb.checked = sourceCb.checked;
-        });
-        updateSelectedCount();
-    }
-
-    function updateSelectedCount() {
-        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
-        document.getElementById('selCount').innerText = selected;
-        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
-
-        const totalVisible = currentVisibleRows.length;
-        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
-    }
-
-    function deleteSelected() {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        if(selectedCbs.length === 0) return;
-
-        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
-            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(selectedIds)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    selectedCbs.forEach(cb => {
-                        const tr = cb.closest('tr');
-                        tr.remove();
-                        allRows = allRows.filter(r => r !== tr); // Remove from cache
-                    });
-                    document.getElementById('selectAllCb').checked = false;
-                    updateSelectedCount();
-                    applyPagination();
-                } else alert("Database Error: " + data.message);
-            }).catch(error => alert("Network error occurred."));
-        }
-    }
-
-    function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-            fetch('/Accounts/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([parseInt(id)])
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const row = element.closest('tr.account-row');
-                    if(row) {
-                        row.remove();
-                        allRows = allRows.filter(r => r !== row); // Remove from cache
-                    }
-                    updateSelectedCount();
-                    applyPagination();
-                } else alert("Database Error: " + data.message);
-            }).catch(error => alert("Network error occurred."));
-        }
-    }
-
-    function executeMassUpdate() {
-        const field = document.getElementById('massUpdateField').value;
-        const val = document.getElementById('massUpdateValue').value;
-        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
-
-        if(!field || selectedIds.length === 0) {
-            alert("Please select a field and ensure records are checked.");
-            return;
-        }
-
-        alert(`Initiating ZDK Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
-        const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
-        modal.hide();
-        document.getElementById('selectAllCb').click();
-    }
-
-    function exportTableToCSV(filename) {
-        let csv = [];
-        let headerRow = [];
-        const table = document.getElementById("accountsTable");
-        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
-            if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
-        });
-        csv.push(headerRow.join(","));
-
-        let targetRows = [];
-        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-        if (checkedCbs.length > 0) {
-            checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
-        } else {
-            targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
-        }
-
-        targetRows.forEach(tr => {
-            let rowData = [];
-            tr.querySelectorAll("td[data-col-index]").forEach(td => {
-                if(td.style.display !== 'none') {
-                    let text = td.innerText.trim().replace(/"/g, '""');
-                    rowData.push(`"${text}"`);
-                }
-            });
-            csv.push(rowData.join(","));
-        });
-
-        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
-        let downloadLink = document.createElement("a");
-        downloadLink.download = filename;
-        downloadLink.href = window.URL.createObjectURL(csvFile);
-        downloadLink.style.display = "none";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-    }
-
-    // ==========================================
-    // 6. NOTES PANEL
-    // ==========================================
-    async function openNotesPanel(accountId, accountName) {
-        currentNoteAccountId = accountId;
-        document.getElementById('noteAccountName').innerText = accountName;
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-        const list = document.getElementById('notesTimelineList');
-        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
-        offcanvas.show();
-
-        setTimeout(() => {
-            list.innerHTML = '<p class="text-muted text-center mt-3" style="font-size:0.85rem;">No historical notes found.</p>';
-        }, 600);
-    }
-
-    async function saveNote() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-        const btn = document.getElementById('btnSaveNote');
-
-        if (!text.trim() && !attachment) return;
-
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
-        btn.disabled = true;
-
-        setTimeout(() => {
-            const now = new Date();
-            const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-            if(fallbackMsg) fallbackMsg.remove();
-
-            appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
-
-            document.getElementById('newNoteText').value = '';
-            document.getElementById('noteAttachment').value = '';
-            btn.innerHTML = 'Save Note';
-            btn.disabled = false;
-        }, 500);
-    }
-
-    function appendNoteToUI(ownerName, timeString, text, fileName) {
-        let attachmentHtml = '';
-        if(fileName) {
-            attachmentHtml = `<div class="mt-2 p-2 bg-white rounded border border-secondary shadow-sm d-inline-block"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${fileName}</span></div>`;
-        }
-        const noteHtml = `
-            <div class="timeline-item pb-3">
-                <div class="timeline-icon bg-primary text-white" style="border-color: #bfdbfe;"><i class="fa-solid fa-user" style="font-size: 10px;"></i></div>
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
-                    <small class="text-muted fw-medium"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
+                        </select>
+                        <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+                    </div>
                 </div>
-                <div class="text-main bg-white p-3 rounded border border-soft shadow-sm mt-2" style="font-size:0.85rem; line-height: 1.5;">${text.replace(/\n/g, '<br>')}</div>
-                ${attachmentHtml}
+                <div class="modal-footer bg-light border-top-0 rounded-bottom">
+                    <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
+                </div>
             </div>
-        `;
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-    }
-</script>
+        </div>
+    </div>
+
+    <!-- Notes Offcanvas Panel -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid var(--border-soft);">
+        <div class="offcanvas-header border-bottom bg-light">
+            <h5 class="offcanvas-title fw-bold">
+                <i class="fa-regular fa-comments text-primary me-2"></i> <span id="noteAccountName" class="text-dark"></span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <!-- Add Note Box -->
+            <div class="mb-4">
+                <textarea id="newNoteText" class="form-control mb-2 fw-medium text-dark" rows="3" placeholder="Write a note..."></textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <input type="file" id="noteAttachment" class="form-control form-control-sm w-50" />
+                    <button class="btn-saas-primary" id="btnSaveNote" onclick="saveNote()">Save Note</button>
+                </div>
+            </div>
+
+            <!-- Notes Timeline -->
+            <h6 class="text-muted fw-bold mb-3" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Timeline Log</h6>
+            <div class="timeline-container" id="notesTimelineList">
+                <!-- Notes dynamically appended here via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+            // ==========================================
+            // 1. GLOBAL VARIABLES & INITIALIZATION
+            // ==========================================
+            const defaultVisibleColumns = ["AccountName", "MobileNumber", "Email", "CurrentStatus", "DateOfEntry"];
+            let currentNoteAccountId = null;
+
+            // CACHE MEMORY: Store all rows in memory once so we don't query the DOM repeatedly
+            let allRows = [];
+            let currentVisibleRows = [];
+            let hiddenCols = new Set();
+
+            document.addEventListener("DOMContentLoaded", function () {
+                allRows = Array.from(document.querySelectorAll('tbody tr.account-row'));
+
+                // Create a dynamic style tag for instant CSS-based column hiding
+                const style = document.createElement('style');
+                style.id = 'dynamic-col-styles';
+                document.head.appendChild(style);
+
+                // Hide all rows initially to prevent layout shifts
+                allRows.forEach(r => r.style.display = 'none');
+
+                // Initialize all modules
+                setupColumnToggles();
+                setupFilterInteractions();
+                setupLazyDatalists();
+                refreshVisibleRows(); // Adapted to apply current filtering logic to the 100 rows
+                setupFileUpload();
+            });
+
+            // ==========================================
+            // 2. JS FILTER/SORT REFRESH (Adapted for 100-record Server Pagination)
+            // ==========================================
+            function refreshVisibleRows() {
+                // Keeps local filters working without fighting the server's pagination
+                const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
+
+                currentVisibleRows.forEach(r => r.style.display = 'none');
+                currentVisibleRows = [...filteredRows];
+                currentVisibleRows.forEach(r => r.style.display = '');
+
+                // Uncheck "Select All" to prevent accidental mass actions on hidden records
+                const selectAllCb = document.getElementById('selectAllCb');
+                if (selectAllCb) selectAllCb.checked = false;
+                updateSelectedCount();
+            }
+
+            // ==========================================
+            // 3. FILTERING & SEARCHING
+            // ==========================================
+            function togglePinFilter(imgElement) {
+                const item = imgElement.closest('.filter-field-item');
+                const pinnedWrapper = document.getElementById('pinnedFilters');
+                const pinnedContainer = document.getElementById('pinnedItemsContainer');
+                const unpinnedContainer = document.getElementById('sidebarList');
+
+                if (imgElement.classList.contains('unpinned-star')) {
+                    imgElement.classList.replace('unpinned-star', 'pinned-star');
+                    imgElement.style.filter = "none";
+                    imgElement.style.opacity = "1";
+                    pinnedContainer.appendChild(item);
+                    pinnedWrapper.style.display = 'block';
+                } else {
+                    imgElement.classList.replace('pinned-star', 'unpinned-star');
+                    imgElement.style.filter = "grayscale(100%) opacity(0.3)";
+                    unpinnedContainer.appendChild(item);
+
+                    if (pinnedContainer.querySelectorAll('.filter-field-item').length === 0) {
+                        pinnedWrapper.style.display = 'none';
+                    }
+                }
+            }
+
+            function setupFilterInteractions() {
+                document.querySelectorAll('.field-checkbox').forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        const item = this.closest('.filter-field-item');
+                        if(this.checked) item.classList.add('active');
+                        else {
+                            item.classList.remove('active');
+                            item.querySelector('.condition-val').value = '';
+                        }
+                    });
+                });
+            }
+
+            function filterSidebarItems() {
+                const q = document.getElementById('sidebarSearch').value.toLowerCase();
+                document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
+                    const label = item.querySelector('label').innerText.toLowerCase();
+                    item.style.display = label.includes(q) ? '' : 'none';
+                });
+            }
+
+                   function applyFilters() {
+                const activeFilters = [];
+                document.querySelectorAll('.filter-field-item.active').forEach(item => {
+                    const cb = item.querySelector('.field-checkbox');
+                    if (cb && cb.checked) {
+                        const colName = cb.value;
+                        const condition = item.querySelector('.condition-select').value;
+                        let val = item.querySelector('.condition-val').value;
+                        const isDate = item.dataset.fieldType === "date";
+
+                        if(!isDate) val = val.toLowerCase().trim();
+
+                        const th = document.querySelector(`th[data-col-name="${colName}"]`);
+                        if(th) activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val, isDate });
+                    }
+                });
+
+                allRows.forEach(row => {
+                    let isMatch = true;
+                    for (let f of activeFilters) {
+                        const td = row.querySelector(`td[data-col-index="${f.index}"]`);
+                        // FIX: Changed innerText to textContent so it can read hidden columns
+                        const cellText = td ? td.textContent.trim() : '';
+
+                        if (f.isDate) {
+                            if (['today', 'this_month', 'tomorrow', 'current_fq'].includes(f.condition)) {
+                                if(!cellText) isMatch = false;
+                            } else if (f.val) {
+                                let rowDate = new Date(cellText);
+                                let filterDate = new Date(f.val);
+
+                                if (!isNaN(rowDate) && !isNaN(filterDate)) {
+                                    rowDate.setHours(0,0,0,0);
+                                    filterDate.setHours(0,0,0,0);
+                                    if (f.condition === 'on' && rowDate.getTime() !== filterDate.getTime()) isMatch = false;
+                                    if (f.condition === 'before' && rowDate.getTime() >= filterDate.getTime()) isMatch = false;
+                                    if (f.condition === 'after' && rowDate.getTime() <= filterDate.getTime()) isMatch = false;
+                                }
+                            }
+                        } else {
+                            const lowerText = cellText.toLowerCase();
+                            if (f.condition === 'contains' && !lowerText.includes(f.val)) isMatch = false;
+                            if (f.condition === 'is' && lowerText !== f.val) isMatch = false;
+                            if (f.condition === 'is_not' && lowerText === f.val) isMatch = false;
+                            if (f.condition === 'is_empty' && lowerText !== '') isMatch = false;
+                        }
+                    }
+                    row.classList.toggle('filtered-out', !isMatch);
+                });
+
+                refreshVisibleRows();
+            }
+
+            function clearFilters() {
+                document.querySelectorAll('.field-checkbox').forEach(cb => {
+                    cb.checked = false;
+                    cb.closest('.filter-field-item').classList.remove('active');
+                });
+                document.querySelectorAll('.condition-val').forEach(input => input.value = '');
+                allRows.forEach(row => row.classList.remove('filtered-out'));
+
+                refreshVisibleRows();
+            }
+
+                    function filterSingleColumn(inputEl, colIndex) {
+                const filterValue = inputEl.value.toLowerCase().trim();
+                allRows.forEach(row => {
+                    if(!row.classList.contains('filtered-out')) {
+                        const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                        if (td) {
+                            // FIX: Changed innerText to textContent
+                            const text = td.textContent.trim().toLowerCase();
+                            row.classList.toggle('filtered-out', !text.includes(filterValue));
+                        }
+                    }
+                });
+                refreshVisibleRows();
+            }
+
+            // ==========================================
+            // 4. SORTING
+            // ==========================================
+            function sortTableByCol(colIndex, direction) {
+                document.body.style.cursor = 'wait';
+                setTimeout(() => {
+                    const tbody = document.getElementById("tableBody");
+
+                    allRows.sort((a, b) => {
+                        const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+                        const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+
+                        // FIX: Changed innerText to textContent
+                        const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
+                        const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
+
+                        if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
+                            return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+                        }
+
+                        if (aText < bText) return direction === 'asc' ? -1 : 1;
+                        if (aText > bText) return direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+
+                    // Re-append sorted rows to DOM
+                    allRows.forEach(row => tbody.appendChild(row));
+
+                    refreshVisibleRows();
+                    document.body.style.cursor = 'default';
+                }, 10);
+            }
+            // ==========================================
+            // 5. COLUMN MANAGEMENT & DRAG-DROP
+            // ==========================================
+            function toggleColumnVisibility(idx, isVisible) {
+                if(isVisible) hiddenCols.delete(idx);
+                else hiddenCols.add(idx);
+
+                let css = '';
+                hiddenCols.forEach(colIdx => {
+                    css += `table#accountsTable th[data-col-index="${colIdx}"], table#accountsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
+                });
+                document.getElementById('dynamic-col-styles').innerHTML = css;
+            }
+
+            function setupColumnToggles() {
+                const table = document.querySelector("#accountsTable");
+                const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
+                const columnMenu = document.getElementById("columnToggleMenu");
+                columnMenu.innerHTML = '';
+
+                theadRows.forEach((th) => {
+                    const colIndex = th.getAttribute("data-col-index");
+                    const colName = th.getAttribute("data-col-name");
+
+                    if(colName) {
+                        const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+                        const li = document.createElement("li");
+                        li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
+                        li.draggable = true;
+                        li.dataset.colIndex = colIndex;
+
+                        li.innerHTML = `
+                            <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
+                            <div class="form-check m-0 w-100 d-flex align-items-center">
+                                <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
+                                <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+                            </div>`;
+
+                        li.addEventListener('click', e => e.stopPropagation());
+                        li.addEventListener('dragstart', handleDragStart);
+                        li.addEventListener('dragover', handleDragOver);
+                        li.addEventListener('dragenter', handleDragEnter);
+                        li.addEventListener('dragleave', handleDragLeave);
+                        li.addEventListener('drop', handleDrop);
+                        li.addEventListener('dragend', handleDragEnd);
+
+                        columnMenu.appendChild(li);
+
+                        if(!isDefault) toggleColumnVisibility(colIndex, false);
+                    }
+                });
+
+                document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+                    toggle.addEventListener('change', function() {
+                        toggleColumnVisibility(this.value, this.checked);
+                    });
+                });
+            }
+
+            let draggedItem = null;
+            function handleDragStart(e) {
+                draggedItem = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.dataset.colIndex);
+                setTimeout(() => this.classList.add('dragging'), 0);
+            }
+            function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+            function handleDragEnter(e) { this.classList.add('over'); }
+            function handleDragLeave(e) { this.classList.remove('over'); }
+            function handleDrop(e) {
+                e.stopPropagation();
+                this.classList.remove('over');
+                if (draggedItem !== this) {
+                    let parent = this.parentNode;
+                    let siblings = Array.from(parent.children);
+                    let insertAfter = siblings.indexOf(draggedItem) < siblings.indexOf(this);
+
+                    if (insertAfter) this.after(draggedItem);
+                    else this.before(draggedItem);
+
+                    reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+                }
+                return false;
+            }
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+            }
+
+            function reorderTableColumns(draggedIdx, targetIdx, insertAfter) {
+                document.body.style.cursor = 'wait';
+                setTimeout(() => {
+                    const table = document.querySelector("#accountsTable");
+                    const theadRow = table.querySelector("thead tr");
+                    const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedIdx}"]`);
+                    const targetTh = theadRow.querySelector(`th[data-col-index="${targetIdx}"]`);
+
+                    if (insertAfter) targetTh.after(draggedTh);
+                    else targetTh.before(draggedTh);
+
+                    // Process chunks to prevent UI freeze on large datasets
+                    const chunkSize = 150;
+                    let i = 0;
+                    function processChunk() {
+                        const end = Math.min(i + chunkSize, allRows.length);
+                        for(; i < end; i++) {
+                            const row = allRows[i];
+                            const draggedTd = row.querySelector(`td[data-col-index="${draggedIdx}"]`);
+                            const targetTd = row.querySelector(`td[data-col-index="${targetIdx}"]`);
+                            if(draggedTd && targetTd) {
+                                if (insertAfter) targetTd.after(draggedTd);
+                                else targetTd.before(draggedTd);
+                            }
+                        }
+                        if (i < allRows.length) requestAnimationFrame(processChunk);
+                        else document.body.style.cursor = 'default';
+                    }
+                    requestAnimationFrame(processChunk);
+                }, 10);
+            }
+
+            // ==========================================
+            // 6. BULK ACTIONS, EXPORT & DELETE
+            // ==========================================
+            function toggleAllRowCheckboxes(sourceCb) {
+                currentVisibleRows.forEach(row => {
+                    const cb = row.querySelector('.row-cb');
+                    if(cb) cb.checked = sourceCb.checked;
+                });
+                updateSelectedCount();
+            }
+
+            function updateSelectedCount() {
+                const selected = document.querySelectorAll('tbody .row-cb:checked').length;
+                document.getElementById('selCount').innerText = selected;
+                document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+
+                const totalVisible = currentVisibleRows.length;
+                const selectAllCb = document.getElementById('selectAllCb');
+                if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
+            }
+
+            function deleteSelected() {
+                const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+                if(selectedCbs.length === 0) return;
+
+                if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+                    let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+                    fetch('/Accounts/BulkDelete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(selectedIds)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            selectedCbs.forEach(cb => {
+                                const tr = cb.closest('tr');
+                                tr.remove();
+                                allRows = allRows.filter(r => r !== tr);
+                            });
+                            document.getElementById('selectAllCb').checked = false;
+                            updateSelectedCount();
+                            refreshVisibleRows(); // Refresh current view
+                        } else alert("Database Error: " + data.message);
+                    }).catch(() => alert("Network error occurred."));
+                }
+            }
+
+            function deleteSingleRecord(element, id) {
+                if(confirm('Are you sure you want to delete this record?')) {
+                    fetch('/Accounts/BulkDelete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([parseInt(id)])
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const row = element.closest('tr.account-row');
+                            if(row) {
+                                row.remove();
+                                allRows = allRows.filter(r => r !== row);
+                            }
+                            updateSelectedCount();
+                            refreshVisibleRows();
+                        } else alert("Database Error: " + data.message);
+                    }).catch(() => alert("Network error occurred."));
+                }
+            }
+
+            function executeMassUpdate() {
+                const field = document.getElementById('massUpdateField').value;
+                const val = document.getElementById('massUpdateValue').value;
+                const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
+
+                if(!field || selectedIds.length === 0) {
+                    alert("Please select a field and ensure records are checked.");
+                    return;
+                }
+
+                alert(`Initiating ZDK Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
+                bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
+                document.getElementById('selectAllCb').click(); // clear selection
+            }
+
+            function exportTableToCSV(filename) {
+                let csv = [];
+                let headerRow = [];
+                const table = document.getElementById("accountsTable");
+
+                table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+                    if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
+                });
+                csv.push(headerRow.join(","));
+
+                let targetRows = [];
+                const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
+                if (checkedCbs.length > 0) {
+                    checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+                } else {
+                    targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+                }
+
+                targetRows.forEach(tr => {
+                    let rowData = [];
+                    tr.querySelectorAll("td[data-col-index]").forEach(td => {
+                        if(td.style.display !== 'none') {
+                            let text = td.innerText.trim().replace(/"/g, '""');
+                            rowData.push(`"${text}"`);
+                        }
+                    });
+                    csv.push(rowData.join(","));
+                });
+
+                let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+                let downloadLink = document.createElement("a");
+                downloadLink.download = filename;
+                downloadLink.href = window.URL.createObjectURL(csvFile);
+                downloadLink.style.display = "none";
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }
+
+            // ==========================================
+            // 7. FILE UPLOAD & LAZY DATALISTS
+            // ==========================================
+            function setupFileUpload() {
+                const fileInput = document.getElementById('fileUploadInput');
+                if(!fileInput) return;
+
+                fileInput.addEventListener('change', function () {
+                    const file = this.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('uploadedFile', file);
+
+                    const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+                    const originalHtml = uploadBtn.innerHTML;
+                    uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+                    uploadBtn.disabled = true;
+
+                    fetch('@Url.Action("UploadFile", "Accounts")', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(async response => {
+                        if (response.ok) {
+                            alert("Data uploaded successfully!");
+                            window.location.reload();
+                        } else {
+                            alert("Upload Failed: " + await response.text());
+                            uploadBtn.innerHTML = originalHtml;
+                            uploadBtn.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        alert("Network error during upload.");
+                        uploadBtn.innerHTML = originalHtml;
+                        uploadBtn.disabled = false;
+                    });
+                    this.value = '';
+                });
+            }
+
+            function setupLazyDatalists() {
+                document.querySelectorAll('.condition-val').forEach(input => {
+                    input.addEventListener('focus', function() {
+                        const listId = this.getAttribute('list');
+                        const datalist = document.getElementById(listId);
+
+                        if(datalist && datalist.children.length === 0) {
+                            const colName = listId.replace('dl_', '');
+                            const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+                            if(th) {
+                                const colIndex = th.getAttribute('data-col-index');
+                                let uniqueValues = new Set();
+
+                                allRows.forEach(row => {
+                                    const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                                    if(td) {
+                                        const text = td.innerText.trim();
+                                        if(text) uniqueValues.add(text);
+                                    }
+                                });
+
+                                let fragment = document.createDocumentFragment();
+                                uniqueValues.forEach(val => {
+                                    let option = document.createElement("option");
+                                    option.value = val;
+                                    fragment.appendChild(option);
+                                });
+                                datalist.appendChild(fragment);
+                            }
+                        }
+                    });
+                });
+            }
+
+            // ==========================================
+            // 8. NOTES PANEL UI
+            // ==========================================
+            async function openNotesPanel(accountId, accountName) {
+                currentNoteAccountId = accountId;
+                document.getElementById('noteAccountName').innerText = accountName;
+                document.getElementById('newNoteText').value = '';
+                document.getElementById('noteAttachment').value = '';
+
+                const list = document.getElementById('notesTimelineList');
+                list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+                new bootstrap.Offcanvas(document.getElementById('notesPanel')).show();
+
+                setTimeout(() => {
+                    list.innerHTML = '<p class="text-muted text-center mt-3" style="font-size:0.85rem;">No historical notes found.</p>';
+                }, 600);
+            }
+
+            async function saveNote() {
+                const text = document.getElementById('newNoteText').value;
+                const attachment = document.getElementById('noteAttachment').files[0];
+                const btn = document.getElementById('btnSaveNote');
+
+                if (!text.trim() && !attachment) return;
+
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+                btn.disabled = true;
+
+                setTimeout(() => {
+                    const now = new Date();
+                    const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+                    if(fallbackMsg) fallbackMsg.remove();
+
+                    appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
+
+                    document.getElementById('newNoteText').value = '';
+                    document.getElementById('noteAttachment').value = '';
+                    btn.innerHTML = 'Save Note';
+                    btn.disabled = false;
+                }, 500);
+            }
+
+            function appendNoteToUI(ownerName, timeString, text, fileName) {
+                let attachmentHtml = fileName ? `<div class="mt-2 p-2 bg-white rounded border border-secondary shadow-sm d-inline-block"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${fileName}</span></div>` : '';
+                const noteHtml = `
+                    <div class="timeline-item pb-3">
+                        <div class="timeline-icon bg-primary text-white" style="border-color: #bfdbfe;"><i class="fa-solid fa-user" style="font-size: 10px;"></i></div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
+                            <small class="text-muted fw-medium"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
+                        </div>
+                        <div class="text-main bg-white p-3 rounded border border-soft shadow-sm mt-2" style="font-size:0.85rem; line-height: 1.5;">${text.replace(/\n/g, '<br>')}</div>
+                        ${attachmentHtml}
+                    </div>`;
+                document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+            }
+    </script>

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Radar_CRM.Data;
 
@@ -11,9 +12,11 @@ using Radar_CRM.Data;
 namespace Radar_CRM.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910101446_taskpagetwo")]
+    partial class taskpagetwo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -766,8 +769,6 @@ namespace Radar_CRM.Migrations
 
                     b.HasIndex("NoteOwnerId");
 
-                    b.HasIndex("TaskId");
-
                     b.ToTable("Note");
                 });
 
@@ -986,9 +987,11 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("CreatedBy")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedById")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedTime")
@@ -998,12 +1001,13 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool?>("IsLocked")
+                    b.Property<bool>("IsLocked")
                         .HasColumnType("bit");
 
                     b.Property<DateTime?>("LastActivityTime")
@@ -1013,36 +1017,45 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("LeadStatus")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Mobile")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ModifiedBy")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ModifiedById")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ModifiedTime")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Priority")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RelatedTo")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RelatedToId")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("Reminder")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Repeat")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Subject")
@@ -1050,12 +1063,15 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Tag")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaskOwner")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaskOwnerId")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserId")
@@ -1353,7 +1369,7 @@ namespace Radar_CRM.Migrations
             modelBuilder.Entity("Radar_CRM.Models.Deal", b =>
                 {
                     b.HasOne("Radar_CRM.Models.Account", "Account")
-                        .WithMany("Deals")
+                        .WithMany("Contacts")
                         .HasForeignKey("AccountId");
 
                     b.HasOne("Radar_CRM.Models.User", "DealOwner")
@@ -1434,13 +1450,13 @@ namespace Radar_CRM.Migrations
                         .WithMany("Notes")
                         .HasForeignKey("LeadId");
 
+                    b.HasOne("Radar_CRM.Models.Task", "Task")
+                        .WithMany()
+                        .HasForeignKey("LeadId");
+
                     b.HasOne("Radar_CRM.Models.User", "NoteOwner")
                         .WithMany()
                         .HasForeignKey("NoteOwnerId");
-
-                    b.HasOne("Radar_CRM.Models.Task", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId");
 
                     b.Navigation("Account");
 
@@ -1506,7 +1522,7 @@ namespace Radar_CRM.Migrations
 
             modelBuilder.Entity("Radar_CRM.Models.Account", b =>
                 {
-                    b.Navigation("Deals");
+                    b.Navigation("Contacts");
 
                     b.Navigation("Leads");
 

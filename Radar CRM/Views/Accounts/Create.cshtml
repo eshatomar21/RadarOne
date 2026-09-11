@@ -835,10 +835,9 @@
                 <div class="row">
                     <div class="col-md-6 form-group">
                         <label class="sf-label">Note Owner</label>
-                        <select id="modalNoteOwner" class="sf-select">
-                            <option value="System User">System User</option>
-                            <!-- If you want the full user list here, you can add it just like the main form: -->
-                            <!-- <option value="User 1">User 1</option> -->
+                        <!-- Use asp-items to automatically populate the dropdown from your database -->
+                        <select id="modalNoteOwner" class="sf-select" asp-items="ViewBag.UsersList">
+                            <option value="">- System User -</option>
                         </select>
                     </div>
 
@@ -912,13 +911,19 @@
     const modal = new bootstrap.Modal(document.getElementById('noteModal'));
     modal.show();
     }
-
     function saveNote() {
-    const owner = document.getElementById('modalNoteOwner').value;
+    // Grab the Dropdown element
+    const ownerDropdown = document.getElementById('modalNoteOwner');
+
+    // The database ID (e.g., "1234-abcd...") goes to the server
+    const ownerId = ownerDropdown.value;
+
+    // The readable name (e.g., "Aman") displays on the screen right away
+    const ownerName = ownerDropdown.options[ownerDropdown.selectedIndex].text;
+
     const dateTime = document.getElementById('modalNoteDateTime').value;
     const desc = document.getElementById('modalNoteDesc').value;
 
-    // Grab the actual file input element
     const fileInput = document.getElementById('modalNoteFile');
     const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : '';
 
@@ -927,50 +932,30 @@
     return;
     }
 
-    // 1. Prepare the file input for form submission
-    fileInput.name = "SavedNoteFiles"; // This binds to the List<IFormFile> in C#
-    fileInput.removeAttribute('id');   // Remove ID so we don't duplicate it
-    fileInput.style.display = "none";  // Hide it visually
+    let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
 
-    // 2. Create a fresh file input to replace the one we are taking away
-    const newFileInput = document.createElement('input');
-    newFileInput.type = "file";
-    newFileInput.id = "modalNoteFile";
-    newFileInput.className = "sf-input"; // Use "form-control" if on the Master page
-    newFileInput.style.padding = "5px 12px";
-    fileInput.parentNode.insertBefore(newFileInput, fileInput.nextSibling);
-
-    let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem; background: var(--theme-navy-light); padding: 4px 8px; border-radius: 4px; display: inline-block;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
-
-    // 3. Create the Note wrapper
-    const noteWrapper = document.createElement('div');
-    noteWrapper.className = "saved-note-card p-3 mb-3 shadow-sm";
-    noteWrapper.style.cssText = "border: 1px solid var(--theme-border); border-left: 4px solid var(--theme-navy-primary); border-radius: 8px; background: var(--theme-surface);";
-
-    noteWrapper.innerHTML = `
+    const noteHtml = `
+    <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid #e5e7eb; border-left: 4px solid #1a56db; border-radius: 8px; background: #fff;">
     <div class="d-flex justify-content-between align-items-center mb-2">
-    <span class="fw-bold" style="font-size: 0.9rem; color: var(--theme-text-main);">
-    <i class="fa-solid fa-circle-user text-muted me-2"></i>${owner}
+    <span class="fw-bold" style="font-size: 0.9rem; color: #111827;">
+    <i class="fa-solid fa-circle-user text-muted me-2"></i>${ownerName} <!-- DISPLAY NAME -->
     </span>
     <span class="text-muted" style="font-size: 0.8rem;">
     <i class="fa-regular fa-clock me-1"></i> ${dateTime}
     </span>
     </div>
-    <div style="font-size: 0.9rem; color: var(--theme-text-muted); white-space: pre-wrap;">${desc}</div>
+    <div style="font-size: 0.9rem; color: #374151; white-space: pre-wrap;">${desc}</div>
     ${fileHtml}
 
-    <input type="hidden" name="SavedNoteOwner[]" value="${owner}" />
+    <!-- Hidden inputs so the data is sent to the server on Form Submit -->
+    <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" /> <!-- SUBMIT ID -->
     <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
     <input type="hidden" name="SavedNoteDesc[]" value="${desc}" />
+    </div>
     `;
 
-    // 4. Append the hidden file input into this specific note block
-    noteWrapper.appendChild(fileInput);
+    document.getElementById('savedNotesContainer').insertAdjacentHTML('beforeend', noteHtml);
 
-    // 5. Add to the UI
-    document.getElementById('savedNotesContainer').appendChild(noteWrapper);
-
-    // 6. Close the modal
     const modalEl = document.getElementById('noteModal');
     const modalInstance = bootstrap.Modal.getInstance(modalEl);
     modalInstance.hide();

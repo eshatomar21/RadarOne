@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Radar_CRM.Data;
 
@@ -11,9 +12,11 @@ using Radar_CRM.Data;
 namespace Radar_CRM.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910113920_newtaskchange")]
+    partial class newtaskchange
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -766,8 +769,6 @@ namespace Radar_CRM.Migrations
 
                     b.HasIndex("NoteOwnerId");
 
-                    b.HasIndex("TaskId");
-
                     b.ToTable("Note");
                 });
 
@@ -1353,7 +1354,7 @@ namespace Radar_CRM.Migrations
             modelBuilder.Entity("Radar_CRM.Models.Deal", b =>
                 {
                     b.HasOne("Radar_CRM.Models.Account", "Account")
-                        .WithMany("Deals")
+                        .WithMany("Contacts")
                         .HasForeignKey("AccountId");
 
                     b.HasOne("Radar_CRM.Models.User", "DealOwner")
@@ -1434,13 +1435,13 @@ namespace Radar_CRM.Migrations
                         .WithMany("Notes")
                         .HasForeignKey("LeadId");
 
+                    b.HasOne("Radar_CRM.Models.Task", "Task")
+                        .WithMany()
+                        .HasForeignKey("LeadId");
+
                     b.HasOne("Radar_CRM.Models.User", "NoteOwner")
                         .WithMany()
                         .HasForeignKey("NoteOwnerId");
-
-                    b.HasOne("Radar_CRM.Models.Task", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId");
 
                     b.Navigation("Account");
 
@@ -1506,7 +1507,7 @@ namespace Radar_CRM.Migrations
 
             modelBuilder.Entity("Radar_CRM.Models.Account", b =>
                 {
-                    b.Navigation("Deals");
+                    b.Navigation("Contacts");
 
                     b.Navigation("Leads");
 

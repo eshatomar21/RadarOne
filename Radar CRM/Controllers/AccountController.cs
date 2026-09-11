@@ -21,25 +21,23 @@ namespace Radar_CRM.Controllers
             _context = context;
         }
 
-        // ==========================================
-        // INDEX: Shows all records in the database
-        // ==========================================
         public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
         {
-            int pageSize = 100;
+            int pageSize = 100; // Exactly 100 records per page
             var query = _context.Accounts.AsQueryable();
 
             // 1. Server-Side Filtering
             if (!string.IsNullOrEmpty(search))
-            {
+                {
+                var searchLower = search.ToLower();
                 query = query.Where(a =>
-                    (a.AccountName != null && a.AccountName.Contains(search)) ||
+                    (a.AccountName != null && a.AccountName.ToLower().Contains(searchLower)) ||
                     (a.MobileNumber != null && a.MobileNumber.Contains(search)) ||
-                    (a.Email != null && a.Email.Contains(search))
+                    (a.Email != null && a.Email.ToLower().Contains(searchLower))
                 );
             }
 
-            // 2. Server-Side Sorting (Defaults to Id descending so newest are on top)
+            // 2. Server-Side Sorting
             if (sortDir == "desc")
             {
                 query = sortCol switch
@@ -61,7 +59,7 @@ namespace Radar_CRM.Controllers
                 };
             }
 
-            // 3. Server-Side Pagination
+            // 3. Server-Side Pagination (Gets total count first, then slices 100 records)
             var totalRecords = await query.CountAsync();
             var accounts = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
@@ -71,7 +69,6 @@ namespace Radar_CRM.Controllers
 
             return View(accounts);
         }
-
         // ==========================================
         // CREATE: GET (Opens the blank form)
         // ==========================================
@@ -110,7 +107,7 @@ namespace Radar_CRM.Controllers
             return View(account);
         }
         // ==========================================
-        // EDIT: GET (Fetches specific record)
+        // EDIT: GET (Fetches specific record & automatically linked data)
         // ==========================================
         public async Task<IActionResult> Edit(int? id)
         {
@@ -119,11 +116,29 @@ namespace Radar_CRM.Controllers
             var account = await _context.Accounts.FindAsync(id);
             if (account == null) return NotFound();
 
-            // 🚀 Fetch Existing Notes for this Account to display on the Edit Page
+            // 1. Fetch Existing Notes
             ViewBag.ExistingNotes = await _context.Note
-     .Where(n => n.AccountId == id)
-     .OrderByDescending(n => n.CreatedDateTime)
-     .ToListAsync();
+                .Include(n => n.NoteOwner) // 🚀 ADD THIS LINE to load the User data
+                .Where(n => n.AccountId == id)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
+
+            // 2. Fetch Automatically Linked Leads (Contacts)
+            // This finds any Lead in the database where AccountId matches this Account
+            ViewBag.RelatedLeads = await _context.Leads
+                .Where(l => l.AccountId == id)
+                .ToListAsync();
+
+            // 3. Fetch Automatically Linked Deals
+            // This finds any Deal in the database where AccountId matches this Account
+            ViewBag.RelatedDeals = await _context.Set<Deal>()
+                .Where(d => d.AccountId == id)
+                .ToListAsync();
+
+            // 4. Fetch Automatically Linked Tasks
+            ViewBag.RelatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                .Where(t => t.AccountId == id)
+                .ToListAsync();
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             return View(account);
@@ -191,14 +206,15 @@ namespace Radar_CRM.Controllers
         // ==========================================
         private async Task SaveNotesAsync(int recordId, string moduleName, string[] owners, string[] dateTimes, string[] descs, List<IFormFile> files)
         {
-            // Define your C: Drive folder path
             string uploadPath = @"C:\CRM_Files\Notes";
 
-            // Create the directory automatically if it doesn't exist
             if (!Directory.Exists(uploadPath))
             {
                 Directory.CreateDirectory(uploadPath);
             }
+
+            // 1. Fetch all valid User IDs from the database to be 100% certain
+            var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
 
             if (descs != null && descs.Length > 0)
             {
@@ -207,14 +223,21 @@ namespace Radar_CRM.Controllers
                     // Only save if there is text OR a file attached
                     if (!string.IsNullOrWhiteSpace(descs[i]) || (files != null && i < files.Count && files[i] != null && files[i].Length > 0))
                     {
+                        // 2. BULLETPROOF FOREIGN KEY FIX:
+                        // Extract whatever the frontend sent (could be an ID, could be "System User", could be empty)
+                        string incomingOwner = (owners != null && owners.Length > i) ? owners[i]?.Trim() : null;
+
+                        // 3. Only assign the ID if it STRICTLY exists in the database. Otherwise, force it to NULL.
+                        string finalOwnerId = null;
+                        if (!string.IsNullOrEmpty(incomingOwner) && validUserIds.Contains(incomingOwner))
+                        {
+                            finalOwnerId = incomingOwner;
+                        }
+
                         var newNote = new Notes
                         {
-                            // Removed Id = recordId (Let the database auto-generate the Note's ID)
-                            // Removed ModuleName = moduleName
-
-                            // Maps the owner (NoteOwnerId replaces NoteOwner)
-                            NoteOwnerId = owners != null && owners.Length > i ? owners[i] : null,
-
+                            AccountId = recordId,
+                            NoteOwnerId = finalOwnerId, // Guaranteed to either be a real User ID or safely NULL
                             CreatedDateTime = dateTimes != null && dateTimes.Length > i && DateTime.TryParse(dateTimes[i], out DateTime parsedDate) ? parsedDate : DateTime.Now,
                             Description = descs[i]
                         };
@@ -224,17 +247,14 @@ namespace Radar_CRM.Controllers
                         {
                             var file = files[i];
 
-                            // Generate a unique filename to prevent overwriting
                             string fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(file.FileName);
                             string filePath = Path.Combine(uploadPath, fileName);
 
-                            // Save physical file to C: drive
                             using (var stream = new FileStream(filePath, FileMode.Create))
                             {
                                 await file.CopyToAsync(stream);
                             }
 
-                            // Save paths to database
                             newNote.AttachmentFileName = file.FileName;
                             newNote.AttachmentFilePath = filePath;
                         }
@@ -336,17 +356,17 @@ namespace Radar_CRM.Controllers
                 var ownerUser = await _context.Users.FindAsync(acc.AccountOwnerId);
                 string ownerFullName = ownerUser?.fullName ?? ownerUser?.FirstName ?? "System User";
 
-                if (ownerFullName.Contains("Vishakha", StringComparison.OrdinalIgnoreCase) ||
-                    ownerFullName.Contains("Mamta", StringComparison.OrdinalIgnoreCase))
+                // 🚀 FIX: Removed Vishakha from here. Now ONLY Mamta assigns to Aman. 
+                // Vishakha will keep her own ID naturally.
+                if (ownerFullName.Contains("Mamta", StringComparison.OrdinalIgnoreCase))
                 {
                     var amanUser = await _context.Users.FirstOrDefaultAsync(u => u.FirstName.Contains("Aman"));
                     if (amanUser != null)
                     {
                         assignedOwnerId = amanUser.Id;
-                        ownerFullName = amanUser.fullName ?? amanUser.FirstName; // 🚀 FIX: Capture Aman's name string too
+                        ownerFullName = amanUser.fullName ?? amanUser.FirstName; // Capture Aman's name
                     }
                 }
-
                 // Creating as a Contact Record within the Lead model structure
                 var newContact = new Lead
                 {
@@ -421,7 +441,6 @@ namespace Radar_CRM.Controllers
                     Contact3Phone = acc.Contact3Phone,
 
                     Description = acc.Description,
-
                     // --- System Logic Default Fields ---
                     Stage = "Open",
                     CreatedDateAndTime = DateTime.Now,
@@ -429,11 +448,44 @@ namespace Radar_CRM.Controllers
                     Pipeline = acc.CurrentStatus == "User" ? "Upgrade Software" : "New Software"
                 };
 
+                // 1. SAVE THE NEW CONTACT FIRST
                 _context.Leads.Add(newContact);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(); // This generates the newContact.Id
+
+                // ==========================================
+                // 2. 🚀 NEW: COPY/TRANSFER NOTES TO THE NEW CONTACT
+                // ==========================================
+                var accountNotes = await _context.Note
+                    .Where(n => n.AccountId == acc.Id)
+                    .AsNoTracking() // Ensures we create new copies
+                    .ToListAsync();
+
+                if (accountNotes.Any())
+                {
+                    // Fetch valid user IDs to prevent Foreign Key crashes if NoteOwnerId is invalid
+                    var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
+                    var contactNotes = new List<Notes>();
+
+                    foreach (var note in accountNotes)
+                    {
+                        contactNotes.Add(new Notes
+                        {
+                            LeadId = newContact.Id,
+                            AccountId = null, // 🔥 FIX: Set to null so it uniquely maps to the new Lead/Contact record and doesn't duplicate on the Account view
+                                              // 🔥 FIX: Ensure the Owner ID actually exists in the DB, otherwise default to null to prevent crash
+                            NoteOwnerId = (!string.IsNullOrEmpty(note.NoteOwnerId) && validUserIds.Contains(note.NoteOwnerId)) ? note.NoteOwnerId : null,
+                            CreatedDateTime = note.CreatedDateTime,
+                            Description = note.Description,
+                            AttachmentFileName = note.AttachmentFileName,
+                            AttachmentFilePath = note.AttachmentFilePath
+                        });
+                    }
+
+                    await _context.Note.AddRangeAsync(contactNotes);
+                    await _context.SaveChangesAsync();
+                }
             }
         }
-
         // ==========================================
         // DELETE: GET (Fetches record for confirmation)
         // ==========================================

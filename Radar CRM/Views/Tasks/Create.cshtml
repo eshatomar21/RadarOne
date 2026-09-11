@@ -4,8 +4,8 @@
     ViewData["Title"] = "Create Task";
 }
 
-<!-- Bootstrap 5 -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+<!-- Select2 CSS for Type and Search -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
 <style>
@@ -21,37 +21,41 @@
         --theme-text-main: #1f2937;
         --theme-text-muted: #64748b;
         --theme-border: #e2e8f0;
-        --theme-shadow-float: 0 20px 40px -10px rgba(30, 58, 138, 0.08);
     }
 
     body {
-        background-color: var(--theme-bg-cream);
+        background-color: var(--theme-surface);
         font-family: 'Inter', sans-serif;
         color: var(--theme-text-main);
         -webkit-font-smoothing: antialiased;
+        margin: 0;
+        padding: 0;
     }
 
     .sf-container {
         background-color: var(--theme-surface);
-        width: 98%;
-        max-width: 1200px; /* Slightly narrower since it's a single form */
-        margin: 30px auto;
-        min-height: 90vh;
-        border-radius: 16px;
-        box-shadow: var(--theme-shadow-float);
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        min-height: 100vh;
         display: flex;
         flex-direction: column;
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        overflow: hidden;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .sf-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 24px 40px;
+        padding: 20px 40px;
         background-color: var(--theme-surface);
         border-bottom: 1px solid var(--theme-border);
+        border-radius: 0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
 
     .sf-header-title {
@@ -69,17 +73,6 @@
             align-items: center;
             gap: 12px;
             letter-spacing: -0.02em;
-        }
-
-        .sf-header-title .entity-type {
-            color: var(--theme-navy-primary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            background: var(--theme-navy-light);
-            padding: 6px 14px;
-            border-radius: 20px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
         }
 
     .sf-close-btn {
@@ -100,7 +93,6 @@
             background: var(--theme-navy-light);
             color: var(--theme-navy-primary);
             border-color: var(--theme-navy-light);
-            transform: rotate(90deg);
         }
 
     .btn-sf-primary {
@@ -118,38 +110,38 @@
 
         .btn-sf-primary:hover {
             background-color: var(--theme-navy-hover);
-            box-shadow: 0 6px 16px rgba(30, 58, 138, 0.25);
             transform: translateY(-1px);
         }
 
     .form-group {
         margin-bottom: 24px;
+        display: flex;
+        align-items: center;
     }
 
     .sf-label {
-        display: block;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: var(--theme-text-muted);
-        margin-bottom: 8px;
         font-weight: 500;
+        width: 180px;
+        flex-shrink: 0;
+        margin-bottom: 0;
+    }
+
+    .sf-input, .sf-select, .select2-container {
+        flex-grow: 1;
+        max-width: 800px;
     }
 
     .sf-input, .sf-select {
-        width: 100%;
         border: 1px solid var(--theme-border);
         border-radius: 6px;
-        padding: 6px 12px;
-        height: 36px;
-        font-size: 0.85rem;
+        padding: 8px 12px;
+        font-size: 0.9rem;
         color: var(--theme-text-main);
         background-color: #fafaf9;
-        transition: all 0.2s ease-in-out;
+        transition: all 0.2s ease;
     }
-
-        .sf-input:hover, .sf-select:hover {
-            border-color: #cbd5e1;
-            background-color: var(--theme-surface);
-        }
 
         .sf-input:focus, .sf-select:focus {
             outline: none;
@@ -158,132 +150,457 @@
             box-shadow: 0 0 0 3px var(--theme-navy-light);
         }
 
-    textarea.sf-input {
-        height: auto;
+    /* Select2 Theme Adjustments */
+    .select2-container--default .select2-selection--single {
+        background-color: #fafaf9;
+        border: 1px solid var(--theme-border);
+        border-radius: 6px;
+        height: 38px;
+        padding: 4px 6px;
     }
 
+        .select2-container--default .select2-selection--single:focus {
+            border-color: var(--theme-navy-primary);
+        }
+
     .pane-section-title {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
         font-weight: 600;
         color: var(--theme-navy-primary);
-        margin-bottom: 20px;
-        margin-top: 16px;
+        margin-bottom: 24px;
+        margin-top: 32px;
         padding-bottom: 8px;
-        border-bottom: 1px solid var(--theme-border);
-        letter-spacing: -0.01em;
+        border-bottom: 2px solid var(--theme-navy-light);
+        max-width: 980px;
+    }
+
+    .expandable-panel {
+        display: none;
+        background-color: #fafaf9;
+        border: 1px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 10px;
+        margin-left: 180px;
+        margin-bottom: 24px;
+        max-width: 800px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .form-switch .form-check-input {
+        width: 2.5rem;
+        height: 1.25rem;
+        cursor: pointer;
+    }
+
+        .form-switch .form-check-input:checked {
+            background-color: var(--theme-navy-primary);
+            border-color: var(--theme-navy-primary);
+        }
+
+        .form-switch .form-check-input:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+    .notes-section {
+        background-color: var(--theme-bg-cream);
+        border: 1px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 24px;
+        margin-top: 20px;
+        max-width: 980px;
+    }
+
+    .notes-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
     }
 </style>
 
 <form asp-action="Create" method="post" id="taskForm">
-    <div class="sf-container">
+    <!-- Validation Summary to surface Database Errors directly to the UI -->
+    <div asp-validation-summary="All" class="text-danger mb-3 fw-bold" style="padding-left: 40px; margin-top: 20px;"></div>
 
+    <div class="sf-container">
         <div class="sf-header">
             <div class="sf-header-title">
                 <button type="button" class="sf-close-btn" onclick="window.history.back();">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
-                <h1><span class="entity-type">Task</span> Create New Task</h1>
-            </div>
-            <div class="sf-header-actions">
-                <button type="submit" class="btn-sf-primary">Save Task</button>
+                <h1>Task Information</h1>
             </div>
         </div>
 
-        <div style="padding: 32px 40px; flex-grow: 1; overflow-y: auto;">
+        <div style="padding: 32px 60px;">
 
-            <h3 class="pane-section-title mt-0">Task Information</h3>
-            <div class="row">
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Task Owner</label>
-                    <input asp-for="TaskOwner" class="sf-input" placeholder="Assign to..." />
-                </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Subject <span class="text-danger">*</span></label>
-                    <input asp-for="Subject" class="sf-input" required style="font-weight: 600;" placeholder="What needs to be done?" />
-                </div>
+            <div class="form-group">
+                <label class="sf-label">Task Owner</label>
+                <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId">
+                    @if (!string.IsNullOrEmpty(Model?.TaskOwnerId))
+                    {
+                        <option value="@Model.TaskOwnerId" selected>@Model.TaskOwner</option>
+                    }
+                </select>
+            </div>
 
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Due Date</label>
-                    <input asp-for="DueDate" type="date" class="sf-input" />
-                </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Contact Name</label>
-                    <input asp-for="ContactName" class="sf-input" placeholder="Search Contacts..." />
-                </div>
+            <div class="form-group">
+                <label class="sf-label">Subject <span class="text-danger">*</span></label>
+                <input asp-for="Subject" class="sf-input" required />
+            </div>
 
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Related To</label>
-                    <input asp-for="RelatedTo" class="sf-input" placeholder="Account, Lead, or Deal..." />
-                </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Mobile</label>
-                    <input asp-for="Mobile" class="sf-input" placeholder="+1..." />
+            <div class="form-group">
+                <label class="sf-label">Due Date</label>
+                <input asp-for="DueDate" type="date" class="sf-input" id="dueDateInput" />
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Accounts</label>
+                <select asp-for="AccountId" class="sf-select" id="AccountId">
+                    @if (Model?.AccountId != null)
+                    {
+                        <option value="@Model.AccountId" selected>Account Selected</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Leads</label>
+                <select asp-for="LeadId" class="sf-select" id="LeadId">
+                    @if (Model?.LeadId != null)
+                    {
+                        <option value="@Model.LeadId" selected>Lead Selected</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Mobile</label>
+                <input asp-for="Mobile" class="sf-input" />
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Lead Status</label>
+                <select asp-for="LeadStatus" class="sf-select">
+                    <option value="">-None-</option>
+                    <option value="New">New</option>
+                    <option value="Contacted">Contacted</option>
+                    <option value="Qualified">Qualified</option>
+                    <option value="Lost">Lost</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Status</label>
+                <select asp-for="Status" class="sf-select">
+                    <option value="Not Started" selected>Not Started</option>
+                    <option value="Deferred">Deferred</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Waiting on input">Waiting on input</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="sf-label">Priority</label>
+                <select asp-for="Priority" class="sf-select">
+                    <option value="Highest">Highest</option>
+                    <option value="High" selected>High</option>
+                    <option value="Normal">Normal</option>
+                    <option value="Low">Low</option>
+                    <option value="Lowest">Lowest</option>
+                </select>
+            </div>
+
+            <!-- Repeat Toggle Area -->
+            <div class="form-group mb-1">
+                <label class="sf-label">Repeat</label>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="repeatToggle" disabled>
+                    <span class="text-muted ms-2" style="font-size:0.8rem;" id="repeatHelpText">(Select Due Date first)</span>
                 </div>
             </div>
 
-            <h3 class="pane-section-title">Status & Priority</h3>
-            <div class="row">
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Status</label>
-                    <select asp-for="Status" class="sf-select">
-                        <option value="Not Started">Not Started</option>
-                        <option value="Deferred">Deferred</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Waiting on input">Waiting on input</option>
-                    </select>
+            <div class="expandable-panel" id="repeatPanel">
+                <div class="row align-items-center mb-3">
+                    <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
+                    <div class="col-9">
+                        <select class="sf-select w-50 mb-2">
+                            <option>Daily</option>
+                            <option>Weekly</option>
+                            <option>Monthly</option>
+                            <option>Yearly</option>
+                        </select>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="excludeWeekends">
+                            <label class="form-check-label text-muted" for="excludeWeekends" style="font-size:0.85rem;">Except weekends and holidays.</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Priority</label>
-                    <select asp-for="Priority" class="sf-select">
-                        <option value="Highest">Highest</option>
-                        <option value="High">High</option>
-                        <option value="Normal" selected>Normal</option>
-                        <option value="Low">Low</option>
-                        <option value="Lowest">Lowest</option>
-                    </select>
+                <div class="row">
+                    <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Ends</div>
+                    <div class="col-9">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="endsRadio" id="endsNever" checked>
+                            <label class="form-check-label" for="endsNever" style="font-size:0.85rem;">Never</label>
+                        </div>
+                        <div class="form-check mb-2 d-flex align-items-center gap-2">
+                            <input class="form-check-input" type="radio" name="endsRadio" id="endsAfter">
+                            <label class="form-check-label" for="endsAfter" style="font-size:0.85rem;">After</label>
+                            <input type="number" class="form-control form-control-sm w-25 d-inline" value="1">
+                            <span style="font-size:0.85rem;">Times</span>
+                        </div>
+                        <div class="form-check d-flex align-items-center gap-2">
+                            <input class="form-check-input" type="radio" name="endsRadio" id="endsOn">
+                            <label class="form-check-label" for="endsOn" style="font-size:0.85rem;">On</label>
+                            <input type="date" class="form-control form-control-sm w-50 d-inline">
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Repeat</label>
-                    <select asp-for="Repeat" class="sf-select">
-                        <option value="None">None</option>
-                        <option value="Daily">Daily</option>
-                        <option value="Weekly">Weekly</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Yearly">Yearly</option>
-                    </select>
-                </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Reminder</label>
-                    <input asp-for="Reminder" type="datetime-local" class="sf-input" />
+            <!-- Reminder Toggle Area -->
+            <div class="form-group mt-3 mb-1">
+                <label class="sf-label">Reminder</label>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="reminderToggle" disabled>
                 </div>
             </div>
 
-            <h3 class="pane-section-title">Additional Information</h3>
-            <div class="row">
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Tag</label>
-                    <input asp-for="Tag" class="sf-input" placeholder="e.g. Follow-up, Urgent" />
+            <div class="expandable-panel" id="reminderPanel">
+                <div class="form-check mb-3 d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="radio" name="remindRadio" id="remindOnDate" checked>
+                    <label class="form-check-label" for="remindOnDate" style="font-size:0.85rem;">On</label>
+                    <input type="date" class="form-control form-control-sm w-25 d-inline">
+                    <span style="font-size:0.85rem;">at</span>
+                    <input type="time" class="form-control form-control-sm w-25 d-inline">
                 </div>
-                <div class="col-md-6 form-group">
-                    <label class="sf-label">Lead Status</label>
-                    <input asp-for="LeadStatus" class="sf-input" placeholder="If applicable..." />
+                <div class="form-check mb-4 d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="radio" name="remindRadio" id="remindDays">
+                    <label class="form-check-label" for="remindDays" style="font-size:0.85rem;">On</label>
+                    <select class="form-select form-select-sm w-25 d-inline">
+                        <option>1 Day(s)</option>
+                        <option>2 Day(s)</option>
+                    </select>
+                    <span style="font-size:0.85rem;">of due date at</span>
+                    <input type="time" class="form-control form-control-sm w-25 d-inline">
                 </div>
 
-                <div class="col-md-12 form-group">
-                    <label class="sf-label">Description</label>
-                    <textarea asp-for="Description" class="sf-input" rows="5" placeholder="Add task details here..."></textarea>
+                <div class="row align-items-center mb-3">
+                    <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
+                    <div class="col-9">
+                        <select class="sf-select w-50">
+                            <option>None</option>
+                            <option>Daily</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row align-items-center">
+                    <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Notify</div>
+                    <div class="col-9">
+                        <select class="sf-select w-50">
+                            <option>Email</option>
+                            <option>Popup</option>
+                        </select>
+                    </div>
                 </div>
             </div>
+
+            <h3 class="pane-section-title">Description Information</h3>
+            <div class="form-group" style="align-items: flex-start;">
+                <label class="sf-label" style="padding-top: 8px;">Description</label>
+                <textarea asp-for="Description" class="sf-input" rows="4"></textarea>
+            </div>
+
+            <!-- Notes Section -->
+            <div class="notes-section">
+                <div class="notes-header">
+                    <h5 style="color: var(--theme-navy-primary); font-weight: 600; margin: 0;">Notes & Attachments</h5>
+                    <button type="button" class="btn btn-outline-primary btn-sm rounded" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                        <i class="fa-solid fa-plus"></i> Add Note
+                    </button>
+                </div>
+                <hr style="border-color: var(--theme-border);" />
+                <div id="notesContainer" class="text-muted text-center py-3" style="font-size:0.9rem;">
+                    No notes added yet.
+                </div>
+            </div>
+
         </div>
 
+        <!-- Footer Buttons -->
         <div style="padding: 16px 40px; border-top: 1px solid var(--theme-border); background-color: #fafaf9; display: flex; justify-content: flex-end; gap: 16px;">
             <a asp-action="Index" class="btn" style="background: white; border: 1px solid var(--theme-border); color: var(--theme-text-muted); font-weight: 500; font-size: 0.95rem; padding: 6px 24px; border-radius: 8px; text-decoration: none;">Cancel</a>
+
+            <!-- 🔥 CHANGED TO A STANDARD SUBMIT BUTTON TO GUARANTEE EXECUTION -->
             <button type="submit" class="btn-sf-primary">Save Task</button>
         </div>
 
     </div>
 </form>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Add Note Modal -->
+<div class="modal fade" id="addNoteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+            <div class="modal-header" style="background-color: var(--theme-surface); border-bottom: 1px solid var(--theme-border);">
+                <h5 class="modal-title" style="color: var(--theme-navy-primary); font-weight: 600;">
+                    <i class="fa-regular fa-pen-to-square me-2"></i> Add New Note
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="background-color: var(--theme-bg-cream);">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Note Owner</label>
+                        <select class="form-select" id="modalNoteOwner">
+                            <option>System User</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Date & Time</label>
+                        <input type="text" class="form-control bg-light" id="modalDateTime" readonly />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Attachment</label>
+                    <input type="file" class="form-control" id="modalNoteFile" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Note Description</label>
+                    <textarea class="form-control" id="modalNoteText" rows="4" placeholder="Write your note details here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="background-color: var(--theme-surface); border-top: 1px solid var(--theme-border);">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-sf-primary" onclick="appendNoteUI()" data-bs-dismiss="modal">Save Note</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS SECTION: This forces all scripts to load AFTER jQuery in _Layout.cshtml -->
+@section Scripts {
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+        // Apply 'Type and Search' to User Dropdown using AJAX
+        $('#TaskOwnerId').select2({
+        placeholder: "-- Select Owner --",
+        allowClear: true,
+        ajax: {
+        url: '/Tasks/SearchUsers',
+        dataType: 'json',
+        delay: 250,
+        data: function (params) { return { q: params.term }; },
+        processResults: function (data) { return { results: data.results }; },
+        cache: true
+        }
+        });
+
+        // Apply 'Type and Search' to Account Dropdown using AJAX
+        $('#AccountId').select2({
+        placeholder: "-- Search Accounts --",
+        allowClear: true,
+        ajax: {
+        url: '/Tasks/SearchAccounts',
+        dataType: 'json',
+        delay: 250,
+        data: function (params) { return { q: params.term }; },
+        processResults: function (data) { return { results: data.results }; },
+        cache: true
+        }
+        });
+
+        // Apply 'Type and Search' to Lead Dropdown using AJAX
+        $('#LeadId').select2({
+        placeholder: "-- Search Leads --",
+        allowClear: true,
+        ajax: {
+        url: '/Tasks/SearchLeads',
+        dataType: 'json',
+        delay: 250,
+        data: function (params) { return { q: params.term }; },
+        processResults: function (data) { return { results: data.results }; },
+        cache: true
+        }
+        });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+        const dueDateInput = document.getElementById('dueDateInput');
+        const repeatToggle = document.getElementById('repeatToggle');
+        const reminderToggle = document.getElementById('reminderToggle');
+        const repeatHelpText = document.getElementById('repeatHelpText');
+
+        const repeatPanel = document.getElementById('repeatPanel');
+        const reminderPanel = document.getElementById('reminderPanel');
+
+        // Note Modal Auto-Date Logic
+        const addNoteModal = document.getElementById('addNoteModal');
+        addNoteModal.addEventListener('show.bs.modal', function () {
+        const now = new Date();
+        document.getElementById('modalDateTime').value = now.toLocaleString();
+        });
+
+        // Due Date Dependency Logic
+        dueDateInput.addEventListener('change', function () {
+        const hasDate = !!this.value;
+        repeatToggle.disabled = !hasDate;
+        reminderToggle.disabled = !hasDate;
+
+        if (hasDate) {
+        repeatHelpText.style.display = 'none';
+        } else {
+        repeatHelpText.style.display = 'inline';
+        repeatToggle.checked = false;
+        reminderToggle.checked = false;
+        repeatPanel.style.display = 'none';
+        reminderPanel.style.display = 'none';
+        }
+        });
+
+        repeatToggle.addEventListener('change', function () {
+        repeatPanel.style.display = this.checked ? 'block' : 'none';
+        });
+
+        reminderToggle.addEventListener('change', function () {
+        reminderPanel.style.display = this.checked ? 'block' : 'none';
+        });
+        });
+
+        let noteIndex = 0;
+        function appendNoteUI() {
+        const text = document.getElementById('modalNoteText').value;
+        const time = document.getElementById('modalDateTime').value;
+        const container = document.getElementById('notesContainer');
+
+        if(!text.trim()) return;
+
+        if(noteIndex === 0) container.innerHTML = '';
+
+        const html = `
+        <div class="mb-2 p-3 bg-white border rounded shadow-sm d-flex justify-content-between">
+        <div>
+        <strong style="color: var(--theme-navy-primary); font-size: 0.9rem;">System User</strong>
+        <div style="font-size: 0.85rem; color: var(--theme-text-main); margin-top:4px;">${text}</div>
+
+        <input type="hidden" name="SavedNoteDesc[]" value="${text}" />
+        <input type="hidden" name="SavedNoteDateTime[]" value="${time}" />
+        </div>
+        <span class="text-muted" style="font-size: 0.75rem;">${time}</span>
+        </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', html);
+        noteIndex++;
+
+        document.getElementById('modalNoteText').value = '';
+        document.getElementById('modalNoteFile').value = '';
+        }
+    </script>
+}

@@ -25,7 +25,7 @@ namespace Radar_CRM.Models
         public virtual Lead? Lead { get; set; }
 
         public int? TaskId { get; set; }
-        [ForeignKey("LeadId")]
+        [ForeignKey("TaskId")]
         public virtual Task? Task { get; set; }
 
 
