@@ -20,6 +20,7 @@ namespace Radar_CRM.Controllers
         [HttpPost("WordpressContact")]
         public async Task<IActionResult> ReceiveWordpressContact([FromBody] WordpressLeadDto formData)
         {
+            // 1. SECURITY CHECK
             string mySecretKey = "RADAR_CRM_SECURE_KEY_2026";
 
             if (!Request.Headers.TryGetValue("X-API-KEY", out var extractedApiKey) || extractedApiKey != mySecretKey)
@@ -34,16 +35,23 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                // Set source name based on the Form ID
-                string leadSource = formData.FormId == "29a1994" ? "POP UP Form" : "Website Direct";
+                // 2. IDENTIFY THE EXACT SOURCE BASED ON FORM ID
+                string leadSource = formData.FormId switch
+                {
+                    "29a1994" => "POP UP Form",
+                    "66097b8" => "Contact Page Form",
+                    "7966888" => "Untitled Form", // From the new form you provided
+                    _ => string.IsNullOrEmpty(formData.FormId) ? "Website Direct" : $"Website Form (ID: {formData.FormId})"
+                };
 
-                // 1. CREATE THE ACCOUNT RECORD
+                // 3. CREATE THE ACCOUNT RECORD
                 var newAccount = new Account
                 {
                     AccountName = formData.Name,
                     ContactPersonName = formData.Name,
                     Email = formData.Email,
                     MobileNumber = formData.Phone,
+                    IsHomeopathicDoctor = formData.DoctorRole, // Mapped from form dropdown
 
                     Description = $"Message: {formData.Message}\n\n" +
                                   $"--- Tracking Info ---\n" +
@@ -62,40 +70,37 @@ namespace Radar_CRM.Controllers
                 _context.Accounts.Add(newAccount);
                 await _context.SaveChangesAsync();
 
-                // 2. CONVERT TO CONTACT RECORD IF IT'S THE POPUP FORM
-                if (formData.FormId == "29a1994")
+                // 4. CREATE THE CONTACT RECORD 
+                // Both forms will automatically generate the connected Contact record
+                var newContact = new Lead
                 {
-                    var newContact = new Lead
-                    {
-                        AccountId = newAccount.Id,
-                        ContactName = formData.Name,
-                        LeadName = formData.Name,
-                        EmailID = formData.Email,
-                        MobileNumber = formData.Phone,
+                    AccountId = newAccount.Id,
+                    ContactName = formData.Name,
+                    LeadName = formData.Name,
+                    EmailID = formData.Email,
+                    MobileNumber = formData.Phone,
+                    IsHomeopathicDoctor = formData.DoctorRole, // Mapped from form dropdown
 
-                        DataSources = leadSource,
-                        CampaignSource = leadSource,
-                        Description = formData.Message,
+                    DataSources = leadSource,
+                    CampaignSource = leadSource,
+                    Description = formData.Message,
 
-                        Stage = "Open",
-                        CurrentStatus = "Non-User",
-                        CreatedDateAndTime = DateTime.Now,
-                        LeadCreatedTime = DateTime.Now
-                    };
+                    Stage = "Open",
+                    CurrentStatus = "Non-User",
+                    CreatedDateAndTime = DateTime.Now,
+                    LeadCreatedTime = DateTime.Now
+                };
 
-                    _context.Leads.Add(newContact);
-                    await _context.SaveChangesAsync();
+                _context.Leads.Add(newContact);
+                await _context.SaveChangesAsync();
 
-                    return Ok(new
-                    {
-                        success = true,
-                        message = "Account and Contact created successfully",
-                        accountId = newAccount.Id,
-                        contactId = newContact.Id
-                    });
-                }
-
-                return Ok(new { success = true, message = "Account created successfully", accountId = newAccount.Id });
+                return Ok(new
+                {
+                    success = true,
+                    message = "Account and Contact created successfully",
+                    accountId = newAccount.Id,
+                    contactId = newContact.Id
+                });
             }
             catch (Exception ex)
             {
