@@ -20,7 +20,6 @@ namespace Radar_CRM.Controllers
         [HttpPost("WordpressContact")]
         public async Task<IActionResult> ReceiveWordpressContact([FromBody] WordpressLeadDto formData)
         {
-            // 1. SECURITY CHECK: Read the header manually to prevent the 400 Validation Error
             string mySecretKey = "RADAR_CRM_SECURE_KEY_2026";
 
             if (!Request.Headers.TryGetValue("X-API-KEY", out var extractedApiKey) || extractedApiKey != mySecretKey)
@@ -35,7 +34,10 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                // 2. MAP TO ACCOUNT: Convert the incoming web data into a CRM Account record
+                // Set source name based on the Form ID
+                string leadSource = formData.FormId == "29a1994" ? "POP UP Form" : "Website Direct";
+
+                // 1. CREATE THE ACCOUNT RECORD
                 var newAccount = new Account
                 {
                     AccountName = formData.Name,
@@ -43,35 +45,60 @@ namespace Radar_CRM.Controllers
                     Email = formData.Email,
                     MobileNumber = formData.Phone,
 
-                    // Combine the user's message and tracking details into the description
                     Description = $"Message: {formData.Message}\n\n" +
                                   $"--- Tracking Info ---\n" +
+                                  $"Form ID: {formData.FormId}\n" +
                                   $"Source: {formData.UtmSource}\n" +
                                   $"Medium: {formData.UtmMedium}\n" +
                                   $"Campaign: {formData.UtmCampaign}\n" +
-                                  $"Term: {formData.UtmTerm}\n" +
-                                  $"Content: {formData.UtmContent}\n" +
                                   $"GCLID: {formData.Gclid}",
 
-                    // Mapping UTMs to specific fields if they exist in your model
                     MetaCampaignName = formData.UtmCampaign,
-
-                    // Default system values for website leads
-                    DataSource = "Website Direct",
+                    DataSource = leadSource,
                     CurrentStatus = "Non-User",
-
                     DateOfEntry = DateTime.Now,
                 };
 
-                // 3. SAVE TO DATABASE
                 _context.Accounts.Add(newAccount);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { success = true, message = "Record created successfully", accountId = newAccount.Id });
+                // 2. CONVERT TO CONTACT RECORD IF IT'S THE POPUP FORM
+                if (formData.FormId == "29a1994")
+                {
+                    var newContact = new Lead
+                    {
+                        AccountId = newAccount.Id,
+                        ContactName = formData.Name,
+                        LeadName = formData.Name,
+                        EmailID = formData.Email,
+                        MobileNumber = formData.Phone,
+
+                        DataSources = leadSource,
+                        CampaignSource = leadSource,
+                        Description = formData.Message,
+
+                        Stage = "Open",
+                        CurrentStatus = "Non-User",
+                        CreatedDateAndTime = DateTime.Now,
+                        LeadCreatedTime = DateTime.Now
+                    };
+
+                    _context.Leads.Add(newContact);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Account and Contact created successfully",
+                        accountId = newAccount.Id,
+                        contactId = newContact.Id
+                    });
+                }
+
+                return Ok(new { success = true, message = "Account created successfully", accountId = newAccount.Id });
             }
             catch (Exception ex)
             {
-                // Log the exact error to the console for debugging
                 Console.WriteLine("WEBHOOK ERROR: " + ex.Message);
                 return StatusCode(500, new { success = false, message = "Database error: " + ex.Message });
             }
