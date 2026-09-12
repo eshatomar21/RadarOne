@@ -1,0 +1,506 @@
+﻿@model List<Radar_CRM.Models.RoleHierarchyNode>
+
+@{
+    ViewData["Title"] = "Organization Roles";
+}
+
+<!-- Standard Inter Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+    /* --- Base Page Layout --- */
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+    }
+
+    .role-page-container {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 30px 40px;
+        margin-top: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        max-width: 1400px;
+    }
+
+    .role-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+    }
+
+    .role-page-title h3 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0 0 6px 0;
+    }
+
+    .role-page-title p {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .btn-new-role {
+        background-color: #007bff; /* Bright blue from your image */
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+        .btn-new-role:hover {
+            background-color: #0056b3;
+            color: #ffffff;
+        }
+
+    /* --- Exact Dashed Tree Styling (From Image) --- */
+    .org-tree {
+        list-style-type: none;
+        padding-left: 20px;
+        margin: 0;
+    }
+
+        .org-tree li {
+            margin: 0;
+            padding: 12px 0 12px 35px;
+            position: relative;
+        }
+
+            /* Vertical dashed line */
+            .org-tree li::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                border-left: 1px dashed #94a3b8;
+            }
+
+            /* Horizontal dashed line connecting to the box */
+            .org-tree li::after {
+                content: '';
+                position: absolute;
+                top: 26px; /* Aligns with the middle of the text/box */
+                left: 0;
+                width: 30px;
+                border-top: 1px dashed #94a3b8;
+            }
+
+            /* Stop vertical line on the last child */
+            .org-tree li:last-child::before {
+                bottom: auto;
+                height: 26px;
+            }
+
+    /* Node Styling */
+    .role-wrapper {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .tree-icon-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border: 1px solid #cbd5e1;
+        background-color: #ffffff;
+        border-radius: 2px;
+        color: #64748b;
+        font-size: 10px;
+        z-index: 2;
+    }
+
+    .role-text {
+        font-size: 0.95rem;
+        color: #1e293b;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+        .role-text:hover {
+            color: #007bff;
+        }
+
+    /* Action Icons (Fade in on hover) */
+    .role-actions {
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        display: flex;
+        gap: 6px;
+        margin-left: 10px;
+    }
+
+    .role-wrapper:hover .role-actions {
+        opacity: 1;
+    }
+
+    .action-icon {
+        cursor: pointer;
+        font-size: 13px;
+        color: #64748b;
+        padding: 4px 6px;
+        border-radius: 4px;
+        background-color: #f1f5f9;
+        transition: all 0.2s;
+    }
+
+        .action-icon:hover {
+            color: #ffffff;
+        }
+
+    .icon-add:hover {
+        background-color: #10b981;
+    }
+
+    .icon-edit:hover {
+        background-color: #3b82f6;
+    }
+
+    .icon-delete:hover {
+        background-color: #ef4444;
+    }
+
+    /* --- Simple Navy & Cream Modal Styling --- */
+    .modal-navy-header {
+        background-color: #1e3a8a; /* Navy Blue */
+        color: #ffffff;
+        border-bottom: none;
+    }
+
+        .modal-navy-header .modal-title {
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .modal-navy-header .btn-close {
+            filter: invert(1) grayscale(100%) brightness(200%);
+        }
+
+    .modal-cream-body {
+        background-color: #Fdfbf7; /* Cream */
+        padding: 24px;
+    }
+
+    .sf-label {
+        font-size: 0.85rem;
+        color: #1e3a8a; /* Navy labels */
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .sf-input, .sf-select {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 8px 12px;
+        background-color: #ffffff;
+        font-size: 0.9rem;
+    }
+
+        .sf-input:focus, .sf-select:focus {
+            outline: none;
+            border-color: #1e3a8a;
+            box-shadow: 0 0 0 3px #eff6ff;
+        }
+
+    .btn-navy {
+        background-color: #1e3a8a;
+        color: #ffffff;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: 0.2s;
+    }
+
+        .btn-navy:hover {
+            background-color: #1e40af;
+            color: #ffffff;
+        }
+</style>
+
+<div class="container-fluid">
+    <div class="role-page-container">
+
+        <div class="role-page-header">
+            <div class="role-page-title">
+                <h3>Organization Roles</h3>
+                <p>Click on a role to view its assigned users.</p>
+            </div>
+            <button type="button" class="btn-new-role" data-bs-toggle="modal" data-bs-target="#roleModal" onclick="openCreateModal()">
+                + New Role
+            </button>
+        </div>
+
+        <!-- Recursive function to render the tree -->
+        @{
+            void RenderTree(IEnumerable<Radar_CRM.Models.RoleHierarchyNode> nodes, int? currentParentId)
+            {
+                if (nodes != null && nodes.Any())
+                {
+                    <ul class="org-tree">
+                        @foreach (var node in nodes)
+                        {
+                            <li>
+                                <div class="role-wrapper">
+
+                                    <!-- Node Box & Text -->
+                                    <div class="tree-icon-box">
+                                        <i class="fa-solid @(node.Children.Any() ? "fa-minus" : "fa-minus")"></i>
+                                    </div>
+                                    <span class="role-text" data-role-name="@node.Name" onclick="viewUsers(this.getAttribute('data-role-name'))">
+                                        @node.Name
+                                    </span>
+
+                                    <!-- Hover Action Icons -->
+                                    <div class="role-actions">
+                                        <div class="action-icon icon-add" title="Add Subordinate Role" onclick="openCreateModal(@node.Id)">
+                                            <i class="fa-solid fa-plus"></i>
+                                        </div>
+
+                                        <div class="action-icon icon-edit" title="Edit Role"
+                                             data-role-id="@node.Id"
+                                             data-role-name="@node.Name"
+                                             data-parent-id="@currentParentId"
+                                             onclick="openEditModal(this.getAttribute('data-role-id'), this.getAttribute('data-role-name'), this.getAttribute('data-parent-id'))">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </div>
+
+                                        <div class="action-icon icon-delete" title="Delete Role" onclick="deleteRole(@node.Id)">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @{
+                                    RenderTree(node.Children, node.Id);
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        }
+
+        <!-- Render the Tree Data -->
+        <div style="padding-top: 10px;">
+            @if (Model != null && Model.Any())
+            {
+                <!-- A dummy root container to force the top dashed line like the image -->
+                <ul class="org-tree" style="padding-left: 0;">
+                    <li style="padding-left: 40px;">
+                        @{
+                            RenderTree(Model, null);
+                        }
+                    </li>
+                </ul>
+            }
+            else
+            {
+                <div class="text-center p-5 border rounded" style="background-color: #f8fafc; border-style: dashed !important;">
+                    <p class="text-muted mb-3">No roles found. Start building your organization's hierarchy.</p>
+                    <button class="btn-new-role" onclick="openCreateModal()">Create First Role</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ROLE MODAL (Create/Edit) -->
+<div class="modal fade" id="roleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow border-0" style="border-radius: 8px; overflow: hidden;">
+
+            <div class="modal-header modal-navy-header">
+                <h5 class="modal-title" id="roleModalLabel">New Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body modal-cream-body">
+                <form id="roleForm">
+                    <input type="hidden" id="RoleId" name="Id" value="0" />
+
+                    <div class="mb-3">
+                        <label class="sf-label">Role Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" id="RoleName" class="sf-input" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="sf-label">Reports To (Parent Role)</label>
+                        <select name="ParentRoleId" id="ParentRoleId" class="sf-select">
+                            <option value="">-- None (Top Level Organization) --</option>
+                            @if (ViewBag.ParentRoles != null)
+                            {
+                                var parentRoles = ViewBag.ParentRoles as List<SelectListItem>;
+                                if (parentRoles != null)
+                                {
+                                    foreach (var item in parentRoles)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="sf-label">Description</label>
+                        <textarea name="Description" id="RoleDescription" class="sf-input" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer bg-white border-top">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-navy" id="btnSaveRole">Save Role</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VIEW USERS IN ROLE MODAL -->
+<div class="modal fade" id="viewUsersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow border-0" style="border-radius: 8px; overflow: hidden;">
+            <div class="modal-header modal-navy-header">
+                <h6 class="modal-title">
+                    Users in: <span id="displayRoleName" style="color: #eff6ff;"></span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body modal-cream-body p-0">
+                <ul class="list-group list-group-flush" id="usersListContainer">
+                    <!-- Users injected here -->
+                </ul>
+            </div>
+            <div class="modal-footer bg-white border-top">
+                <button type="button" class="btn btn-light border w-100" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let isEditMode = false;
+
+        function openCreateModal(parentRoleId = '') {
+             isEditMode = false;
+             document.getElementById('roleModalLabel').innerText = 'Create New Role';
+             document.getElementById('roleForm').reset();
+             document.getElementById('RoleId').value = "0";
+
+             if (parentRoleId) {
+                 document.getElementById('ParentRoleId').value = parentRoleId;
+             }
+
+             const modalEl = document.getElementById('roleModal');
+             bootstrap.Modal.getOrCreateInstance(modalEl).show();
+         }
+
+         function openEditModal(id, name, parentId) {
+             isEditMode = true;
+             document.getElementById('roleModalLabel').innerText = 'Edit Role';
+             document.getElementById('roleForm').reset();
+
+             document.getElementById('RoleId').value = id;
+             document.getElementById('RoleName').value = name;
+
+             // Handle null parent IDs correctly
+             document.getElementById('ParentRoleId').value = (parentId && parentId !== "null") ? parentId : '';
+
+             const modalEl = document.getElementById('roleModal');
+             bootstrap.Modal.getOrCreateInstance(modalEl).show();
+         }
+
+        document.getElementById('btnSaveRole').addEventListener('click', function () {
+            const form = document.getElementById('roleForm');
+            const formData = new FormData(form);
+
+            if (!document.getElementById('RoleName').value) {
+                alert("Role Name is required.");
+                return;
+            }
+
+            const targetUrl = isEditMode ? '@Url.Action("EditAjax", "Roles")' : '@Url.Action("CreateAjax", "Roles")';
+
+            fetch(targetUrl, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || "An error occurred while saving.");
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function deleteRole(roleId) {
+            if (confirm("Are you sure you want to delete this role? This action cannot be undone.")) {
+                fetch(`@Url.Action("DeleteAjax", "Roles")?id=${roleId}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || "Cannot delete. Please reassign subordinates first.");
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function viewUsers(roleName) {
+            document.getElementById('displayRoleName').textContent = roleName;
+            const listContainer = document.getElementById('usersListContainer');
+            listContainer.innerHTML = '<li class="list-group-item text-center text-muted fw-medium py-4 bg-transparent"><div class="spinner-border spinner-border-sm me-2"></div>Loading users...</li>';
+
+            new bootstrap.Modal(document.getElementById('viewUsersModal')).show();
+
+            fetch(`@Url.Action("GetUsersByRole", "Roles")?roleName=${encodeURIComponent(roleName)}`)
+                .then(response => response.json())
+                .then(users => {
+                    listContainer.innerHTML = '';
+
+                    if (users.length === 0) {
+                        listContainer.innerHTML = '<li class="list-group-item text-center text-muted fw-medium py-4 bg-transparent">No users are assigned to this role yet.</li>';
+                        return;
+                    }
+
+                    users.forEach(user => {
+                        listContainer.innerHTML += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent border-bottom px-4 py-3">
+                                <div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">${user.fullName}</div>
+                                    <div class="text-muted" style="font-size: 0.85rem;">${user.email || 'No email provided'}</div>
+                                </div>
+                            </li>
+                        `;
+                    });
+                })
+                .catch(error => {
+                    listContainer.innerHTML = '<li class="list-group-item text-danger text-center fw-medium py-4 bg-transparent">Error loading users.</li>';
+                });
+        }
+    </script>
+}

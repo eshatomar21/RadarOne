@@ -3,6 +3,14 @@
 @{
     ViewData["Title"] = "Deals Master";
 
+    // --- Catch pagination & state values from Controller (Matched with Account UI) ---
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    int totalRecords = ViewBag.TotalRecords ?? 0;
+    string currentSearch = Context.Request.Query["search"];
+    string currentSortCol = Context.Request.Query["sortCol"];
+    string currentSortDir = Context.Request.Query["sortDir"];
+
     // Dynamically get properties of the Deal model, EXCLUDING lists (PaymentRows, Notes) so they don't break the data table
     var tableProps = Model != null && Model.Any() ?
         Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -220,6 +228,19 @@
                     transform: translateY(0);
                 }
             }
+
+            .form-select, .form-control {
+                border: 1px solid var(--border-soft);
+                border-radius: var(--radius-md);
+                font-size: 0.85rem;
+                padding: 8px 12px;
+            }
+
+                .form-control:focus, .form-select:focus {
+                    border-color: var(--primary-blue);
+                    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+                    outline: none;
+                }
 
             /* Main Table Container */
             .table-container {
@@ -470,7 +491,10 @@
         <!-- Fixed Sidebar Filter -->
         <div class="filter-sidebar">
             <div class="filter-header">
-                <h6><i class="fa-solid fa-filter text-muted me-2"></i> Filters</h6>
+                <h6>
+                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
+                    Filters
+                </h6>
                 <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
             </div>
             <div class="filter-search-box">
@@ -480,29 +504,55 @@
                 </div>
             </div>
 
-            <div class="filter-body" id="sidebarList">
-                @foreach (var prop in tableProps)
-                {
-                    <div class="filter-field-item field-item-row">
-                        <div class="form-check m-0 d-flex align-items-center">
-                            <input class="form-check-input field-checkbox me-2" type="checkbox" value="@prop.Name" id="chk_@prop.Name">
-                            <label class="form-check-label flex-grow-1 fw-semibold text-dark" for="chk_@prop.Name">@prop.Name</label>
-                        </div>
-                        <div class="filter-expanded-area">
-                            <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                <option value="contains" selected>contains</option>
-                                <option value="is">is exactly</option>
-                                <option value="is_not">is not</option>
-                                <option value="is_empty">is empty</option>
-                            </select>
-                            <!-- Native HTML5 Datalist for Dropdown Suggestions -->
-                            <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
-                            <datalist id="dl_@prop.Name">
-                                <!-- Populated dynamically via JS on load -->
-                            </datalist>
-                        </div>
+            <!-- ONE UNIFIED SCROLLING BODY -->
+            <div class="filter-body">
+
+                <!-- FREQUENTLY USED SECTION (Pinned Items) -->
+                <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
+                    <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                        <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857" style="width: 12px; height: 12px; margin-right: 6px;" alt="Star">
+                        FREQUENTLY USED
                     </div>
-                }
+                    <div id="pinnedItemsContainer">
+                        <!-- Pinned filters will be dynamically moved here -->
+                    </div>
+                </div>
+
+                <!-- UNPINNED LIST -->
+                <div id="sidebarList">
+                    @foreach (var prop in tableProps)
+                    {
+                        <div class="filter-field-item field-item-row">
+                            <div class="d-flex align-items-center m-0 w-100">
+                                <!-- Custom Star Image for Pinning -->
+                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857"
+                                     class="pin-filter-btn unpinned-star flex-shrink-0"
+                                     style="width: 15px; height: 15px; cursor: pointer; filter: grayscale(100%) opacity(0.3); transition: all 0.2s;"
+                                     onclick="togglePinFilter(this)" title="Pin this filter" alt="Pin">
+
+                                <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
+
+                                <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
+                                    @prop.Name
+                                </label>
+                            </div>
+
+                            <div class="filter-expanded-area">
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="contains" selected>contains</option>
+                                    <option value="is">is exactly</option>
+                                    <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                </select>
+                                <!-- Native HTML5 Datalist for Dropdown Suggestions -->
+                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
+                                <datalist id="dl_@prop.Name">
+                                    <!-- Populated dynamically via JS on load -->
+                                </datalist>
+                            </div>
+                        </div>
+                    }
+                </div>
             </div>
             <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto">
                 <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
@@ -513,13 +563,54 @@
         <div class="table-container">
             <!-- Top Toolbar -->
             <div class="table-toolbar">
-                <div class="dropdown">
-                    <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                        <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
-                        <!-- Populated via JS for Drag & Drop -->
-                    </ul>
+                <div class="me-auto d-flex align-items-center">
+                    <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
+                        <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
+                    </span>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <!-- Global Sort Dropdown UI -->
+                    <div class="dropdown">
+                        <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i class="fa-solid fa-arrow-up-wide-short text-muted me-1"></i> Sort
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="width: 320px; border-radius: 12px;">
+                            <h6 class="mb-3 text-dark fw-bold">Sort By</h6>
+                            <div class="d-flex gap-2 mb-3">
+                                <select id="globalSortField" class="form-select form-select-sm">
+                                    <option value="" selected>None</option>
+                                    @if (tableProps.Length > 0)
+                                    {
+                                        int colIndex = 0;
+                                        foreach (var prop in tableProps)
+                                        {
+                                            <option value="@colIndex">@prop.Name</option>
+                                            colIndex++;
+                                        }
+                                    }
+                                </select>
+                                <select id="globalSortDir" class="form-select form-select-sm" style="width: 140px;">
+                                    <option value="asc" selected>Ascending</option>
+                                    <option value="desc">Descending</option>
+                                </select>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn-saas border" data-bs-dismiss="dropdown" style="padding: 4px 12px;">Cancel</button>
+                                <button type="button" class="btn-saas-primary" onclick="applyGlobalSort()" style="background-color: #84b679; border-color: #84b679; padding: 4px 16px;">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manage Columns Drag & Drop -->
+                    <div class="dropdown">
+                        <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
+                            <!-- Populated via JS for Drag & Drop -->
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -543,8 +634,8 @@
 
                                             <!-- Funnel Menu inside Column Header -->
                                             <div class="dropdown">
-                                                <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="fa-solid fa-filter" style="font-size: 11px;"></i>
+                                                <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort" style="background: transparent; border: none; padding: 0;">
+                                                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
                                                 </button>
                                                 <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
                                                     <!-- Internal Column Search -->
@@ -649,12 +740,34 @@
                 </table>
             </div>
 
-            <!-- Pagination -->
+            <!-- Pagination (Server-Side Integration matching Account page) -->
             <div class="pagination-container">
-                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">Showing 0 records</span>
+                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
+                    Showing page @currentPage of @totalPages (@totalRecords total records)
+                </span>
                 <div class="d-flex gap-2">
-                    <button id="prevBtn" class="btn-saas" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                    <button id="nextBtn" class="btn-saas" onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
+                    @if (currentPage > 1)
+                    {
+                        <a href="@Url.Action("Index", new { page = currentPage - 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
+                            <i class="fa-solid fa-chevron-left"></i> Prev
+                        </a>
+                    }
+                    else
+                    {
+                        <!-- Fallback to original Deal logic for client-side interactions when button used -->
+                        <button id="prevBtn" class="btn-saas" disabled onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                    }
+
+                    @if (currentPage < totalPages)
+                    {
+                        <a href="@Url.Action("Index", new { page = currentPage + 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
+                            Next <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    }
+                    else
+                    {
+                        <button id="nextBtn" class="btn-saas" disabled onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
+                    }
                 </div>
             </div>
         </div>
@@ -722,6 +835,7 @@
         let currentPage = 1;
         let rowsPerPage = 15;
         let currentNoteDealId = null;
+        const urlParams = new URLSearchParams(window.location.search);
 
         document.addEventListener("DOMContentLoaded", function () {
         setupColumnToggles();
@@ -731,8 +845,68 @@
         });
 
         // ==========================================
-        // SIDEBAR FILTERING & SUGGESTIONS LOGIC
+        // GLOBAL SORT FUNCTIONALITY
         // ==========================================
+        function applyGlobalSort() {
+        const colIndex = document.getElementById('globalSortField').value;
+        const direction = document.getElementById('globalSortDir').value;
+
+        if (colIndex === "") {
+        alert("Please select a field to sort by.");
+        return;
+        }
+
+        sortTableByCol(colIndex, direction);
+
+        // Close the dropdown after applying
+        const sortBtn = document.querySelector('.table-toolbar .dropdown button');
+        const bsDropdown = bootstrap.Dropdown.getInstance(sortBtn) || new bootstrap.Dropdown(sortBtn);
+        if(bsDropdown) bsDropdown.hide();
+        }
+
+        // ==========================================
+        // SIDEBAR FILTERING, PINNING & SUGGESTIONS LOGIC
+        // ==========================================
+        function togglePinFilter(imgElement) {
+        const itemRow = imgElement.closest('.field-item-row');
+        const pinnedContainer = document.getElementById('pinnedItemsContainer');
+        const unpinnedContainer = document.getElementById('sidebarList');
+        const pinnedSection = document.getElementById('pinnedFilters');
+
+        const isPinned = itemRow.classList.contains('pinned-item');
+
+        if (!isPinned) {
+        imgElement.style.filter = "none";
+        imgElement.style.opacity = "1";
+        itemRow.classList.add('pinned-item');
+        pinnedContainer.appendChild(itemRow);
+        } else {
+        imgElement.style.filter = "grayscale(100%) opacity(0.3)";
+        itemRow.classList.remove('pinned-item');
+
+        // Return to alphabetical position
+        const unpinnedItems = Array.from(unpinnedContainer.querySelectorAll('.field-item-row'));
+        const itemName = itemRow.querySelector('label').innerText.toLowerCase();
+
+        let inserted = false;
+        for (let i = 0; i < unpinnedItems.length; i++) {
+        if (unpinnedItems[i].querySelector('label').innerText.toLowerCase() > itemName) {
+        unpinnedContainer.insertBefore(itemRow, unpinnedItems[i]);
+        inserted = true;
+        break;
+        }
+        }
+        if (!inserted) {
+        unpinnedContainer.appendChild(itemRow);
+        }
+        }
+
+        if (pinnedContainer.children.length > 0) {
+        pinnedSection.style.display = 'block';
+        } else {
+        pinnedSection.style.display = 'none';
+        }
+        }
 
         function populateDatalists() {
         const table = document.getElementById("dealsTable");
@@ -765,6 +939,9 @@
         const item = this.closest('.filter-field-item');
         if(this.checked) {
         item.classList.add('active');
+        // Optional focus logic
+        const valInput = item.querySelector('.condition-val');
+        if(valInput) setTimeout(() => valInput.focus(), 100);
         } else {
         item.classList.remove('active');
         item.querySelector('.condition-val').value = '';
@@ -842,7 +1019,7 @@
         }
 
         // ==========================================
-        // SORTING LOGIC
+        // SORTING LOGIC (SERVER-BASED)
         // ==========================================
         function sortTableByCol(colIndex, direction) {
         const th = document.querySelector(`th[data-col-index="${colIndex}"]`);
@@ -867,7 +1044,6 @@
         }
 
         if (confirm(`Are you sure you want to delete ${selectedIds.length} selected record(s)?`)) {
-
         fetch('/Deals/BulkDelete', {
         method: 'POST',
         headers: {
@@ -1207,12 +1383,16 @@
         function applyPagination() {
         const rows = Array.from(document.querySelectorAll('tbody tr.deal-row:not(.filtered-out)'));
         const totalRows = rows.length;
-        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
 
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
+        // Client side logic handling the visual display for current active rows
+        // if server filtering isn't completely overriding it
+        let calculatedTotalPages = Math.ceil(totalRows / rowsPerPage) || 1;
 
-        const startIdx = (currentPage - 1) * rowsPerPage;
+        let internalPage = currentPage;
+        if (internalPage > calculatedTotalPages) internalPage = calculatedTotalPages;
+        if (internalPage < 1) internalPage = 1;
+
+        const startIdx = (internalPage - 1) * rowsPerPage;
         const endIdx = startIdx + rowsPerPage;
 
         document.querySelectorAll('tbody tr.deal-row').forEach(r => {
@@ -1223,17 +1403,18 @@
         rows[i].style.display = '';
         }
 
-        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} records`;
+        // Updating local info if filtering happened
+        if(document.querySelectorAll('.filter-field-item.active').length > 0) {
+        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} filtered records`;
+        }
         }
 
         // ==========================================
         // SERVER-SIDE PAGINATION & SORTING
         // ==========================================
-        const urlParams = new URLSearchParams(window.location.search);
-
         function changePage(step) {
-        let currentPage = parseInt(urlParams.get('page')) || 1;
-        let newPage = currentPage + step;
+        let internalPage = parseInt(urlParams.get('page')) || 1;
+        let newPage = internalPage + step;
         if (newPage < 1) newPage = 1;
 
         urlParams.set('page', newPage);

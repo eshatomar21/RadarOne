@@ -18,7 +18,6 @@ namespace Radar_CRM.Controllers
         }
 
         [HttpPost("WordpressContact")]
-        // FIX: Removed the [FromHeader] attribute from the parentheses
         public async Task<IActionResult> ReceiveWordpressContact([FromBody] WordpressLeadDto formData)
         {
             // 1. SECURITY CHECK: Read the header manually to prevent the 400 Validation Error

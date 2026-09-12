@@ -11,11 +11,6 @@
         "Name": "formData",
         "Type": "Radar_CRM.Models.WordpressLeadDto",
         "IsRequired": true
-      },
-      {
-        "Name": "X-API-KEY",
-        "Type": "System.String",
-        "IsRequired": false
       }
     ],
     "ReturnTypes": []

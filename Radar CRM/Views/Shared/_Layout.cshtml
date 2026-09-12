@@ -14,8 +14,8 @@
     <link rel="stylesheet" href="~/Publisher%20CRM.styles.css" asp-append-version="true" />
 
     <style>
-        /* --- Premium Enterprise SaaS Palette (Light Theme) --- */
-       @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        /* --- Premium Enterprise SaaS Palette (Cream & Navy Theme) --- */
+        @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
         :root {
         /* Main Workspace Colors */
@@ -24,15 +24,14 @@
         --navbar-border: #e2e8f0;
         --text-main: #0f172a;
         --text-muted: #64748b;
-        /* Clean Light Sidebar Theme */
-        --sidebar-bg: #ffffff; /* Crisp White */
-        --sidebar-border: #e2e8f0; /* Light border */
-        --sidebar-text: #475569; /* Slate grey for unselected */
-        --sidebar-hover-bg: #f1f5f9; /* Soft slate hover */
-        --sidebar-hover-text: #0f172a; /* Bold dark slate on hover */
-        --sidebar-active-bg: #eff6ff; /* Very soft vibrant blue */
-        --sidebar-active-text: #2563eb; /* Strong vibrant blue */
-        --sidebar-active-border: #2563eb;
+        /* Clean Cream & Navy Sidebar Theme */
+        --sidebar-bg: #Fdfbf7; /* Cream Background */
+        --sidebar-border: #e2e8f0;
+        --sidebar-text: #475569;
+        --sidebar-hover-bg: #1e3a8a; /* Dark Navy Blue */
+        --sidebar-hover-text: #ffffff; /* White text on hover */
+        --sidebar-active-bg: #1e3a8a; /* Dark Navy Blue active state */
+        --sidebar-active-text: #ffffff; /* White text on active state */
         --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
 
@@ -55,7 +54,7 @@
 
         /* --- Premium Sidebar Styling --- */
         .sidebar {
-        width: 260px; /* Slightly wider for bolder text */
+        width: 240px; /* Thinner width */
         background-color: var(--sidebar-bg);
         border-right: 1px solid var(--sidebar-border);
         display: flex;
@@ -63,7 +62,7 @@
         flex-shrink: 0;
         z-index: 1040;
         transition: transform 0.3s ease-in-out;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.03); /* Soft shadow bleeding into content */
+        box-shadow: 4px 0 15px rgba(0,0,0,0.02);
         }
 
         .sidebar-brand {
@@ -71,23 +70,43 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        height: 70px;
+        height: 85px; /* Increased height for larger logo */
         background-color: var(--sidebar-bg);
         border-bottom: 1px solid var(--sidebar-border);
         }
 
+        /* PREMIUM 3D BRAND LOGO STYLING */
         .brand-logo-container {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
+        }
+
+        .brand-logo-container img {
+        width: 46px; /* Larger high-quality size */
+        height: 46px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 2px solid #ffffff;
+        /* Deep 3D Shadow */
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .brand-logo-container img:hover {
+        transform: translateY(-2px) scale(1.05); /* Slight pop out on hover */
         }
 
         .brand-logo-container h5 {
-        color: #0f172a; /* Dark bold brand color */
-        font-weight: 800; /* Extra bold */
+        font-weight: 800;
         margin: 0;
         letter-spacing: -0.5px;
-        font-size: 1.3rem;
+        font-size: 1.5rem; /* Larger font */
+        /* Gradient and 3D Text Shadow */
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(30, 58, 138, 0.15);
         }
 
         .sidebar-nav {
@@ -124,10 +143,10 @@
         text-decoration: none;
         border-radius: 8px;
         margin-bottom: 6px;
-        font-weight: 600; /* Bold text */
+        font-weight: 600;
         font-size: 0.95rem;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        border-left: 4px solid transparent; /* Ready for active state */
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
         }
 
         .nav-item-link-content {
@@ -135,86 +154,77 @@
         align-items: center;
         }
 
-        .nav-item-link i {
+        /* 3D Colored Icons */
+        .icon-3d {
         margin-right: 0.85rem;
-        font-size: 1.25rem; /* Larger, bolder icons */
-        color: #64748b;
-        transition: all 0.2s ease;
+        font-size: 1.25rem;
+        filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.15)); /* 3D Shadow effect */
+        transition: all 0.25s ease;
         }
 
-        /* Hover States - Sliding Motion */
+        /* Hover States - Navy Blue background, White text & icon */
         .nav-item-link:hover:not(.active) {
         background-color: var(--sidebar-hover-bg);
         color: var(--sidebar-hover-text);
-        transform: translateX(4px); /* Sleek slide effect */
+        transform: translateX(4px);
+        box-shadow: 0 4px 10px rgba(30, 58, 138, 0.15);
         }
 
-        .nav-item-link:hover:not(.active) i {
-        color: var(--sidebar-hover-text);
+        .nav-item-link:hover:not(.active) .icon-3d,
+        .nav-item-link:hover:not(.active) .toggle-arrow {
+        color: var(--sidebar-hover-text) !important;
+        filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
         }
 
-        /* Active States - Vibrant Blue */
+        /* Active States - Sticky Navy Blue background */
         .nav-item-link.active {
-        background: var(--sidebar-active-bg);
+        background-color: var(--sidebar-active-bg);
         color: var(--sidebar-active-text);
         font-weight: 700;
-        border-left: 4px solid var(--sidebar-active-border);
+        box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2);
         }
 
-        .nav-item-link.active i {
-        color: var(--sidebar-active-text);
+        .nav-item-link.active .icon-3d,
+        .nav-item-link.active .toggle-arrow {
+        color: var(--sidebar-active-text) !important;
+        filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
         }
 
-        /* --- Sub-menu (Other Modules) Styling --- */
-        .nav-item-link .toggle-arrow {
+        /* --- Sub-menu (Dropdown) Styling --- */
+        .toggle-arrow {
         transition: transform 0.3s ease;
         font-size: 0.85rem;
         color: #64748b;
         font-weight: bold;
         }
 
-        /* When dropdown is open, style the main button */
+        /* Dropdown open state for main toggle */
         .nav-item-link[aria-expanded="true"] {
-        background-color: var(--sidebar-hover-bg);
-        color: var(--sidebar-hover-text);
-        }
-
-        .nav-item-link[aria-expanded="true"] i {
-        color: var(--sidebar-hover-text);
+        background-color: #e2e8f0;
+        color: #0f172a;
         }
 
         .nav-item-link[aria-expanded="true"] .toggle-arrow {
         transform: rotate(180deg);
         }
 
-        /* Dropdown Container */
-        .sub-menu {
-        margin-left: 1.7rem;
+        /* Dynamic Dropdown Container */
+        .collapse.sub-menu {
+        margin-left: 1.5rem;
         padding-left: 0.5rem;
-        border-left: 2px solid #e2e8f0;
+        border-left: 2px solid #cbd5e1;
         margin-top: 4px;
         margin-bottom: 12px;
-        background-color: #f8fafc; /* Subtle grey background for the list */
         border-radius: 0 8px 8px 0;
-        padding-top: 4px;
-        padding-bottom: 4px;
+        transition: all 0.3s ease-in-out;
         }
 
         .sub-menu .nav-item-link {
         font-size: 0.85rem;
-        padding: 0.5rem 1rem;
+        padding: 0.6rem 1rem;
         color: #475569;
-        border-left: none;
         margin-bottom: 2px;
         font-weight: 600;
-        }
-
-        /* Dropdown Hover State */
-        .sub-menu .nav-item-link:hover {
-        color: var(--sidebar-active-text);
-        background-color: #eff6ff; /* Soft blue tint */
-        transform: translateX(4px);
-        border-radius: 6px;
         }
 
         /* --- Main Content Area --- */
@@ -279,13 +289,13 @@
 
         .search-wrapper input:focus {
         background-color: #ffffff;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.15);
         outline: none;
         }
 
         .search-wrapper input:focus + .bi-search {
-        color: #3b82f6;
+        color: #1e3a8a;
         }
 
         /* Search Results Dropdown */
@@ -324,7 +334,7 @@
 
         .search-result-icon {
         background: #eff6ff;
-        color: #2563eb;
+        color: #1e3a8a;
         width: 32px;
         height: 32px;
         border-radius: 6px;
@@ -406,7 +416,7 @@
         .avatar-circle {
         width: 42px;
         height: 42px;
-        background: linear-gradient(135deg, #3b82f6, #2dd4bf);
+        background: linear-gradient(135deg, #1e3a8a, #0ea5e9);
         color: #ffffff;
         border-radius: 50%;
         display: flex;
@@ -414,14 +424,14 @@
         justify-content: center;
         font-weight: 700;
         font-size: 1.1rem;
-        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
         border: 2px solid #ffffff;
         transition: all 0.2s ease;
         }
 
         .user-dropdown-btn:hover .avatar-circle {
         transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
         }
 
         /* --- Mobile Responsive --- */
@@ -438,7 +448,7 @@
         transition: opacity 0.3s ease;
         }
 
-       @@media (max-width: 768px) {
+        @@media (max-width: 768px) {
         .sidebar {
         position: fixed;
         top: 0;
@@ -485,61 +495,56 @@
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <div class="brand-logo-container">
-                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/Radaropusd_funal.jpg?v=1788239642"
-                         alt="Radar One Logo"
-                         style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/Radaropusd_funal.jpg?v=1788239642" alt="Radar One Logo">
                     <h5>Radar One</h5>
                 </div>
             </div>
 
             <div class="sidebar-nav">
                 <div class="nav-section-title">Work</div>
-                <a href="#" class="nav-item-link active">
-                    <div class="nav-item-link-content"><i class="bi bi-house"></i> Home</div>
+                <!-- REMOVED THE HARDCODED "ACTIVE" CLASS. JS NOW HANDLES IT DYNAMICALLY -->
+                <a href="/" class="nav-item-link">
+                    <div class="nav-item-link-content"><i class="fa-solid fa-house icon-3d" style="color: #3b82f6;"></i> Home</div>
                 </a>
                 <a href="#" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-file-earmark-bar-graph"></i> Reports</div>
-                </a>
-                <a href="#" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-graph-up"></i> Analytics</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-file-invoice icon-3d" style="color: #8b5cf6;"></i> Reports</div>
                 </a>
 
                 <div class="nav-section-title">Sales</div>
                 <a asp-controller="Accounts" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-buildings"></i> Accounts</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-building icon-3d" style="color: #0ea5e9;"></i> Accounts</div>
                 </a>
                 <a asp-controller="Leads" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-person-lines-fill"></i> Leads</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-user-tie icon-3d" style="color: #10b981;"></i> Leads</div>
                 </a>
                 <a asp-controller="Deals" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-briefcase"></i> Deals</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-briefcase icon-3d" style="color: #f59e0b;"></i> Deals</div>
                 </a>
                 <a asp-controller="Tasks" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-check2-square"></i> Tasks</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-list-check icon-3d" style="color: #ef4444;"></i> Tasks</div>
                 </a>
 
                 <!-- Dropdown: Other Modules -->
-                <a href="#otherModulesMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false">
-                    <div class="nav-item-link-content"><i class="bi bi-grid"></i> Other Modules</div>
-                    <i class="bi bi-chevron-down toggle-arrow"></i>
+                <a href="#otherModulesMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="otherModulesMenu">
+                    <div class="nav-item-link-content"><i class="fa-solid fa-layer-group icon-3d" style="color: #06b6d4;"></i> Other Modules</div>
+                    <i class="fa-solid fa-chevron-down toggle-arrow"></i>
                 </a>
                 <div class="collapse sub-menu" id="otherModulesMenu">
-                    <a href="#" class="nav-item-link">Meetings</a>
-                    <a asp-controller="Vendors" asp-action="Index" class="nav-item-link">Vendors</a>
-                    <a href="#" class="nav-item-link">Outreach Source</a>
                     <a asp-controller="Products" asp-action="Index" class="nav-item-link">Products</a>
+                    <a asp-controller="Vendors" asp-action="Index" class="nav-item-link">Vendors</a>
                 </div>
 
+                <!-- Dropdown: Administration -->
                 <div class="nav-section-title">Administration</div>
-                <a asp-controller="Users" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-people"></i> Users</div>
+                <a href="#adminMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="adminMenu">
+                    <div class="nav-item-link-content"><i class="fa-solid fa-gear icon-3d" style="color: #64748b;"></i> Settings</div>
+                    <i class="fa-solid fa-chevron-down toggle-arrow"></i>
                 </a>
-                <a href="#" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-shield-lock"></i> Roles</div>
-                </a>
-                <a href="#" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="bi bi-person-badge"></i> Profiles</div>
-                </a>
+                <div class="collapse sub-menu" id="adminMenu">
+                    <a asp-controller="Users" asp-action="Index" class="nav-item-link">Users</a>
+                    <a asp-controller="Roles" asp-action="Index" class="nav-item-link">Roles</a>
+                    <a href="#" class="nav-item-link">Profiles</a>
+                </div>
             </div>
         </nav>
 
@@ -619,6 +624,45 @@
     <!-- UI & Search Scripts -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+
+        // --- Dynamic Active State Logic based on URL ---
+        const currentPath = window.location.pathname.toLowerCase();
+        const navLinks = document.querySelectorAll('.sidebar-nav .nav-item-link');
+
+        // 1. First, strip any lingering active classes
+        navLinks.forEach(l => l.classList.remove('active'));
+
+        let matched = false;
+
+        // 2. Loop through links to find the one matching the current URL
+        navLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        if (!href || href === '#' || link.hasAttribute('data-bs-toggle')) return; // Ignore dropdown triggers and empty links
+
+        // Fix URLs for accurate string matching
+        const linkPath = href.toLowerCase();
+
+        // If the current path contains the href of the link (e.g., /Accounts/Index matches /Accounts)
+        if (currentPath.includes(linkPath) && linkPath !== '/') {
+        link.classList.add('active');
+        matched = true;
+
+        // If this link is inside a dropdown menu, ensure the menu opens automatically
+        const parentCollapse = link.closest('.collapse.sub-menu');
+        if (parentCollapse) {
+        parentCollapse.classList.add('show');
+        const trigger = document.querySelector(`[aria-controls="${parentCollapse.id}"]`);
+        if(trigger) trigger.setAttribute('aria-expanded', 'true');
+        }
+        }
+        });
+
+        // 3. Fallback: If we are exactly at root ("/") and nothing matched, make Home active
+        if (!matched && (currentPath === '/' || currentPath === '')) {
+        const homeLink = document.querySelector('a[href="/"]');
+        if (homeLink) homeLink.classList.add('active');
+        }
+
 
         // --- Mobile Sidebar Toggle ---
         const mobileBtn = document.getElementById('mobileMenuBtn');
