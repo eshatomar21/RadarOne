@@ -27,6 +27,9 @@ namespace Radar_CRM.Models
 
         public string? LeadStatus { get; set; }
 
+        [Column("Group_Name")]
+        public string? GroupName { get; set; }
+
         // --- Relational Ownership ---
         public string? AccountOwnerId { get; set; }
         [ForeignKey("AccountOwnerId")]

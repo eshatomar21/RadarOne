@@ -157,13 +157,7 @@
                 </div>
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Category</label>
-                    <select asp-for="Category" class="sf-select">
-                        <option value="">- None -</option>
-                        <option value="Hardware">Hardware</option>
-                        <option value="Software">Software</option>
-                        <option value="Services">Services</option>
-                        <option value="Logistics">Logistics</option>
-                    </select>
+                    <input asp-for="Category" class="sf-input" />
                 </div>
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Phone</label>
@@ -187,9 +181,14 @@
                     <label class="sf-label">GL Account</label>
                     <select asp-for="GLAccount" class="sf-select">
                         <option value="">- None -</option>
-                        <option value="Sales Revenue">Sales Revenue</option>
-                        <option value="Cost of Goods Sold">Cost of Goods Sold</option>
-                        <option value="Inventory Asset">Inventory Asset</option>
+                        <option value="Sales-Software">Sales-Software</option>
+                        <option value="Sales-Hardware">Sales-Hardware</option>
+                        <option value="Rental Income">Rental Income</option>
+                        <option value="Interest Income">Interest Income</option>
+                        <option value="Sales Software Support">Sales Software Support</option>
+                        <option value="Sales Other">Sales Other</option>
+                        <option value="Interest Sales">Interest Sales</option>
+                        <option value="Labor Hardware Service">Labor Hardware Service</option>
                     </select>
                 </div>
                 <div class="col-md-4 form-group">
@@ -203,9 +202,9 @@
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Vendor Type</label>
                     <select asp-for="VendorType" class="sf-select">
-                        <option value="">- None -</option>
-                        <option value="Registered">Registered</option>
-                        <option value="Unregistered">Unregistered</option>
+                        <option value="">-None-</option>
+                        <option value="Referral / Dealer">Referral / Dealer</option>
+                        <option value="Group Lead">Group Lead</option>
                     </select>
                 </div>
             </div>

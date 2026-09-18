@@ -1,0 +1,45 @@
+﻿@{
+    ViewData["Title"] = "Integrations";
+}
+
+<div class="min-h-screen bg-[#FDFBF7] p-8 font-sans">
+    <div class="max-w-4xl mx-auto">
+
+        <div class="mb-8 border-b border-gray-200 pb-5">
+            <h2 class="text-2xl font-bold text-[#1E3A8A]">Connect Your Apps</h2>
+            <p class="text-sm text-gray-600 mt-1">
+                Link external sources to automatically sync data into your CRM.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Meta Lead Ads Integration Card -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col justify-between hover:shadow-lg transition-shadow">
+                <div>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center p-2">
+                            <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Facebook Lead Ads</h3>
+                            <p class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Meta Integrations</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-6">
+                        Automatically pull incoming leads from your Facebook and Instagram ad campaigns directly into the CRM.
+                    </p>
+                </div>
+
+                <!-- This hits the Connect method in the MetaAuthController -->
+                <a href="@Url.Action("Connect", "MetaAuth")"
+                   class="block w-full text-center bg-[#1E3A8A] hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-md transition-colors">
+                    Connect Facebook
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>

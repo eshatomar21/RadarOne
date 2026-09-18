@@ -10,11 +10,15 @@
     string currentSearch = Context.Request.Query["search"];
     string currentSortCol = Context.Request.Query["sortCol"];
     string currentSortDir = Context.Request.Query["sortDir"];
+    string advancedFilters = Context.Request.Query["advancedFilters"];
 
-    // EXCLUSION LIST: Removed internal IDs
-    var excludedFields = new[] { "ZohoRecordId", "LeadOwnerId", "CoOwnerId" };
+    // EXCLUSION LIST: Removed relational lists to prevent table breaking, but kept Owner properties so they render
+    var excludedFields = new[] {
+        "ZohoRecordId", "LeadOwnerId", "CoOwnerId", "AccountOwnerId", "DemoOwnerId",
+        "Tasks", "Notes", "Deals", "PaymentRow"
+    };
 
-    // Dynamically get all properties of the Lead model, EXCLUDING lists (so they don't break the table) and excluded fields
+    // Dynamically get all properties of the Lead model, EXCLUDING lists and excluded fields
     var tableProps = Model != null && Model.Any() ?
         Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
         .Where(p => !excludedFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)))
@@ -353,7 +357,7 @@
     .sticky-actions {
         position: sticky;
         right: 0;
-        width: 100px;
+        width: 130px;
         text-align: center;
         z-index: 11;
         border-left: 1px solid var(--border-soft) !important;
@@ -389,43 +393,7 @@
             cursor: grabbing;
         }
 
-    /* -------------------------------------
-                LEAD SPECIFIC STYLES (Icons/Badges)
-                ------------------------------------- */
-
-    .row-action-icon {
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: 1.1rem;
-        transition: color 0.2s;
-        padding: 4px 8px;
-    }
-
-        .row-action-icon:hover {
-            color: var(--primary-blue);
-        }
-
-    .btn-notes-pill {
-        background: #eff6ff;
-        color: var(--primary-blue);
-        border: 1px solid #bfdbfe;
-        border-radius: 20px;
-        padding: 4px 10px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-        .btn-notes-pill:hover {
-            background: var(--primary-blue);
-            color: white;
-            border-color: var(--primary-blue);
-        }
-
+    /* Badges */
     .badge-soft-success {
         background: #dcfce3;
         color: #166534;
@@ -461,35 +429,6 @@
         justify-content: space-between;
         align-items: center;
         background-color: var(--bg-surface);
-    }
-
-    /* Notes Timeline */
-    .timeline-container {
-        border-left: 2px solid var(--border-soft);
-        margin-left: 15px;
-        padding-left: 20px;
-        margin-top: 20px;
-    }
-
-    .timeline-item {
-        position: relative;
-        margin-bottom: 20px;
-    }
-
-    .timeline-icon {
-        position: absolute;
-        left: -32px;
-        top: 0;
-        background: var(--bg-surface);
-        border: 2px solid var(--primary-blue);
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--primary-blue);
-        font-size: 10px;
     }
 
     /* Mobile Friendly Adjustments */
@@ -553,7 +492,7 @@
 <div class="crm-container">
 
     <!-- Fixed Sidebar Filter -->
-    <div class="filter-sidebar">
+    <div class="filter-sidebar" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <div class="filter-header">
             <h6>
                 <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
@@ -569,12 +508,12 @@
         </div>
 
         <!-- ONE UNIFIED SCROLLING BODY -->
-        <div class="filter-body">
+        <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
 
             <!-- FREQUENTLY USED SECTION -->
             <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857" style="width: 12px; height: 12px; margin-right: 6px;" alt="Star">
+                    <i class="fa-solid fa-star me-2" style="color: #eab308;"></i>
                     FREQUENTLY USED
                 </div>
                 <div id="pinnedItemsContainer">
@@ -591,12 +530,10 @@
                     <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
 
                         <div class="d-flex align-items-center m-0 w-100">
-
-                            <!-- Custom Star Image -->
-                            <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857"
-                                 class="pin-filter-btn unpinned-star flex-shrink-0"
-                                 style="width: 15px; height: 15px; cursor: pointer; filter: grayscale(100%) opacity(0.3); transition: all 0.2s;"
-                                 onclick="togglePinFilter(this)" title="Pin this filter" alt="Pin">
+                            <!-- Star Icon -->
+                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
+                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
+                               onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
 
                             <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
 
@@ -608,42 +545,38 @@
                         <div class="filter-expanded-area">
                             @if (isDate)
                             {
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
                                     <option value="on" selected>On</option>
                                     <option value="before">before</option>
                                     <option value="after">after</option>
-                                    <option value="not_between">not between</option>
+                                    <option value="between">between</option>
                                     <option value="today">Today</option>
-                                    <option value="tomorrow">Tomorrow</option>
                                     <option value="this_month">This Month</option>
-                                    <option value="current_fq">Current FQ</option>
                                 </select>
-                                <input type="date" class="form-control form-control-sm condition-val date-val" />
+                                <div class="d-flex flex-column gap-2">
+                                    <input type="date" class="form-control form-control-sm condition-val date-val-1" />
+                                    <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
+                                </div>
                             }
-                            else if (prop.Name == "Id")
+                            else if (prop.Name.Contains("Owner"))
                             {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is exactly</option>
-                                    <option value="contains">contains</option>
+                                    <option value="contains" selected>contains</option>
+                                    <option value="does_not_contain">does not contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
+                                    <option value="is">is exactly</option>
                                     <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" class="form-control form-control-sm condition-val" placeholder="Enter ID..." />
-                            }
-                            else if (prop.Name == "LeadOwner" || prop.Name == "CurrentStatus" || prop.Name == "DataSource")
-                            {
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is exactly</option>
-                                    <option value="contains">contains</option>
-                                    <option value="is_not">is not</option>
-                                </select>
-                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Select or type..." />
-                                <datalist id="dl_@prop.Name">
-                                    @if (Model != null && Model.Any())
+                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type..." />
+                                <datalist id="dl_users_@prop.Name">
+                                    @if (ViewBag.UsersList != null)
                                     {
-                                        var uniqueValues = Model.Select(m => prop.GetValue(m)?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Distinct().Take(50);
-                                        foreach (var val in uniqueValues)
+                                        foreach (var user in (SelectList)ViewBag.UsersList)
                                         {
-                                            <option value="@val"></option>
+                                            <option value="@user.Text" data-userid="@user.Value"></option>
                                         }
                                     }
                                 </datalist>
@@ -652,78 +585,47 @@
                             {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="contains" selected>contains</option>
+                                    <option value="does_not_contain">does not contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
                                     <option value="is">is exactly</option>
                                     <option value="is_not">is not</option>
-                                    <option value="starts_with">starts with</option>
                                     <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
-                                <datalist id="dl_@prop.Name">
-                                    @if (Model != null && Model.Any())
-                                    {
-                                        var uniqueValues = Model.Select(m => prop.GetValue(m)?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Distinct().Take(50);
-                                        foreach (var val in uniqueValues)
-                                        {
-                                            <option value="@val"></option>
-                                        }
-                                    }
-                                </datalist>
+                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Type or select..." />
+                                <datalist id="dl_@prop.Name"></datalist>
                             }
                         </div>
                     </div>
                 }
             </div>
         </div>
-        <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto">
-            <button class="btn-saas w-100 justify-content-center" onclick="clearFilters()">Clear</button>
-            <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply</button>
+        <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto" style="flex-shrink: 0; z-index: 10;">
+            <button type="button" class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
         </div>
     </div>
 
     <!-- Table Area -->
-    <div class="table-container">
+    <div class="table-container" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <!-- Top Toolbar -->
         <div class="table-toolbar">
-            <div class="me-auto d-flex align-items-center">
+            <div class="me-auto d-flex align-items-center gap-3">
                 <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
                     <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
                 </span>
+
+                <form method="get" action="@Url.Action("Index")" class="m-0 d-flex gap-2 align-items-center">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search entire database..." value="@currentSearch" style="width: 250px;" />
+                    <button type="submit" class="btn-saas-primary" style="padding: 4px 12px;">Search All</button>
+                    @if (!string.IsNullOrEmpty(currentSearch) || !string.IsNullOrEmpty(Context.Request.Query["advancedFilters"]))
+                    {
+                        <a href="@Url.Action("Index")" class="btn btn-sm btn-light border">Clear</a>
+                    }
+                </form>
             </div>
 
             <div class="d-flex gap-2">
-                <!-- Global Sort Dropdown UI -->
-                <div class="dropdown">
-                    <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                        <i class="fa-solid fa-arrow-up-wide-short text-muted me-1"></i> Sort
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="width: 320px; border-radius: 12px;">
-                        <h6 class="mb-3 text-dark fw-bold">Sort By</h6>
-                        <div class="d-flex gap-2 mb-3">
-                            <select id="globalSortField" class="form-select form-select-sm">
-                                <option value="" selected>None</option>
-                                @if (tableProps.Length > 0)
-                                {
-                                    int colIndex = 0;
-                                    foreach (var prop in tableProps)
-                                    {
-                                        <option value="@colIndex">@prop.Name</option>
-                                        colIndex++;
-                                    }
-                                }
-                            </select>
-                            <select id="globalSortDir" class="form-select form-select-sm" style="width: 140px;">
-                                <option value="asc" selected>Ascending</option>
-                                <option value="desc">Descending</option>
-                            </select>
-                        </div>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn-saas border" data-bs-dismiss="dropdown" style="padding: 4px 12px;">Cancel</button>
-                            <button type="button" class="btn-saas-primary" onclick="applyGlobalSort()" style="background-color: #84b679; border-color: #84b679; padding: 4px 16px;">Apply</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Manage Columns Drag & Drop -->
                 <div class="dropdown">
                     <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                         <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
@@ -736,7 +638,7 @@
         </div>
 
         <!-- The Data Table -->
-        <div class="table-responsive" id="tableWrapper">
+        <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow-y: auto;">
             <table class="table" id="leadsTable">
                 <thead>
                     <tr>
@@ -798,7 +700,25 @@
                                     int tdIndex = 0;
                                     foreach (var prop in tableProps)
                                     {
-                                        var value = prop.GetValue(item, null)?.ToString() ?? "";
+                                        string value = "";
+                                        var rawValue = prop.GetValue(item, null);
+
+                                        if (rawValue != null)
+                                        {
+                                            if (rawValue.GetType().Name.Contains("User"))
+                                            {
+                                                var props = rawValue.GetType().GetProperties();
+                                                var nameProp = props.FirstOrDefault(p => p.Name.Equals("FullName", StringComparison.OrdinalIgnoreCase))
+                                                                    ?? props.FirstOrDefault(p => p.Name.Equals("FirstName", StringComparison.OrdinalIgnoreCase));
+
+                                                value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown User";
+                                            }
+                                            else
+                                            {
+                                                value = rawValue.ToString();
+                                            }
+                                        }
+
                                         <td data-col-index="@tdIndex">
                                             @if (prop.Name == "LeadName")
                                             {
@@ -828,23 +748,10 @@
                                     }
                                 }
                                 <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-                                    <div class="d-flex align-items-center justify-content-center gap-3">
-                                        <button class="btn-notes-pill" title="View/Add Notes" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')">
-                                            <i class="fa-regular fa-note-sticky"></i> Note
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                        <button class="btn btn-sm" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+                                            <i class="fa-regular fa-comment-dots"></i> Notes
                                         </button>
-
-                                        <div class="dropdown">
-                                            <i class="fa-solid fa-ellipsis-vertical row-action-icon" data-bs-toggle="dropdown"></i>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                                                <li><a class="dropdown-item" href="#" onclick="alert('Initiating Call...')"><i class="fa-solid fa-phone text-primary me-2"></i> Call</a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="alert('Scheduling Meeting...')"><i class="fa-solid fa-video text-success me-2"></i> Meeting</a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="alert('Task Creation for ID: @item.Id')"><i class="fa-solid fa-list-check text-warning me-2"></i> Create Task</a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item" href="#" onclick="alert('Converting Lead ID @item.Id to Contact...')"><i class="fa-solid fa-user-plus text-muted me-2"></i> Convert to Contact</a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteSingleRecord(this, '@item.Id')"><i class="fa-solid fa-trash text-danger me-2"></i> Delete</a></li>
-                                            </ul>
-                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -862,35 +769,34 @@
                     }
                 </tbody>
             </table>
+        </div>
 
-            <!-- Pagination Container -->
-            <div class="pagination-container">
-                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
-                    Showing page @currentPage of @totalPages (@totalRecords total records)
-                </span>
-                <div class="d-flex gap-2">
-                    @if (currentPage > 1)
-                    {
-                        <a href="@Url.Action("Index", new { page = currentPage - 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
-                            <i class="fa-solid fa-chevron-left"></i> Prev
-                        </a>
-                    }
-                    else
-                    {
-                        <button id="prevBtn" class="btn-saas" disabled onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                    }
+        <div class="pagination-container" style="flex-shrink: 0;">
+            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
+                Showing page @currentPage of @totalPages (@totalRecords total records)
+            </span>
+            <div class="d-flex gap-2">
+                @if (currentPage > 1)
+                {
+                    <button class="btn-saas" onclick="goToPage(@(currentPage - 1))">
+                        <i class="fa-solid fa-chevron-left"></i> Prev
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-saas" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                }
 
-                    @if (currentPage < totalPages)
-                    {
-                        <a href="@Url.Action("Index", new { page = currentPage + 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
-                            Next <i class="fa-solid fa-chevron-right"></i>
-                        </a>
-                    }
-                    else
-                    {
-                        <button id="nextBtn" class="btn-saas" disabled onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
-                    }
-                </div>
+                @if (currentPage < totalPages)
+                {
+                    <button class="btn-saas" onclick="goToPage(@(currentPage + 1))">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-saas" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                }
             </div>
         </div>
     </div>
@@ -925,267 +831,336 @@
     </div>
 </div>
 
-<!-- Notes Offcanvas Panel -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid var(--border-soft);">
-    <div class="offcanvas-header border-bottom bg-light">
-        <h5 class="offcanvas-title fw-bold">
-            <i class="fa-regular fa-comments text-primary me-2"></i> Notes: <span id="noteLeadName" class="text-dark"></span>
+<!-- ==========================================
+     PREMIUM SAAS NOTES OFFCANVAS PANEL
+     ========================================== -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
+
+    <!-- Header -->
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a; letter-spacing: -0.01em;">
+            <i class="fa-regular fa-message me-2 text-muted"></i> <span id="noteAccountName">Lead Name</span>
         </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    <div class="offcanvas-body">
-        <!-- Add Note Box -->
-        <div class="mb-4">
-            <textarea id="newNoteText" class="form-control mb-2" rows="3" placeholder="Add a note..."></textarea>
-            <div class="d-flex justify-content-between align-items-center">
-                <input type="file" id="noteAttachment" class="form-control form-control-sm w-50" />
-                <button class="btn-saas-primary" onclick="saveNote()">Save Note</button>
+
+    <!-- Body -->
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+
+        <!-- Cohesive Compose Box -->
+        <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
+            <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
+
+            <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="position-relative overflow-hidden btn btn-sm bg-white border shadow-sm" style="color: #475569; font-weight: 500;">
+                        <i class="fa-solid fa-paperclip"></i>
+                        <input type="file" id="noteAttachment" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" style="cursor: pointer;" title="Attach file" />
+                    </div>
+                    <select id="noteOwnerId" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="background-color: transparent; color: #475569; cursor: pointer; max-width: 130px;">
+                        <option value="">System</option>
+                    </select>
+                </div>
+
+                <button id="btnSaveNote" class="btn btn-sm shadow-sm" onclick="saveNoteAjax()" style="background-color: #0f172a; color: #ffffff; font-weight: 600; border-radius: 6px; padding: 6px 16px; transition: all 0.2s;">
+                    Save Note
+                </button>
             </div>
         </div>
 
-        <!-- Notes Timeline -->
-        <h6 class="text-muted fw-bold mb-3" style="font-size: 0.8rem; text-transform: uppercase;">Recent Notes</h6>
-        <div class="timeline-container" id="notesTimelineList">
+        <div class="d-flex align-items-center mb-3">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em; text-transform: uppercase;">
+                Timeline Log
+            </span>
+            <div class="ms-3 flex-grow-1" style="height: 1px; background-color: #e2e8f0;"></div>
+        </div>
+
+        <div class="position-relative ms-2 ps-4" id="notesTimelineList" style="border-left: 2px solid #e2e8f0;">
             <!-- Notes dynamically appended here via JS -->
         </div>
     </div>
 </div>
 
 <script>
-    // System Variables
+    // ==========================================
+    // 1. GLOBAL VARIABLES & INITIALIZATION
+    // ==========================================
     const defaultVisibleColumns = ["LeadName", "MobileNumber", "LeadStatus", "Stage", "LeadOwner", "CreatedDateAndTime"];
-    let currentPage = 1;
-    let rowsPerPage = 15;
     let currentNoteLeadId = null;
 
+    let allRows = [];
+    let hiddenCols = new Set();
+
     document.addEventListener("DOMContentLoaded", function () {
+        allRows = Array.from(document.querySelectorAll('tbody tr.lead-row'));
+
+        const style = document.createElement('style');
+        style.id = 'dynamic-col-styles';
+        document.head.appendChild(style);
+
+        allRows.forEach(r => r.style.display = 'none');
+
+        const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols_leads') || '[]');
+        hiddenCols = new Set(savedHidden);
+
         setupColumnToggles();
         setupFilterInteractions();
-        applyPagination();
+        setupLazyDatalists();
+        setupFileUpload();
+
+        restorePinnedFilters();
+
+        refreshVisibleRows();
     });
 
     // ==========================================
-    // SIDEBAR FILTERING LOGIC & PINNING
+    // 2. UI REFRESH (Local display toggles)
     // ==========================================
-    function setupFilterInteractions() {
-        document.querySelectorAll('.condition-select').forEach(sel => {
-            sel.addEventListener('change', function() {
-                const input = this.nextElementSibling;
-                if(this.value === 'is_empty' || this.value === 'is_not_empty') {
-                    input.style.display = 'none';
-                } else {
-                    input.style.display = 'block';
-                }
-            });
-        });
+    function refreshVisibleRows() {
+        const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
 
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-            cb.addEventListener('change', function() {
-                const parentDiv = this.closest('.filter-field-item');
-                const valueInput = parentDiv.querySelector('.condition-val');
-                if(this.checked) {
-                    parentDiv.classList.add('active');
-                    setTimeout(() => valueInput.focus(), 100);
-                } else {
-                    parentDiv.classList.remove('active');
-                    if(valueInput) valueInput.value = '';
-                }
-            });
-        });
-    }
+        allRows.forEach(r => r.style.display = 'none');
+        filteredRows.forEach(r => r.style.display = '');
 
-    function togglePinFilter(imgElement) {
-        const itemRow = imgElement.closest('.field-item-row');
-        const pinnedContainer = document.getElementById('pinnedItemsContainer');
-        const unpinnedContainer = document.getElementById('sidebarList');
-        const pinnedSection = document.getElementById('pinnedFilters');
-
-        const isPinned = itemRow.classList.contains('pinned-item');
-
-        if (!isPinned) {
-            imgElement.style.filter = "none";
-            imgElement.style.opacity = "1";
-            itemRow.classList.add('pinned-item');
-            pinnedContainer.appendChild(itemRow);
-        } else {
-            imgElement.style.filter = "grayscale(100%) opacity(0.3)";
-            itemRow.classList.remove('pinned-item');
-
-            // Return to alphabetical position
-            const unpinnedItems = Array.from(unpinnedContainer.querySelectorAll('.field-item-row'));
-            const itemName = itemRow.querySelector('label').innerText.toLowerCase();
-
-            let inserted = false;
-            for (let i = 0; i < unpinnedItems.length; i++) {
-                if (unpinnedItems[i].querySelector('label').innerText.toLowerCase() > itemName) {
-                    unpinnedContainer.insertBefore(itemRow, unpinnedItems[i]);
-                    inserted = true;
-                    break;
-                }
-            }
-            if (!inserted) {
-                unpinnedContainer.appendChild(itemRow);
+        const totalCountBadge = document.getElementById('topTotalCount');
+        if (totalCountBadge) {
+            if (filteredRows.length === allRows.length) {
+                totalCountBadge.innerText = '@totalRecords';
+            } else {
+                totalCountBadge.innerText = filteredRows.length + ' (Filtered)';
             }
         }
 
-        if (pinnedContainer.children.length > 0) {
-            pinnedSection.style.display = 'block';
-        } else {
-            pinnedSection.style.display = 'none';
-        }
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) selectAllCb.checked = false;
+        updateSelectedCount();
     }
 
-    function filterSidebarItems() {
-        const filter = document.getElementById('sidebarSearch').value.toLowerCase();
-        document.querySelectorAll('.field-item-row').forEach(row => {
-            const label = row.querySelector('label').innerText.toLowerCase();
-            row.style.display = label.includes(filter) ? "" : "none";
-        });
-    }
-
-    function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase();
-        const tbody = document.getElementById("tableBody");
-        const rows = tbody.querySelectorAll("tr.lead-row");
-
-        rows.forEach(row => {
-            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-            if (td) {
-                const cellText = td.innerText.toLowerCase();
-                if (cellText.includes(filterValue)) {
-                    row.style.display = "";
-                } else {
-                    row.style.display = "none";
-                }
-            }
-        });
-    }
-
+    // ==========================================
+    // 3. SERVER-SIDE FILTERING & PAGINATION
+    // ==========================================
     function applyFilters() {
         const activeFilters = [];
         document.querySelectorAll('.filter-field-item.active').forEach(item => {
-            const colName = item.querySelector('.field-checkbox').value;
-            const condition = item.querySelector('.condition-select').value;
-            const valInput = item.querySelector('.condition-val');
-            const val = valInput ? valInput.value.trim().toLowerCase() : '';
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                const colName = cb.value;
+                const conditionNode = item.querySelector('.condition-select');
+                const condition = conditionNode ? conditionNode.value : 'contains';
+                const isDate = item.dataset.fieldType === "date";
 
-            const table = document.getElementById("leadsTable");
-            const th = table.querySelector(`th[data-col-name="${colName}"]`);
-            if(th) {
-                activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
+                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+
+                activeFilters.push({
+                    ColumnName: colName,
+                    Condition: condition,
+                    Value: val1,
+                    IsDate: isDate
+                });
             }
         });
 
-        document.querySelectorAll('tbody tr.lead-row').forEach(row => {
-            let isMatch = true;
-
-            for (let f of activeFilters) {
-                const td = row.querySelector(`td[data-col-index="${f.index}"]`);
-                const cellText = td ? td.innerText.trim().toLowerCase() : '';
-
-                if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
-                if (f.condition === 'starts_with' && !cellText.startsWith(f.val)) isMatch = false;
-                if (f.condition === 'is' && cellText !== f.val) isMatch = false;
-                if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
-                if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
-            }
-
-            if (isMatch) {
-                row.classList.remove('filtered-out');
-            } else {
-                row.classList.add('filtered-out');
-            }
-        });
-
-        currentPage = 1;
-        applyPagination();
-
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    function clearFilters() {
-        document.querySelectorAll('.filter-field-item.active').forEach(item => {
-            item.querySelector('.field-checkbox').checked = false;
-            const valInput = item.querySelector('.condition-val');
-            if (valInput) valInput.value = '';
-            item.classList.remove('active');
-        });
-        document.querySelectorAll('tbody tr.lead-row').forEach(row => row.classList.remove('filtered-out'));
-
-        currentPage = 1;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-    }
-
-    // ==========================================
-    // SORTING LOGIC (GLOBAL UI & INLINE)
-    // ==========================================
-    function applyGlobalSort() {
-        const colIndex = document.getElementById('globalSortField').value;
-        const direction = document.getElementById('globalSortDir').value;
-
-        if (colIndex === "") {
-            alert("Please select a field to sort by.");
+        if (activeFilters.length === 0) {
+            clearFilters();
             return;
         }
 
-        sortTableByCol(colIndex, direction);
+        const filterStr = JSON.stringify(activeFilters);
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('advancedFilters', filterStr);
+        urlParams.set('page', 1);
+        urlParams.set('_t', Date.now());
 
-        // Close the dropdown after applying
-        const sortBtn = document.querySelector('.table-toolbar .dropdown button');
-        const bsDropdown = bootstrap.Dropdown.getInstance(sortBtn) || new bootstrap.Dropdown(sortBtn);
-        if(bsDropdown) bsDropdown.hide();
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
     }
 
-    function sortTableByCol(colIndex, direction) {
-        const tbody = document.getElementById("tableBody");
-        const rows = Array.from(tbody.querySelectorAll("tr.lead-row"));
+    function clearFilters() {
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname;
+    }
 
-        if (rows.length === 0) return;
+    function goToPage(pageNumber) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', pageNumber);
+        urlParams.set('_t', Date.now());
 
-        rows.sort((a, b) => {
-            const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-            const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
 
-            const aText = aCol ? aCol.innerText.trim().toLowerCase() : '';
-            const bText = bCol ? bCol.innerText.trim().toLowerCase() : '';
-
-            const isNumA = aText !== '' && !isNaN(aText);
-            const isNumB = bText !== '' && !isNaN(bText);
-
-            if (isNumA && isNumB) {
-                return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+    function filterSingleColumn(inputEl, colIndex) {
+        const filterValue = inputEl.value.toLowerCase().trim();
+        allRows.forEach(row => {
+            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+            if (td) {
+                const text = td.textContent.trim().toLowerCase();
+                row.classList.toggle('filtered-out', !text.includes(filterValue));
             }
-
-            if (aText < bText) return direction === 'asc' ? -1 : 1;
-            if (aText > bText) return direction === 'asc' ? 1 : -1;
-            return 0;
         });
-
-        rows.forEach(row => tbody.appendChild(row));
-        applyPagination();
+        refreshVisibleRows();
     }
 
     // ==========================================
-    // COLUMN MANAGEMENT (WITH DRAG & DROP)
+    // 4. SIDEBAR UI INTERACTIONS (Pins & Dates)
     // ==========================================
-    let draggedItem = null;
+    function togglePinFilter(event, iconElement, isRestoring = false) {
+        if(event) event.stopPropagation();
+
+        const item = iconElement.closest('.filter-field-item');
+        const pinnedWrapper = document.getElementById('pinnedFilters');
+        const pinnedContainer = document.getElementById('pinnedItemsContainer');
+        const unpinnedContainer = document.getElementById('sidebarList');
+
+        if (iconElement.classList.contains('fa-regular')) {
+            iconElement.classList.replace('fa-regular', 'fa-solid');
+            iconElement.style.color = '#eab308';
+            pinnedContainer.appendChild(item);
+            pinnedWrapper.style.display = 'block';
+        } else {
+            iconElement.classList.replace('fa-solid', 'fa-regular');
+            iconElement.style.color = '#cbd5e1';
+            unpinnedContainer.appendChild(item);
+            if (pinnedContainer.children.length === 0) {
+                pinnedWrapper.style.display = 'none';
+            }
+        }
+
+        if (!isRestoring) {
+            const pinnedIds = Array.from(pinnedContainer.children).map(el => el.querySelector('.field-checkbox').id);
+            localStorage.setItem('crm_pinned_filters_leads', JSON.stringify(pinnedIds));
+        }
+    }
+
+    function restorePinnedFilters() {
+        const pinnedIds = JSON.parse(localStorage.getItem('crm_pinned_filters_leads') || '[]');
+        pinnedIds.forEach(id => {
+            const cb = document.getElementById(id);
+            if (cb) {
+                const icon = cb.closest('.filter-field-item').querySelector('.pin-filter-btn');
+                if (icon) togglePinFilter(null, icon, true);
+            }
+        });
+    }
+
+    function toggleDateInputs(selectElement) {
+        const wrapper = selectElement.closest('.filter-expanded-area');
+        const val2 = wrapper.querySelector('.date-val-2');
+        if (val2) {
+            val2.style.display = selectElement.value === 'between' ? 'block' : 'none';
+        }
+    }
+
+    function setupFilterInteractions() {
+        document.querySelectorAll('.field-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const item = this.closest('.filter-field-item');
+                if(this.checked) item.classList.add('active');
+                else {
+                    item.classList.remove('active');
+                    const textVal = item.querySelector('.text-val');
+                    const dateVal1 = item.querySelector('.date-val-1');
+                    const dateVal2 = item.querySelector('.date-val-2');
+
+                    if (textVal) textVal.value = '';
+                    if (dateVal1) dateVal1.value = '';
+                    if (dateVal2) dateVal2.value = '';
+                }
+            });
+        });
+    }
+
+    function filterSidebarItems() {
+        const q = document.getElementById('sidebarSearch').value.toLowerCase();
+        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            item.style.display = label.includes(q) ? '' : 'none';
+        });
+    }
+
+    // ==========================================
+    // 5. SORTING
+    // ==========================================
+    function sortTableByCol(colIndex, direction) {
+        document.body.style.cursor = 'wait';
+        setTimeout(() => {
+            const tbody = document.getElementById("tableBody");
+
+            allRows.sort((a, b) => {
+                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+
+                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
+                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
+
+                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
+                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+                }
+
+                if (aText < bText) return direction === 'asc' ? -1 : 1;
+                if (aText > bText) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            allRows.forEach(row => tbody.appendChild(row));
+
+            refreshVisibleRows();
+            document.body.style.cursor = 'default';
+        }, 10);
+    }
+
+    // ==========================================
+    // 6. COLUMN MANAGEMENT & DRAG-DROP
+    // ==========================================
+    function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
+        const idxStr = idx.toString();
+        if(isVisible) hiddenCols.delete(idxStr);
+        else hiddenCols.add(idxStr);
+
+        let css = '';
+        hiddenCols.forEach(colIdx => {
+            css += `table#leadsTable th[data-col-index="${colIdx}"], table#leadsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
+        });
+        document.getElementById('dynamic-col-styles').innerHTML = css;
+
+        if (!isRestoring) {
+            localStorage.setItem('crm_hidden_cols_leads', JSON.stringify(Array.from(hiddenCols)));
+        }
+    }
 
     function setupColumnToggles() {
         const table = document.getElementById("leadsTable");
+        if (!table) return;
+
         const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
         const columnMenu = document.getElementById("columnToggleMenu");
+        if (!columnMenu) return;
 
         columnMenu.innerHTML = '';
+
+        const hasSavedState = localStorage.getItem('crm_hidden_cols_leads') !== null;
+
+        let savedHidden = [];
+        try {
+            const stored = localStorage.getItem('crm_hidden_cols_leads');
+            if (stored) savedHidden = JSON.parse(stored);
+        } catch(e) {
+            savedHidden = [];
+        }
+
+        hiddenCols = new Set(savedHidden);
 
         theadRows.forEach((th) => {
             const colIndex = th.getAttribute("data-col-index");
             const colName = th.getAttribute("data-col-name");
 
             if(colName) {
-                const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+                let isVisible;
+                if (savedHidden.length > 0 || hasSavedState) {
+                    isVisible = !hiddenCols.has(colIndex.toString());
+                } else {
+                    isVisible = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
+                }
 
                 const li = document.createElement("li");
                 li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
@@ -1193,13 +1168,13 @@
                 li.dataset.colIndex = colIndex;
 
                 li.innerHTML = `
-                <i class="fa-solid fa-grip-vertical drag-handle"></i>
-                <div class="form-check m-0 w-100 d-flex align-items-center">
-                <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
-                <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
-                </div>`;
+                    <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
+                    <div class="form-check m-0 w-100 d-flex align-items-center">
+                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isVisible ? 'checked' : ''}>
+                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+                    </div>`;
 
-                li.addEventListener('click', function(e) { e.stopPropagation(); });
+                li.addEventListener('click', e => e.stopPropagation());
                 li.addEventListener('dragstart', handleDragStart);
                 li.addEventListener('dragover', handleDragOver);
                 li.addEventListener('dragenter', handleDragEnter);
@@ -1209,7 +1184,7 @@
 
                 columnMenu.appendChild(li);
 
-                if(!isDefault) toggleColumnVisibility(colIndex, false);
+                if(!isVisible) toggleColumnVisibility(colIndex, false, true);
             }
         });
 
@@ -1220,39 +1195,23 @@
         });
     }
 
-    function toggleColumnVisibility(idx, isVisible) {
-        const table = document.getElementById("leadsTable");
-        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
-        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
-    }
-
-    // DRAG AND DROP HANDLERS
+    let draggedItem = null;
     function handleDragStart(e) {
         draggedItem = this;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', this.dataset.colIndex);
         setTimeout(() => this.classList.add('dragging'), 0);
     }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        return false;
-    }
-
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
     function handleDragEnter(e) { this.classList.add('over'); }
     function handleDragLeave(e) { this.classList.remove('over'); }
-
     function handleDrop(e) {
         e.stopPropagation();
         this.classList.remove('over');
-
         if (draggedItem !== this) {
             let parent = this.parentNode;
             let siblings = Array.from(parent.children);
-            let draggedIdx = siblings.indexOf(draggedItem);
-            let targetIdx = siblings.indexOf(this);
-            let insertAfter = draggedIdx < targetIdx;
+            let insertAfter = siblings.indexOf(draggedItem) < siblings.indexOf(this);
 
             if (insertAfter) this.after(draggedItem);
             else this.before(draggedItem);
@@ -1261,68 +1220,68 @@
         }
         return false;
     }
-
     function handleDragEnd(e) {
-        this.classList.remove('dragging');
-        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
-    }
+          this.classList.remove('dragging');
+          document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+      }
 
-    function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
-        const table = document.getElementById("leadsTable");
-        const theadRow = table.querySelector("thead tr");
-        const tbodyRows = table.querySelectorAll("tbody tr");
+    function reorderTableColumns(draggedIdx, targetIdx, insertAfter) {
+         document.body.style.cursor = 'wait';
+         setTimeout(() => {
+             const table = document.querySelector("#leadsTable");
+             if(!table) { document.body.style.cursor = 'default'; return; }
 
-        const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
-        const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
+             const theadRow = table.querySelector("thead tr");
+             const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedIdx}"]`);
+             const targetTh = theadRow.querySelector(`th[data-col-index="${targetIdx}"]`);
 
-        if (insertAfter) targetTh.after(draggedTh);
-        else targetTh.before(draggedTh);
+             if(!draggedTh || !targetTh) { document.body.style.cursor = 'default'; return; }
 
-        tbodyRows.forEach(row => {
-            const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
-            const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
-            if(draggedTd && targetTd) {
-                if (insertAfter) targetTd.after(draggedTd);
-                else targetTd.before(draggedTd);
-            }
-        });
-    }
+             if (insertAfter) targetTh.after(draggedTh);
+             else targetTh.before(draggedTh);
+
+             const chunkSize = 150;
+             let i = 0;
+             function processChunk() {
+                 const end = Math.min(i + chunkSize, allRows.length);
+                 for(; i < end; i++) {
+                     const row = allRows[i];
+                     const draggedTd = row.querySelector(`td[data-col-index="${draggedIdx}"]`);
+                     const targetTd = row.querySelector(`td[data-col-index="${targetIdx}"]`);
+                     if(draggedTd && targetTd) {
+                         if (insertAfter) targetTd.after(draggedTd);
+                         else targetTd.before(draggedTd);
+                     }
+                 }
+                 if (i < allRows.length) requestAnimationFrame(processChunk);
+                 else document.body.style.cursor = 'default';
+             }
+             requestAnimationFrame(processChunk);
+         }, 10);
+     }
 
     // ==========================================
-    // SELECTION, MASS ACTIONS & DELETE
+    // 7. BULK ACTIONS, EXPORT & DELETE
     // ==========================================
     function toggleAllRowCheckboxes(sourceCb) {
-        const visibleRows = document.querySelectorAll('tbody tr.lead-row:not([style*="display: none"]) .row-cb');
-        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
+        allRows.forEach(row => {
+            if (!row.classList.contains('filtered-out')) {
+                const cb = row.querySelector('.row-cb');
+                if(cb) cb.checked = sourceCb.checked;
+            }
+        });
         updateSelectedCount();
     }
 
     function updateSelectedCount() {
         const selected = document.querySelectorAll('tbody .row-cb:checked').length;
         document.getElementById('selCount').innerText = selected;
+        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
 
-        const bulkContainer = document.getElementById('bulkActionsContainer');
-        bulkContainer.style.display = selected > 0 ? 'flex' : 'none';
-
-        const totalVisible = document.querySelectorAll('tbody tr.lead-row:not([style*="display: none"]) .row-cb').length;
-        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
-    }
-
-    function executeMassUpdate() {
-        const field = document.getElementById('massUpdateField').value;
-        const val = document.getElementById('massUpdateValue').value;
-        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
-
-        if(!field || selectedIds.length === 0) {
-            alert("Please select a field and ensure records are checked.");
-            return;
-        }
-
-        alert(`Initiating Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
-
-        const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
-        modal.hide();
-        document.getElementById('selectAllCb').click();
+        const activeRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+        const totalVisible = activeRows.length;
+        const selectAllCb = document.getElementById('selectAllCb');
+        if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
     }
 
     function deleteSelected() {
@@ -1337,126 +1296,53 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(selectedIds)
             })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    selectedCbs.forEach(cb => cb.closest('tr').remove());
+                    selectedCbs.forEach(cb => {
+                        const tr = cb.closest('tr');
+                        tr.remove();
+                        allRows = allRows.filter(r => r !== tr);
+                    });
                     document.getElementById('selectAllCb').checked = false;
                     updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => {
-                console.error("Fetch Error:", error);
-                alert("Network error occurred. Please check the browser console.");
-            });
+                    refreshVisibleRows();
+                } else alert("Database Error: " + data.message);
+            }).catch(() => alert("Network error occurred."));
         }
     }
 
-    function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-            fetch('/Leads/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([parseInt(id)])
-            })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    const row = element.closest('tr');
-                    if(row) row.remove();
-                    updateSelectedCount();
-                    applyPagination();
-                } else {
-                    alert("Database Error: " + data.message);
-                }
-            })
-            .catch(error => {
-                console.error("Fetch Error:", error);
-                alert("Network error occurred. Please check the browser console.");
-            });
-        }
-    }
+    function executeMassUpdate() {
+        const field = document.getElementById('massUpdateField').value;
+        const val = document.getElementById('massUpdateValue').value;
+        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
 
-    // ==========================================
-    // NOTES & TIMELINE SYSTEM
-    // ==========================================
-    function openNotesPanel(leadId, leadName) {
-        currentNoteLeadId = leadId;
-        document.getElementById('noteLeadName').innerText = leadName;
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-        document.getElementById('notesTimelineList').innerHTML = '';
-
-        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
-        offcanvas.show();
-    }
-
-    function saveNote() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-
-        if (!text.trim() && !attachment) return;
-
-        const now = new Date();
-        const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const ownerName = "System User";
-
-        let attachmentHtml = '';
-        if(attachment) {
-            attachmentHtml = `<div class="mt-2 p-2 bg-light rounded border"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${attachment.name}</span></div>`;
+        if(!field || selectedIds.length === 0) {
+            alert("Please select a field and ensure records are checked.");
+            return;
         }
 
-        const noteHtml = `
-        <div class="timeline-item">
-        <div class="timeline-icon"><i class="fa-solid fa-user"></i></div>
-        <div class="d-flex justify-content-between align-items-center mb-1">
-        <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
-        <small class="text-muted"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
-        </div>
-        <div class="text-main" style="font-size:0.85rem; line-height: 1.4;">${text.replace(/\n/g, '<br>')}</div>
-        ${attachmentHtml}
-        </div>
-        `;
-
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
+        alert(`Initiating Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
+        bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
+        document.getElementById('selectAllCb').click();
     }
 
-    // ==========================================
-    // EXPORT TO CSV
-    // ==========================================
     function exportTableToCSV(filename) {
-        const table = document.getElementById("leadsTable");
         let csv = [];
-
-        // Get Headers
         let headerRow = [];
+        const table = document.getElementById("leadsTable");
+
         table.querySelectorAll("thead th[data-col-name]").forEach(th => {
-            if(th.style.display !== 'none') headerRow.push(`"${th.innerText.trim()}"`);
+            if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
         });
         csv.push(headerRow.join(","));
 
         let targetRows = [];
-        const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
-
+        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
         if (checkedCbs.length > 0) {
             checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
         } else {
-            table.querySelectorAll("tbody tr.lead-row").forEach(tr => {
-                if(!tr.classList.contains('filtered-out')) {
-                    targetRows.push(tr);
-                }
-            });
+            targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
         }
 
         targetRows.forEach(tr => {
@@ -1481,82 +1367,192 @@
     }
 
     // ==========================================
-    // FILE UPLOAD HANDLER
+    // 8. FILE UPLOAD & LAZY DATALISTS
     // ==========================================
-    document.getElementById('fileUploadInput').addEventListener('change', function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
+    function setupFileUpload() {
+        const fileInput = document.getElementById('fileUploadInput');
+        if(!fileInput) return;
 
-        // 1. Prepare the file to be sent to the backend
-        var formData = new FormData();
-        formData.append("uploadedFile", file); // "uploadedFile" exactly matches your controller parameter
+        fileInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
 
-        // 2. Alert the user that processing has started
-        alert("Uploading data, please wait... This might take a few moments for 1000+ rows.");
+            const formData = new FormData();
+            formData.append('uploadedFile', file);
 
-        // 3. Send the file to your LeadsController -> UploadFile method
-        fetch('/Leads/UploadFile', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            // Check if the backend threw a 500 error (like a database crash)
-            if (!response.ok) {
-                return response.text().then(text => { throw new Error(text) });
+            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+            const originalHtml = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+            uploadBtn.disabled = true;
+
+            fetch('@Url.Action("UploadFile", "Leads")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                if (response.ok) {
+                    alert("Data uploaded successfully!");
+                    window.location.reload();
+                } else {
+                    alert("Upload Failed: " + await response.text());
+                    uploadBtn.innerHTML = originalHtml;
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert("Network error during upload.");
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            });
+            this.value = '';
+        });
+    }
+
+    function setupLazyDatalists() {
+        document.querySelectorAll('.condition-val').forEach(input => {
+            input.addEventListener('focus', function() {
+                const listId = this.getAttribute('list');
+                if(!listId) return;
+
+                const datalist = document.getElementById(listId);
+
+                if(datalist && datalist.children.length === 0) {
+                    const colName = listId.replace('dl_', '');
+                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+                    if(th) {
+                        const colIndex = th.getAttribute('data-col-index');
+                        let uniqueValues = new Set();
+
+                        allRows.forEach(row => {
+                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                            if(td) {
+                                const text = td.innerText.trim();
+                                if(text) uniqueValues.add(text);
+                            }
+                        });
+
+                        let fragment = document.createDocumentFragment();
+                        uniqueValues.forEach(val => {
+                            let option = document.createElement("option");
+                            option.value = val;
+                            fragment.appendChild(option);
+                        });
+                        datalist.appendChild(fragment);
+                    }
+                }
+            });
+        });
+    }
+
+    // ==========================================
+    // 9. NOTES PANEL UI (AJAX ENABLED)
+    // ==========================================
+    async function openNotesPanel(leadId, leadName) {
+        currentNoteLeadId = leadId;
+        document.getElementById('noteAccountName').innerText = leadName;
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+
+        const list = document.getElementById('notesTimelineList');
+        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+        new bootstrap.Offcanvas(document.getElementById('notesPanel')).show();
+
+        try {
+            const response = await fetch(`/Leads/GetNotes?leadId=${leadId}`);
+            const notes = await response.json();
+
+            list.innerHTML = '';
+
+            if (notes.length > 0) {
+                notes.forEach(n => appendNoteToUI(n.ownerName, n.createdDateTime, n.description, n.attachmentFileName));
+            } else {
+                list.innerHTML = `
+                    <div class="position-relative mb-4">
+                        <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
+                        <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
+                    </div>`;
             }
-            return response;
-        })
-        .then(data => {
-            // 4. Success!
-            alert("Upload successful! The page will now reload to show your data.");
-            window.location.reload();
-        })
-        .catch(error => {
-            // 5. THIS IS YOUR LOG: It will print the exact Row number and Error message we built in the backend
-            console.error("Upload Error:", error);
-            alert(error.message);
-        })
-        .finally(() => {
-            // Clear the file input so you can upload the same file again if it failed
-            document.getElementById('fileUploadInput').value = '';
-        });
-    });
-
-    // ==========================================
-    // PAGINATION
-    // ==========================================
-    function applyPagination() {
-        const rows = Array.from(document.querySelectorAll('tbody tr.lead-row:not(.filtered-out)'));
-        const totalRows = rows.length;
-
-        // Use backend totalPages if available, otherwise calculate locally
-        let calculatedTotalPages = Math.ceil(totalRows / rowsPerPage) || 1;
-        // In a true server-side setup, this logic handles filtering visually until the backend handles the filter fetch.
-
-        if (currentPage > calculatedTotalPages) currentPage = calculatedTotalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const startIdx = (currentPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
-
-        document.querySelectorAll('tbody tr.lead-row').forEach(r => {
-            if(!r.classList.contains('filtered-out')) r.style.display = 'none';
-        });
-
-        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
-            rows[i].style.display = '';
-        }
-
-        // Updating local info if filtering happened
-        if(document.querySelectorAll('.filter-field-item.active').length > 0) {
-            document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} filtered records`;
+        } catch(e) {
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes. Did you add GetNotes to LeadsController?</p>';
         }
     }
 
-    function changePage(step) {
-        currentPage += step;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
+    async function saveNoteAjax() {
+        const text = document.getElementById('newNoteText').value;
+        const attachment = document.getElementById('noteAttachment').files[0];
+        const ownerId = document.getElementById('noteOwnerId').value;
+        const btn = document.getElementById('btnSaveNote');
+
+        if (!text.trim() && !attachment) return;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('leadId', currentNoteLeadId);
+        formData.append('description', text);
+        formData.append('ownerId', ownerId);
+        if (attachment) formData.append('attachment', attachment);
+
+        try {
+            const response = await fetch('/Leads/SaveNoteAjax', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+                if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
+
+                appendNoteToUI(data.note.ownerName, data.note.createdDateTime, data.note.description, data.note.attachmentFileName);
+
+                document.getElementById('newNoteText').value = '';
+                document.getElementById('noteAttachment').value = '';
+            } else {
+                alert("Failed to save note: " + data.message);
+            }
+        } catch(e) {
+            alert("Network error while saving note.");
+        } finally {
+            btn.innerHTML = 'Save Note';
+            btn.disabled = false;
+        }
+    }
+
+    function appendNoteToUI(ownerName, timeString, text, fileName) {
+        let attachmentHtml = fileName ? `
+            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155; transition: 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#cbd5e1'">
+                <i class="fa-solid fa-file-lines text-muted"></i>
+                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+            </div>` : '';
+
+        const noteHtml = `
+            <div class="position-relative mb-4">
+                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+
+                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            ${ownerName}
+                        </div>
+                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                            <i class="fa-regular fa-clock me-1"></i>${timeString}
+                        </span>
+                    </div>
+
+                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+
+                    ${attachmentHtml}
+                </div>
+            </div>`;
+
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
 </script>

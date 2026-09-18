@@ -323,40 +323,214 @@
         border-bottom: 4px solid var(--theme-bg-cream);
     }
 
-    /* --- ADD THESE NEW CLASSES FOR THE PURPLE POPUPS --- */
-    .modal-purple-header {
-        background-color: #7e22ce; /* Vibrant Purple */
-        color: #ffffff;
-        border-bottom: 1px solid #6b21a8;
+    /* --- SLEEK SAAS SLATE MODAL STYLING --- */
+    .modal-slate-header {
+        background-color: #ffffff; /* Clean modern white */
+        color: #0f172a; /* Deep Slate text */
+        border-bottom: 1px solid #e2e8f0; /* Soft, elegant border */
     }
 
-        .modal-purple-header .btn-close {
-            filter: invert(1) grayscale(100%) brightness(200%);
+        .modal-slate-header .btn-close {
+            filter: none; /* Standard dark close icon */
+            opacity: 0.5;
+            transition: opacity 0.2s;
         }
 
-    .btn-purple-primary {
-        background-color: #7e22ce;
+            .modal-slate-header .btn-close:hover {
+                opacity: 1;
+            }
+
+    .btn-slate-primary {
+        background-color: #0f172a; /* Deep, premium Slate */
         color: #ffffff;
         border: none;
         padding: 10px 28px;
         border-radius: 8px;
-        font-weight: 600;
+        font-weight: 500;
+        letter-spacing: 0.02em;
         transition: all 0.3s ease;
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1);
     }
 
-        .btn-purple-primary:hover {
-            background-color: #6b21a8;
+        .btn-slate-primary:hover {
+            background-color: #1e293b; /* Slightly lighter on hover */
             color: #ffffff;
+            box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.15);
+            transform: translateY(-1px);
         }
 
-    .modal-purple-body {
-        background-color: #faf5ff; /* Light purple tinted background */
+    .modal-slate-body {
+        background-color: #f8fafc; /* Ultra-light cool gray to pop the inputs */
     }
 
-        .modal-purple-body .sf-input:focus,
-        .modal-purple-body .sf-select:focus {
-            border-color: #7e22ce;
-            box-shadow: 0 0 0 3px #f3e8ff;
+        .modal-slate-body .sf-input,
+        .modal-slate-body .sf-select {
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+        }
+
+            .modal-slate-body .sf-input:focus,
+            .modal-slate-body .sf-select:focus {
+                border-color: #64748b; /* Sleek slate outline */
+                box-shadow: 0 0 0 3px #f1f5f9; /* Soft, premium glow */
+            }
+
+    /* ==========================================
+           MODERN SAAS TASK MODAL (Navy & Slate Theme)
+           ========================================== */
+    .task-modal-content {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 25px 50px -12px rgba(30, 58, 138, 0.25);
+        background-color: #ffffff;
+    }
+
+    .task-modal-header {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 20px 24px;
+        background-color: #ffffff;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .task-modal-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--theme-text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .task-modal-body {
+        padding: 24px;
+    }
+
+    .task-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--theme-text-muted); /* Slate gray instead of purple */
+        margin-bottom: 6px;
+        display: block;
+        letter-spacing: 0.02em;
+    }
+
+        /* Required field asterisk */
+        .task-label .text-danger {
+            color: #ef4444;
+            margin-left: 2px;
+        }
+
+    .task-input {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        color: var(--theme-text-main);
+        background-color: #ffffff;
+        transition: all 0.2s ease;
+    }
+
+        .task-input:hover {
+            border-color: #94a3b8;
+        }
+
+        .task-input:focus {
+            outline: none;
+            border-color: var(--theme-navy-primary);
+            box-shadow: 0 0 0 3px var(--theme-navy-light);
+        }
+
+    /* Modern Custom Switches */
+    .task-switch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+        .task-switch .form-check-input {
+            width: 36px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+            .task-switch .form-check-input:checked {
+                background-color: var(--theme-navy-primary);
+                border-color: var(--theme-navy-primary);
+            }
+
+        .task-switch .form-check-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--theme-navy-primary);
+            cursor: pointer;
+            padding-top: 2px;
+        }
+
+    /* Sleek Expandable Button */
+    .task-more-fields-btn {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 14px 16px;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--theme-navy-primary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 10px;
+    }
+
+        .task-more-fields-btn:hover {
+            background-color: var(--theme-navy-light);
+            border-color: #bfdbfe;
+        }
+
+    .task-modal-footer {
+        border-top: 1px solid #e2e8f0;
+        padding: 16px 24px;
+        background-color: #f8fafc;
+        border-radius: 0 0 16px 16px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    /* Footer Buttons */
+    .btn-task-cancel {
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        font-weight: 500;
+        padding: 8px 20px;
+        border-radius: 6px;
+        transition: 0.2s;
+    }
+
+        .btn-task-cancel:hover {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+    .btn-task-save {
+        background-color: var(--theme-navy-primary);
+        color: #ffffff;
+        border: none;
+        font-weight: 500;
+        padding: 8px 24px;
+        border-radius: 6px;
+        transition: 0.2s;
+    }
+
+        .btn-task-save:hover {
+            background-color: var(--theme-navy-hover);
+            box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);
         }
 
     /* More Fields Toggle Styles */
@@ -630,6 +804,14 @@
                         </select>
                     </div>
 
+                    <!-- FIX: Removed the extra nested <div class="row"> here -->
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Group Name</label>
+                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                            <option value="">-Select Group Name-</option>
+                        </select>
+                    </div>
+
                     <div class="col-md-6 form-group">
                         <label class="sf-label">Current Status</label>
                         <select asp-for="CurrentStatus" class="sf-select">
@@ -726,13 +908,14 @@
                         <div class="row">
                             <div class="col-md-6 form-group">
                                 <label class="sf-label">Profile Status</label>
-                                <select asp-for="Profilestatus" class="sf-select">
+                                <select asp-for="Profilestatus" class="sf-select" disabled>
                                     <option value="">-None-</option>
                                     <option value="Completed">Completed</option>
                                     <option value="Strongly Completed">Strongly Completed</option>
                                     <option value="Not Completed">Not Completed</option>
                                     <option value="Not-Qualified">Not-Qualified</option>
                                 </select>
+                                <input type="hidden" asp-for="Profilestatus" />
                             </div>
 
                             <div class="col-md-6 form-group">
@@ -1094,7 +1277,7 @@
 
             <!-- 1. Automatically Linked Contacts (Formerly Leads) -->
             <div class="mb-4">
-                <div class="sidebar-section-title">Contacts</div>
+                <div class="sidebar-section-title">Leads</div>
 
                 @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
                 {
@@ -1192,86 +1375,97 @@
 </div>
 
 <!-- ========================================================
-     THE NEW MODAL FOR CREATING NOTES
+     MODERN SAAS NOTE MODAL (Matches Task Modal UI)
      ======================================================== -->
 <div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px; overflow: hidden;">
+        <div class="modal-content task-modal-content">
 
-            <div class="modal-header modal-purple-header" style="padding: 20px 24px;">
-                <h5 class="modal-title fw-bold" id="noteModalLabel" style="font-size: 1.15rem; display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-regular fa-pen-to-square"></i> Add New Note
+            <div class="modal-header task-modal-header">
+                <h5 class="modal-title task-modal-title" id="noteModalLabel">
+                    <!-- Amber/Orange accent icon box for Notes -->
+                    <div style="background: #fef3c7; color: #d97706; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </div>
+                    Add New Note
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <div class="modal-body modal-purple-body" style="padding: 24px;">
+            <div class="modal-body task-modal-body">
                 <div class="row">
-                    <div class="col-md-6 form-group mb-3">
-                        <label class="sf-label" style="color: #6b21a8; width: 100%;">Note Owner</label>
-                        <select id="modalNoteOwner" class="sf-select bg-white" asp-items="ViewBag.UsersList">
+                    <div class="col-md-6 form-group mb-4">
+                        <label class="task-label">Note Owner</label>
+                        <select id="modalNoteOwner" class="task-input" asp-items="ViewBag.UsersList">
                             <option value="">- System User -</option>
                         </select>
                     </div>
 
-                    <div class="col-md-6 form-group mb-3">
-                        <label class="sf-label" style="color: #6b21a8; width: 100%;">Date & Time</label>
-                        <input type="text" id="modalNoteDateTime" class="sf-input bg-white" readonly />
+                    <div class="col-md-6 form-group mb-4">
+                        <label class="task-label">Date & Time</label>
+                        <input type="text" id="modalNoteDateTime" class="task-input" style="background-color: #f8fafc; color: #64748b;" readonly />
                     </div>
 
-                    <div class="col-md-12 form-group mb-3">
-                        <label class="sf-label" style="color: #6b21a8; width: 100%;">Attachment</label>
-                        <input type="file" id="modalNoteFile" class="sf-input bg-white" style="padding: 7px 12px;" />
+                    <div class="col-md-12 form-group mb-4">
+                        <label class="task-label">Attachment</label>
+                        <!-- Modern File Input Wrapper -->
+                        <div class="d-flex align-items-center gap-2 p-2" style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px;">
+                            <i class="fa-solid fa-cloud-arrow-up ms-2 text-muted"></i>
+                            <input type="file" id="modalNoteFile" class="form-control border-0 bg-transparent shadow-none" style="font-size: 0.9rem;" />
+                        </div>
                     </div>
 
                     <div class="col-md-12 form-group m-0">
-                        <label class="sf-label" style="color: #6b21a8; width: 100%;">Note Description</label>
-                        <textarea id="modalNoteDesc" class="sf-input bg-white" rows="4" placeholder="Write your note details here..."></textarea>
+                        <label class="task-label">Note Description</label>
+                        <textarea id="modalNoteDesc" class="task-input" rows="4" placeholder="Write your note details here..."></textarea>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-footer" style="background-color: #ffffff; border-top: 1px solid #e9d5ff; padding: 16px 24px;">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500;">Cancel</button>
-                <button type="button" class="btn-purple-primary" onclick="saveNote()">Save Note</button>
+            <div class="modal-footer task-modal-footer">
+                <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-task-save" onclick="saveNote()">Save Note</button>
             </div>
 
         </div>
     </div>
 </div>
-
 <!-- ========================================================
-     PREMIUM PURPLE QUICK CREATE TASK MODAL (WITH MORE FIELDS)
+     MODERN SAAS QUICK CREATE TASK MODAL (Navy & Slate Theme)
      ======================================================== -->
 <div class="modal fade" id="quickTaskModal" tabindex="-1" aria-labelledby="quickTaskModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px; overflow: hidden;">
+        <div class="modal-content task-modal-content">
 
-            <div class="modal-header modal-purple-header" style="padding: 20px 24px;">
-                <h5 class="modal-title fw-bold" id="quickTaskModalLabel" style="font-size: 1.15rem; display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-check-square"></i> Add New Task
+            <div class="modal-header task-modal-header">
+                <h5 class="modal-title task-modal-title" id="quickTaskModalLabel">
+                    <div style="background: var(--theme-navy-light); color: var(--theme-navy-primary); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-check-square"></i>
+                    </div>
+                    Add New Task
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
             <form asp-controller="Tasks" asp-action="Create" method="post">
-                <div class="modal-body modal-purple-body" style="padding: 24px;">
+                <div class="modal-body task-modal-body">
+                    <!-- Original Hidden Input Kept Intact -->
                     <input type="hidden" name="AccountId" value="@Model.Id" />
 
-                    <div class="row border-bottom border-light pb-3 mb-3">
-                        <div class="col-md-12 form-group mb-3">
-                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Subject <span class="text-danger">*</span></label>
-                            <input name="Subject" class="sf-input w-100 bg-white" placeholder="E.g., Follow up call..." required />
+                    <div class="row">
+                        <div class="col-md-12 form-group mb-4">
+                            <label class="task-label">Subject <span class="text-danger">*</span></label>
+                            <input name="Subject" class="task-input" placeholder="E.g., Follow up call..." required />
                         </div>
 
-                        <div class="col-md-6 form-group mb-3">
-                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Due Date</label>
-                            <input name="DueDate" type="date" class="sf-input w-100 bg-white" />
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Due Date</label>
+                            <input name="DueDate" type="date" class="task-input" />
                         </div>
 
-                        <div class="col-md-6 form-group mb-3">
-                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Priority</label>
-                            <select name="Priority" class="sf-select w-100 bg-white">
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Priority</label>
+                            <select name="Priority" class="task-input">
                                 <option value="Highest">Highest</option>
                                 <option value="High" selected>High</option>
                                 <option value="Normal">Normal</option>
@@ -1280,43 +1474,43 @@
                             </select>
                         </div>
 
-                        <div class="col-md-6 form-group mb-3">
-                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Task Owner</label>
-                            <select name="TaskOwnerId" asp-items="ViewBag.UsersList" class="sf-select w-100 bg-white">
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Task Owner</label>
+                            <select name="TaskOwnerId" asp-items="ViewBag.UsersList" class="task-input">
                                 <option value="">- Assign To -</option>
                             </select>
                         </div>
 
-                        <!-- Toggles -->
-                        <div class="col-md-6 form-group mb-3 d-flex align-items-end pb-2">
-                            <div class="form-check form-switch d-flex align-items-center me-4">
-                                <input class="form-check-input me-2" type="checkbox" id="modalReminderToggle">
-                                <label class="form-check-label" style="font-weight: 500; color: #6b21a8;">Reminder</label>
+                        <!-- Modern UI Toggles -->
+                        <div class="col-md-6 form-group mb-4 d-flex align-items-center gap-4 pt-3">
+                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
+                                <input class="form-check-input" type="checkbox" id="modalReminderToggle">
+                                <label class="form-check-label ms-2" for="modalReminderToggle">Reminder</label>
                             </div>
-                            <div class="form-check form-switch d-flex align-items-center">
-                                <input class="form-check-input me-2" type="checkbox" id="modalRepeatToggle">
-                                <label class="form-check-label" style="font-weight: 500; color: #6b21a8;">Repeat</label>
+                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
+                                <input class="form-check-input" type="checkbox" id="modalRepeatToggle">
+                                <label class="form-check-label ms-2" for="modalRepeatToggle">Repeat</label>
                             </div>
                         </div>
 
-                        <div class="col-md-12 form-group m-0">
-                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Description</label>
-                            <textarea name="Description" class="sf-input w-100 bg-white" rows="2" placeholder="Task details..."></textarea>
+                        <div class="col-md-12 form-group mb-2">
+                            <label class="task-label">Description</label>
+                            <textarea name="Description" class="task-input" rows="2" placeholder="Task details..."></textarea>
                         </div>
                     </div>
 
                     <!-- Expandable "More Fields" Button -->
-                    <div class="more-fields-btn shadow-sm" id="moreFieldsToggle" onclick="toggleMoreFields()">
+                    <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="toggleMoreFields()">
                         <span>More Fields</span>
-                        <i class="fa-solid fa-chevron-right" id="moreFieldsIcon"></i>
+                        <i class="fa-solid fa-chevron-right" id="moreFieldsIcon" style="transition: transform 0.2s;"></i>
                     </div>
 
                     <!-- Hidden Extended Fields -->
-                    <div id="moreFieldsContainer" style="display: none;">
+                    <div id="moreFieldsContainer" style="display: none; padding-top: 24px; border-top: 1px dashed #e2e8f0; margin-top: 20px;">
                         <div class="row">
-                            <div class="col-md-6 form-group mb-3">
-                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Lead Name</label>
-                                <select name="LeadId" class="sf-select w-100 bg-white">
+                            <div class="col-md-6 form-group mb-4">
+                                <label class="task-label">Lead Name</label>
+                                <select name="LeadId" class="task-input">
                                     <option value="">- Select Lead -</option>
                                     @if (ViewBag.RelatedLeads != null)
                                     {
@@ -1328,14 +1522,14 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-6 form-group mb-3">
-                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Mobile</label>
-                                <input name="Mobile" class="sf-input w-100 bg-white" placeholder="+1..." />
+                            <div class="col-md-6 form-group mb-4">
+                                <label class="task-label">Mobile</label>
+                                <input name="Mobile" class="task-input" placeholder="+1..." />
                             </div>
 
-                            <div class="col-md-6 form-group mb-3">
-                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Lead Status</label>
-                                <select name="LeadStatus" class="sf-select w-100 bg-white">
+                            <div class="col-md-6 form-group mb-0">
+                                <label class="task-label">Lead Status</label>
+                                <select name="LeadStatus" class="task-input">
                                     <option value="">-None-</option>
                                     <option value="Important contact">Important contact</option>
                                     <option value="Not a Doctor">Not a Doctor</option>
@@ -1346,8 +1540,8 @@
                             </div>
 
                             <div class="col-md-6 form-group mb-0">
-                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Status</label>
-                                <select name="Status" class="sf-select w-100 bg-white">
+                                <label class="task-label">Status</label>
+                                <select name="Status" class="task-input">
                                     <option value="Not Started" selected>Not Started</option>
                                     <option value="In Progress">In Progress</option>
                                     <option value="Deferred">Deferred</option>
@@ -1359,9 +1553,9 @@
 
                 </div>
 
-                <div class="modal-footer" style="background-color: #ffffff; border-top: 1px solid #e9d5ff; padding: 16px 24px;">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500;">Cancel</button>
-                    <button type="submit" class="btn-purple-primary">Save Task</button>
+                <div class="modal-footer task-modal-footer">
+                    <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-task-save">Save Task</button>
                 </div>
             </form>
 

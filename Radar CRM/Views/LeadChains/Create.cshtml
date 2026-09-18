@@ -1,0 +1,79 @@
+﻿@model Radar_CRM.Models.LeadChainCreateViewModel
+
+@{
+    ViewData["Title"] = "Field Mapping Setup";
+}
+
+<!-- Cream Background for the page -->
+<div class="min-h-screen bg-[#FDFBF7] p-8 font-sans">
+
+    <!-- Navy accented main card -->
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg border-t-4 border-[#1E3A8A] p-8">
+
+        <div class="flex items-center justify-between mb-8 border-b border-gray-200 pb-5">
+            <div>
+                <h2 class="text-2xl font-bold text-[#1E3A8A]">Field Mapping Configuration</h2>
+                <p class="text-sm text-gray-600 mt-1">
+                    Map incoming <span class="font-semibold text-blue-600">Meta Ads</span> fields to your <span class="font-semibold text-[#1E3A8A]">CRM Contacts</span>
+                </p>
+            </div>
+        </div>
+
+        <form method="post" asp-action="Create" asp-controller="LeadChains">
+            <div class="space-y-3">
+
+                <!-- Column Headers -->
+                <div class="flex px-4 py-2 text-xs font-bold text-[#1E3A8A] uppercase tracking-wider">
+                    <div class="w-5/12">Meta Ad Field</div>
+                    <div class="w-1/12 text-center">Map</div>
+                    <div class="w-5/12">CRM Contact Field</div>
+                </div>
+
+                @for (int i = 0; i < Model.Mappings.Count; i++)
+                {
+                    <div class="flex items-center justify-between bg-gray-50 hover:bg-[#F0F4F8] p-4 rounded-lg border border-gray-200 transition-colors">
+
+                        <!-- Left Side: Meta Field (Read-Only styling) -->
+                        <div class="w-5/12">
+                            <div class="w-full bg-white border border-gray-300 rounded-md px-4 py-2.5 text-sm text-[#1E3A8A] font-medium shadow-sm">
+                                @Model.Mappings[i].MetaField
+                                <input type="hidden" name="Mappings[@i].MetaField" value="@Model.Mappings[i].MetaField" />
+                            </div>
+                        </div>
+
+                        <!-- Center Link Icon (Soft Blue & Navy) -->
+                        <div class="w-1/12 flex justify-center">
+                            <div class="w-10 h-10 bg-[#E0E7FF] text-[#1E3A8A] rounded-full flex items-center justify-center shadow-sm">
+                                <!-- Explicit width/height added to prevent the giant icon bug -->
+                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Right Side: CRM Field Dropdown -->
+                        <div class="w-5/12">
+                            <select name="Mappings[@i].CrmField"
+                                    class="w-full bg-white border border-gray-300 rounded-md px-4 py-2.5 text-sm text-[#1E3A8A] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A] cursor-pointer">
+                                <option value="" class="text-gray-400">-- Select Destination Field --</option>
+
+                                @foreach (var col in Model.CrmColumns)
+                                {
+                                    <option value="@col">@col</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="mt-10 flex justify-end">
+                <button type="submit"
+                        class="bg-[#1E3A8A] hover:bg-blue-900 text-white font-semibold py-2.5 px-8 rounded-md shadow-md transition-all duration-200 transform hover:-translate-y-0.5">
+                    Save Field Mappings
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>

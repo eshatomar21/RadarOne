@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
 using Radar_CRM.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Radar_CRM.Controllers
 {
@@ -22,10 +23,155 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // INDEX: Paginated & Sorted (100 per page)
         // ==========================================
-        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc", string advancedFilters = "")
         {
+            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
+
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser == null) return RedirectToAction("Login", "Users");
+
             int pageSize = 100;
-            var query = _context.Deals.AsQueryable();
+
+            // 🚀 Added .Include() so the Account data is fetched from the database
+            var query = _context.Deals
+                .Include(d => d.Account)
+                .AsQueryable();
+
+            // 🚀 ADMIN CHECK BASED ON 'PROFILE'
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            // 🚀 THE HIERARCHY LOGIC 
+            if (!isAdmin)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                visibleUserIds.Add(currentUserId);
+                query = query.Where(d => visibleUserIds.Contains(d.DealOwnerId));
+            }
+
+            // 🚀 BULLETPROOF FILTERING ENGINE (ENTIRE DB)
+            if (!string.IsNullOrWhiteSpace(advancedFilters))
+            {
+                try
+                {
+                    string jsonString = advancedFilters;
+                    if (jsonString.Contains("%5B") || jsonString.Contains("%7B"))
+                    {
+                        jsonString = Uri.UnescapeDataString(jsonString);
+                    }
+
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                    foreach (var f in filters)
+                    {
+                        if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                        var propertyInfo = typeof(Deal).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (propertyInfo == null) continue;
+
+                        string dbColName = propertyInfo.Name;
+
+                        // Switch complex navigation properties to their Foreign Key (Id)
+                        if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                        {
+                            var idProp = typeof(Deal).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (idProp != null)
+                            {
+                                dbColName = idProp.Name;
+                                propertyInfo = idProp;
+                            }
+                            else continue;
+                        }
+
+                        // 🚀 FIX: Translate '+' back into ' ' to fix URL encoding breaks (e.g. "Jaspal+Rawat" -> "Jaspal Rawat")
+                        string safeValue = f.Value?.Replace("+", " ") ?? "";
+
+                        if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
+                        {
+                            if (DateTime.TryParse(safeValue, out DateTime dVal))
+                            {
+                                if (f.Condition == "on") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == dVal.Date);
+                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < dVal.Date);
+                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > dVal.Date);
+                            }
+                        }
+                        // 🚀 CRITICAL FIX: Only run User ID mappings on actual ID columns!
+                        else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var searchValue = safeValue.ToLower().Trim();
+                            var matchingUserIds = _context.Users
+                                .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
+                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                .Select(u => u.Id)
+                                .ToList();
+
+                            if (f.Condition == "contains" || f.Condition == "is")
+                                query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_empty")
+                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty")
+                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                        }
+                        else if (propertyInfo.PropertyType == typeof(string))
+                        {
+                            var searchValue = safeValue.ToLower().Trim();
+                            if (f.Condition == "contains") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "does_not_contain") query = query.Where(a => EF.Property<string>(a, dbColName) == null || !EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "starts_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().StartsWith(searchValue));
+                            else if (f.Condition == "ends_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().EndsWith(searchValue));
+                            else if (f.Condition == "is") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower() == searchValue);
+                            else if (f.Condition == "is_not") query = query.Where(a => EF.Property<string>(a, dbColName) != searchValue);
+                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                        }
+                        else
+                        {
+                            if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                            {
+                                if (int.TryParse(safeValue, out int numVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
+                                }
+                            }
+                            else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                            {
+                                if (decimal.TryParse(safeValue, out decimal decVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("FILTER CRASH AVOIDED: " + ex.Message);
+                }
+            }
 
             // Server-Side Filtering
             if (!string.IsNullOrEmpty(search))
@@ -56,15 +202,41 @@ namespace Radar_CRM.Controllers
                 };
             }
 
-            // Execute Pagination on the Database
+            // Execute Pagination on the Database safely
             var totalRecords = await query.CountAsync();
+            if (page < 1) page = 1;
+            int totalPagesCalc = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            if (totalPagesCalc == 0) totalPagesCalc = 1;
+            if (page > totalPagesCalc) page = totalPagesCalc;
+
             var deals = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
 
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+
             return View(deals);
+        }
+        // ==========================================
+        // HELPER METHOD (Add this to the bottom of the DealsController)
+        // ==========================================
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
         }
 
         // ==========================================
@@ -140,6 +312,14 @@ namespace Radar_CRM.Controllers
             // This line prevents the NullReferenceException on the Edit page
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            // 🚀 FETCH NOTES FOR THE DEAL EDIT PAGE
+            // Fetch the notes
+            // 🚀 FIX: Fetch actual 'Notes' models instead of Anonymous Types
+            ViewBag.ExistingNotes = await _context.Note
+                .Include(n => n.NoteOwner)
+                .Where(n => n.DealId == id) // NOTE: Use n.LeadId == id if you are doing this in LeadsController
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
             return View(deal);
         }
 
@@ -154,7 +334,7 @@ namespace Radar_CRM.Controllers
             var dealsToInsert = new List<Deal>();
             int currentRow = 1;
 
-            // 🚀 HIGH PERFORMANCE CACHE: Get valid IDs into memory so we don't query the DB thousands of times
+            // Cache valid IDs to prevent DB hanging
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
             var validAccountIds = new HashSet<int>(_context.Accounts.Select(a => a.Id));
 
@@ -162,7 +342,20 @@ namespace Radar_CRM.Controllers
             {
                 using (var reader = new System.IO.StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    var headerLine = await reader.ReadLineAsync(); // Skip header row
+                    // 🚀 SMART FIX: Dynamically read headers so it never breaks when Zoho changes column order!
+                    var headerLine = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
+
+                    // Create a lowercase lookup list of the headers
+                    var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower()).ToList();
+
+                    // Inner helper function to safely grab value by exact column name
+                    string GetValSafe(string[] vals, string colName)
+                    {
+                        var normalizedTarget = colName.Replace(" ", "").ToLower();
+                        var idx = headers.FindIndex(h => h.Replace(" ", "").ToLower() == normalizedTarget);
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
 
                     while (!reader.EndOfStream)
                     {
@@ -172,49 +365,56 @@ namespace Radar_CRM.Controllers
 
                         var values = ParseCsvLine(line);
 
-                        // Verify the row has enough columns based on the Deals_2026_09_10.csv structure (49 columns)
-                        if (values.Length >= 48)
+                        string rawDealOwnerId = GetValSafe(values, "DealsOwner.id");
+                        int? parsedAccountId = int.TryParse(GetValSafe(values, "AccountName.id"), out int accId) ? accId : null;
+
+                        var newDeal = new Deal
                         {
-                            // 🚀 SAFE ID EXTRACTION: Validate against the database before assigning to prevent crashes
-                            string rawDealOwnerId = GetVal(values, 2);  // Deals Owner.id
-                            string rawDemoOwnerId = GetVal(values, 46); // Demo Owner.id
-                            int? parsedAccountId = int.TryParse(GetVal(values, 30), out int accId) ? accId : null; // AccountName.id
+                            ZohoRecordId = GetValSafe(values, "RecordId"),
 
-                            var newDeal = new Deal
-                            {
-                                // --- Core Identifiers ---
-                                DealName = GetVal(values, 1),
+                            // --- Core Identifiers ---
+                            DealName = GetValSafe(values, "DealName"),
 
-                                // --- Relational IDs ---
-                                DealOwnerId = validUserIds.Contains(rawDealOwnerId) ? rawDealOwnerId : null,
-                                DemoOwner = validUserIds.Contains(rawDemoOwnerId) ? rawDemoOwnerId : null,
-                                AccountId = parsedAccountId.HasValue && validAccountIds.Contains(parsedAccountId.Value) ? parsedAccountId.Value : null,
+                            // 🚀 This will now safely capture the text name regardless of spaces in the header
+                            AccountName = GetValSafe(values, "AccountName"),
 
-                                // --- Profile & Text Info ---
-                                LeadSource = GetVal(values, 26),         // Lead Source
-                                AccountType = GetVal(values, 48),        // Account Type
-                                LeadName = GetVal(values, 39),           // Lead Name
-                                ContactPersonName = GetVal(values, 45),  // Contact Person Name
-                                MetaCampaignName = GetVal(values, 44),   // Meta Campaign Name
+                            // --- Relational IDs ---
+                            DealOwnerId = validUserIds.Contains(rawDealOwnerId) ? rawDealOwnerId : null,
+                            AccountId = parsedAccountId.HasValue && validAccountIds.Contains(parsedAccountId.Value) ? parsedAccountId.Value : null,
 
-                                // --- Status & Types ---
-                                PaymentStatus = GetVal(values, 25),      // Payment Status
-                                PaymentType = GetVal(values, 36),        // Payment Type
-                                PaymentMode = GetVal(values, 37),        // payment Mode
+                            // 🚀 Grabs the text names for the Owners
+                            DemoOwner = GetValSafe(values, "DemoOwner"),
+                            AccountOwner = GetValSafe(values, "AccountOwner"),
 
-                                // --- Financials (With safe parsing) ---
-                                SubTotal = decimal.TryParse(GetVal(values, 42), out decimal subTotal) ? subTotal : 0m,     // Sub Total
-                                Taxes = decimal.TryParse(GetVal(values, 41), out decimal taxes) ? taxes : 0m,              // Taxs
-                                Adjustment = decimal.TryParse(GetVal(values, 40), out decimal adj) ? adj : 0m,             // Adjustment
-                                GrandTotal = decimal.TryParse(GetVal(values, 43), out decimal grandTot) ? grandTot : 0m    // GrandTotal
-                            };
+                            // --- Profile & Text Info ---
+                            LeadSource = GetValSafe(values, "LeadSource"),
+                            AccountType = GetValSafe(values, "AccountType"),
+                            LeadName = GetValSafe(values, "LeadName"),
+                            ContactPersonName = GetValSafe(values, "ContactPersonName"),
+                            MetaCampaignName = GetValSafe(values, "MetaCampaignName"),
 
-                            dealsToInsert.Add(newDeal);
-                        }
+                            // --- Status & Types ---
+                            PaymentStatus = GetValSafe(values, "PaymentStatus"),
+                            PaymentType = GetValSafe(values, "PaymentType"),
+                            PaymentMode = GetValSafe(values, "paymentMode"),
+
+                            // --- Additional Info ---
+                            Remarks = GetValSafe(values, "Remarks"),
+                            ApprovedBy = GetValSafe(values, "ApprovedBy"),
+                            ApprovalRequired = GetValSafe(values, "ApprovalRequired?"),
+
+                            // --- Financials ---
+                            SubTotal = decimal.TryParse(GetValSafe(values, "SubTotal"), out decimal subTotal) ? subTotal : 0m,
+                            Taxes = decimal.TryParse(GetValSafe(values, "Taxs"), out decimal taxes) ? taxes : 0m,
+                            Adjustment = decimal.TryParse(GetValSafe(values, "Adjustment"), out decimal adj) ? adj : 0m,
+                            GrandTotal = decimal.TryParse(GetValSafe(values, "GrandTotal"), out decimal grandTot) ? grandTot : 0m
+                        };
+
+                        dealsToInsert.Add(newDeal);
                     }
                 }
 
-                // 🚀 MASSIVE SPEED BOOST: Turn off tracking during bulk insert to stop Entity Framework from hanging
+                // 🚀 Turn off tracking during bulk insert to stop EF Core from freezing
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
                 await _context.Deals.AddRangeAsync(dealsToInsert);
@@ -222,17 +422,69 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // Extracts the deepest inner exception so you know EXACTLY what broke (e.g., column truncation, foreign key)
                 string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
             }
             finally
             {
-                // Always turn tracking back on safely
                 _context.ChangeTracker.AutoDetectChangesEnabled = true;
             }
 
             return Ok();
+        }
+
+        // ==========================================
+        // 🚀 AJAX: BULK DELETE (Fixed FK Constraint)
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> BulkDelete([FromBody] List<int> ids)
+        {
+            if (ids == null || !ids.Any())
+            {
+                return Json(new { success = false, message = "No records selected." });
+            }
+
+            try
+            {
+                // 1. Safely remove related Notes first to satisfy the FK constraint
+                var relatedNotes = await _context.Note
+                    .Where(n => n.DealId != null && ids.Contains((int)n.DealId))
+                    .ToListAsync();
+
+                if (relatedNotes.Any())
+                {
+                    _context.Note.RemoveRange(relatedNotes);
+                }
+
+                // (Optional but recommended) If you also have Payment Rows attached, delete them here:
+                var relatedPayments = await _context.DealPaymentRows
+                    .Where(p => ids.Contains(p.DealId))
+                    .ToListAsync();
+
+                if (relatedPayments.Any())
+                {
+                    _context.DealPaymentRows.RemoveRange(relatedPayments);
+                }
+
+                // 2. Now delete the actual Deals
+                var dealsToDelete = await _context.Deals
+                    .Where(d => ids.Contains(d.Id))
+                    .ToListAsync();
+
+                if (dealsToDelete.Any())
+                {
+                    _context.Deals.RemoveRange(dealsToDelete);
+                }
+
+                // Commit all deletions together in one transaction
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.InnerException?.Message ?? ex.Message });
+            }
         }
 
         // ==========================================
@@ -262,6 +514,74 @@ namespace Radar_CRM.Controllers
             }
             result.Add(currentField.ToString());
             return result.ToArray();
+        }
+
+        // ==========================================
+        // 🚀 AJAX: GET NOTES FOR DEAL SIDE PANEL
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> GetNotes(int dealId)
+        {
+            try
+            {
+                // Note: Using DealNotes based on your Edit POST method
+                var rawNotes = await _context.DealNotes
+                    .Where(n => n.DealId == dealId)
+                    .OrderByDescending(n => n.DateTime)
+                    .ToListAsync();
+
+                var notes = rawNotes.Select(n => new
+                {
+                    id = n.Id,
+                    ownerName = string.IsNullOrEmpty(n.Owner) ? "System" : n.Owner,
+                    createdDateTime = n.DateTime.ToString("dd-MM-yyyy HH:mm"),
+                    description = n.Description,
+                    attachmentFileName = "" // If DealNote has no attachment column, leave blank
+                });
+
+                return Json(notes);
+            }
+            catch (Exception)
+            {
+                return Json(new List<object>());
+            }
+        }
+
+        // ==========================================
+        // 🚀 AJAX: SAVE NEW NOTE FROM SIDE PANEL
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> SaveNoteAjax(int dealId, string description, string ownerId)
+        {
+            try
+            {
+                var newNote = new DealNote
+                {
+                    DealId = dealId,
+                    Description = description,
+                    Owner = string.IsNullOrWhiteSpace(ownerId) ? "System" : ownerId,
+                    DateTime = DateTime.Now
+                };
+
+                _context.DealNotes.Add(newNote);
+                await _context.SaveChangesAsync();
+
+                return Json(new
+                {
+                    success = true,
+                    note = new
+                    {
+                        ownerName = newNote.Owner,
+                        createdDateTime = newNote.DateTime.ToString("dd-MM-yyyy HH:mm"),
+                        description = newNote.Description,
+                        attachmentFileName = ""
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
         // ==========================================
@@ -325,5 +645,13 @@ namespace Radar_CRM.Controllers
             ViewBag.UsersList = new SelectList(_context.Users, "FullName", "FullName");
             return View(deal);
         }
+    }
+
+    public class FilterCriteria
+    {
+        public string ColumnName { get; set; }
+        public string Condition { get; set; }
+        public string Value { get; set; }
+        public bool IsDate { get; set; }
     }
 }

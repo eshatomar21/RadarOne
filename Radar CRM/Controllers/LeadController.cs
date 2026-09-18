@@ -2,11 +2,14 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
+using Radar_CRM.Migrations;
 using Radar_CRM.Models;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using static Radar_CRM.Controllers.AccountsController;
 
 namespace Radar_CRM.Controllers
 {
@@ -23,22 +26,164 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // GET: Leads/Index (Paginated, Sorted, Filtered)
         // ==========================================
-        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc", string advancedFilters = "")
         {
-            int pageSize = 100;
-            var query = _context.Leads.AsQueryable();
+            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
 
-            // 1. Server-Side Filtering
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser == null) return RedirectToAction("Login", "Users");
+
+            int pageSize = 100;
+
+            // 🚀 Eager-load relational User objects for Leads
+            var query = _context.Leads
+                .Include(l => l.LeadOwner)
+                .Include(l => l.CoOwner)
+                .Include(l => l.AccountOwner)
+                .Include(l => l.DemoOwner)
+                .AsQueryable();
+
+            // 🚀 ADMIN CHECK BASED ON 'PROFILE'
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            if (!isAdmin)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                visibleUserIds.Add(currentUserId);
+                query = query.Where(l => visibleUserIds.Contains(l.LeadOwnerId));
+            }
+
+            // 🚀 BULLETPROOF FILTERING ENGINE (ENTIRE DB)
+            if (!string.IsNullOrWhiteSpace(advancedFilters))
+            {
+                try
+                {
+                    string jsonString = advancedFilters;
+                    if (jsonString.Contains("%5B") || jsonString.Contains("%7B"))
+                    {
+                        jsonString = Uri.UnescapeDataString(jsonString);
+                    }
+
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                    foreach (var f in filters)
+                    {
+                        if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                        var propertyInfo = typeof(Lead).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (propertyInfo == null) continue;
+
+                        string dbColName = propertyInfo.Name;
+
+                        // Switch complex navigation properties to their Foreign Key (Id)
+                        if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                        {
+                            var idProp = typeof(Lead).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (idProp != null)
+                            {
+                                dbColName = idProp.Name;
+                                propertyInfo = idProp;
+                            }
+                            else continue;
+                        }
+
+                        if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
+                        {
+                            if (DateTime.TryParse(f.Value, out DateTime dVal))
+                            {
+                                if (f.Condition == "on") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == dVal.Date);
+                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < dVal.Date);
+                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > dVal.Date);
+                            }
+                        }
+                        else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var searchValue = f.Value?.ToLower().Trim() ?? "";
+                            var matchingUserIds = _context.Users
+                                .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
+                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                .Select(u => u.Id)
+                                .ToList();
+
+                            if (f.Condition == "contains" || f.Condition == "is")
+                                query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_empty")
+                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty")
+                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                        }
+                        else if (propertyInfo.PropertyType == typeof(string))
+                        {
+                            var searchValue = f.Value.ToLower().Trim();
+                            if (f.Condition == "contains") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "does_not_contain") query = query.Where(a => EF.Property<string>(a, dbColName) == null || !EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "starts_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().StartsWith(searchValue));
+                            else if (f.Condition == "ends_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().EndsWith(searchValue));
+                            else if (f.Condition == "is") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower() == searchValue);
+                            else if (f.Condition == "is_not") query = query.Where(a => EF.Property<string>(a, dbColName) != searchValue);
+                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                        }
+                        else
+                        {
+                            if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                            {
+                                if (int.TryParse(f.Value, out int numVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
+                                }
+                            }
+                            else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                            {
+                                if (decimal.TryParse(f.Value, out decimal decVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("FILTER CRASH AVOIDED: " + ex.Message);
+                }
+            }
+
             if (!string.IsNullOrEmpty(search))
             {
+                var searchLower = search.ToLower();
                 query = query.Where(l =>
-                    (l.LeadName != null && l.LeadName.Contains(search)) ||
+                    (l.LeadName != null && l.LeadName.ToLower().Contains(searchLower)) ||
                     (l.MobileNumber != null && l.MobileNumber.Contains(search)) ||
-                    (l.EmailID != null && l.EmailID.Contains(search))
+                    (l.EmailID != null && l.EmailID.ToLower().Contains(searchLower))
                 );
             }
 
-            // 2. Server-Side Sorting (Defaults to Id descending so newest are on top)
             if (sortDir == "desc")
             {
                 query = sortCol switch
@@ -60,15 +205,41 @@ namespace Radar_CRM.Controllers
                 };
             }
 
-            // 3. Server-Side Pagination
+            // Safely calculate total records
             var totalRecords = await query.CountAsync();
+
+            if (page < 1) page = 1;
+            int totalPagesCalc = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            if (totalPagesCalc == 0) totalPagesCalc = 1;
+            if (page > totalPagesCalc) page = totalPagesCalc;
+
             var leads = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
 
             return View(leads);
+        }
+
+        // ==========================================
+        // HELPER METHOD (Add this to the bottom of the LeadsController)
+        // ==========================================
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
         }
 
         // GET: Leads/Create
@@ -76,6 +247,7 @@ namespace Radar_CRM.Controllers
         {
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
 
             // 🚀 Binds to ProductId and passes dictionary for Javascript pricing
             ViewBag.ProductsList = new SelectList(_context.Products, "Id", "ProductName");
@@ -91,7 +263,6 @@ namespace Radar_CRM.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Lead lead)
         {
-            // Clear validation errors for the payment rows
             var paymentKeys = ModelState.Keys.Where(k => k.StartsWith("PaymentRow")).ToList();
             foreach (var key in paymentKeys)
             {
@@ -101,14 +272,6 @@ namespace Radar_CRM.Controllers
 
             if (ModelState.IsValid)
             {
-                // 1. 🚀 STRICT FILTER: Remove blank rows to prevent database Foreign Key crashes
-                if (lead.PaymentRow != null)
-                {
-                    lead.PaymentRow = lead.PaymentRow
-                        .Where(r => r.ProductId.HasValue && r.ProductId.Value > 0)
-                        .ToList();
-                }
-
                 // =========================================================
                 // AUTOMATED PIPELINE ASSIGNMENT
                 // =========================================================
@@ -121,65 +284,30 @@ namespace Radar_CRM.Controllers
                     lead.Pipeline = "New Software";
                 }
 
-                // 2. Save new lead to DB (Generates the Lead.Id)
-                _context.Add(lead);
-                await _context.SaveChangesAsync();
-
-                // 3. 🚀 Explicitly force the child rows to save and link to the new Lead ID
-                if (lead.PaymentRow != null && lead.PaymentRow.Any())
+                // 🚀 FIX: Prevent EF from Double-Inserting Products
+                var rowsToSave = new List<ProductPaymentRow>();
+                if (lead.PaymentRow != null)
                 {
-                    foreach (var row in lead.PaymentRow)
-                    {
-                        row.LeadId = lead.Id;
-                        if (row.Id == 0)
-                        {
-                            _context.Add(row);
-                        }
-                    }
-                    await _context.SaveChangesAsync(); // Saves the rows to the database
+                    rowsToSave = lead.PaymentRow
+                        .Where(r => (r.ProductId.HasValue && r.ProductId.Value > 0) || !string.IsNullOrWhiteSpace(r.ProductName))
+                        .ToList();
                 }
+                // Detach the list so Entity Framework doesn't save them automatically (we will do it manually to prevent duplicates)
+                lead.PaymentRow = null;
 
-                // 4. Automated Lead-to-Deal Mapping logic
-                if (lead.Stage == "Direct Deal")
+                // 1. Save new lead to DB 
+                _context.Add(lead);
+                await _context.SaveChangesAsync(); // Generates the new Lead.Id
+
+                // 2. Manually link and save the products
+                if (rowsToSave.Any())
                 {
-                    var newDeal = new Deal
+                    foreach (var row in rowsToSave)
                     {
-                        DealName = lead.LeadName + " - Direct Deal",
-
-                        // 🚀 ACCOUNT MAPPING (Passes the ID so the Deal view can use the Lookup)
-                        AccountId = lead.AccountId,
-
-                        // 🚀 OWNER MAPPING FIXED (Only map the ID strings, not the Navigation Models)
-                        DealOwnerId = lead.LeadOwnerId,
-                        AccountOwner = lead.AccountOwnerId,
-                        DemoOwner = lead.DemoOwnerId,
-
-                        ContactPersonName = lead.ContactName,
-                        LeadName = lead.LeadName,
-                        LeadSource = lead.DataSources,
-                        AccountType = lead.AccountType,
-                        MetaCampaignName = lead.MetaCampaignName,
-                        PaymentMode = lead.PaymentMode,
-                        PaymentType = lead.PaymentType,
-                        PaymentStatus = lead.PaymentStatus,
-                        SubTotal = lead.SubTotal ?? 0m,
-                        Taxes = lead.Taxes ?? 0m,
-                        Adjustment = lead.Adjustment ?? 0m,
-                        GrandTotal = lead.GrandTotal ?? 0m,
-                        PaymentRows = lead.PaymentRow?.Select(row => new DealPaymentRow
-                        {
-                            DealType = row.DealType,
-                            ProductId = row.ProductId,
-                            ProductName = row.ProductName,
-                            Quantity = row.Quantity ?? 1,
-                            UnitPrice = row.ProductPrice ?? 0,
-                            Amount = row.Total ?? 0,
-                            Discount = row.DiscountPercent ?? 0,
-                            Total = row.FinalAmount ?? 0
-                        }).ToList() ?? new List<DealPaymentRow>()
-                    };
-
-                    _context.Deals.Add(newDeal);
+                        row.Id = 0; // Force it to be a new record
+                        row.LeadId = lead.Id;
+                        _context.Add(row);
+                    }
                     await _context.SaveChangesAsync();
                 }
 
@@ -190,9 +318,100 @@ namespace Radar_CRM.Controllers
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.ProductsList = new SelectList(_context.Products, "Id", "ProductName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             ViewBag.ProductPrices = _context.Products.ToDictionary(p => p.Id, p => p.UnitPrice);
 
             return View(lead);
+        }
+
+        // ==========================================
+        // AJAX: GET NOTES FOR SIDE PANEL
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> GetNotes(int leadId)
+        {
+            try
+            {
+                // 1. Fetch the raw data from the database first
+                var rawNotes = await _context.Note
+                    .Include(n => n.NoteOwner)
+                    .Where(n => n.LeadId == leadId)
+                    .OrderByDescending(n => n.CreatedDateTime)
+                    .ToListAsync(); // <-- Call this BEFORE .Select()
+
+                // 2. Format the dates in memory to avoid EF Core SQL translation errors
+                var notes = rawNotes.Select(n => new
+                {
+                    id = n.Id,
+                    ownerName = n.NoteOwner != null ? n.NoteOwner.FirstName : "System",
+                    // Since it's a non-nullable DateTime, we can just call .ToString() directly
+                    createdDateTime = n.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
+                    description = n.Description,
+                    attachmentFileName = n.AttachmentFileName
+                });
+
+                return Json(notes);
+            }
+            catch (Exception ex)
+            {
+                // Return an empty array instead of crashing if something goes wrong
+                return Json(new List<object>());
+            }
+        }
+
+        // ==========================================
+        // AJAX: SAVE NEW NOTE FROM SIDE PANEL
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> SaveNoteAjax(int leadId, string description, string ownerId, IFormFile attachment)
+        {
+            try
+            {
+                string fileName = null;
+
+                // Handle basic file attachment info if provided
+                if (attachment != null && attachment.Length > 0)
+                {
+                    fileName = attachment.FileName;
+                    // Note: Add your actual file system saving logic here if you want to store the physical file.
+                    // Example: var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", fileName);
+                    // using (var stream = new FileStream(filePath, FileMode.Create)) { await attachment.CopyToAsync(stream); }
+                }
+
+                // Create the new Note object (Make sure your model is actually called 'Notes' or 'Note' as defined in your DB Context)
+                var newNote = new Notes
+                {
+                    LeadId = leadId,
+                    Description = description,
+                    NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
+                    CreatedDateTime = DateTime.Now,
+                    AttachmentFileName = fileName
+                };
+
+                _context.Note.Add(newNote);
+                await _context.SaveChangesAsync();
+
+                // Fetch the owner's name so we can return it to the UI instantly
+                var owner = await _context.Users.FindAsync(ownerId);
+                string ownerName = owner != null ? owner.FirstName : "System";
+
+                // Return exactly what the JavaScript is expecting
+                return Json(new
+                {
+                    success = true,
+                    note = new
+                    {
+                        ownerName = ownerName,
+                        createdDateTime = newNote.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
+                        description = newNote.Description,
+                        attachmentFileName = newNote.AttachmentFileName
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
         // ==========================================
@@ -248,21 +467,24 @@ namespace Radar_CRM.Controllers
                 return NotFound();
             }
 
-            // Fetch the specific lead from the DB based on ID, including PaymentRows
             var lead = await _context.Leads
                 .Include(l => l.PaymentRow)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (lead == null) return NotFound();
 
-            // Populate ViewBags
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
-
-            // 🚀 Binds to ProductId and passes dictionary for Javascript pricing
             ViewBag.ProductsList = new SelectList(_context.Products, "Id", "ProductName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             ViewBag.ProductPrices = _context.Products.ToDictionary(p => p.Id, p => p.UnitPrice);
 
+            // 🚀 FIX: Changed DealId to LeadId so it successfully finds the Lead's notes!
+            ViewBag.ExistingNotes = await _context.Note
+                .Include(n => n.NoteOwner)
+                .Where(n => n.LeadId == id)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
             return View(lead);
         }
 
@@ -276,7 +498,6 @@ namespace Radar_CRM.Controllers
                 return NotFound();
             }
 
-            // Clears validation for "PaymentRow"
             ModelState.Remove("PaymentRow");
             var paymentKeys = ModelState.Keys.Where(k => k.StartsWith("PaymentRow")).ToList();
             foreach (var key in paymentKeys)
@@ -286,9 +507,6 @@ namespace Radar_CRM.Controllers
 
             if (ModelState.IsValid)
             {
-                // =========================================================
-                // AUTOMATED PIPELINE ASSIGNMENT
-                // =========================================================
                 if (lead.CurrentStatus == "User")
                 {
                     lead.Pipeline = "Upgrade Software";
@@ -301,7 +519,38 @@ namespace Radar_CRM.Controllers
                 try
                 {
                     // =========================================================
-                    // HANDOVER LEAD AUTOMATION (.NET EF Core Implementation)
+                    // 🚀 FIX: SAVE NEW NOTES APPENDED BY AJAX
+                    // =========================================================
+                    var newNoteOwners = Request.Form["SavedNoteOwner[]"];
+                    var newNoteDates = Request.Form["SavedNoteDateTime[]"];
+                    var newNoteDescs = Request.Form["SavedNoteDesc[]"];
+
+                    if (newNoteDescs.Count > 0)
+                    {
+                        for (int i = 0; i < newNoteDescs.Count; i++)
+                        {
+                            var noteDesc = newNoteDescs[i];
+                            if (!string.IsNullOrWhiteSpace(noteDesc))
+                            {
+                                // 🟢 CRITICAL FIX: Convert empty string "" to actual null to prevent FK constraint crashes
+                                string rawOwnerId = newNoteOwners.Count > i ? newNoteOwners[i] : null;
+                                string safeOwnerId = string.IsNullOrWhiteSpace(rawOwnerId) ? null : rawOwnerId;
+
+                                var newNote = new Notes
+                                {
+                                    LeadId = lead.Id,
+                                    NoteOwnerId = safeOwnerId, // Passes null if empty, preventing the SQL crash
+                                    Description = noteDesc,
+                                    CreatedDateTime = DateTime.TryParse(newNoteDates.Count > i ? newNoteDates[i] : "", out DateTime dt) ? dt : DateTime.Now
+                                };
+                                _context.Note.Add(newNote);
+                            }
+                        }
+                        // Save the notes so they are immediately available for the Deal Transfer query
+                        await _context.SaveChangesAsync();
+                    }
+                    // =========================================================
+                    // HANDOVER LEAD AUTOMATION
                     // =========================================================
                     bool isHandoverConditionMet = (lead.Stage == "Demo Done" && lead.LeadStatus == "Hot") ||
                                                   (lead.LeadStatus == "Warm");
@@ -332,47 +581,33 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
-
-
                     // =========================================================
-                    // PAYMENT ROWS SYNCHRONIZATION
+                    // 🚀 FIX: PAYMENT ROWS DUPLICATION SYNCHRONIZATION
                     // =========================================================
                     if (lead.PaymentRow != null)
                     {
-                        // 1. 🚀 STRICT FILTER: Ignore blank fallback rows to prevent DB crash
+                        // Clean sync process: Get valid rows from UI
                         var validRows = lead.PaymentRow
-                            .Where(r => r.ProductId.HasValue && r.ProductId.Value > 0)
+                            .Where(r => (r.ProductId.HasValue && r.ProductId.Value > 0) || !string.IsNullOrWhiteSpace(r.ProductName))
                             .ToList();
 
-                        // 2. Identify rows that were deleted in the UI and remove them from the database
-                        var validRowIds = validRows.Select(r => r.Id).ToList();
+                        // Detach to stop EF double tracking
+                        lead.PaymentRow = null;
 
-                        var rowsToDelete = _context.Set<ProductPaymentRow>()
-                            .Where(r => r.LeadId == lead.Id && !validRowIds.Contains(r.Id))
-                            .ToList();
-
-                        if (rowsToDelete.Any())
+                        // Wipe out existing rows for this lead in the DB to perfectly mirror the UI state
+                        var oldRows = _context.Set<ProductPaymentRow>().Where(r => r.LeadId == lead.Id).ToList();
+                        if (oldRows.Any())
                         {
-                            _context.RemoveRange(rowsToDelete);
+                            _context.RemoveRange(oldRows);
                         }
 
-                        // 3. Add or Update the valid rows
+                        // Re-add the fresh list from the UI
                         foreach (var row in validRows)
                         {
-                            row.LeadId = lead.Id; // CRITICAL: Explicitly link the row to the lead
-
-                            if (row.Id == 0)
-                            {
-                                _context.Add(row); // Insert new row
-                            }
-                            else
-                            {
-                                _context.Update(row); // Update existing row
-                            }
+                            row.Id = 0; // Force as new
+                            row.LeadId = lead.Id;
+                            _context.Add(row);
                         }
-
-                        // Temporarily detach the list from the Lead model so _context.Update(lead) doesn't try to double-save them
-                        lead.PaymentRow = null;
                     }
 
                     // Update existing lead in the DB
@@ -380,15 +615,98 @@ namespace Radar_CRM.Controllers
                     await _context.SaveChangesAsync();
 
                     // =========================================================
-                    // DIRECT DEAL CREATION
+                    // 🚀 NEW: SYNC UPDATES TO THE LINKED ACCOUNT
+                    // =========================================================
+                    if (lead.AccountId.HasValue)
+                    {
+                        var linkedAccount = await _context.Accounts.FindAsync(lead.AccountId.Value);
+                        if (linkedAccount != null)
+                        {
+                            // --- Core Identifiers ---
+                            linkedAccount.ContactPersonName = lead.ContactName;
+                            linkedAccount.AccountName = lead.LeadName;
+
+                            // --- Ownership Mapping ---
+                            linkedAccount.AccountOwnerId = lead.AccountOwnerId;
+                            linkedAccount.CoOwnerId = lead.CoOwnerId;
+
+                            // --- Source Mapping ---
+                            linkedAccount.DataSource = lead.DataSources;
+                            linkedAccount.MetaCampaignName = lead.MetaCampaignName;
+                            linkedAccount.SeminarName = lead.SeminarName;
+
+                            // --- Basic Details ---
+                            linkedAccount.MobileNumber = lead.MobileNumber;
+                            linkedAccount.AlternateMobile = lead.AlternateMobile;
+                            linkedAccount.Email = lead.EmailID;
+                            linkedAccount.AlternateEmailID = lead.AlternateEmailID;
+                            linkedAccount.AccountType = lead.AccountType;
+                            linkedAccount.CurrentStatus = lead.CurrentStatus;
+
+                            // --- Address Mapping ---
+                            linkedAccount.Addr1_Country = lead.Addr1_Country;
+                            linkedAccount.Addr1_FlatHouse = lead.Addr1_FlatHouse;
+                            linkedAccount.Addr1_Street = lead.Addr1_Street;
+                            linkedAccount.Addr1_City = lead.Addr1_City;
+                            linkedAccount.Addr1_State = lead.Addr1_State;
+                            linkedAccount.Addr1_Zip = lead.Addr1_Zip;
+
+                            linkedAccount.Addr2_Country = lead.Addr2_Country;
+                            linkedAccount.Addr2_FlatHouse = lead.Addr2_FlatHouse;
+                            linkedAccount.Addr2_Street = lead.Addr2_Street;
+                            linkedAccount.Addr2_City = lead.Addr2_City;
+                            linkedAccount.Addr2_State = lead.Addr2_State;
+                            linkedAccount.Addr2_Zip = lead.Addr2_Zip;
+
+                            // --- Professional Mapping ---
+                            linkedAccount.IsHomeopathicDoctor = lead.IsHomeopathicDoctor;
+                            linkedAccount.ClinicType = lead.ClinicType;
+                            linkedAccount.WorkType = lead.WorkType;
+                            linkedAccount.HasComputer = lead.HasComputer;
+                            linkedAccount.DateOfBirth = lead.DateOfBirth;
+                            linkedAccount.Age = lead.Age;
+                            linkedAccount.YearsOfPractice = lead.YearOfPractice;
+                            linkedAccount.AveragePatientFee = lead.AveragePatientFee;
+                            linkedAccount.PatientsPerDay = lead.PatientsPerDay;
+                            linkedAccount.TotalExperience = lead.TotalExperience;
+                            linkedAccount.NumberOfClinics = lead.NumberOfClinics;
+                            linkedAccount.Qualification = lead.Qualification;
+                            linkedAccount.YearOfPassing = lead.YearOfPassing;
+                            linkedAccount.CollegeName = lead.CollegeName;
+
+                            // --- Software & Purchases ---
+                            linkedAccount.CurrentlyUsingSoftware = lead.CurrentlyUsingSoftware;
+                            linkedAccount.CurrentSoftwareName = lead.CurrentSoftwareName;
+                            linkedAccount.PurchaseDate = lead.PurchaseDate;
+                            linkedAccount.PurchaseValue = lead.PurchaseValue;
+                            linkedAccount.PaymentType = lead.PaymentType;
+                            linkedAccount.PaymentStatus = lead.PaymentStatus;
+
+                            linkedAccount.ContactPerson1 = lead.ContactPerson1;
+                            linkedAccount.Contact1Phone = lead.Contact1Phone;
+                            linkedAccount.ContactPerson2 = lead.ContactPerson2;
+                            linkedAccount.Contact2Phone = lead.Contact2Phone;
+                            linkedAccount.ContactPerson3 = lead.ContactPerson3;
+                            linkedAccount.Contact3Phone = lead.Contact3Phone;
+
+                            linkedAccount.Description = lead.Description;
+
+                            _context.Update(linkedAccount);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+
+                    // =========================================================
+                    // 🚀 DIRECT DEAL CREATION WITH NOTE TRANSFER (WITH LOGS)
                     // =========================================================
                     if (lead.Stage == "Direct Deal")
                     {
+                        System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Checking if Deal exists for LeadName: '{lead.LeadName}'...");
                         bool dealExists = _context.Deals.Any(d => d.LeadName == lead.LeadName);
 
                         if (!dealExists)
                         {
-                            // Fetch the freshly saved rows to map them to the deal
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Deal does NOT exist. Proceeding to create Deal for Lead ID: {lead.Id}");
                             var savedRows = _context.Set<ProductPaymentRow>().Where(r => r.LeadId == lead.Id).ToList();
 
                             var newDeal = new Deal
@@ -410,7 +728,6 @@ namespace Radar_CRM.Controllers
                                 Taxes = lead.Taxes ?? 0m,
                                 Adjustment = lead.Adjustment ?? 0m,
                                 GrandTotal = lead.GrandTotal ?? 0m,
-
                                 PaymentRows = savedRows.Select(row => new DealPaymentRow
                                 {
                                     DealType = row.DealType,
@@ -424,8 +741,81 @@ namespace Radar_CRM.Controllers
                                 }).ToList()
                             };
 
+                            // 1. SAVE THE NEW DEAL FIRST TO GENERATE THE NEW DEAL ID
                             _context.Deals.Add(newDeal);
                             await _context.SaveChangesAsync();
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Successfully created Deal with ID: {newDeal.Id}");
+
+                            // ==========================================
+                            // 2. 🚀 COPY/TRANSFER NOTES TO THE NEW DEAL
+                            // ==========================================
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Fetching notes for Lead ID: {lead.Id}...");
+                            var leadNotes = await _context.Note
+                                 .Where(n => n.LeadId == lead.Id)
+                                 .AsNoTracking() // Ensures we create new copies, not modifying old ones
+                                 .ToListAsync();
+
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Found {leadNotes.Count} notes attached to Lead {lead.Id}");
+
+                            if (leadNotes.Any())
+                            {
+                                var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
+                                var dealNotes = new List<Notes>();
+
+                                foreach (var note in leadNotes)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Mapping Note ID {note.Id} | Original Owner: '{note.NoteOwnerId}'");
+
+                                    // Validate the owner ID to prevent Foreign Key constraint crashes silently killing the save
+                                    string safeOwnerId = null;
+                                    if (!string.IsNullOrEmpty(note.NoteOwnerId) && validUserIds.Contains(note.NoteOwnerId))
+                                    {
+                                        safeOwnerId = note.NoteOwnerId;
+                                    }
+                                    else
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] WARNING: NoteOwnerId '{note.NoteOwnerId}' is invalid or missing from Users table. Safely setting to null.");
+                                    }
+
+                                    dealNotes.Add(new Notes
+                                    {
+                                        DealId = newDeal.Id, // Link to the newly created Deal
+                                        LeadId = null,       // Set to null so it uniquely maps to the Deal
+                                        AccountId = null,
+
+                                        NoteOwnerId = safeOwnerId,
+                                        CreatedDateTime = note.CreatedDateTime,
+                                        Description = note.Description,
+                                        AttachmentFileName = note.AttachmentFileName,
+                                        AttachmentFilePath = note.AttachmentFilePath
+                                    });
+                                }
+
+                                try
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Attempting to save {dealNotes.Count} notes to DB for Deal {newDeal.Id}...");
+                                    await _context.Note.AddRangeAsync(dealNotes);
+                                    int rowsSaved = await _context.SaveChangesAsync();
+                                    System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] SUCCESS! {rowsSaved} note records saved successfully.");
+                                }
+                                catch (Exception ex)
+                                {
+                                    // THIS CATCHES SILENT DATABASE CRASHES
+                                    System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] ERROR SAVING NOTES: {ex.Message}");
+                                    if (ex.InnerException != null)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] INNER EXCEPTION: {ex.InnerException.Message}");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Skipping transfer because 0 notes were found for Lead {lead.Id}.");
+                            }
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Deal creation skipped because a Deal already exists for LeadName: '{lead.LeadName}'");
                         }
                     }
                 }
@@ -446,14 +836,12 @@ namespace Radar_CRM.Controllers
             return View(lead);
         }
 
-        // Helper method to check if a lead exists during updates
         private bool LeadExists(int id)
         {
             return _context.Leads.Any(e => e.Id == id);
         }
-   
 
-    // ==========================================
+        // ==========================================
         // BULK UPLOAD EXCEL/CSV (HIGH PERFORMANCE)
         // ==========================================
         [HttpPost]
@@ -464,7 +852,6 @@ namespace Radar_CRM.Controllers
             var leadsToInsert = new List<Lead>();
             int currentRow = 1;
 
-            // 🚀 HIGH PERFORMANCE CACHE: Get valid IDs into memory so we don't query the DB 1000 times
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
             var validAccountIds = new HashSet<int>(_context.Accounts.Select(a => a.Id));
 
@@ -484,7 +871,6 @@ namespace Radar_CRM.Controllers
 
                         if (values.Length >= 5)
                         {
-                            // 🚀 SAFE ID EXTRACTION: Validate against the database before assigning to prevent crashes
                             string rawLeadOwnerId = GetVal(values, 1);
                             string rawCoOwnerId = GetVal(values, 52);
                             string rawAccountOwnerId = GetVal(values, 126);
@@ -584,7 +970,7 @@ namespace Radar_CRM.Controllers
                                 Addr1_City = GetVal(values, 138),
                                 Addr1_State = GetVal(values, 139),
                                 Addr1_Zip = GetVal(values, 140),
-                                Addr1_Coordinates = GetVal(values, 141) + " " + GetVal(values, 142), // Combines Lat/Long
+                                Addr1_Coordinates = GetVal(values, 141) + " " + GetVal(values, 142),
 
                                 // --- Address 2 ---
                                 Addr2_Country = GetVal(values, 143),
@@ -615,9 +1001,7 @@ namespace Radar_CRM.Controllers
                     }
                 }
 
-                // 🚀 MASSIVE SPEED BOOST: Turn off tracking during bulk insert to stop Entity Framework from hanging
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
-
                 await _context.Leads.AddRangeAsync(leadsToInsert);
                 await _context.SaveChangesAsync();
             }
@@ -628,14 +1012,12 @@ namespace Radar_CRM.Controllers
             }
             finally
             {
-                // Always turn tracking back on when finished
                 _context.ChangeTracker.AutoDetectChangesEnabled = true;
             }
 
             return Ok();
         }
 
-        // --- Helper Methods to parse CSV properly ---
         private string GetVal(string[] values, int index)
         {
             if (index < values.Length) return values[index]?.Trim() ?? "";
@@ -662,4 +1044,4 @@ namespace Radar_CRM.Controllers
             return result.ToArray();
         }
     }
-    }
+}

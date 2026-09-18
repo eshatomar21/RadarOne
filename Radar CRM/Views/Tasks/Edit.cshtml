@@ -24,6 +24,7 @@
         --theme-text-muted: #64748b;
         --theme-border: #e2e8f0;
         --theme-green: #16a34a; /* Added for info panel */
+        --theme-zoho-green: #4caf50; /* Specific for the Done buttons */
     }
 
     body {
@@ -200,17 +201,83 @@
         max-width: 880px;
     }
 
-    /* Repeat/Reminder Panels */
+    /* Repeat/Reminder Custom Panels */
     .expandable-panel {
         display: none;
-        background-color: #fafaf9;
+        background-color: #ffffff;
         border: 1px solid var(--theme-border);
-        border-radius: 8px;
+        border-radius: 6px;
         padding: 20px;
         margin-top: 10px;
         margin-left: 180px;
         margin-bottom: 24px;
-        max-width: 700px;
+        max-width: 550px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    .panel-footer {
+        border-top: 1px solid var(--theme-border);
+        padding-top: 15px;
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-panel-cancel {
+        background-color: #fff;
+        border: 1px solid var(--theme-border);
+        color: var(--theme-text-main);
+        padding: 6px 16px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+        .btn-panel-cancel:hover {
+            background-color: #f8fafc;
+        }
+
+    .btn-panel-done {
+        background-color: var(--theme-zoho-green);
+        border: 1px solid var(--theme-zoho-green);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .btn-panel-done:hover {
+            background-color: #43a047;
+        }
+
+    .custom-radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .inline-input-control {
+        display: inline-block;
+        width: 60px;
+        padding: 4px 8px;
+        margin: 0 8px;
+        border: 1px solid var(--theme-border);
+        border-radius: 4px;
+        background-color: #fafaf9;
+        text-align: center;
+    }
+
+    .inline-date-control {
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 0 8px;
+        border: 1px solid var(--theme-border);
+        border-radius: 4px;
+        background-color: #fafaf9;
     }
 
     /* Info Sidebar Specific Styling */
@@ -281,7 +348,7 @@
             <div class="main-form-area">
                 <h3 class="pane-section-title mt-0">Task Information</h3>
 
-                <!-- FIX: Explicitly loading the saved owner -->
+                <!-- Task Owner -->
                 <div class="form-group">
                     <label class="sf-label">Task Owner</label>
                     <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId">
@@ -302,25 +369,19 @@
                     <input asp-for="DueDate" type="date" class="sf-input" id="dueDateInput" />
                 </div>
 
-                <!-- FIX: Explicitly loading the saved account -->
+                <!-- Accounts -->
                 <div class="form-group">
                     <label class="sf-label">Accounts</label>
-                    <select asp-for="AccountId" class="sf-select" id="AccountId">
-                        @if (Model?.AccountId != null)
-                        {
-                            <option value="@Model.AccountId" selected>@(ViewBag.RelatedAccount?.AccountName ?? "Current Account")</option>
-                        }
+                    <select asp-for="AccountId" class="sf-select" id="AccountId" asp-items="ViewBag.AccountsList">
+                        <option value="">-- Select Account --</option>
                     </select>
                 </div>
 
-                <!-- FIX: Explicitly loading the saved lead -->
+                <!-- Leads -->
                 <div class="form-group">
                     <label class="sf-label">Leads</label>
-                    <select asp-for="LeadId" class="sf-select" id="LeadId">
-                        @if (Model?.LeadId != null)
-                        {
-                            <option value="@Model.LeadId" selected>@(ViewBag.RelatedLead?.LeadName ?? "Current Lead")</option>
-                        }
+                    <select asp-for="LeadId" class="sf-select" id="LeadId" asp-items="ViewBag.LeadsList">
+                        <option value="">-- Select Lead --</option>
                     </select>
                 </div>
 
@@ -362,19 +423,26 @@
                     </select>
                 </div>
 
-                <!-- Repeat Toggle Area -->
+                <!-- ============================================== -->
+                <!-- REPEAT TOGGLE AND PANEL                        -->
+                <!-- ============================================== -->
                 <div class="form-group mb-1">
                     <label class="sf-label">Repeat</label>
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input" type="checkbox" id="repeatToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
+                    <div class="form-check form-switch m-0 d-flex align-items-center">
+                        <input class="form-check-input mt-0" type="checkbox" id="repeatToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
                         <span class="text-muted ms-2" style="font-size:0.8rem; display: @(Model.DueDate.HasValue ? "none" : "inline");" id="repeatHelpText">(Select Due Date first)</span>
+                        <span id="repeatSummaryText" class="ms-3 fw-medium" style="display:none; font-size: 0.85rem; color: var(--theme-navy-primary);">
+                            Daily, Ends Never
+                            <a href="javascript:void(0)" class="ms-2 text-decoration-underline text-muted" onclick="openRepeatPanel()">Edit</a>
+                        </span>
                     </div>
                 </div>
+
                 <div class="expandable-panel" id="repeatPanel">
                     <div class="row align-items-center mb-3">
-                        <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
+                        <div class="col-3 text-muted" style="font-size:0.9rem;">Repeat type</div>
                         <div class="col-9">
-                            <select asp-for="Repeat" class="sf-select w-50 mb-2">
+                            <select asp-for="Repeat" class="sf-select" style="width: 150px; border:none; border-bottom: 1px solid #ccc; border-radius:0; padding: 2px 4px; background: transparent;">
                                 <option value="Daily">Daily</option>
                                 <option value="Weekly">Weekly</option>
                                 <option value="Monthly">Monthly</option>
@@ -382,29 +450,109 @@
                             </select>
                         </div>
                     </div>
+                    <div class="row mb-3">
+                        <div class="col-3"></div>
+                        <div class="col-9">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="exceptWeekends" name="ExceptWeekends">
+                                <label class="form-check-label text-dark" for="exceptWeekends" style="font-size:0.9rem;">
+                                    Except weekends and holidays.
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-3 text-muted pt-1" style="font-size:0.9rem;">Ends</div>
+                        <div class="col-9">
+                            <div class="custom-radio-group">
+                                <div class="form-check d-flex align-items-center">
+                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsNever" value="Never" checked>
+                                    <label class="form-check-label ms-2 text-dark" for="endsNever" style="font-size:0.9rem;">Never</label>
+                                </div>
+                                <div class="form-check d-flex align-items-center">
+                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsAfter" value="After">
+                                    <label class="form-check-label ms-2 text-dark" for="endsAfter" style="font-size:0.9rem;">
+                                        After <input type="number" class="inline-input-control" value="1" min="1" name="RepeatEndsAfterTimes"> Times
+                                    </label>
+                                </div>
+                                <div class="form-check d-flex align-items-center">
+                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsOn" value="On">
+                                    <label class="form-check-label ms-2 text-dark" for="endsOn" style="font-size:0.9rem;">
+                                        On <input type="date" class="inline-date-control text-muted" name="RepeatEndsOnDate">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-footer">
+                        <button type="button" class="btn-panel-cancel" onclick="cancelRepeatPanel()">Cancel</button>
+                        <button type="button" class="btn-panel-done" onclick="saveRepeatPanel()">Done</button>
+                    </div>
                 </div>
 
-                <!-- Reminder Toggle Area -->
+                <!-- ============================================== -->
+                <!-- REMINDER TOGGLE AND PANEL                      -->
+                <!-- ============================================== -->
                 <div class="form-group mt-3 mb-1">
                     <label class="sf-label">Reminder</label>
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input" type="checkbox" id="reminderToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
+                    <div class="form-check form-switch m-0 d-flex align-items-center">
+                        <input class="form-check-input mt-0" type="checkbox" id="reminderToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
+                        <span id="reminderSummaryText" class="ms-3 fw-medium" style="display:none; font-size: 0.85rem; color: var(--theme-navy-primary);">
+                            Reminder Set
+                            <a href="javascript:void(0)" class="ms-2 text-decoration-underline text-muted" onclick="openReminderPanel()">Edit</a>
+                        </span>
                     </div>
                 </div>
+
                 <div class="expandable-panel" id="reminderPanel">
-                    <div class="form-check mb-3 d-flex align-items-center gap-2">
-                        <input class="form-check-input" type="radio" checked>
-                        <label class="form-check-label" style="font-size:0.85rem;">On</label>
-                        <input asp-for="Reminder" type="datetime-local" class="form-control form-control-sm w-50 d-inline">
+                    <div class="d-flex align-items-center gap-2 mb-4" style="font-size:0.9rem; color: var(--theme-navy-primary);">
+                        <span class="text-muted">On</span>
+                        <input type="date" class="inline-date-control" id="reminderDateInput" name="ReminderDatePart">
+                        <span class="text-muted">at</span>
+                        <input type="time" class="inline-date-control" id="reminderTimeInput" name="ReminderTimePart">
+                    </div>
+                    <div class="row align-items-center">
+                        <div class="col-3 text-muted" style="font-size:0.9rem;">Notify</div>
+                        <div class="col-9 border-bottom pb-1">
+                            <select class="sf-select w-50" name="ReminderNotifyType" style="border:none; background: transparent; padding: 2px 4px;">
+                                <option value="Email">Email</option>
+                                <option value="Popup">Popup</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="panel-footer mt-4">
+                        <button type="button" class="btn-panel-cancel" onclick="cancelReminderPanel()">Cancel</button>
+                        <button type="button" class="btn-panel-done" onclick="saveReminderPanel()">Done</button>
                     </div>
                 </div>
+
+                <!-- 🚀 NEW: Audit Information Section -->
+                <h3 class="pane-section-title">Audit Information</h3>
+                <div class="sf-grid-2">
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CreatedBy">Created By</label>
+                        <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(!string.IsNullOrEmpty(Model.CreatedBy) ? Model.CreatedBy : Model.CreatedById ?? "System")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CreatedTime">Created Time</label>
+                        <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@Model.CreatedTime.ToString("MMM dd, yyyy hh:mm tt")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ModifiedBy">Modified By</label>
+                        <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(!string.IsNullOrEmpty(Model.ModifiedBy) ? Model.ModifiedBy : Model.ModifiedById ?? "-")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ModifiedTime">Modified Time</label>
+                        <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(Model.ModifiedTime.HasValue ? Model.ModifiedTime.Value.ToString("MMM dd, yyyy hh:mm tt") : "-")" readonly tabindex="-1" />
+                    </div>
+                </div>
+                <!-- End of Audit Information Section -->
 
                 <h3 class="pane-section-title">Description Information</h3>
                 <div class="form-group" style="align-items: flex-start;">
                     <label class="sf-label" style="padding-top: 8px;">Description</label>
                     <textarea asp-for="Description" class="sf-input" rows="4"></textarea>
                 </div>
-
                 <!-- Notes Section -->
                 <div class="notes-section">
                     <div class="notes-header">
@@ -593,14 +741,17 @@
     });
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
-    const dueDateInput = document.getElementById('dueDateInput');
-    const repeatToggle = document.getElementById('repeatToggle');
-    const reminderToggle = document.getElementById('reminderToggle');
-    const repeatHelpText = document.getElementById('repeatHelpText');
-
+    // Panel Elements
     const repeatPanel = document.getElementById('repeatPanel');
     const reminderPanel = document.getElementById('reminderPanel');
+    const repeatToggle = document.getElementById('repeatToggle');
+    const reminderToggle = document.getElementById('reminderToggle');
+    const repeatSummaryText = document.getElementById('repeatSummaryText');
+    const reminderSummaryText = document.getElementById('reminderSummaryText');
+
+    document.addEventListener('DOMContentLoaded', function () {
+    const dueDateInput = document.getElementById('dueDateInput');
+    const repeatHelpText = document.getElementById('repeatHelpText');
 
     // Modal Date initialization
     const addNoteModal = document.getElementById('addNoteModal');
@@ -609,7 +760,7 @@
     document.getElementById('modalDateTime').value = now.toLocaleString();
     });
 
-    // Due Date logic
+    // Due Date logic - Disables toggles if no date is set
     dueDateInput.addEventListener('change', function () {
     const hasDate = !!this.value;
     repeatToggle.disabled = !hasDate;
@@ -619,21 +770,72 @@
     repeatHelpText.style.display = 'none';
     } else {
     repeatHelpText.style.display = 'inline';
+
+    // Turn everything off if date is cleared
     repeatToggle.checked = false;
     reminderToggle.checked = false;
     repeatPanel.style.display = 'none';
     reminderPanel.style.display = 'none';
+    repeatSummaryText.style.display = 'none';
+    reminderSummaryText.style.display = 'none';
     }
     });
 
+    // Toggle Listeners
     repeatToggle.addEventListener('change', function () {
-    repeatPanel.style.display = this.checked ? 'block' : 'none';
+    if(this.checked) {
+    openRepeatPanel();
+    } else {
+    repeatPanel.style.display = 'none';
+    repeatSummaryText.style.display = 'none';
+    }
     });
 
     reminderToggle.addEventListener('change', function () {
-    reminderPanel.style.display = this.checked ? 'block' : 'none';
+    if(this.checked) {
+    openReminderPanel();
+    } else {
+    reminderPanel.style.display = 'none';
+    reminderSummaryText.style.display = 'none';
+    }
     });
     });
+
+    // --- Panel Control Functions ---
+
+    function openRepeatPanel() {
+    repeatToggle.checked = true;
+    repeatPanel.style.display = 'block';
+    repeatSummaryText.style.display = 'none';
+    }
+
+    function cancelRepeatPanel() {
+    repeatToggle.checked = false;
+    repeatPanel.style.display = 'none';
+    repeatSummaryText.style.display = 'none';
+    }
+
+    function saveRepeatPanel() {
+    repeatPanel.style.display = 'none';
+    repeatSummaryText.style.display = 'inline';
+    }
+
+    function openReminderPanel() {
+    reminderToggle.checked = true;
+    reminderPanel.style.display = 'block';
+    reminderSummaryText.style.display = 'none';
+    }
+
+    function cancelReminderPanel() {
+    reminderToggle.checked = false;
+    reminderPanel.style.display = 'none';
+    reminderSummaryText.style.display = 'none';
+    }
+
+    function saveReminderPanel() {
+    reminderPanel.style.display = 'none';
+    reminderSummaryText.style.display = 'inline';
+    }
 
     function appendNoteUI() {
     const text = document.getElementById('modalNoteText').value;
@@ -651,13 +853,11 @@
     <strong style="color: var(--theme-navy-primary); font-size: 0.9rem;">System User</strong>
     <div style="font-size: 0.85rem; color: var(--theme-text-main); margin-top:4px;">${text}</div>
 
-    <!-- Hidden inputs pass data to POST action -->
     <input type="hidden" name="SavedNoteDesc[]" value="${text}" />
     <input type="hidden" name="SavedNoteDateTime[]" value="${time}" />
     </div>
     <span class="text-muted" style="font-size: 0.75rem;">${time}</span>
-    </div>
-    `;
+    </div>`;
 
     container.insertAdjacentHTML('afterbegin', html);
 

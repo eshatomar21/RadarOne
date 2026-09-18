@@ -286,8 +286,7 @@
 
                     <div class="form-group">
                         <label class="sf-label" asp-for="RoleId">Role (Hierarchy)</label>
-                        <!-- Note: Add asp-items="ViewBag.Roles" once your controller passes it -->
-                        <select class="sf-select" asp-for="RoleId">
+                        <select class="sf-select" asp-for="RoleId" asp-items="ViewBag.RolesList">
                             <option value="">- Select Role -</option>
                         </select>
                     </div>

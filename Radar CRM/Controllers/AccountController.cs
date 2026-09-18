@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
 using Radar_CRM.Models;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using System.IO;
 using System;
+using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using Task = System.Threading.Tasks.Task;
 
 namespace Radar_CRM.Controllers
@@ -21,14 +22,164 @@ namespace Radar_CRM.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
+        // ==========================================
+        // INDEX: GET (Hierarchical List View)
+        // ==========================================
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc", string advancedFilters = "")
         {
-            int pageSize = 100; // Exactly 100 records per page
+            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
+
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser == null) return RedirectToAction("Login", "Users");
+
+            int pageSize = 100;
             var query = _context.Accounts.AsQueryable();
 
-            // 1. Server-Side Filtering
-            if (!string.IsNullOrEmpty(search))
+            // 🚀 ADMIN CHECK BASED ON 'PROFILE'
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            if (!isAdmin)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
                 {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                visibleUserIds.Add(currentUserId);
+                query = query.Where(a => visibleUserIds.Contains(a.AccountOwnerId));
+            }
+
+            // 🚀 BULLETPROOF FILTERING ENGINE
+            if (!string.IsNullOrWhiteSpace(advancedFilters))
+            {
+                try
+                {
+                    // 1. Prevent JSON crashing by ensuring the string is properly decoded
+                    string jsonString = advancedFilters;
+                    if (jsonString.Contains("%5B") || jsonString.Contains("%7B"))
+                    {
+                        jsonString = Uri.UnescapeDataString(jsonString);
+                    }
+
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                    foreach (var f in filters)
+                    {
+                        if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                        // 2. Safely grab the property (Case-Insensitive to prevent UI/DB casing mismatches)
+                        var propertyInfo = typeof(Account).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (propertyInfo == null) continue;
+
+                        string dbColName = propertyInfo.Name; // Use the exact database casing
+
+                        // If it's a complex class, switch to its foreign key 'Id' column to prevent crashes
+                        if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                        {
+                            var idProp = typeof(Account).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (idProp != null)
+                            {
+                                dbColName = idProp.Name;
+                                propertyInfo = idProp;
+                            }
+                            else continue;
+                        }
+
+                        if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
+                        {
+                            if (DateTime.TryParse(f.Value, out DateTime dVal))
+                            {
+                                if (f.Condition == "on") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == dVal.Date);
+                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < dVal.Date);
+                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > dVal.Date);
+                            }
+                        }
+                        else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Lookup Users whose names match the text input, then query by those IDs
+                            var searchValue = f.Value?.ToLower().Trim() ?? "";
+                            var matchingUserIds = _context.Users
+                                .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
+                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                .Select(u => u.Id)
+                                .ToList();
+
+                            if (f.Condition == "contains" || f.Condition == "is")
+                            {
+                                query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            }
+                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                            {
+                                query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            }
+                            else if (f.Condition == "is_empty")
+                            {
+                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            }
+                            else if (f.Condition == "is_not_empty")
+                            {
+                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            }
+                        }
+                        else if (propertyInfo.PropertyType == typeof(string))
+                        {
+                            // 3. Fully fleshed out string conditions mapped directly to your UI dropdowns
+                            if (f.Condition == "contains") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).Contains(f.Value));
+                            else if (f.Condition == "does_not_contain") query = query.Where(a => EF.Property<string>(a, dbColName) == null || !EF.Property<string>(a, dbColName).Contains(f.Value));
+                            else if (f.Condition == "starts_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).StartsWith(f.Value));
+                            else if (f.Condition == "ends_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).EndsWith(f.Value));
+                            else if (f.Condition == "is") query = query.Where(a => EF.Property<string>(a, dbColName) == f.Value);
+                            else if (f.Condition == "is_not") query = query.Where(a => EF.Property<string>(a, dbColName) != f.Value);
+                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                        }
+                        else
+                        {
+                            // Safe fallback for numeric values
+                            if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                            {
+                                if (int.TryParse(f.Value, out int numVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
+                                }
+                            }
+                            else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                            {
+                                if (decimal.TryParse(f.Value, out decimal decVal))
+                                {
+                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("FILTER CRASH AVOIDED: " + ex.Message);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
                 var searchLower = search.ToLower();
                 query = query.Where(a =>
                     (a.AccountName != null && a.AccountName.ToLower().Contains(searchLower)) ||
@@ -37,7 +188,6 @@ namespace Radar_CRM.Controllers
                 );
             }
 
-            // 2. Server-Side Sorting
             if (sortDir == "desc")
             {
                 query = sortCol switch
@@ -59,15 +209,134 @@ namespace Radar_CRM.Controllers
                 };
             }
 
-            // 3. Server-Side Pagination (Gets total count first, then slices 100 records)
             var totalRecords = await query.CountAsync();
+
+            if (page < 1) page = 1;
+
+            int totalPagesCalc = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            if (totalPagesCalc == 0) totalPagesCalc = 1;
+
+            if (page > totalPagesCalc) page = totalPagesCalc;
+
             var accounts = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+            ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
 
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+
             return View(accounts);
+        }
+        // Ensure this class is at the bottom of your controller file
+        public class FilterCriteria
+        {
+            public string ColumnName { get; set; }
+            public string Condition { get; set; }
+            public string Value { get; set; }
+            public bool IsDate { get; set; }
+        }
+        // ==========================================
+        // HELPER METHOD (Add this to the bottom of the AccountsController)
+        // ==========================================
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
+        }
+
+        // ==========================================
+        // AJAX: GET NOTES FOR OFFCANVAS
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> GetNotes(int accountId)
+        {
+            var notes = await _context.Note
+                .Include(n => n.NoteOwner)
+                .Where(n => n.AccountId == accountId)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .Select(n => new {
+                    id = n.Id,
+                    ownerName = n.NoteOwner != null ? (n.NoteOwner.fullName ?? n.NoteOwner.FirstName) : "System User",
+                    createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                    description = n.Description,
+                    attachmentFileName = n.AttachmentFileName
+                })
+                .ToListAsync();
+
+            return Json(notes);
+        }
+
+        // ==========================================
+        // AJAX: SAVE NOTE FROM OFFCANVAS
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> SaveNoteAjax(int accountId, string description, string ownerId, IFormFile attachment)
+        {
+            try
+            {
+                var note = new Notes
+                {
+                    AccountId = accountId,
+                    NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
+                    Description = description ?? "",
+                    CreatedDateTime = DateTime.Now
+                };
+
+                if (attachment != null && attachment.Length > 0)
+                {
+                    string uploadPath = @"C:\CRM_Files\Notes";
+                    if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+                    string fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(attachment.FileName);
+                    string filePath = Path.Combine(uploadPath, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await attachment.CopyToAsync(stream);
+                    }
+
+                    note.AttachmentFileName = attachment.FileName;
+                    note.AttachmentFilePath = filePath;
+                }
+
+                _context.Note.Add(note);
+                await _context.SaveChangesAsync();
+
+                // Get owner name to pass back to UI
+                string ownerName = "System User";
+                if (!string.IsNullOrEmpty(note.NoteOwnerId))
+                {
+                    var user = await _context.Users.FindAsync(note.NoteOwnerId);
+                    if (user != null) ownerName = user.fullName ?? user.FirstName;
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    note = new
+                    {
+                        ownerName = ownerName,
+                        createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                        description = note.Description,
+                        attachmentFileName = note.AttachmentFileName
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
         // ==========================================
         // CREATE: GET (Opens the blank form)
@@ -75,6 +344,7 @@ namespace Radar_CRM.Controllers
         public IActionResult Create()
         {
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             return View();
         }
 
@@ -104,6 +374,7 @@ namespace Radar_CRM.Controllers
             }
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             return View(account);
         }
         // ==========================================
@@ -119,7 +390,7 @@ namespace Radar_CRM.Controllers
             // 1. Fetch Existing Notes
             ViewBag.ExistingNotes = await _context.Note
                 .Include(n => n.NoteOwner) // 🚀 ADD THIS LINE to load the User data
-                .Where(n => n.AccountId == id)
+               .Where(n => n.AccountId == id)
                 .OrderByDescending(n => n.CreatedDateTime)
                 .ToListAsync();
 
@@ -141,6 +412,7 @@ namespace Radar_CRM.Controllers
                 .ToListAsync();
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             return View(account);
         }
 
@@ -198,6 +470,7 @@ namespace Radar_CRM.Controllers
      .ToListAsync();
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             return View(account);
         }
 
@@ -382,7 +655,8 @@ namespace Radar_CRM.Controllers
 
                     // --- Source Mapping ---
                     DataSources = acc.DataSource,
-                    CampaignSource = acc.DataSource, // Mapped here as well in case the UI expects it
+                    CampaignSource = acc.DataSource,
+                    GroupName = acc.GroupName, // Mapped here as well in case the UI expects it
 
                     // --- Basic Details ---
                     MobileNumber = acc.MobileNumber,
@@ -456,14 +730,16 @@ namespace Radar_CRM.Controllers
                 // 2. 🚀 NEW: COPY/TRANSFER NOTES TO THE NEW CONTACT
                 // ==========================================
                 var accountNotes = await _context.Note
-                    .Where(n => n.AccountId == acc.Id)
-                    .AsNoTracking() // Ensures we create new copies
-                    .ToListAsync();
+                     .Where(n => n.AccountId == acc.Id)
+                     .AsNoTracking() // Ensures we create new copies
+                     .ToListAsync();
 
                 if (accountNotes.Any())
                 {
                     // Fetch valid user IDs to prevent Foreign Key crashes if NoteOwnerId is invalid
                     var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
+
+                    // Declaring contactNotes so Entity Framework can save it
                     var contactNotes = new List<Notes>();
 
                     foreach (var note in accountNotes)
@@ -471,16 +747,17 @@ namespace Radar_CRM.Controllers
                         contactNotes.Add(new Notes
                         {
                             LeadId = newContact.Id,
-                            AccountId = null, // 🔥 FIX: Set to null so it uniquely maps to the new Lead/Contact record and doesn't duplicate on the Account view
-                                              // 🔥 FIX: Ensure the Owner ID actually exists in the DB, otherwise default to null to prevent crash
+                            AccountId = null, // Set to null so it uniquely maps to the new Lead/Contact record
+
+                            // EXACT COPY: Safely transfer Owner, Date, Time, and Text
                             NoteOwnerId = (!string.IsNullOrEmpty(note.NoteOwnerId) && validUserIds.Contains(note.NoteOwnerId)) ? note.NoteOwnerId : null,
                             CreatedDateTime = note.CreatedDateTime,
                             Description = note.Description,
+
                             AttachmentFileName = note.AttachmentFileName,
                             AttachmentFilePath = note.AttachmentFilePath
                         });
                     }
-
                     await _context.Note.AddRangeAsync(contactNotes);
                     await _context.SaveChangesAsync();
                 }

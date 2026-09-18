@@ -157,6 +157,10 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("GroupName")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("Group_Name");
+
                     b.Property<string>("HasComputer")
                         .HasColumnType("nvarchar(max)");
 
@@ -407,6 +411,32 @@ namespace Radar_CRM.Migrations
                     b.HasIndex("DealId");
 
                     b.ToTable("DealPaymentRows");
+                });
+
+            modelBuilder.Entity("Radar_CRM.Models.FieldMapping", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CrmField")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("LeadChainId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MetaField")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadChainId");
+
+                    b.ToTable("FieldMapping");
                 });
 
             modelBuilder.Entity("Radar_CRM.Models.Lead", b =>
@@ -717,6 +747,44 @@ namespace Radar_CRM.Migrations
                     b.ToTable("Leads");
                 });
 
+            modelBuilder.Entity("Radar_CRM.Models.LeadChain", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ChainName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DestinationModule")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FacebookPageId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LastLeadDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PageAccessToken")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TotalLeadsSynced")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LeadChains");
+                });
+
             modelBuilder.Entity("Radar_CRM.Models.Notes", b =>
                 {
                     b.Property<int>("Id")
@@ -769,6 +837,33 @@ namespace Radar_CRM.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("Note");
+                });
+
+            modelBuilder.Entity("Radar_CRM.Models.PersonalNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DateForNote")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NoteText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PersonalNotes");
                 });
 
             modelBuilder.Entity("Radar_CRM.Models.Product", b =>
@@ -846,6 +941,9 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("ProductOwnerId")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("QtyInDemand")
+                        .HasColumnType("int");
+
                     b.Property<int?>("QtyOrdered")
                         .HasColumnType("int");
 
@@ -887,6 +985,9 @@ namespace Radar_CRM.Migrations
 
                     b.Property<decimal?>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("UnitPriceUsd")
+                        .HasColumnType("int");
 
                     b.Property<string>("UsageUnit")
                         .HasColumnType("nvarchar(max)");
@@ -1398,6 +1499,15 @@ namespace Radar_CRM.Migrations
                     b.Navigation("Deal");
                 });
 
+            modelBuilder.Entity("Radar_CRM.Models.FieldMapping", b =>
+                {
+                    b.HasOne("Radar_CRM.Models.LeadChain", null)
+                        .WithMany("FieldMappings")
+                        .HasForeignKey("LeadChainId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Radar_CRM.Models.Lead", b =>
                 {
                     b.HasOne("Radar_CRM.Models.Account", "Account")
@@ -1555,6 +1665,11 @@ namespace Radar_CRM.Migrations
                     b.Navigation("PaymentRow");
 
                     b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("Radar_CRM.Models.LeadChain", b =>
+                {
+                    b.Navigation("FieldMappings");
                 });
 
             modelBuilder.Entity("Radar_CRM.Models.Product", b =>

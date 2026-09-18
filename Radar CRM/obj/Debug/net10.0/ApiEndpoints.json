@@ -1,5 +1,42 @@
 [
   {
+    "ContainingType": "Radar_CRM.Controllers.MetaWebhookController",
+    "Method": "VerifyWebhook",
+    "RelativePath": "api/MetaWebhook",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "hub.mode",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "hub.challenge",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Radar_CRM.Controllers.MetaWebhookController",
+    "Method": "ProcessLead",
+    "RelativePath": "api/MetaWebhook",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "payload",
+        "Type": "System.Text.Json.JsonElement",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "Radar_CRM.Controllers.WebhookController",
     "Method": "ReceiveWordpressContact",
     "RelativePath": "api/Webhook/WordpressContact",

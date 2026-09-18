@@ -3,11 +3,15 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
 using Radar_CRM.Models;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http; // Required for IFormFile
-using System.IO;                 // Required for StreamReader
+using Microsoft.AspNetCore.Http;
+using System.IO;
 
 namespace Radar_CRM.Controllers
 {
@@ -21,12 +25,51 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // INDEX: GET (List View)
+        // INDEX: GET (Hierarchical List View)
         // ==========================================
         public async Task<IActionResult> Index()
         {
-            // Includes the Role data so you can display Role.Name in your UI
-            var users = await _context.Users.Include(u => u.Roles).ToListAsync();
+            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
+
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser == null) return RedirectToAction("Login", "Users");
+
+            var query = _context.Users.Include(u => u.Roles).AsQueryable();
+
+            // 🚀 ADMIN CHECK BASED ON 'PROFILE' (Not Role)
+            // If the user's Profile contains "Admin", they bypass all role hierarchy checks.
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            // 🚀 THE LOGIC: 
+            // If isAdmin is true (Profile = Admin), this IF block is completely skipped.
+            // This allows Admins like Sitara and Jaspal to see each other's data AND all other users, 
+            // regardless of where they sit in the Role hierarchy.
+            if (!isAdmin)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                // Get subordinates (Managers see below users)
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                // Share with peers if enabled
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                // Hierarchy filter applies ONLY to non-admins based on their Role
+                query = query.Where(u => u.Id == currentUserId ||
+                                         (u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value)));
+            }
+
+            var users = await query.ToListAsync();
             return View(users);
         }
 
@@ -35,9 +78,8 @@ namespace Radar_CRM.Controllers
         // ==========================================
         public IActionResult Create()
         {
-            // Populate Dropdowns for the Create view
-            ViewBag.Roles = new SelectList(_context.Roles, "Id", "Name");
-            ViewBag.Users = new SelectList(_context.Users, "RecordId", "FirstName");
+            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "FirstName");
 
             return View();
         }
@@ -50,6 +92,7 @@ namespace Radar_CRM.Controllers
         public async Task<IActionResult> Create(User user)
         {
             ModelState.Remove("Roles");
+            ModelState.Remove("ParentRole");
 
             if (ModelState.IsValid)
             {
@@ -66,36 +109,86 @@ namespace Radar_CRM.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var errors = ModelState.Values.SelectMany(v => v.Errors).ToList();
-
-            ViewBag.Roles = new SelectList(_context.Roles, "Id", "Name", user.RoleId);
-            ViewBag.Users = new SelectList(_context.Users, "RecordId", "FirstName", user.ReportingToId);
+            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "FirstName", user.ReportingToId);
 
             return View(user);
         }
 
         // ==========================================
-        // UPLOAD FILE: POST (Mapped for Users_2026_09_10.csv)
+        // EDIT: GET
+        // ==========================================
+        public async Task<IActionResult> Edit(string? id)
+        {
+            // If no ID is provided in the URL, use the logged-in user's ID
+            if (string.IsNullOrEmpty(id))
+            {
+                id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            }
+
+            if (string.IsNullOrEmpty(id)) return NotFound();
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "FirstName", user.ReportingToId);
+
+            return View(user);
+        }
+
+        // ==========================================
+        // EDIT: POST
+        // ==========================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(string id, User user)
+        {
+            if (id != user.Id) return NotFound();
+
+            ModelState.Remove("Roles");
+            ModelState.Remove("ParentRole");
+
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    user.ModifiedTime = DateTime.Now;
+                    _context.Update(user);
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!UserExists(user.Id)) return NotFound();
+                    else throw;
+                }
+                return RedirectToAction(nameof(Index));
+            }
+
+            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "FirstName", user.ReportingToId);
+
+            return View(user);
+        }
+
+        // ==========================================
+        // UPLOAD FILE: POST
         // ==========================================
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
-            if (uploadedFile == null || uploadedFile.Length == 0)
-            {
-                return BadRequest("No file was uploaded.");
-            }
+            if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var usersToInsert = new List<User>();
             int currentRow = 1;
 
-            // 🚀 HIGH PERFORMANCE CACHE: Get existing IDs into memory to prevent duplicates without hammering the DB
             var existingUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
 
             try
             {
                 using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    var headerLine = await reader.ReadLineAsync(); // Skip the header row
+                    var headerLine = await reader.ReadLineAsync();
 
                     while (!reader.EndOfStream)
                     {
@@ -105,7 +198,6 @@ namespace Radar_CRM.Controllers
 
                         var values = ParseCsvLine(line);
 
-                        // Checking length based on Users_2026_09_10.csv format (needs at least up to index 38)
                         if (values.Length >= 39)
                         {
                             string recordId = !string.IsNullOrWhiteSpace(values[0]) ? values[0].Trim() : Guid.NewGuid().ToString();
@@ -114,38 +206,37 @@ namespace Radar_CRM.Controllers
                             {
                                 var newUser = new User
                                 {
-                                    Id = recordId,                                // [0] Record Id
-                                    FirstName = GetVal(values, 1),                // [1] First Name
-                                    LastName = GetVal(values, 2),                 // [2] Last Name
-                                    Email = GetVal(values, 3),                    // [3] Email
-                                    Role = GetVal(values, 5),                     // [5] Role
-                                    AddedById = GetVal(values, 8),                // [8] Added By.id
-                                    Phone = GetVal(values, 14),                   // [14] Phone
-                                    Mobile = GetVal(values, 15),                  // [15] Mobile
-                                    Website = GetVal(values, 16),                 // [16] Website
-                                    Fax = GetVal(values, 17),                     // [17] Fax
-                                    Profile = !string.IsNullOrWhiteSpace(GetVal(values, 19)) ? GetVal(values, 19) : "Standard", // [19] Profile
-                                    Street = GetVal(values, 20),                  // [20] Street
-                                    City = GetVal(values, 21),                    // [21] City
-                                    State = GetVal(values, 22),                   // [22] State
-                                    Country = GetVal(values, 23),                 // [23] Country
-                                    ZipCode = GetVal(values, 24),                 // [24] Zip Code
-                                    Language = GetVal(values, 25),                // [25] Language
-                                    CountryLocale = GetVal(values, 26),           // [26] Country Locale
-                                    TimeZone = GetVal(values, 27),                // [27] Time Zone
-                                    TimeFormat = GetVal(values, 28),              // [28] Time Format
-                                    UserStatus = !string.IsNullOrWhiteSpace(GetVal(values, 29)) ? GetVal(values, 29) : "Active", // [29] Status
-                                    fullName = GetVal(values, 30),                // [30] Full Name
-                                    Zuid = GetVal(values, 32),                    // [32] Zuid
-                                    SortOrderPreference = GetVal(values, 33),     // [33] Sort order preference
-                                    NameFormat = GetVal(values, 34),              // [34] Name format
-                                    Type = GetVal(values, 35),                    // [35] Type
-                                    StatusReason = GetVal(values, 36),            // [36] status reason
-                                    Source = GetVal(values, 37),                  // [37] Source
-                                    PreferredUnitForDistance = GetVal(values, 38) // [38] Preferred Unit for Distance
+                                    Id = recordId,
+                                    FirstName = GetVal(values, 1),
+                                    LastName = GetVal(values, 2),
+                                    Email = GetVal(values, 3),
+                                    Role = GetVal(values, 5),
+                                    AddedById = GetVal(values, 8),
+                                    Phone = GetVal(values, 14),
+                                    Mobile = GetVal(values, 15),
+                                    Website = GetVal(values, 16),
+                                    Fax = GetVal(values, 17),
+                                    Profile = !string.IsNullOrWhiteSpace(GetVal(values, 19)) ? GetVal(values, 19) : "Standard",
+                                    Street = GetVal(values, 20),
+                                    City = GetVal(values, 21),
+                                    State = GetVal(values, 22),
+                                    Country = GetVal(values, 23),
+                                    ZipCode = GetVal(values, 24),
+                                    Language = GetVal(values, 25),
+                                    CountryLocale = GetVal(values, 26),
+                                    TimeZone = GetVal(values, 27),
+                                    TimeFormat = GetVal(values, 28),
+                                    UserStatus = !string.IsNullOrWhiteSpace(GetVal(values, 29)) ? GetVal(values, 29) : "Active",
+                                    fullName = GetVal(values, 30),
+                                    Zuid = GetVal(values, 32),
+                                    SortOrderPreference = GetVal(values, 33),
+                                    NameFormat = GetVal(values, 34),
+                                    Type = GetVal(values, 35),
+                                    StatusReason = GetVal(values, 36),
+                                    Source = GetVal(values, 37),
+                                    PreferredUnitForDistance = GetVal(values, 38)
                                 };
 
-                                // Safely parse the Added Time (Index 12), fallback to Now if empty
                                 if (DateTime.TryParse(GetVal(values, 12), out DateTime addedTime))
                                 {
                                     newUser.AddedTime = addedTime;
@@ -156,15 +247,13 @@ namespace Radar_CRM.Controllers
                                 }
 
                                 usersToInsert.Add(newUser);
-                                existingUserIds.Add(recordId); // Add to local set to prevent duplicates within the same CSV upload
+                                existingUserIds.Add(recordId);
                             }
                         }
                     }
                 }
 
-                // 🚀 MASSIVE SPEED BOOST: Turn off tracking during bulk insert to stop Entity Framework from hanging
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
-
                 await _context.Users.AddRangeAsync(usersToInsert);
                 await _context.SaveChangesAsync();
 
@@ -177,25 +266,105 @@ namespace Radar_CRM.Controllers
             }
             finally
             {
-                // Always turn tracking back on safely
                 _context.ChangeTracker.AutoDetectChangesEnabled = true;
             }
         }
+
         // ==========================================
-        // HELPER METHODS (Must be inside the class, outside other methods)
+        // GET: Users/Login
+        // ==========================================
+        [HttpGet]
+        public IActionResult Login()
+        {
+            return View(new User());
+        }
+
+        // ==========================================
+        // POST: Users/Login
+        // ==========================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Login(User loginAttempt)
+        {
+            ModelState.Clear();
+
+            if (!string.IsNullOrEmpty(loginAttempt.Email) && !string.IsNullOrEmpty(loginAttempt.Password))
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u =>
+                    u.Email == loginAttempt.Email &&
+                    u.Password == loginAttempt.Password &&
+                    u.UserStatus != null && u.UserStatus.ToLower() == "active");
+
+                if (user != null)
+                {
+                    var claims = new List<Claim>
+{
+    new Claim(ClaimTypes.NameIdentifier, user.Id),
+    new Claim(ClaimTypes.Name, user.fullName ?? $"{user.FirstName} {user.LastName}"),
+    new Claim(ClaimTypes.Email, user.Email ?? ""),
+    new Claim(ClaimTypes.Role, user.Role ?? "User"),
+    new Claim("Profile", user.Profile ?? "Standard"),
+    new Claim(ClaimTypes.MobilePhone, user.Phone ?? "N/A") // Added Phone claim
+};
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var principal = new ClaimsPrincipal(identity);
+
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+                    return RedirectToAction("Index", "Home");
+                }
+
+                ModelState.AddModelError(string.Empty, "Invalid email or password. Please try again.");
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Both Email and Password are required to login.");
+            }
+
+            return View(loginAttempt);
+        }
+
+        // ==========================================
+        // POST: Users/Logout
+        // ==========================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login", "Users");
+        }
+
+        // ==========================================
+        // HELPER METHODS
         // ==========================================
 
-        // 1. Helper to safely get array values without throwing Index Out of Range errors
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
+        }
+
         private string GetVal(string[] values, int index)
         {
             if (index < values.Length) return values[index]?.Trim() ?? "";
             return "";
         }
 
-        // 2. Safely splits CSV lines but ignores commas inside quotation marks
         private string[] ParseCsvLine(string line)
         {
-            var result = new System.Collections.Generic.List<string>();
+            var result = new List<string>();
             bool inQuotes = false;
             var currentField = new System.Text.StringBuilder();
 
@@ -203,7 +372,7 @@ namespace Radar_CRM.Controllers
             {
                 if (c == '\"')
                 {
-                    inQuotes = !inQuotes; // Toggle quote status
+                    inQuotes = !inQuotes;
                 }
                 else if (c == ',' && !inQuotes)
                 {
@@ -218,73 +387,7 @@ namespace Radar_CRM.Controllers
             result.Add(currentField.ToString());
             return result.ToArray();
         }
-        // ==========================================
-        // EDIT: GET (Fetches data to show on the page)
-        // ==========================================
-        public async Task<IActionResult> Edit(string id)
-        {
-            if (string.IsNullOrEmpty(id))
-            {
-                return NotFound();
-            }
 
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            ViewBag.Roles = new SelectList(_context.Roles, "Id", "Name", user.RoleId);
-            ViewBag.Users = new SelectList(_context.Users, "RecordId", "FirstName", user.ReportingToId);
-
-            return View(user);
-        }
-
-        // ==========================================
-        // EDIT: POST (Saves the updated data)
-        // ==========================================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(string id, User user)
-        {
-            if (id != user.Id)
-            {
-                return NotFound();
-            }
-
-            ModelState.Remove("Roles");
-
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    user.ModifiedTime = DateTime.Now;
-
-                    _context.Update(user);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!UserExists(user.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-
-            ViewBag.Roles = new SelectList(_context.Roles, "Id", "Name", user.RoleId);
-            ViewBag.Users = new SelectList(_context.Users, "RecordId", "FirstName", user.ReportingToId);
-
-            return View(user);
-        }
-
-        // Helper method to check if a user exists
         private bool UserExists(string id)
         {
             return _context.Users.Any(e => e.Id == id);

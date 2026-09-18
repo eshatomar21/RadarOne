@@ -258,21 +258,14 @@
 
             <div class="form-group">
                 <label class="sf-label">Accounts</label>
-                <select asp-for="AccountId" class="sf-select" id="AccountId">
-                    @if (Model?.AccountId != null)
-                    {
-                        <option value="@Model.AccountId" selected>Account Selected</option>
-                    }
+                <select asp-for="AccountId" class="sf-select" id="AccountId" asp-items="ViewBag.AccountsList">
+                    <option value="">-- Select Account --</option>
                 </select>
             </div>
-
             <div class="form-group">
                 <label class="sf-label">Leads</label>
-                <select asp-for="LeadId" class="sf-select" id="LeadId">
-                    @if (Model?.LeadId != null)
-                    {
-                        <option value="@Model.LeadId" selected>Lead Selected</option>
-                    }
+                <select asp-for="LeadId" class="sf-select" id="LeadId" asp-items="ViewBag.LeadsList">
+                    <option value="">-- Select Lead --</option>
                 </select>
             </div>
 

@@ -1,18 +1,17 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
 using Radar_CRM.Data;
 using Radar_CRM.Models;
-
-// 1. Force the word 'Task' to always mean the System's async Task
-using Task = System.Threading.Tasks.Task;
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 // 2. Force your database model to use the alias 'CrmTaskModel'
 using CrmTaskModel = Radar_CRM.Models.Task;
+// 1. Force the word 'Task' to always mean the System's async Task
+using Task = System.Threading.Tasks.Task;
 
 namespace Radar_CRM.Controllers
 {
@@ -30,8 +29,52 @@ namespace Radar_CRM.Controllers
         // ==========================================
         public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
         {
+            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
+
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            if (currentUser == null) return RedirectToAction("Login", "Users");
+
             int pageSize = 100;
             var query = _context.Tasks.AsQueryable();
+
+            // 🚀 ADMIN CHECK BASED ON 'PROFILE'
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            // 🚀 THE HIERARCHY LOGIC 
+            // Applies ONLY to non-admins. Filters Tasks based on TaskOwner.
+            if (!isAdmin)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                // Get subordinates
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                // Share with peers if enabled
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                // Get the User IDs belonging to those visible roles
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                // Always include the current user's own ID
+                visibleUserIds.Add(currentUserId);
+
+                // Filter the tasks by TaskOwner
+                // Note: Ensure 'TaskOwner' is the field storing the User ID. If it's named 'TaskOwnerId', change it below.
+                query = query.Where(t => visibleUserIds.Contains(t.TaskOwner));
+            }
 
             if (!string.IsNullOrEmpty(search))
             {
@@ -77,10 +120,32 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
+        // HELPER METHOD (Add this to the bottom of the TasksController)
+        // ==========================================
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
+        }
+        // ==========================================
         // CREATE: GET
         // ==========================================
         public IActionResult Create()
         {
+
+            ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+            ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+
             return View(new CrmTaskModel());
         }
 
@@ -104,7 +169,13 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
+                    // 🚀 FIX: Assign Creation Audit Fields dynamically
+                    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    string currentUserName = User.FindFirstValue(ClaimTypes.Name);
+
                     taskModel.CreatedTime = DateTime.Now;
+                    taskModel.CreatedById = currentUserId;
+                    taskModel.CreatedBy = currentUserName ?? "System";
 
                     if (!string.IsNullOrEmpty(taskModel.TaskOwnerId))
                     {
@@ -134,9 +205,12 @@ namespace Radar_CRM.Controllers
                 if (user != null) taskModel.TaskOwner = user.fullName;
             }
 
+            ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+            ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+
+
             return View(taskModel);
         }
-
         // ==========================================
         // AJAX LAZY-LOAD LOOKUPS FOR SELECT2
         // ==========================================
@@ -194,6 +268,11 @@ namespace Radar_CRM.Controllers
             }
 
             ViewBag.ExistingNotes = await _context.Note.Where(n => n.TaskId == id).OrderByDescending(n => n.CreatedDateTime).ToListAsync();
+            ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+            ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+
+
+
 
             return View(taskModel);
         }
@@ -219,7 +298,13 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
+                    // 🚀 FIX: Assign Modification Audit Fields dynamically
+                    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    string currentUserName = User.FindFirstValue(ClaimTypes.Name);
+
                     taskModel.ModifiedTime = DateTime.Now;
+                    taskModel.ModifiedById = currentUserId;
+                    taskModel.ModifiedBy = currentUserName ?? "System";
 
                     if (!string.IsNullOrEmpty(taskModel.TaskOwnerId))
                     {
@@ -229,6 +314,7 @@ namespace Radar_CRM.Controllers
 
                     _context.Update(taskModel);
                     await _context.SaveChangesAsync();
+
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
 
                     return RedirectToAction(nameof(Index));
@@ -246,9 +332,12 @@ namespace Radar_CRM.Controllers
                 }
             }
 
+            ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
+            ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+
+
             return View(taskModel);
         }
-
         // ==========================================
         // BULK DELETE
         // ==========================================
@@ -273,6 +362,13 @@ namespace Radar_CRM.Controllers
         {
             if (descs != null && descs.Length > 0)
             {
+                // Fetch the logged-in user to act as the Note Owner
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
+
+                // Safely assign the Owner ID, falling back to NULL instead of an invalid text string
+                string safeOwnerId = validUserIds.Contains(currentUserId) ? currentUserId : null;
+
                 for (int i = 0; i < descs.Length; i++)
                 {
                     if (!string.IsNullOrWhiteSpace(descs[i]))
@@ -282,7 +378,9 @@ namespace Radar_CRM.Controllers
                             TaskId = taskId,
                             Description = descs[i],
                             CreatedDateTime = dateTimes != null && dateTimes.Length > i && DateTime.TryParse(dateTimes[i], out DateTime parsed) ? parsed : DateTime.Now,
-                            NoteOwnerId = "System User"
+
+                            // 🚀 CRITICAL FIX: Assigning actual User ID instead of "System User"
+                            NoteOwnerId = safeOwnerId
                         };
                         _context.Note.Add(newNote);
                     }

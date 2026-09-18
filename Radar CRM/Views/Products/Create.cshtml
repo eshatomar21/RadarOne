@@ -1,11 +1,13 @@
 ﻿@model Radar_CRM.Models.Product
 
 @{
-    ViewData["Title"] = ViewContext.RouteData.Values["action"].ToString() + " Product";
+    ViewData["Title"] = ViewContext.RouteData.Values["action"]?.ToString() + " Product";
 }
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<!-- Select2 CSS for Vendor Lookup -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 <style>
     @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -117,10 +119,23 @@
     .form-group {
         margin-bottom: 24px;
     }
+
+    /* Select2 specific overrides to match your theme */
+    .select2-container--default .select2-selection--single {
+        height: 38px;
+        padding: 4px;
+        border-color: var(--theme-border);
+        border-radius: 6px;
+        background-color: #fafaf9;
+    }
+
+        .select2-container--default .select2-selection--single:focus {
+            border-color: var(--theme-navy-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px var(--theme-navy-light);
+        }
 </style>
 
-<!-- NOTE: If this is the Edit.cshtml view, change asp-action="Create" to "Edit" -->
-<!-- Safely grab the action name using ?.ToString() -->
 <form asp-action="@(ViewContext.RouteData.Values["action"]?.ToString())" method="post" enctype="multipart/form-data">
 
     <!-- Safely check if we are in Edit mode -->
@@ -128,6 +143,7 @@
     {
         <input type="hidden" asp-for="Id" />
     }
+
     <div class="sf-container">
         <!-- HEADER -->
         <div class="sf-header">
@@ -162,21 +178,59 @@
                     </select>
                 </div>
 
+                <!-- Vendor Name (Select2 Lookup) -->
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Vendor Name</label>
-                    <input asp-for="VendorName" class="sf-input" />
+                    <select asp-for="VendorName" id="VendorLookup" class="sf-select">
+                        <option value="">- Search Vendor -</option>
+                        @if (!string.IsNullOrEmpty(Model?.VendorName))
+                        {
+                            <option value="@Model.VendorName" selected>@Model.VendorName</option>
+                        }
+                    </select>
                 </div>
+
+                <!-- Manufacturer (Dropdown) -->
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Manufacturer</label>
-                    <input asp-for="Manufacturer" class="sf-input" />
+                    <select asp-for="Manufacturer" class="sf-select">
+                        <option value="">-None-</option>
+                        <option value="AltvetPet Inc.">AltvetPet Inc.</option>
+                        <option value="LexPon Inc.">LexPon Inc.</option>
+                        <option value="MetBeat Corp.">MetBeat Corp.</option>
+                    </select>
                 </div>
+
                 <div class="col-md-4 form-group">
                     <label class="sf-label">Product Category</label>
                     <select asp-for="ProductCategory" class="sf-select">
                         <option value="">- None -</option>
-                        <option value="Hardware">Hardware</option>
-                        <option value="Software">Software</option>
-                        <option value="CRM Applications">CRM Applications</option>
+                        <option value="Additional">Additional</option>
+                        <option value="Addons">Addons</option>
+                        <option value="HW Key">HW Key</option>
+                        <option value="Module">Module</option>
+                        <option value="Repertory">Repertory</option>
+                        <option value="SW Key">SW Key</option>
+                        <option value="Update New">Update New</option>
+                        <option value="Package New">Package New</option>
+                        <option value="Upgrade New">Upgrade New</option>
+                        <option value="Old Package / Upgrade">Old Package / Upgrade</option>
+                        <option value="Package">Package</option>
+                        <option value="Upgarde to starter">Upgarde to starter</option>
+                        <option value="Upgrade to Core">Upgrade to Core</option>
+                        <option value="Upgrade to Plus">Upgrade to Plus</option>
+                        <option value="Upgrade to Advance">Upgrade to Advance</option>
+                        <option value="Upgrade to Expert">Upgrade to Expert</option>
+                        <option value="Add On">Add On</option>
+                        <option value="Wibu (USB) Key">Wibu (USB) Key</option>
+                        <option value="Radar Update Version">Radar Update Version</option>
+                        <option value="Tool">Tool</option>
+                        <option value="Update">Update</option>
+                        <option value="Map">Map</option>
+                        <option value="Keynotes">Keynotes</option>
+                        <option value="Family">Family</option>
+                        <option value="Bundle">Bundle</option>
+                        <option value="Upgrade">Upgrade</option>
                     </select>
                 </div>
 
@@ -196,14 +250,34 @@
                     <label class="sf-label">Unit Price (₹)</label>
                     <input asp-for="UnitPrice" type="number" step="0.01" class="sf-input" />
                 </div>
+
+                <!-- NEW: Unit Price (USD) -->
+                <div class="col-md-3 form-group">
+                    <label class="sf-label">Unit Price (USD)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-secondary text-muted" style="font-size: 0.85rem; border-color: var(--theme-border) !important;">$</span>
+                        <input asp-for="UnitPriceUsd" type="number" step="0.01" class="form-control sf-input" style="border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0;" />
+                    </div>
+                </div>
+
                 <div class="col-md-3 form-group">
                     <label class="sf-label">Commission Rate (%)</label>
                     <input asp-for="CommissionRate" type="number" step="0.01" class="sf-input" />
                 </div>
+
+                <!-- Tax (Dropdown) -->
                 <div class="col-md-3 form-group">
-                    <label class="sf-label">Tax (%)</label>
-                    <input asp-for="Tax" type="number" step="0.01" class="sf-input" />
+                    <label class="sf-label">Tax</label>
+                    <select asp-for="Tax" class="sf-select">
+                        <option value="">- None -</option>
+                        <option value="0.00">0.00 %</option>
+                        <option value="5.00">5.00 %</option>
+                        <option value="12.00">12.00 %</option>
+                        <option value="18.00">18.00 %</option>
+                        <option value="28.00">28.00 %</option>
+                    </select>
                 </div>
+
                 <div class="col-md-3 form-group d-flex align-items-center mt-3">
                     <div class="form-check">
                         <input class="form-check-input border-secondary" type="checkbox" asp-for="Taxable" id="Taxable">
@@ -211,24 +285,46 @@
                     </div>
                 </div>
 
+                <!-- Usage Unit (Dropdown) -->
                 <div class="col-md-3 form-group">
                     <label class="sf-label">Usage Unit</label>
                     <select asp-for="UsageUnit" class="sf-select">
                         <option value="">- None -</option>
                         <option value="Box">Box</option>
+                        <option value="Carton">Carton</option>
+                        <option value="Dozen">Dozen</option>
+                        <option value="Each">Each</option>
+                        <option value="Hour(s)">Hour(s)</option>
+                        <option value="Impressions">Impressions</option>
+                        <option value="Lb">Lb</option>
+                        <option value="M">M</option>
+                        <option value="Pack">Pack</option>
+                        <option value="Pages">Pages</option>
                         <option value="Pieces">Pieces</option>
-                        <option value="Licenses">Licenses</option>
-                        <option value="Hours">Hours</option>
+                        <option value="Quantity">Quantity</option>
+                        <option value="Reams">Reams</option>
+                        <option value="Sheet">Sheet</option>
+                        <option value="Spiral Binder">Spiral Binder</option>
+                        <option value="Square Feet">Square Feet</option>
                     </select>
                 </div>
+
                 <div class="col-md-3 form-group">
                     <label class="sf-label">Quantity in Stock</label>
                     <input asp-for="QuantityInStock" type="number" class="sf-input" />
                 </div>
+
                 <div class="col-md-3 form-group">
                     <label class="sf-label">Qty Ordered</label>
                     <input asp-for="QtyOrdered" type="number" class="sf-input" />
                 </div>
+
+                <!-- NEW: Quantity in Demand -->
+                <div class="col-md-3 form-group">
+                    <label class="sf-label">Quantity in Demand</label>
+                    <input asp-for="QtyInDemand" type="number" class="sf-input" />
+                </div>
+
                 <div class="col-md-3 form-group">
                     <label class="sf-label">Reorder Level</label>
                     <input asp-for="ReorderLevel" type="number" class="sf-input" />
@@ -287,3 +383,34 @@
 
     </div>
 </form>
+
+<!-- REQUIRED SCRIPTS FOR VENDOR LOOKUP -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+    // Initialize the Vendor Lookup Field using Select2
+    $('#VendorLookup').select2({
+    placeholder: "-- Search Vendor --",
+    allowClear: true,
+    width: '100%'
+    // Uncomment the AJAX block below if you have a backend endpoint to dynamically search vendors
+    /*
+    , ajax: {
+    url: '/Vendors/Search', // Replace with your actual endpoint
+    dataType: 'json',
+    delay: 250,
+    data: function (params) {
+    return { q: params.term };
+    },
+    processResults: function (data) {
+    return { results: data.results };
+    },
+    cache: true
+    }
+    */
+    });
+    });
+</script>

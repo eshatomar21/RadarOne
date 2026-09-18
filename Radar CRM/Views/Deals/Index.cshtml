@@ -3,1448 +3,1581 @@
 @{
     ViewData["Title"] = "Deals Master";
 
-    // --- Catch pagination & state values from Controller (Matched with Account UI) ---
+    // --- Catch pagination & state values from Controller ---
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
     int totalRecords = ViewBag.TotalRecords ?? 0;
     string currentSearch = Context.Request.Query["search"];
     string currentSortCol = Context.Request.Query["sortCol"];
     string currentSortDir = Context.Request.Query["sortDir"];
+    string advancedFilters = Context.Request.Query["advancedFilters"];
 
-    // Dynamically get properties of the Deal model, EXCLUDING lists (PaymentRows, Notes) so they don't break the data table
-    var tableProps = Model != null && Model.Any() ?
-        Model.First().GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-        .Where(p => !p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>))
-        .ToArray()
-        : Array.Empty<System.Reflection.PropertyInfo>();
+    // EXCLUSION LIST: Removed relational lists to prevent table breaking
+    var excludedFields = new[] { "ZohoRecordId", "PaymentRows", "Notes", "Note", "DealOwnerId", "AccountId", "AccountOwnerId", "CoOwnerId", "DemoOwnerId", "Tasks" };
+
+    // 🚀 SMART FIX: Use typeof(Deal) instead of Model.First() so filters & columns load EVEN IF the table is empty!
+    var tableProps = typeof(Radar_CRM.Models.Deal).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => !excludedFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)) && p.PropertyType.Name != "ICollection`1")
+        .ToArray();
 }
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Radar CRM</title>
-    <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>@ViewData["Title"] - Radar CRM</title>
 
-    <style>
-            /* Premium Enterprise SaaS Theme */
-            @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+<style>
+    /* Premium Enterprise SaaS Theme */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-            :root {
-                --bg-body: #f8fafc;
-                --bg-surface: #ffffff;
-                --primary-blue: #2563eb;
-                --primary-hover: #1d4ed8;
-                --text-dark: #0f172a;
-                --text-main: #334155;
-                --text-muted: #64748b;
-                --border-soft: #e2e8f0;
-                --radius-md: 8px;
-                --radius-lg: 12px;
-                --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-                --btn-depth: 2px;
-            }
+    :root {
+        --bg-body: #f8fafc;
+        --bg-surface: #ffffff;
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --text-dark: #0f172a;
+        --text-main: #334155;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --btn-depth: 2px;
+    }
 
-            body {
-                background-color: var(--bg-body);
-                color: var(--text-main);
-                font-family: 'Inter', -apple-system, sans-serif;
-                -webkit-font-smoothing: antialiased;
-            }
+    /* Fixed Body - No extra padding to prevent white borders */
+    body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-family: 'Inter', -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
 
-            /* Top Page Header */
-            .page-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 24px;
-                background: var(--bg-surface);
-                padding: 20px 28px;
-                border-radius: var(--radius-lg);
-                box-shadow: var(--shadow-sm);
-                border: 1px solid var(--border-soft);
-                flex-wrap: wrap;
-                gap: 16px;
-            }
+    /* Top Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        background: var(--bg-surface);
+        padding: 20px 28px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        flex-wrap: wrap;
+        gap: 16px;
+    }
 
-            .page-title {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                margin: 0;
-                font-weight: 700;
-                font-size: 1.4rem;
-                color: var(--text-dark);
-                letter-spacing: -0.02em;
-            }
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        letter-spacing: -0.02em;
+    }
 
-                .page-title i {
-                    color: var(--primary-blue);
-                }
+        .page-title i {
+            color: var(--primary-blue);
+        }
 
-            /* Action Buttons (3D SaaS Style) */
-            .btn-saas {
-                background-color: var(--bg-surface);
-                color: var(--text-dark);
-                border: 1px solid #cbd5e1;
-                font-weight: 500;
-                border-radius: var(--radius-md);
-                padding: 8px 16px;
-                font-size: 0.85rem;
-                transition: all 0.15s ease;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                cursor: pointer;
-                box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
-                transform: translateY(0);
-            }
+    /* Action Buttons (3D SaaS Style) */
+    .btn-saas {
+        background-color: var(--bg-surface);
+        color: var(--text-dark);
+        border: 1px solid #cbd5e1;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
+        transform: translateY(0);
+    }
 
-                .btn-saas:active {
-                    transform: translateY(var(--btn-depth));
-                    box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
-                }
+        .btn-saas:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
+        }
 
-            .btn-saas-primary {
-                background-color: var(--primary-blue);
-                color: white;
-                font-weight: 600;
-                border: 1px solid var(--primary-hover);
-                border-radius: var(--radius-md);
-                padding: 8px 20px;
-                font-size: 0.85rem;
-                transition: all 0.15s ease;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                text-decoration: none;
-                box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
-            }
+    .btn-saas-primary {
+        background-color: var(--primary-blue);
+        color: white;
+        font-weight: 600;
+        border: 1px solid var(--primary-hover);
+        border-radius: var(--radius-md);
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+    }
 
-                .btn-saas-primary:hover {
-                    color: white;
-                    background-color: var(--primary-hover);
-                }
+        .btn-saas-primary:hover {
+            color: white;
+            background-color: var(--primary-hover);
+        }
 
-                .btn-saas-primary:active {
-                    transform: translateY(var(--btn-depth));
-                    box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
-                }
+        .btn-saas-primary:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
+        }
 
-            .btn-saas-danger {
-                background-color: #fef2f2;
-                color: #b91c1c;
-                border: 1px solid #fca5a5;
-                box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
-            }
+    .btn-saas-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
+    }
 
-                .btn-saas-danger:active {
-                    transform: translateY(var(--btn-depth));
-                    box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
-                }
+        .btn-saas-danger:active {
+            transform: translateY(var(--btn-depth));
+            box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
+        }
 
-            /* Layout Grid */
-            .crm-container {
-                display: flex;
-                height: calc(100vh - 160px);
-                gap: 24px;
-                width: 100%;
-                max-width: 100%;
-            }
+    /* Layout Grid */
+    .crm-container {
+        display: flex;
+        height: calc(100vh - 160px);
+        gap: 24px;
+        width: 100%;
+        max-width: 100%;
+    }
 
-            /* Fixed Sidebar Filter */
-            .filter-sidebar {
-                width: 320px;
-                min-width: 320px;
-                background: var(--bg-surface);
-                border: 1px solid var(--border-soft);
-                border-radius: var(--radius-lg);
-                display: flex;
-                flex-direction: column;
-                box-shadow: var(--shadow-sm);
-                height: 100%;
-            }
+    /* Fixed Sidebar Filter */
+    .filter-sidebar {
+        width: 320px;
+        min-width: 320px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        display: flex;
+        flex-direction: column;
+        box-shadow: var(--shadow-sm);
+        height: 100%;
+    }
 
-            .filter-header {
-                padding: 18px 20px;
-                border-bottom: 1px solid var(--border-soft);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
+    .filter-header {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-                .filter-header h6 {
-                    margin: 0;
-                    font-weight: 600;
-                    font-size: 0.95rem;
-                }
+        .filter-header h6 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
 
-            .filter-search-box {
-                padding: 12px 20px;
-                border-bottom: 1px solid var(--border-soft);
-                background-color: #f8fafc;
-            }
+    .filter-search-box {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        background-color: #f8fafc;
+    }
 
-            .filter-body {
-                overflow-y: auto;
-                flex-grow: 1;
-                padding: 0;
-            }
+    .filter-body {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 0;
+    }
 
-            .filter-field-item {
-                padding: 14px 20px;
-                border-bottom: 1px solid #f1f5f9;
-                transition: background-color 0.2s;
-            }
+    .filter-field-item {
+        padding: 14px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.2s;
+    }
 
-                .filter-field-item:hover {
-                    background-color: #f8fafc;
-                }
+        .filter-field-item:hover {
+            background-color: #f8fafc;
+        }
 
-            .filter-expanded-area {
-                display: none;
-                margin-top: 12px;
-                padding-left: 28px;
-            }
+    .filter-expanded-area {
+        display: none;
+        margin-top: 12px;
+        padding-left: 28px;
+    }
 
-            .filter-field-item.active .filter-expanded-area {
-                display: block;
-                animation: fadeIn 0.3s ease;
-            }
+    .filter-field-item.active .filter-expanded-area {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
 
-            @@keyframes fadeIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(-5px);
-                }
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-5px);
+        }
 
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
 
-            .form-select, .form-control {
-                border: 1px solid var(--border-soft);
-                border-radius: var(--radius-md);
-                font-size: 0.85rem;
-                padding: 8px 12px;
-            }
+    .form-select, .form-control {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
 
-                .form-control:focus, .form-select:focus {
-                    border-color: var(--primary-blue);
-                    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-                    outline: none;
-                }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+            outline: none;
+        }
 
-            /* Main Table Container */
-            .table-container {
-                flex: 1;
-                min-width: 0;
-                background: var(--bg-surface);
-                border-radius: var(--radius-lg);
-                box-shadow: var(--shadow-sm);
-                border: 1px solid var(--border-soft);
-                display: flex;
-                flex-direction: column;
-                height: 100%;
-                overflow: hidden;
-            }
+    /* Main Table Container */
+    .table-container {
+        flex: 1;
+        min-width: 0;
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
 
-            /* Table Toolbar */
-            .table-toolbar {
-                padding: 14px 20px;
-                border-bottom: 1px solid var(--border-soft);
-                display: flex;
-                justify-content: flex-end;
-                align-items: center;
-                background-color: var(--bg-surface);
-            }
+    /* Table Toolbar */
+    .table-toolbar {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
 
-            /* The Table */
-            .table-responsive {
-                overflow: auto;
-                flex-grow: 1;
-                width: 100%;
-            }
+    /* The Table */
+    .table-responsive {
+        overflow: auto;
+        flex-grow: 1;
+        width: 100%;
+    }
 
-            .table {
-                margin-bottom: 0;
-                white-space: nowrap;
-                border-collapse: separate;
-                border-spacing: 0;
-            }
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
 
-                .table thead th {
-                    background-color: #f8fafc;
-                    color: var(--text-muted);
-                    font-weight: 600;
-                    font-size: 0.8rem;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                    border-bottom: 1px solid var(--border-soft);
-                    padding: 14px 16px;
-                }
+        .table thead th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-soft);
+            padding: 14px 16px;
+        }
 
-            /* Flex Layout for Header Content */
-            .th-content {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                width: 100%;
-                gap: 12px;
-            }
+    /* Flex Layout for Header Content */
+    .th-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        gap: 12px;
+    }
 
-            /* Funnel Icon Button */
-            .header-menu-btn {
-                color: var(--text-muted);
-                background: transparent;
-                border: 1px solid transparent;
-                cursor: pointer;
-                width: 28px;
-                height: 28px;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.2s;
-            }
+    /* Funnel Icon Button */
+    .header-menu-btn {
+        color: var(--text-muted);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
 
-                .header-menu-btn:hover, .header-menu-btn[aria-expanded="true"] {
-                    background: #e2e8f0;
-                    color: var(--text-dark);
-                    border-color: #cbd5e1;
-                }
+        .header-menu-btn:hover, .header-menu-btn[aria-expanded="true"] {
+            background: #e2e8f0;
+            color: var(--text-dark);
+            border-color: #cbd5e1;
+        }
 
-            .table tbody td {
-                padding: 16px;
-                vertical-align: middle;
-                color: var(--text-dark);
-                font-size: 0.85rem;
-                font-weight: 500;
-                border-bottom: 1px solid #f1f5f9;
-                background-color: var(--bg-surface);
-            }
+    .table tbody td {
+        padding: 16px;
+        vertical-align: middle;
+        color: var(--text-dark);
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-bottom: 1px solid #f1f5f9;
+        background-color: var(--bg-surface);
+    }
 
-            .table tbody tr:hover td {
-                background-color: #f8fafc;
-            }
+    .table tbody tr {
+        cursor: pointer;
+    }
 
-            /* Sticky Columns (Checkboxes & Actions) */
-            .sticky-cb {
-                position: sticky;
-                left: 0;
-                width: 40px;
-                text-align: center;
-                z-index: 11;
-                border-right: 1px solid var(--border-soft) !important;
-                background-color: var(--bg-surface);
-            }
+        .table tbody tr:hover td {
+            background-color: #f8fafc;
+        }
 
-            .sticky-actions {
-                position: sticky;
-                right: 0;
-                width: 100px;
-                text-align: center;
-                z-index: 11;
-                border-left: 1px solid var(--border-soft) !important;
-                background-color: var(--bg-surface);
-            }
+    /* Sticky Columns (Checkboxes & Actions) */
+    .sticky-cb {
+        position: sticky;
+        left: 0;
+        width: 40px;
+        text-align: center;
+        z-index: 11;
+        border-right: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
 
-            .table thead th.sticky-cb, .table thead th.sticky-actions {
-                z-index: 12;
-                background-color: #f8fafc;
-            }
+    .sticky-actions {
+        position: sticky;
+        right: 0;
+        width: 130px;
+        text-align: center;
+        z-index: 11;
+        border-left: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+    }
 
-            /* Drag and Drop Manage Columns Styles */
-            .draggable-col-item {
-                transition: background-color 0.2s;
-            }
+    .table thead th.sticky-cb, .table thead th.sticky-actions {
+        z-index: 12;
+        background-color: #f8fafc;
+    }
 
-                .draggable-col-item.dragging {
-                    opacity: 0.4;
-                    background-color: #f1f5f9;
-                }
+    /* Drag and Drop Manage Columns Styles */
+    .draggable-col-item {
+        transition: background-color 0.2s;
+    }
 
-                .draggable-col-item.over {
-                    border-top: 2px solid var(--primary-blue);
-                }
+        .draggable-col-item.dragging {
+            opacity: 0.4;
+            background-color: #f1f5f9;
+        }
 
-            .drag-handle {
-                cursor: grab;
-                padding: 4px;
-                color: #94a3b8;
-            }
+        .draggable-col-item.over {
+            border-top: 2px solid var(--primary-blue);
+        }
 
-                .drag-handle:active {
-                    cursor: grabbing;
-                }
+    .drag-handle {
+        cursor: grab;
+        padding: 4px;
+        color: #94a3b8;
+    }
 
-            /* Badges */
-            .badge-soft-success {
-                background: #dcfce3;
-                color: #166534;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-weight: 600;
-                font-size: 0.75rem;
-            }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
 
-            .badge-soft-warning {
-                background: #fef3c7;
-                color: #92400e;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-weight: 600;
-                font-size: 0.75rem;
-            }
+    /* Badges */
+    .badge-soft-success {
+        background: #dcfce3;
+        color: #166534;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
 
-            .badge-soft-danger {
-                background: #fee2e2;
-                color: #b91c1c;
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-weight: 600;
-                font-size: 0.75rem;
-            }
+    .badge-soft-danger {
+        background: #fee2e2;
+        color: #b91c1c;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
 
-            /* Pagination */
-            .pagination-container {
-                padding: 14px 24px;
-                border-top: 1px solid var(--border-soft);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                background-color: var(--bg-surface);
-            }
+    .badge-soft-warning {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
 
-            /* Mobile Friendly Adjustments */
-            @@media (max-width: 992px) {
-                .crm-container {
-                    flex-direction: column;
-                    height: auto;
-                }
+    /* Pagination */
+    .pagination-container {
+        padding: 14px 24px;
+        border-top: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
 
-                .filter-sidebar {
-                    width: 100%;
-                    height: 400px;
-                }
+    /* Mobile Friendly Adjustments */
+    @@media (max-width: 992px) {
+        .crm-container {
+            flex-direction: column;
+            height: auto;
+        }
 
-                .table-container {
-                    height: 600px;
-                }
+        .filter-sidebar {
+            width: 100%;
+            height: 400px;
+        }
 
-                .page-header {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-            }
-    </style>
-</head>
-<body>
+        .table-container {
+            height: 600px;
+        }
 
-    <!-- Hidden Inputs -->
-    <input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
 
-    <!-- Top Action Header -->
-    <div class="page-header">
-        <h1 class="page-title"><i class="fa-solid fa-handshake"></i> Deals Master</h1>
+<!-- Hidden Input for Files -->
+<input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
 
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            <!-- Bulk Action Container -->
-            <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
-                <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
-                    <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
-                </button>
-                <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
-                    <i class="fa-solid fa-layer-group"></i> Mass Update
-                </button>
-                <button class="btn-saas" onclick="alert('Task Creation Module Opened')">
-                    <i class="fa-solid fa-list-check"></i> Create Task
-                </button>
-                <div class="vr mx-2 d-none d-md-block"></div>
-            </div>
+<!-- Top Action Header -->
+<div class="page-header">
+    <h1 class="page-title"><i class="fa-solid fa-handshake"></i> Deals Master</h1>
 
-            <button class="btn-saas" onclick="exportTableToCSV('Deals_Export.csv')">
-                <i class="fa-solid fa-file-csv"></i> Export
+    <div class="d-flex gap-3 align-items-center">
+        <!-- Bulk Action Container -->
+        <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+            <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
+                <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
             </button>
-            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+            <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
+                <i class="fa-solid fa-layer-group"></i> Mass Update
             </button>
-            <a href="@Url.Action("Create", "Deals")" class="btn-saas-primary">
-                <i class="fa-solid fa-plus"></i> Create Deal
-            </a>
+            <button class="btn-saas" onclick="alert('Task Creation Module Opened')">
+                <i class="fa-solid fa-list-check"></i> Create Task
+            </button>
+            <div class="vr mx-2"></div>
         </div>
+
+        <button class="btn-saas" onclick="exportTableToCSV('Deals_Export.csv')">
+            <i class="fa-solid fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
+        </button>
+        <a href="@Url.Action("Create", "Deals")" class="btn-saas-primary">
+            <i class="fa-solid fa-plus"></i> Create Deal
+        </a>
     </div>
+</div>
 
-    <!-- Main Table Container -->
-    <div class="crm-container">
+<!-- Main Table Container -->
+<div class="crm-container">
 
-        <!-- Fixed Sidebar Filter -->
-        <div class="filter-sidebar">
-            <div class="filter-header">
-                <h6>
-                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
-                    Filters
-                </h6>
-                <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
+    <!-- Fixed Sidebar Filter -->
+    <div class="filter-sidebar" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+        <div class="filter-header">
+            <h6>
+                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
+                Filters
+            </h6>
+            <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
+        </div>
+        <div class="filter-search-box">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0 fw-medium" placeholder="Find filter..." id="sidebarSearch" onkeyup="filterSidebarItems()">
             </div>
-            <div class="filter-search-box">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0 ps-0 fw-medium" placeholder="Find filter..." id="sidebarSearch" onkeyup="filterSidebarItems()">
+        </div>
+
+        <!-- ONE UNIFIED SCROLLING BODY -->
+        <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
+
+            <!-- FREQUENTLY USED SECTION -->
+            <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
+                <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                    <i class="fa-solid fa-star me-2" style="color: #eab308;"></i>
+                    FREQUENTLY USED
+                </div>
+                <div id="pinnedItemsContainer">
+                    <!-- Pinned filters will be dynamically moved here -->
                 </div>
             </div>
 
-            <!-- ONE UNIFIED SCROLLING BODY -->
-            <div class="filter-body">
+            <!-- UNPINNED LIST -->
+            <div id="sidebarList">
+                @foreach (var prop in tableProps)
+                {
+                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date");
 
-                <!-- FREQUENTLY USED SECTION (Pinned Items) -->
-                <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
-                    <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                        <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857" style="width: 12px; height: 12px; margin-right: 6px;" alt="Star">
-                        FREQUENTLY USED
-                    </div>
-                    <div id="pinnedItemsContainer">
-                        <!-- Pinned filters will be dynamically moved here -->
-                    </div>
-                </div>
+                    <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
 
-                <!-- UNPINNED LIST -->
-                <div id="sidebarList">
-                    @foreach (var prop in tableProps)
-                    {
-                        <div class="filter-field-item field-item-row">
-                            <div class="d-flex align-items-center m-0 w-100">
-                                <!-- Custom Star Image for Pinning -->
-                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857"
-                                     class="pin-filter-btn unpinned-star flex-shrink-0"
-                                     style="width: 15px; height: 15px; cursor: pointer; filter: grayscale(100%) opacity(0.3); transition: all 0.2s;"
-                                     onclick="togglePinFilter(this)" title="Pin this filter" alt="Pin">
+                        <div class="d-flex align-items-center m-0 w-100">
+                            <!-- Star Icon for Pinning -->
+                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
+                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
+                               onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
 
-                                <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
+                            <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
 
-                                <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
-                                    @prop.Name
-                                </label>
-                            </div>
+                            <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
+                                @prop.Name
+                            </label>
+                        </div>
 
-                            <div class="filter-expanded-area">
+                        <div class="filter-expanded-area">
+                            @if (isDate)
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
+                                    <option value="on" selected>On</option>
+                                    <option value="before">before</option>
+                                    <option value="after">after</option>
+                                    <option value="between">between</option>
+                                    <option value="today">Today</option>
+                                    <option value="this_month">This Month</option>
+                                </select>
+                                <div class="d-flex flex-column gap-2">
+                                    <input type="date" class="form-control form-control-sm condition-val date-val-1" />
+                                    <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
+                                </div>
+                            }
+                            else if (prop.Name.Contains("Owner"))
+                            {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="contains" selected>contains</option>
+                                    <option value="does_not_contain">does not contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
                                     <option value="is">is exactly</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <!-- Native HTML5 Datalist for Dropdown Suggestions -->
-                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val" placeholder="Type or select..." />
-                                <datalist id="dl_@prop.Name">
-                                    <!-- Populated dynamically via JS on load -->
+                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type..." />
+                                <datalist id="dl_users_@prop.Name">
+                                    @if (ViewBag.UsersList != null)
+                                    {
+                                        foreach (var user in (SelectList)ViewBag.UsersList)
+                                        {
+                                            <option value="@user.Text"></option>
+                                        }
+                                    }
                                 </datalist>
-                            </div>
+                            }
+                            else
+                            {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="contains" selected>contains</option>
+                                    <option value="does_not_contain">does not contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
+                                    <option value="is">is exactly</option>
+                                    <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
+                                </select>
+                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Type or select..." />
+                                <datalist id="dl_@prop.Name"></datalist>
+                            }
                         </div>
-                    }
-                </div>
+                    </div>
+                }
             </div>
-            <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto">
-                <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
+        </div>
+        <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto" style="flex-shrink: 0; z-index: 10;">
+            <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
+        </div>
+    </div>
+
+    <!-- Table Area -->
+    <div class="table-container" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+        <!-- Top Toolbar -->
+        <div class="table-toolbar">
+            <div class="me-auto d-flex align-items-center gap-3">
+                <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
+                    <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
+                </span>
+
+                <form method="get" action="@Url.Action("Index")" class="m-0 d-flex gap-2 align-items-center">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search entire database..." value="@currentSearch" style="width: 250px;" />
+                    <button type="submit" class="btn-saas-primary" style="padding: 4px 12px;">Search All</button>
+                    @if (!string.IsNullOrEmpty(currentSearch) || !string.IsNullOrEmpty(advancedFilters))
+                    {
+                        <a href="@Url.Action("Index")" class="btn btn-sm btn-light border">Clear</a>
+                    }
+                </form>
+            </div>
+
+            <div class="d-flex gap-2">
+                <!-- Manage Columns Drag & Drop -->
+                <div class="dropdown">
+                    <button class="btn-saas shadow-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#manageColumnsPanel">
+                        <i class="fa-solid fa-table-columns text-primary"></i> Columns
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
+                        <!-- Populated via JS for Drag & Drop -->
+                    </ul>
+                </div>
             </div>
         </div>
 
-        <!-- Table Area -->
-        <div class="table-container">
-            <!-- Top Toolbar -->
-            <div class="table-toolbar">
-                <div class="me-auto d-flex align-items-center">
-                    <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
-                        <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
-                    </span>
-                </div>
+        <!-- The Data Table -->
+        <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow-y: auto;">
+            <table class="table" id="dealsTable">
+                <thead>
+                    <tr>
+                        <th class="sticky-cb">
+                            <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        </th>
 
-                <div class="d-flex gap-2">
-                    <!-- Global Sort Dropdown UI -->
-                    <div class="dropdown">
-                        <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                            <i class="fa-solid fa-arrow-up-wide-short text-muted me-1"></i> Sort
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="width: 320px; border-radius: 12px;">
-                            <h6 class="mb-3 text-dark fw-bold">Sort By</h6>
-                            <div class="d-flex gap-2 mb-3">
-                                <select id="globalSortField" class="form-select form-select-sm">
-                                    <option value="" selected>None</option>
-                                    @if (tableProps.Length > 0)
-                                    {
-                                        int colIndex = 0;
-                                        foreach (var prop in tableProps)
-                                        {
-                                            <option value="@colIndex">@prop.Name</option>
-                                            colIndex++;
-                                        }
-                                    }
-                                </select>
-                                <select id="globalSortDir" class="form-select form-select-sm" style="width: 140px;">
-                                    <option value="asc" selected>Ascending</option>
-                                    <option value="desc">Descending</option>
-                                </select>
-                            </div>
-                            <div class="d-flex justify-content-end gap-2">
-                                <button type="button" class="btn-saas border" data-bs-dismiss="dropdown" style="padding: 4px 12px;">Cancel</button>
-                                <button type="button" class="btn-saas-primary" onclick="applyGlobalSort()" style="background-color: #84b679; border-color: #84b679; padding: 4px 16px;">Apply</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Manage Columns Drag & Drop -->
-                    <div class="dropdown">
-                        <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                            <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
-                            <!-- Populated via JS for Drag & Drop -->
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- The Data Table -->
-            <div class="table-responsive" id="tableWrapper">
-                <table class="table" id="dealsTable">
-                    <thead>
-                        <tr>
-                            <th class="sticky-cb">
-                                <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
-                            </th>
-
-                            @if (tableProps.Length > 0)
-                            {
-                                int colIndex = 0;
-                                foreach (var prop in tableProps)
-                                {
-                                    <th data-col-index="@colIndex" data-col-name="@prop.Name">
-                                        <div class="th-content">
-                                            <span>@prop.Name</span>
-
-                                            <!-- Funnel Menu inside Column Header -->
-                                            <div class="dropdown">
-                                                <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort" style="background: transparent; border: none; padding: 0;">
-                                                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                                                </button>
-                                                <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
-                                                    <!-- Internal Column Search -->
-                                                    <li>
-                                                        <input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)">
-                                                    </li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li>
-                                                        <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'asc')">
-                                                            <i class="fa-solid fa-arrow-down-a-z text-muted me-2"></i> Sort A to Z
-                                                        </a>
-                                                    </li>
-                                                    <li>
-                                                        <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'desc')">
-                                                            <i class="fa-solid fa-arrow-up-z-a text-muted me-2"></i> Sort Z to A
-                                                        </a>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </th>
-                                    colIndex++;
-                                }
-                            }
-
-                            <!-- Actions Column -->
-                            <th class="sticky-actions text-center">
-                                <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        @if (Model != null && Model.Any())
+                        @if (tableProps.Length > 0)
                         {
-                            foreach (var item in Model)
+                            int colIndex = 0;
+                            foreach (var prop in tableProps)
                             {
-                                <tr class="deal-row" data-id="@item.Id" style="cursor: pointer;">
-                                    <td class="sticky-cb" onclick="event.stopPropagation()">
-                                        <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
-                                    </td>
-                                    @{
-                                        int tdIndex = 0;
-                                        foreach (var prop in tableProps)
-                                        {
-                                            var value = prop.GetValue(item, null)?.ToString() ?? "";
-                                            <td data-col-index="@tdIndex">
-                                                @if (prop.Name == "DealName")
-                                                {
-                                                    <a href="@Url.Action("Edit", "Deals", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a>
-                                                }
-                                                else if (prop.Name == "PaymentStatus")
-                                                {
-                                                    @if (value.ToLower() == "paid")
-                                                    {
-                                                        <span class="badge-soft-success">@value</span>
-                                                    }
-                                                    else if (value.ToLower() == "pending" || value.ToLower() == "partial")
-                                                    {
-                                                        <span class="badge-soft-warning">@value</span>
-                                                    }
-                                                    else if (!string.IsNullOrEmpty(value))
-                                                    {
-                                                        <span class="badge-soft-danger">@value</span>
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    @value
-                                                }
-                                            </td>
-                                            tdIndex++;
-                                        }
-                                    }
-                                    <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-                                        <div class="d-flex align-items-center justify-content-center gap-3">
-                                            <i class="fa-regular fa-comment-dots row-action-icon text-primary" title="Notes" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("DealName")?.GetValue(item, null)?.ToString() ?? "Deal")')"></i>
+                                <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                                    <div class="th-content">
+                                        <span>@prop.Name</span>
 
-                                            <div class="dropdown">
-                                                <i class="fa-solid fa-ellipsis-vertical row-action-icon" data-bs-toggle="dropdown"></i>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                                                    <li><a class="dropdown-item" href="#" onclick="alert('Task Creation for ID: @item.Id')"><i class="fa-solid fa-list-check text-muted me-2"></i> Create Task</a></li>
-                                                    <li><hr class="dropdown-divider"></li>
-                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteSingleRecord(this, '@item.Id')"><i class="fa-solid fa-trash text-danger me-2"></i> Delete</a></li>
-                                                </ul>
-                                            </div>
+                                        <div class="dropdown">
+                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort" style="background: transparent; border: none; padding: 0;">
+                                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                            </button>
+                                            <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
+                                                <li>
+                                                    <input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)">
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'asc')">
+                                                        <i class="fa-solid fa-arrow-down-a-z text-muted me-2"></i> Sort A to Z
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'desc')">
+                                                        <i class="fa-solid fa-arrow-up-z-a text-muted me-2"></i> Sort Z to A
+                                                    </a>
+                                                </li>
+                                            </ul>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </th>
+                                colIndex++;
                             }
                         }
-                        else
+
+                        <th class="sticky-actions text-center">
+                            <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var item in Model)
                         {
-                            <tr id="noRecordsRow">
-                                <td colspan="50" class="text-center py-5 text-muted">
-                                    <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
-                                    <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
-                                    <p class="mt-1">Try adjusting your filters or upload new data.</p>
+                            <tr class="deal-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Deals", new { id = item.Id })'">
+                                <td class="sticky-cb" onclick="event.stopPropagation()">
+                                    <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                </td>
+                                @{
+                                    int tdIndex = 0;
+                                    foreach (var prop in tableProps)
+                                    {
+                                        string value = "";
+                                        var rawValue = prop.GetValue(item, null);
+
+                                        if (rawValue != null)
+                                        {
+                                            if (rawValue.GetType().Name.Contains("User"))
+                                            {
+                                                var nameProp = rawValue.GetType().GetProperty("fullName") ?? rawValue.GetType().GetProperty("FirstName");
+                                                value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown User";
+                                            }
+                                            else if (rawValue.GetType().Name.Contains("Account"))
+                                            {
+                                                var nameProp = rawValue.GetType().GetProperty("AccountName");
+                                                value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown Account";
+                                            }
+                                            else
+                                            {
+                                                value = rawValue.ToString();
+                                            }
+                                        }
+
+                                        <td data-col-index="@tdIndex">
+                                            @if (prop.Name == "DealName")
+                                            {
+                                                <a href="@Url.Action("Edit", "Deals", new { id = item.Id })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value</a>
+                                            }
+                                            else if (prop.Name == "PaymentStatus")
+                                            {
+                                                @if (value.ToLower() == "paid")
+                                                {
+                                                    <span class="badge-soft-success">@value</span>
+                                                }
+                                                else if (value.ToLower() == "pending" || value.ToLower() == "partial")
+                                                {
+                                                    <span class="badge-soft-warning">@value</span>
+                                                }
+                                                else if (!string.IsNullOrEmpty(value))
+                                                {
+                                                    <span class="badge-soft-danger">@value</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @value
+                                            }
+                                        </td>
+                                        tdIndex++;
+                                    }
+                                }
+                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                        <!-- Clean SaaS Notes Button -->
+                                        <button class="btn btn-sm" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("DealName")?.GetValue(item, null)?.ToString() ?? "Deal")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+                                            <i class="fa-regular fa-comment-dots"></i> Notes
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination (Server-Side Integration matching Account page) -->
-            <div class="pagination-container">
-                <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
-                    Showing page @currentPage of @totalPages (@totalRecords total records)
-                </span>
-                <div class="d-flex gap-2">
-                    @if (currentPage > 1)
-                    {
-                        <a href="@Url.Action("Index", new { page = currentPage - 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
-                            <i class="fa-solid fa-chevron-left"></i> Prev
-                        </a>
                     }
                     else
                     {
-                        <!-- Fallback to original Deal logic for client-side interactions when button used -->
-                        <button id="prevBtn" class="btn-saas" disabled onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <tr id="noRecordsRow">
+                            <td colspan="50" class="text-center py-5 text-muted">
+                                <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                                <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
+                                <p class="mt-1">Try adjusting your filters or upload new data.</p>
+                            </td>
+                        </tr>
                     }
+                </tbody>
+            </table>
+        </div>
 
-                    @if (currentPage < totalPages)
-                    {
-                        <a href="@Url.Action("Index", new { page = currentPage + 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir })" class="btn-saas text-decoration-none">
-                            Next <i class="fa-solid fa-chevron-right"></i>
-                        </a>
-                    }
-                    else
-                    {
-                        <button id="nextBtn" class="btn-saas" disabled onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
-                    }
-                </div>
+        <div class="pagination-container" style="flex-shrink: 0;">
+            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
+                Showing page @currentPage of @totalPages (@totalRecords total records)
+            </span>
+            <div class="d-flex gap-2">
+                @if (currentPage > 1)
+                {
+                    <button class="btn-saas" onclick="goToPage(@(currentPage - 1))">
+                        <i class="fa-solid fa-chevron-left"></i> Prev
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-saas" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                }
+
+                @if (currentPage < totalPages)
+                {
+                    <button class="btn-saas" onclick="goToPage(@(currentPage + 1))">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-saas" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                }
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Mass Update Modal -->
-    <div class="modal fade" id="massUpdateModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
-                <div class="modal-header border-bottom-0 pb-0">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update Deals</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Mass Update Modal -->
+<div class="modal fade" id="massUpdateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update Deals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4">
+                <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
+                <div class="d-flex gap-3 align-items-center">
+                    <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
+                        <option value="" disabled selected>Select a field...</option>
+                        @foreach (var prop in tableProps)
+                        {
+                            <option value="@prop.Name">@prop.Name</option>
+                        }
+                    </select>
+                    <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
                 </div>
-                <div class="modal-body py-4">
-                    <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
-                    <div class="d-flex gap-3 align-items-center">
-                        <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
-                            <option value="" disabled selected>Select a field...</option>
-                            @foreach (var prop in tableProps)
-                            {
-                                <option value="@prop.Name">@prop.Name</option>
-                            }
-                        </select>
-                        <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+            </div>
+            <div class="modal-footer bg-light border-top-0 rounded-bottom">
+                <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Premium SaaS Notes Offcanvas Panel -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a; letter-spacing: -0.01em;">
+            <i class="fa-regular fa-message me-2 text-muted"></i> <span id="noteDealName">Deal Name</span>
+        </h5>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+        <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
+            <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
+
+            <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="position-relative overflow-hidden btn btn-sm bg-white border shadow-sm" style="color: #475569; font-weight: 500;">
+                        <i class="fa-solid fa-paperclip"></i>
+                        <input type="file" id="noteAttachment" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" style="cursor: pointer;" title="Attach file" />
                     </div>
+                    <select id="noteOwnerId" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="background-color: transparent; color: #475569; cursor: pointer; max-width: 130px;">
+                        <option value="">System</option>
+                    </select>
                 </div>
-                <div class="modal-footer bg-light border-top-0 rounded-bottom">
-                    <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn-saas-primary" onclick="executeMassUpdate()">Update Records</button>
-                </div>
+                <button id="btnSaveNote" class="btn btn-sm shadow-sm" onclick="saveNoteAjax()" style="background-color: #0f172a; color: #ffffff; font-weight: 600; border-radius: 6px; padding: 6px 16px; transition: all 0.2s;">
+                    Save Note
+                </button>
             </div>
+        </div>
+
+        <div class="d-flex align-items-center mb-3">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em; text-transform: uppercase;">Timeline Log</span>
+            <div class="ms-3 flex-grow-1" style="height: 1px; background-color: #e2e8f0;"></div>
+        </div>
+
+        <div class="position-relative ms-2 ps-4" id="notesTimelineList" style="border-left: 2px solid #e2e8f0;">
+            <!-- Notes dynamically appended here via JS -->
         </div>
     </div>
+</div>
 
-    <!-- Notes Offcanvas Panel -->
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid var(--border-soft);">
-        <div class="offcanvas-header border-bottom bg-light">
-            <h5 class="offcanvas-title fw-bold">
-                <i class="fa-regular fa-comments text-primary me-2"></i> <span id="noteDealName" class="text-dark"></span>
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-        </div>
-        <div class="offcanvas-body">
-            <!-- Add Note Box -->
-            <div class="mb-4">
-                <textarea id="newNoteText" class="form-control mb-2 fw-medium text-dark" rows="3" placeholder="Write a note..."></textarea>
-                <div class="d-flex justify-content-between align-items-center">
-                    <input type="file" id="noteAttachment" class="form-control form-control-sm w-50" />
-                    <button class="btn-saas-primary" id="btnSaveNote" onclick="saveNote()">Save Note</button>
-                </div>
-            </div>
-
-            <!-- Notes Timeline -->
-            <h6 class="text-muted fw-bold mb-3" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Timeline Log</h6>
-            <div class="timeline-container" id="notesTimelineList">
-                <!-- Notes dynamically appended here via JS -->
-            </div>
-        </div>
+<!-- Manage Columns Offcanvas Panel -->
+<div class="offcanvas offcanvas-end shadow" tabindex="-1" id="manageColumnsPanel" style="width: 350px;">
+    <div class="offcanvas-header bg-light border-bottom">
+        <h5 class="offcanvas-title fw-bold">
+            <i class="fa-solid fa-sliders text-primary me-2"></i> Manage Columns
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        const defaultVisibleColumns = ["DealName", "AccountName", "DealOwner", "PaymentMode", "PaymentStatus", "GrandTotal"];
-        let currentPage = 1;
-        let rowsPerPage = 15;
-        let currentNoteDealId = null;
-        const urlParams = new URLSearchParams(window.location.search);
-
-        document.addEventListener("DOMContentLoaded", function () {
-        setupColumnToggles();
-        setupFilterInteractions();
-        populateDatalists(); // Populate the auto-suggest lists
-        applyPagination();
-        });
-
-        // ==========================================
-        // GLOBAL SORT FUNCTIONALITY
-        // ==========================================
-        function applyGlobalSort() {
-        const colIndex = document.getElementById('globalSortField').value;
-        const direction = document.getElementById('globalSortDir').value;
-
-        if (colIndex === "") {
-        alert("Please select a field to sort by.");
-        return;
-        }
-
-        sortTableByCol(colIndex, direction);
-
-        // Close the dropdown after applying
-        const sortBtn = document.querySelector('.table-toolbar .dropdown button');
-        const bsDropdown = bootstrap.Dropdown.getInstance(sortBtn) || new bootstrap.Dropdown(sortBtn);
-        if(bsDropdown) bsDropdown.hide();
-        }
-
-        // ==========================================
-        // SIDEBAR FILTERING, PINNING & SUGGESTIONS LOGIC
-        // ==========================================
-        function togglePinFilter(imgElement) {
-        const itemRow = imgElement.closest('.field-item-row');
-        const pinnedContainer = document.getElementById('pinnedItemsContainer');
-        const unpinnedContainer = document.getElementById('sidebarList');
-        const pinnedSection = document.getElementById('pinnedFilters');
-
-        const isPinned = itemRow.classList.contains('pinned-item');
-
-        if (!isPinned) {
-        imgElement.style.filter = "none";
-        imgElement.style.opacity = "1";
-        itemRow.classList.add('pinned-item');
-        pinnedContainer.appendChild(itemRow);
-        } else {
-        imgElement.style.filter = "grayscale(100%) opacity(0.3)";
-        itemRow.classList.remove('pinned-item');
-
-        // Return to alphabetical position
-        const unpinnedItems = Array.from(unpinnedContainer.querySelectorAll('.field-item-row'));
-        const itemName = itemRow.querySelector('label').innerText.toLowerCase();
-
-        let inserted = false;
-        for (let i = 0; i < unpinnedItems.length; i++) {
-        if (unpinnedItems[i].querySelector('label').innerText.toLowerCase() > itemName) {
-        unpinnedContainer.insertBefore(itemRow, unpinnedItems[i]);
-        inserted = true;
-        break;
-        }
-        }
-        if (!inserted) {
-        unpinnedContainer.appendChild(itemRow);
-        }
-        }
-
-        if (pinnedContainer.children.length > 0) {
-        pinnedSection.style.display = 'block';
-        } else {
-        pinnedSection.style.display = 'none';
-        }
-        }
-
-        function populateDatalists() {
-        const table = document.getElementById("dealsTable");
-        const headers = table.querySelectorAll("thead th[data-col-name]");
-
-        headers.forEach(th => {
-        const colIndex = th.getAttribute("data-col-index");
-        const colName = th.getAttribute("data-col-name");
-        const datalist = document.getElementById(`dl_${colName}`);
-
-        if (datalist) {
-        let uniqueValues = new Set();
-        table.querySelectorAll(`tbody tr.deal-row td[data-col-index="${colIndex}"]`).forEach(td => {
-        const text = td.innerText.trim();
-        if(text) uniqueValues.add(text);
-        });
-
-        uniqueValues.forEach(val => {
-        let option = document.createElement("option");
-        option.value = val;
-        datalist.appendChild(option);
-        });
-        }
-        });
-        }
-
-        function setupFilterInteractions() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-        cb.addEventListener('change', function() {
-        const item = this.closest('.filter-field-item');
-        if(this.checked) {
-        item.classList.add('active');
-        // Optional focus logic
-        const valInput = item.querySelector('.condition-val');
-        if(valInput) setTimeout(() => valInput.focus(), 100);
-        } else {
-        item.classList.remove('active');
-        item.querySelector('.condition-val').value = '';
-        }
-        });
-        });
-        }
-
-        function filterSidebarItems() {
-        const q = document.getElementById('sidebarSearch').value.toLowerCase();
-        document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
-        const label = item.querySelector('label').innerText.toLowerCase();
-        item.style.display = label.includes(q) ? '' : 'none';
-        });
-        }
-
-        function applyFilters() {
-        const activeFilters = [];
-        document.querySelectorAll('.filter-field-item').forEach(item => {
-        const cb = item.querySelector('.field-checkbox');
-        if (cb && cb.checked) {
-        const colName = cb.value;
-        const condition = item.querySelector('.condition-select').value;
-        const val = item.querySelector('.condition-val').value.toLowerCase().trim();
-
-        const th = document.querySelector(`th[data-col-name="${colName}"]`);
-        if(th) {
-        activeFilters.push({ index: th.getAttribute('data-col-index'), condition, val });
-        }
-        }
-        });
-
-        document.querySelectorAll('tbody tr.deal-row').forEach(row => {
-        let isMatch = true;
-        for (let f of activeFilters) {
-        const td = row.querySelector(`td[data-col-index="${f.index}"]`);
-        const cellText = td ? td.innerText.trim().toLowerCase() : '';
-
-        if (f.condition === 'contains' && !cellText.includes(f.val)) isMatch = false;
-        if (f.condition === 'is' && cellText !== f.val) isMatch = false;
-        if (f.condition === 'is_not' && cellText === f.val) isMatch = false;
-        if (f.condition === 'is_empty' && cellText !== '') isMatch = false;
-        }
-        row.classList.toggle('filtered-out', !isMatch);
-        });
-
-        currentPage = 1;
-        applyPagination();
-        document.getElementById('selectAllCb').checked = false;
-        updateSelectedCount();
-        }
-
-        function clearFilters() {
-        document.querySelectorAll('.field-checkbox').forEach(cb => {
-        cb.checked = false;
-        cb.closest('.filter-field-item').classList.remove('active');
-        });
-        document.querySelectorAll('.condition-val').forEach(input => input.value = '');
-        applyFilters();
-        }
-
-        // Single Column Search (from Funnel Dropdown)
-        function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase().trim();
-
-        document.querySelectorAll('tbody tr.deal-row').forEach(row => {
-        if(row.classList.contains('filtered-out')) return;
-
-        const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-        if (td) {
-        const text = td.innerText.trim().toLowerCase();
-        row.style.display = text.includes(filterValue) ? '' : 'none';
-        }
-        });
-        }
-
-        // ==========================================
-        // SORTING LOGIC (SERVER-BASED)
-        // ==========================================
-        function sortTableByCol(colIndex, direction) {
-        const th = document.querySelector(`th[data-col-index="${colIndex}"]`);
-        const colName = th.getAttribute("data-col-name");
-
-        urlParams.set('sortCol', colName);
-        urlParams.set('sortDir', direction);
-        urlParams.set('page', 1);
-
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
-        }
-
-        function deleteSelected() {
-        let selectedIds = [];
-        document.querySelectorAll('.row-cb:checked').forEach(cb => {
-        selectedIds.push(parseInt(cb.value));
-        });
-
-        if (selectedIds.length === 0) {
-        alert("Please select at least one record.");
-        return;
-        }
-
-        if (confirm(`Are you sure you want to delete ${selectedIds.length} selected record(s)?`)) {
-        fetch('/Deals/BulkDelete', {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(selectedIds)
-        })
-        .then(response => response.json())
-        .then(data => {
-        if (data.success) {
-        window.location.reload();
-        } else {
-        alert(data.message || "Error deleting records.");
-        }
-        })
-        .catch(error => {
-        console.error("Error:", error);
-        alert("Something went wrong during deletion.");
-        });
-        }
-        }
-
-        // ==========================================
-        // FILE UPLOAD TRIGGER
-        // ==========================================
-        document.addEventListener("DOMContentLoaded", function () {
-        const fileInput = document.getElementById('fileUploadInput');
-
-        if(fileInput) {
-        fileInput.addEventListener('change', function () {
-        const file = this.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('uploadedFile', file);
-
-        // Re-render UI state to show processing...
-        const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
-        const originalHtml = uploadBtn.innerHTML;
-        uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
-        uploadBtn.disabled = true;
-
-        fetch('@Url.Action("UploadFile", "Deals")', { method: 'POST', body: formData })
-        .then(async response => {
-        if (response.ok) {
-        alert("Deals data uploaded successfully!");
-        window.location.href = window.location.pathname; // Reloads fresh page 1
-        } else {
-        const errorText = await response.text();
-        alert("Upload Failed: " + errorText);
-        uploadBtn.innerHTML = originalHtml;
-        uploadBtn.disabled = false;
-        }
-        })
-        .catch(error => {
-        alert("Network error during upload.");
-        uploadBtn.innerHTML = originalHtml;
-        uploadBtn.disabled = false;
-        });
-        this.value = ''; // Reset input
-        });
-        }
-        });
-
-        // ==========================================
-        // COLUMN MANAGEMENT & DRAG-AND-DROP
-        // ==========================================
-        let draggedItem = null;
-
-        function setupColumnToggles() {
-        const table = document.querySelector(".table-responsive table");
-        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
-        const columnMenu = document.getElementById("columnToggleMenu");
-
-        columnMenu.innerHTML = '';
-
-        theadRows.forEach((th) => {
-        const colIndex = th.getAttribute("data-col-index");
-        const colName = th.getAttribute("data-col-name");
-
-        if(colName) {
-        const isDefault = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
-        const li = document.createElement("li");
-        li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
-        li.draggable = true;
-        li.dataset.colIndex = colIndex;
-
-        li.innerHTML = `
-        <i class="fa-solid fa-grip-vertical drag-handle"></i>
-        <div class="form-check m-0 w-100 d-flex align-items-center">
-        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isDefault ? 'checked' : ''}>
-        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
-        </div>`;
-
-        li.addEventListener('click', function(e) { e.stopPropagation(); });
-        li.addEventListener('dragstart', handleDragStart);
-        li.addEventListener('dragover', handleDragOver);
-        li.addEventListener('dragenter', handleDragEnter);
-        li.addEventListener('dragleave', handleDragLeave);
-        li.addEventListener('drop', handleDrop);
-        li.addEventListener('dragend', handleDragEnd);
-
-        columnMenu.appendChild(li);
-        if(!isDefault) toggleColumnVisibility(colIndex, false);
-        }
-        });
-
-        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
-        toggle.addEventListener('change', function() {
-        toggleColumnVisibility(this.value, this.checked);
-        });
-        });
-        }
-
-        function toggleColumnVisibility(idx, isVisible) {
-        const table = document.getElementById("dealsTable");
-        table.querySelectorAll(`th[data-col-index="${idx}"]`).forEach(th => th.style.display = isVisible ? '' : 'none');
-        table.querySelectorAll(`td[data-col-index="${idx}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
-        }
-
-        function handleDragStart(e) {
-        draggedItem = this;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', this.dataset.colIndex);
-        setTimeout(() => this.classList.add('dragging'), 0);
-        }
-
-        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
-        function handleDragEnter(e) { this.classList.add('over'); }
-        function handleDragLeave(e) { this.classList.remove('over'); }
-
-        function handleDrop(e) {
-        e.stopPropagation();
-        this.classList.remove('over');
-
-        if (draggedItem !== this) {
-        let parent = this.parentNode;
-        let siblings = Array.from(parent.children);
-        let draggedIdx = siblings.indexOf(draggedItem);
-        let targetIdx = siblings.indexOf(this);
-        let insertAfter = draggedIdx < targetIdx;
-
-        if (insertAfter) this.after(draggedItem);
-        else this.before(draggedItem);
-
-        reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
-        }
-        return false;
-        }
-
-        function handleDragEnd(e) {
-        this.classList.remove('dragging');
-        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
-        }
-
-        function reorderTableColumns(draggedOriginalIdx, targetOriginalIdx, insertAfter) {
-        const table = document.querySelector(".table-responsive table");
-        const theadRow = table.querySelector("thead tr");
-        const tbodyRows = table.querySelectorAll("tbody tr");
-
-        const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedOriginalIdx}"]`);
-        const targetTh = theadRow.querySelector(`th[data-col-index="${targetOriginalIdx}"]`);
-
-        if (insertAfter) targetTh.after(draggedTh);
-        else targetTh.before(draggedTh);
-
-        tbodyRows.forEach(row => {
-        const draggedTd = row.querySelector(`td[data-col-index="${draggedOriginalIdx}"]`);
-        const targetTd = row.querySelector(`td[data-col-index="${targetOriginalIdx}"]`);
-        if(draggedTd && targetTd) {
-        if (insertAfter) targetTd.after(draggedTd);
-        else targetTd.before(draggedTd);
-        }
-        });
-        }
-
-        // ==========================================
-        // SELECTION & MASS ACTIONS
-        // ==========================================
-        function toggleAllRowCheckboxes(sourceCb) {
-        const visibleRows = document.querySelectorAll('tbody tr.deal-row:not([style*="display: none"]):not(.filtered-out) .row-cb');
-        visibleRows.forEach(cb => cb.checked = sourceCb.checked);
-        updateSelectedCount();
-        }
-
-        function updateSelectedCount() {
-        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
-        document.getElementById('selCount').innerText = selected;
-        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
-
-        const totalVisible = document.querySelectorAll('tbody tr.deal-row:not([style*="display: none"]):not(.filtered-out) .row-cb').length;
-        document.getElementById('selectAllCb').checked = (selected > 0 && selected === totalVisible);
-        }
-
-        function executeMassUpdate() {
-        const field = document.getElementById('massUpdateField').value;
-        const val = document.getElementById('massUpdateValue').value;
-        const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
-
-        if(!field || selectedIds.length === 0) {
-        alert("Please select a field and ensure records are checked.");
-        return;
-        }
-
-        alert(`Initiating ZDK Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
-
-        const modal = bootstrap.Modal.getInstance(document.getElementById('massUpdateModal'));
-        modal.hide();
-        document.getElementById('selectAllCb').click();
-        }
-
-        // ==========================================
-        // DATABASE NOTES AJAX SYSTEM
-        // ==========================================
-        async function openNotesPanel(dealId, dealName) {
-        currentNoteDealId = dealId;
-        document.getElementById('noteDealName').innerText = dealName;
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-        const list = document.getElementById('notesTimelineList');
-        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-        var offcanvas = new bootstrap.Offcanvas(document.getElementById('notesPanel'));
-        offcanvas.show();
-
-        try {
-        // Fallback for visual testing if endpoint doesn't exist yet
-        setTimeout(() => {
-        list.innerHTML = '<p class="text-muted text-center mt-3" style="font-size:0.85rem;">No historical notes found.</p>';
-        }, 600);
-        } catch(e) {
-        list.innerHTML = '<p class="text-danger">Failed to load notes.</p>';
-        }
-        }
-
-        async function saveNote() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-        const btn = document.getElementById('btnSaveNote');
-
-        if (!text.trim() && !attachment) return;
-
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append("DealId", currentNoteDealId);
-        formData.append("Text", text);
-        if(attachment) formData.append("File", attachment);
-
-        try {
-        setTimeout(() => {
-        const now = new Date();
-        const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-        if(fallbackMsg) fallbackMsg.remove();
-
-        appendNoteToUI("System User", timeString, text, attachment ? attachment.name : null);
-
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-        btn.innerHTML = 'Save Note';
-        btn.disabled = false;
-        }, 500);
-
-        } catch(e) {
-        alert("Error saving note to database.");
-        btn.innerHTML = 'Save Note';
-        btn.disabled = false;
-        }
-        }
-
-        function appendNoteToUI(ownerName, timeString, text, fileName) {
-        let attachmentHtml = '';
-        if(fileName) {
-        attachmentHtml = `<div class="mt-2 p-2 bg-white rounded border border-secondary shadow-sm d-inline-block"><i class="fa-solid fa-paperclip me-2 text-primary"></i> <span class="fw-semibold text-dark" style="font-size:0.8rem;">${fileName}</span></div>`;
-        }
-
-        const noteHtml = `
-        <div class="timeline-item pb-3">
-        <div class="timeline-icon bg-primary text-white" style="border-color: #bfdbfe;"><i class="fa-solid fa-user" style="font-size: 10px;"></i></div>
-        <div class="d-flex justify-content-between align-items-center mb-1">
-        <span class="fw-bold text-dark" style="font-size:0.9rem;">${ownerName}</span>
-        <small class="text-muted fw-medium"><i class="fa-regular fa-clock me-1"></i>${timeString}</small>
+    <div class="offcanvas-body bg-white p-0">
+        <div class="p-3 border-bottom bg-light">
+            <span class="text-muted" style="font-size: 0.85rem;">Check to show/hide. Drag the handle to reorder columns.</span>
         </div>
-        <div class="text-main bg-white p-3 rounded border border-soft shadow-sm mt-2" style="font-size:0.85rem; line-height: 1.5;">${text.replace(/\n/g, '<br>')}</div>
-        ${attachmentHtml}
-        </div>
-        `;
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-        }
+        <ul class="list-group list-group-flush" id="columnsDraggableList">
+        </ul>
+    </div>
+</div>
 
-        // ==========================================
-        // EXPORT & PAGINATION
-        // ==========================================
-        function exportTableToCSV(filename) {
-        const table = document.getElementById("dealsTable");
-        let csv = [];
-        let headerRow = [];
-        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
-        if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
-        });
-        csv.push(headerRow.join(","));
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-        let targetRows = [];
-        const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
-        if (checkedCbs.length > 0) {
-        checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
-        } else {
-        table.querySelectorAll("tbody tr.deal-row").forEach(tr => {
-        if(!tr.classList.contains('filtered-out')) targetRows.push(tr);
-        });
-        }
+<script>
+    // ==========================================
+    // 1. GLOBAL VARIABLES & INITIALIZATION
+    // ==========================================
+    const defaultVisibleColumns = ["DealName", "AccountName", "DealOwner", "PaymentMode", "PaymentStatus", "GrandTotal"];
+    let currentNoteDealId = null;
 
-        targetRows.forEach(tr => {
-        let rowData = [];
-        tr.querySelectorAll("td[data-col-index]").forEach(td => {
-        if(td.style.display !== 'none') {
-        let text = td.innerText.trim().replace(/"/g, '""');
-        rowData.push(`"${text}"`);
-        }
-        });
-        csv.push(rowData.join(","));
-        });
+    let allRows = [];
+    let hiddenCols = new Set();
 
-        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
-        let downloadLink = document.createElement("a");
-        downloadLink.download = filename;
-        downloadLink.href = window.URL.createObjectURL(csvFile);
-        downloadLink.style.display = "none";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        }
+    document.addEventListener("DOMContentLoaded", function () {
+    console.log("🚀 DOMContentLoaded triggered. Initializing CRM scripts...");
+    try {
+    allRows = Array.from(document.querySelectorAll('tbody tr.deal-row'));
+    console.log(`📊 Found ${allRows.length} deal rows in the table.`);
 
-        function applyPagination() {
-        const rows = Array.from(document.querySelectorAll('tbody tr.deal-row:not(.filtered-out)'));
-        const totalRows = rows.length;
+    if(!document.getElementById('dynamic-col-styles')) {
+    const style = document.createElement('style');
+    style.id = 'dynamic-col-styles';
+    document.head.appendChild(style);
+    }
 
-        // Client side logic handling the visual display for current active rows
-        // if server filtering isn't completely overriding it
-        let calculatedTotalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+    formatUserAndAccountIDs();
 
-        let internalPage = currentPage;
-        if (internalPage > calculatedTotalPages) internalPage = calculatedTotalPages;
-        if (internalPage < 1) internalPage = 1;
+    allRows.forEach(r => r.style.display = 'none');
 
-        const startIdx = (internalPage - 1) * rowsPerPage;
-        const endIdx = startIdx + rowsPerPage;
+    initColumnManager();
+    setupFilterInteractions();
+    setupLazyDatalists();
+    setupFileUpload();
 
-        document.querySelectorAll('tbody tr.deal-row').forEach(r => {
-        r.style.display = 'none';
-        });
+    try {
+    const pinnedStored = localStorage.getItem('crm_pinned_filters_deals');
+    if(pinnedStored && pinnedStored !== "undefined" && pinnedStored !== "null") {
+    const pinnedIds = JSON.parse(pinnedStored);
+    if(Array.isArray(pinnedIds)) {
+    pinnedIds.forEach(id => {
+    const cb = document.getElementById(id);
+    if (cb) {
+    const icon = cb.closest('.filter-field-item').querySelector('.pin-filter-btn');
+    if (icon) togglePinFilter(null, icon, true);
+    }
+    });
+    }
+    }
+    } catch(e) { console.warn("⚠️ Could not load pinned filters.", e); }
 
-        for(let i = startIdx; i < endIdx && i < totalRows; i++) {
-        rows[i].style.display = '';
-        }
+    refreshVisibleRows();
 
-        // Updating local info if filtering happened
-        if(document.querySelectorAll('.filter-field-item.active').length > 0) {
-        document.getElementById('pageInfo').innerText = `Showing ${totalRows === 0 ? 0 : startIdx + 1} to ${Math.min(endIdx, totalRows)} of ${totalRows} filtered records`;
-        }
-        }
+    console.log("✅ Initialization complete.");
+    } catch(error) {
+    console.error("❌ Critical error during page initialization: ", error);
+    }
+    });
 
-        // ==========================================
-        // SERVER-SIDE PAGINATION & SORTING
-        // ==========================================
-        function changePage(step) {
-        let internalPage = parseInt(urlParams.get('page')) || 1;
-        let newPage = internalPage + step;
-        if (newPage < 1) newPage = 1;
+    // ==========================================
+    // 1.5 ID TRANSLATION (ZOHO ID -> NAME)
+    // ==========================================
+    const userLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.UsersList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
+    const accountLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.AccountsList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
 
-        urlParams.set('page', newPage);
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
-        }
+    function formatUserAndAccountIDs() {
+    console.log("⚙️ Translating User and Account IDs to Names...");
+    const masterMap = { ...userLookup, ...accountLookup };
 
-        // ==========================================
-        // DELETE SINGLE RECORD
-        // ==========================================
-        function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-        fetch('/Deals/BulkDelete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([parseInt(id)])
-        })
-        .then(response => response.json())
-        .then(data => {
-        if (data.success) {
-        const row = element.closest('tr.deal-row');
-        if(row) row.remove();
-        updateSelectedCount();
-        applyPagination();
-        } else {
-        alert("Database Error: " + data.message);
-        }
-        })
-        .catch(error => alert("Network error occurred."));
-        }
-        }
-    </script>
-</body>
-</html>
+    if (Object.keys(masterMap).length > 0) {
+    allRows.forEach(row => {
+    row.querySelectorAll('td').forEach(td => {
+    const text = td.innerText.trim();
+    if (masterMap[text]) {
+    td.innerHTML = `<span class="fw-medium text-dark">${masterMap[text]}</span>`;
+    } else if (text.startsWith("zcrm_")) {
+    td.innerHTML = `<span class="text-muted" style="font-size: 0.8rem;">Unknown (${text.substring(0, 10)}...)</span>`;
+    }
+    });
+    });
+    }
+    }
+
+    // ==========================================
+    // 2. JS FILTER/SORT REFRESH
+    // ==========================================
+    function refreshVisibleRows() {
+    const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
+
+    allRows.forEach(r => r.style.display = 'none');
+    filteredRows.forEach(r => r.style.display = '');
+
+    const totalCountBadge = document.getElementById('topTotalCount');
+    if (totalCountBadge) {
+    if (filteredRows.length === allRows.length) {
+    totalCountBadge.innerText = '@totalRecords';
+    } else {
+    totalCountBadge.innerText = filteredRows.length + ' (Filtered)';
+    }
+    }
+
+    const selectAllCb = document.getElementById('selectAllCb');
+    if (selectAllCb) selectAllCb.checked = false;
+    updateSelectedCount();
+    }
+
+    // ==========================================
+    // 3. FILTERING & SEARCHING
+    // ==========================================
+    function togglePinFilter(event, iconElement, isRestoring = false) {
+    if(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    }
+
+    const item = iconElement.closest('.filter-field-item');
+    const pinnedWrapper = document.getElementById('pinnedFilters');
+    const pinnedContainer = document.getElementById('pinnedItemsContainer');
+    const unpinnedContainer = document.getElementById('sidebarList');
+
+    if (!item || !pinnedContainer || !unpinnedContainer) return;
+
+    if (iconElement.classList.contains('fa-regular')) {
+    iconElement.classList.replace('fa-regular', 'fa-solid');
+    iconElement.style.color = '#eab308';
+    pinnedContainer.appendChild(item);
+    pinnedWrapper.style.display = 'block';
+    } else {
+    iconElement.classList.replace('fa-solid', 'fa-regular');
+    iconElement.style.color = '#cbd5e1';
+    unpinnedContainer.appendChild(item);
+    if (pinnedContainer.children.length === 0) {
+    pinnedWrapper.style.display = 'none';
+    }
+    }
+
+    if (!isRestoring) {
+    const pinnedIds = Array.from(pinnedContainer.children).map(el => el.querySelector('.field-checkbox').id);
+    localStorage.setItem('crm_pinned_filters_deals', JSON.stringify(pinnedIds));
+    }
+    }
+
+    function toggleDateInputs(selectElement) {
+    const wrapper = selectElement.closest('.filter-expanded-area');
+    const val2 = wrapper.querySelector('.date-val-2');
+    if (val2) {
+    val2.style.display = selectElement.value === 'between' ? 'block' : 'none';
+    }
+    }
+
+    function setupFilterInteractions() {
+    document.querySelectorAll('.field-checkbox').forEach(cb => {
+    cb.addEventListener('change', function() {
+    const item = this.closest('.filter-field-item');
+    if(this.checked) item.classList.add('active');
+    else {
+    item.classList.remove('active');
+    const textVal = item.querySelector('.text-val');
+    const dateVal1 = item.querySelector('.date-val-1');
+    const dateVal2 = item.querySelector('.date-val-2');
+
+    if (textVal) textVal.value = '';
+    if (dateVal1) dateVal1.value = '';
+    if (dateVal2) dateVal2.value = '';
+    }
+    });
+    });
+    }
+
+    function filterSidebarItems() {
+    const q = document.getElementById('sidebarSearch').value.toLowerCase();
+    document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
+    const label = item.querySelector('label').innerText.toLowerCase();
+    item.style.display = label.includes(q) ? '' : 'none';
+    });
+    }
+
+    function applyFilters() {
+    const activeFilters = [];
+    document.querySelectorAll('.filter-field-item.active').forEach(item => {
+    const cb = item.querySelector('.field-checkbox');
+    if (cb && cb.checked) {
+    const colName = cb.value;
+    const conditionNode = item.querySelector('.condition-select');
+    const condition = conditionNode ? conditionNode.value : 'contains';
+    const isDate = item.dataset.fieldType === "date";
+
+    let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+
+    activeFilters.push({
+    ColumnName: colName,
+    Condition: condition,
+    Value: val1,
+    IsDate: isDate
+    });
+    }
+    });
+
+    if (activeFilters.length === 0) {
+    window.location.href = window.location.pathname;
+    return;
+    }
+
+    const filterStr = JSON.stringify(activeFilters);
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('advancedFilters', filterStr);
+    urlParams.set('page', 1);
+    urlParams.set('_t', Date.now());
+
+    document.body.style.cursor = 'wait';
+    window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function clearFilters() {
+    document.body.style.cursor = 'wait';
+    window.location.href = window.location.pathname;
+    }
+
+    function goToPage(pageNumber) {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', pageNumber);
+    urlParams.set('_t', Date.now());
+
+    document.body.style.cursor = 'wait';
+    window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function filterSingleColumn(inputEl, colIndex) {
+    const filterValue = inputEl.value.toLowerCase().trim();
+    allRows.forEach(row => {
+    const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+    if (td) {
+    const text = td.textContent.trim().toLowerCase();
+    row.classList.toggle('filtered-out', !text.includes(filterValue));
+    }
+    });
+    refreshVisibleRows();
+    }
+
+    // ==========================================
+    // 4. OFFCANVAS COLUMN MANAGER (SAFE DRAG)
+    // ==========================================
+    function initColumnManager() {
+    const table = document.getElementById("dealsTable");
+    const listContainer = document.getElementById("columnsDraggableList");
+
+    if (!table || !listContainer) return;
+
+    const headers = Array.from(table.querySelectorAll("thead th[data-col-index]"));
+    listContainer.innerHTML = '';
+
+    if(headers.length === 0) return;
+
+    let savedHidden = [];
+    try {
+    savedHidden = JSON.parse(localStorage.getItem('crm_custom_columns_deals')) || [];
+    } catch(e) { savedHidden = []; }
+
+    headers.forEach(th => {
+    const colIndex = th.dataset.colIndex;
+    const colName = th.dataset.colName || th.innerText.trim();
+
+    let isHidden = false;
+    if (localStorage.getItem('crm_custom_columns_deals')) {
+    isHidden = savedHidden.includes(colIndex);
+    } else {
+    isHidden = defaultVisibleColumns.length > 0 && !defaultVisibleColumns.includes(colName);
+    }
+
+    if(isHidden) applyColumnVisibility(colIndex, false);
+
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex align-items-center gap-3 border-bottom py-3';
+    li.draggable = true;
+    li.dataset.colIndex = colIndex;
+
+    li.innerHTML = `
+    <i class="fa-solid fa-grip-vertical text-muted" style="cursor: grab; font-size: 1.2rem;"></i>
+    <div class="form-check form-switch m-0 flex-grow-1">
+    <input class="form-check-input fs-5 mt-0 toggle-col-cb" type="checkbox" id="chkCol_${colIndex}" value="${colIndex}" ${isHidden ? '' : 'checked'} style="cursor:pointer;">
+    <label class="form-check-label fw-medium ms-2 w-100" style="cursor:pointer;" for="chkCol_${colIndex}">${colName}</label>
+    </div>
+    `;
+    listContainer.appendChild(li);
+
+    li.querySelector('.toggle-col-cb').addEventListener('change', function() {
+    applyColumnVisibility(this.value, this.checked);
+    saveColumnState();
+    });
+
+    li.addEventListener('dragstart', handleDragStart);
+    li.addEventListener('dragover', handleDragOver);
+    li.addEventListener('drop', handleDrop);
+    li.addEventListener('dragenter', e => li.style.backgroundColor = '#f1f5f9');
+    li.addEventListener('dragleave', e => li.style.backgroundColor = '');
+    li.addEventListener('dragend', e => li.style.backgroundColor = '');
+    });
+    }
+
+    function applyColumnVisibility(index, isVisible) {
+    document.querySelectorAll(`th[data-col-index="${index}"], td[data-col-index="${index}"]`).forEach(el => {
+    el.style.display = isVisible ? '' : 'none';
+    });
+    }
+
+    function saveColumnState() {
+    const hidden = Array.from(document.querySelectorAll('.toggle-col-cb:not(:checked)')).map(cb => cb.value);
+    localStorage.setItem('crm_custom_columns_deals', JSON.stringify(hidden));
+    }
+
+    let draggedColumnItem = null;
+
+    function handleDragStart(e) {
+    draggedColumnItem = e.target.closest('li');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedColumnItem.dataset.colIndex);
+    }
+
+    function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDrop(e) {
+    e.preventDefault();
+    const targetItem = e.target.closest('li');
+    if(targetItem) targetItem.style.backgroundColor = '';
+
+    if (targetItem && draggedColumnItem !== targetItem) {
+    let siblings = Array.from(targetItem.parentNode.children);
+    let insertAfter = siblings.indexOf(draggedColumnItem) < siblings.indexOf(targetItem);
+
+    if (insertAfter) targetItem.after(draggedColumnItem);
+    else targetItem.before(draggedColumnItem);
+
+    reorderLiveTable(draggedColumnItem.dataset.colIndex, targetItem.dataset.colIndex, insertAfter);
+    }
+    }
+
+    function reorderLiveTable(draggedIdx, targetIdx, insertAfter) {
+    const theadRow = document.querySelector("#dealsTable thead tr");
+    const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedIdx}"]`);
+    const targetTh = theadRow.querySelector(`th[data-col-index="${targetIdx}"]`);
+
+    if (insertAfter) targetTh.after(draggedTh);
+    else targetTh.before(draggedTh);
+
+    document.querySelectorAll("#dealsTable tbody tr").forEach(row => {
+    const draggedTd = row.querySelector(`td[data-col-index="${draggedIdx}"]`);
+    const targetTd = row.querySelector(`td[data-col-index="${targetIdx}"]`);
+    if (draggedTd && targetTd) {
+    if (insertAfter) targetTd.after(draggedTd);
+    else targetTd.before(draggedTd);
+    }
+    });
+    }
+
+    function toggleTextInput(selectEl) {
+    const inputEl = selectEl.parentElement.querySelector('.text-val');
+    if (selectEl.value === 'is_empty' || selectEl.value === 'is_not_empty') {
+    inputEl.style.display = 'none';
+    } else {
+    inputEl.style.display = 'block';
+    }
+    }
+
+    // ==========================================
+    // 5. SORTING
+    // ==========================================
+    function sortTableByCol(colIndex, direction) {
+    if (window.event) window.event.preventDefault();
+
+    document.body.style.cursor = 'wait';
+    setTimeout(() => {
+    const tbody = document.getElementById("tableBody");
+
+    allRows.sort((a, b) => {
+    const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+    const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+
+    const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
+    const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
+
+    const aNum = parseFloat(aText.replace(/[^0-9.-]+/g,""));
+    const bNum = parseFloat(bText.replace(/[^0-9.-]+/g,""));
+
+    if (!isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '') {
+    return direction === 'asc' ? aNum - bNum : bNum - aNum;
+    }
+
+    if (aText < bText) return direction === 'asc' ? -1 : 1;
+    if (aText > bText) return direction === 'asc' ? 1 : -1;
+    return 0;
+    });
+
+    allRows.forEach(row => tbody.appendChild(row));
+    refreshVisibleRows();
+    document.body.style.cursor = 'default';
+    }, 10);
+    }
+
+    // ==========================================
+    // 7. BULK ACTIONS, EXPORT & DELETE
+    // ==========================================
+    function toggleAllRowCheckboxes(sourceCb) {
+    allRows.forEach(row => {
+    if (!row.classList.contains('filtered-out')) {
+    const cb = row.querySelector('.row-cb');
+    if(cb) cb.checked = sourceCb.checked;
+    }
+    });
+    updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+    const selected = document.querySelectorAll('tbody .row-cb:checked').length;
+    document.getElementById('selCount').innerText = selected;
+    document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+
+    const activeRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+    const totalVisible = activeRows.length;
+    const selectAllCb = document.getElementById('selectAllCb');
+    if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
+    }
+
+    function deleteSelected() {
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+    if(selectedCbs.length === 0) return;
+
+    if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
+    let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+    fetch('@Url.Action("BulkDelete", "Deals")', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(selectedIds)
+    }).then(response => response.json()).then(data => {
+    if (data.success) {
+    window.location.reload();
+    } else alert("Database Error: " + data.message);
+    }).catch(() => alert("Network error. Check console."));
+    }
+    }
+
+    function deleteSingleRecord(element, id) {
+    if(confirm('Are you sure you want to delete this record?')) {
+    fetch('@Url.Action("BulkDelete", "Deals")', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([parseInt(id)])
+    }).then(response => response.json()).then(data => {
+    if (data.success) {
+    window.location.reload();
+    } else alert("Database Error: " + data.message);
+    }).catch(() => alert("Network error. Check console."));
+    }
+    }
+
+    function executeMassUpdate() {
+    const field = document.getElementById('massUpdateField').value;
+    const val = document.getElementById('massUpdateValue').value;
+    const selectedIds = Array.from(document.querySelectorAll('tbody .row-cb:checked')).map(cb => cb.value);
+
+    if(!field || selectedIds.length === 0) {
+    alert("Please select a field and ensure records are checked.");
+    return;
+    }
+
+    alert(`Initiating Mass Update.\nUpdating ${selectedIds.length} records.\nField: ${field}\nNew Value: ${val}`);
+    bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
+    document.getElementById('selectAllCb').click();
+    }
+
+    function exportTableToCSV(filename) {
+    let csv = [];
+    let headerRow = [];
+    const table = document.getElementById("dealsTable");
+
+    table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+    if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
+    });
+    csv.push(headerRow.join(","));
+
+    let targetRows = [];
+    const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
+    if (checkedCbs.length > 0) {
+    checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+    } else {
+    targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+    }
+
+    targetRows.forEach(tr => {
+    let rowData = [];
+    tr.querySelectorAll("td[data-col-index]").forEach(td => {
+    if(td.style.display !== 'none') {
+    let text = td.innerText.trim().replace(/"/g, '""');
+    rowData.push(`"${text}"`);
+    }
+    });
+    csv.push(rowData.join(","));
+    });
+
+    let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+    let downloadLink = document.createElement("a");
+    downloadLink.download = filename;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    }
+
+    // ==========================================
+    // 8. FILE UPLOAD & LAZY DATALISTS
+    // ==========================================
+    function setupFileUpload() {
+    const fileInput = document.getElementById('fileUploadInput');
+    if(!fileInput) return;
+
+    fileInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('uploadedFile', file);
+
+    const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+    const originalHtml = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+    uploadBtn.disabled = true;
+
+    fetch('@Url.Action("UploadFile", "Deals")', {
+    method: 'POST',
+    body: formData
+    }).then(async response => {
+    if (response.ok) {
+    alert("Data uploaded successfully!");
+    window.location.reload();
+    } else {
+    alert("Upload Failed: " + await response.text());
+    uploadBtn.innerHTML = originalHtml;
+    uploadBtn.disabled = false;
+    }
+    }).catch(error => {
+    alert("Network error during upload.");
+    uploadBtn.innerHTML = originalHtml;
+    uploadBtn.disabled = false;
+    });
+    this.value = '';
+    });
+    }
+
+    function setupLazyDatalists() {
+    document.querySelectorAll('.condition-val').forEach(input => {
+    input.addEventListener('focus', function() {
+    const listId = this.getAttribute('list');
+    if(!listId) return;
+
+    const datalist = document.getElementById(listId);
+
+    if(datalist && datalist.children.length === 0) {
+    const colName = listId.replace('dl_', '');
+    const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+    if(th) {
+    const colIndex = th.getAttribute('data-col-index');
+    let uniqueValues = new Set();
+
+    allRows.forEach(row => {
+    const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+    if(td) {
+    const text = td.innerText.trim();
+    if(text && !text.startsWith("zcrm_")) uniqueValues.add(text);
+    }
+    });
+
+    let fragment = document.createDocumentFragment();
+    uniqueValues.forEach(val => {
+    let option = document.createElement("option");
+    option.value = val;
+    fragment.appendChild(option);
+    });
+    datalist.appendChild(fragment);
+    }
+    }
+    });
+    });
+    }
+
+    // ==========================================
+    // 9. NOTES PANEL UI (AJAX ENABLED)
+    // ==========================================
+    async function openNotesPanel(dealId, dealName) {
+    currentNoteDealId = dealId;
+    document.getElementById('noteDealName').innerText = dealName;
+    document.getElementById('newNoteText').value = '';
+    document.getElementById('noteAttachment').value = '';
+
+    const list = document.getElementById('notesTimelineList');
+    list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+    new bootstrap.Offcanvas(document.getElementById('notesPanel')).show();
+
+    try {
+    const response = await fetch(`@Url.Action("GetNotes", "Deals")?dealId=${dealId}`);
+    const notes = await response.json();
+
+    list.innerHTML = '';
+
+    if (notes.length > 0) {
+    notes.forEach(n => appendNoteToUI(n.ownerName, n.createdDateTime, n.description, n.attachmentFileName));
+    } else {
+    list.innerHTML = `
+    <div class="position-relative mb-4">
+    <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
+    <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
+    </div>`;
+    }
+    } catch(e) {
+    list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes.</p>';
+    }
+    }
+
+    async function saveNoteAjax() {
+    const text = document.getElementById('newNoteText').value;
+    const attachment = document.getElementById('noteAttachment').files[0];
+    const ownerId = document.getElementById('noteOwnerId').value;
+    const btn = document.getElementById('btnSaveNote');
+
+    if (!text.trim() && !attachment) return;
+
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('dealId', currentNoteDealId);
+    formData.append('description', text);
+    formData.append('ownerId', ownerId);
+    if (attachment) formData.append('attachment', attachment);
+
+    try {
+    const response = await fetch('@Url.Action("SaveNoteAjax", "Deals")', {
+    method: 'POST',
+    body: formData
+    });
+    const data = await response.json();
+
+    if (data.success) {
+    const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+    if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
+
+    appendNoteToUI(data.note.ownerName, data.note.createdDateTime, data.note.description, data.note.attachmentFileName);
+
+    document.getElementById('newNoteText').value = '';
+    document.getElementById('noteAttachment').value = '';
+    } else {
+    alert("Failed to save note: " + data.message);
+    }
+    } catch(e) {
+    alert("Network error while saving note.");
+    } finally {
+    btn.innerHTML = 'Save Note';
+    btn.disabled = false;
+    }
+    }
+
+    function appendNoteToUI(ownerName, timeString, text, fileName) {
+    let attachmentHtml = fileName ? `
+    <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155; transition: 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#cbd5e1'">
+    <i class="fa-solid fa-file-lines text-muted"></i>
+    <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+    </div>` : '';
+
+    const noteHtml = `
+    <div class="position-relative mb-4">
+    <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+    <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+    <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+    <i class="fa-solid fa-user"></i>
+    </div>
+    ${ownerName}
+    </div>
+    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+    <i class="fa-regular fa-clock me-1"></i>${timeString}
+    </span>
+    </div>
+    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+    ${attachmentHtml}
+    </div>
+    </div>`;
+
+    document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+    }
+</script>

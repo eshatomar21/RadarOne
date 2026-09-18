@@ -24,6 +24,10 @@ namespace Radar_CRM.Models
         public string? Manufacturer { get; set; }
         public string? ProductCategory { get; set; }
 
+        public int? UnitPriceUsd { get; set; }
+
+        public int? QtyInDemand { get; set; }
+
         // --- Dates ---
         [DataType(DataType.Date)]
         public DateTime? SalesStartDate { get; set; }

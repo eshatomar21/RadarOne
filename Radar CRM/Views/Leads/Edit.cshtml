@@ -527,6 +527,7 @@
         color: #334155;
         background-color: #ffffff;
     }
+
     /* Dynamic Transferred Notes Styling */
     .note-card {
         border: 1px solid var(--theme-border);
@@ -583,8 +584,10 @@
                 <div style="padding: 24px 40px 0;">
                     <div style="font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 4px;">START</div>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px;">@DateTime.Now.ToString("dd/MM/yyyy")</div>
-                    <ul class="sf-chevron-bar" id="chevronStageBar">
-                        <li data-val="Open">Open <i class="fa-solid fa-caret-down ms-1"></i></li>
+
+                    <!-- Added pointer-events: none to disable clicking -->
+                    <ul class="sf-chevron-bar" id="chevronStageBar" style="pointer-events: none; opacity: 0.9;">
+                        <li data-val="Open">Open</li>
                         <li data-val="Demo Scheduled">Demo Scheduled</li>
                         <li data-val="Demo Done">Demo Done</li>
                         <li data-val="Trial Offered">Trial Offered</li>
@@ -666,10 +669,13 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 form-group">
+                            <div class="col-md-6 form-group">
                                 <label class="sf-label">Group Name</label>
-                                <input asp-for="GroupName" class="sf-input" />
+                                <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                                    <option value="">-Select Group Name-</option>
+                                </select>
                             </div>
+
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Mobile Number</label>
                                 <div class="verify-group">
@@ -828,6 +834,50 @@
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Probability (%)</label>
                                 <input asp-for="Probability" type="number" class="sf-input" />
+                            </div>
+                        </div>
+
+                        <!-- Fixed Notes Section Target ID -->
+                        <div class="notes-section" style="max-width: 100%; margin-top: 30px; border-radius: 8px; border: 1px solid var(--theme-border); background-color: var(--theme-bg-cream); padding: 24px;">
+                            <div class="notes-header d-flex justify-content-between align-items-center">
+                                <h5 style="color: var(--theme-navy-primary); font-weight: 600; margin: 0;">Notes & Attachments</h5>
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded" onclick="openNoteModal()">
+                                    <i class="fa-solid fa-plus"></i> Add Note
+                                </button>
+                            </div>
+                            <hr style="border-color: var(--theme-border);" />
+                            <!-- The ID must be notesContainer for the JS to append correctly -->
+                            <div id="notesContainer">
+                                @if (ViewBag.ExistingNotes != null)
+                                {
+                                    foreach (var note in (IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes)
+                                    {
+                                        <div class="mb-2 p-3 bg-white border rounded shadow-sm d-flex justify-content-between" style="border-left: 4px solid #1e3a8a !important;">
+                                            <div>
+                                                <strong style="color: var(--theme-navy-primary); font-size: 0.9rem;">
+                                                    @(note.NoteOwner?.fullName ?? "System User")
+                                                </strong>
+                                                <div style="font-size: 0.85rem; color: var(--theme-text-main); margin-top:4px;">@note.Description</div>
+
+                                                @if (!string.IsNullOrEmpty(note.AttachmentFileName))
+                                                {
+                                                    <div class="mt-2" style="font-size: 0.75rem;">
+                                                        <a href="@Url.Action("DownloadNoteFile", "Leads", new { noteId = note.Id })" target="_blank" class="text-primary text-decoration-none" style="background: var(--theme-navy-light); padding: 2px 8px; border-radius: 4px; border: 1px solid #bfdbfe;">
+                                                            <i class="fa-solid fa-paperclip me-1"></i>@note.AttachmentFileName
+                                                        </a>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <span class="text-muted" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MM/dd/yyyy, h:mm tt")</span>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="text-muted text-center py-3" style="font-size:0.9rem;" id="noNotesPlaceholder">
+                                        No notes found for this Lead.
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -1367,7 +1417,7 @@
                     </div>
                 </div>
             </div> <!-- End of main col -->
-            <!-- NEW RIGHT SIDEBAR (Matching reference image) -->
+            <!-- RIGHT SIDEBAR -->
             <div class="sidebar-col">
                 <div class="sidebar-wrapper">
                     <div class="sidebar-header">
@@ -1381,7 +1431,6 @@
                             <div class="contact-card">
                                 <div class="d-flex align-items-center gap-3">
                                     <i class="fa-solid fa-user" style="color: #1e3a8a;"></i>
-                                    <!-- Use ContactName if it exists, otherwise fallback -->
                                     <span>@(string.IsNullOrEmpty(Model?.ContactName) ? "No linked contact" : Model.ContactName)</span>
                                 </div>
                                 <i class="fa-solid fa-chevron-right text-muted" style="font-size: 0.8rem;"></i>
@@ -1394,23 +1443,21 @@
                             <div class="sidebar-empty">No linked deals</div>
                         </div>
 
-                        <!-- TASKS SECTION -->
-                        <div class="sidebar-section">
-                            <div class="sidebar-section-title">
-                                Tasks
-                                <button type="button" class="sidebar-add-btn"><i class="fa-solid fa-plus"></i></button>
-                            </div>
-                            <div class="sidebar-empty">No open tasks</div>
+                        <div class="sidebar-section-title">
+                            Tasks
+                            <button type="button" class="sidebar-add-btn" data-bs-toggle="modal" data-bs-target="#quickTaskModal" title="Add Task">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
                         </div>
 
-                        <!-- RECENT NOTES SECTION (With Dynamic Backend Rendering) -->
+                        <!-- RECENT NOTES SECTION -->
                         <div class="sidebar-section">
                             <div class="sidebar-section-title">
                                 Recent Notes
                                 <button type="button" class="sidebar-add-btn" onclick="openNoteModal()"><i class="fa-solid fa-plus"></i></button>
                             </div>
 
-                            <!-- Notes Container -->
+                            <!-- Target ID for sidebar note appending -->
                             <div id="savedNotesContainer">
                                 @if (ViewBag.ExistingNotes != null)
                                 {
@@ -1433,7 +1480,6 @@
                                     }
                                 }
                             </div>
-
                             <div class="text-end mt-3">
                                 <a href="#" style="font-size: 0.85rem; font-weight: 600; color: #3b82f6; text-decoration: none;">View all notes <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem; margin-left: 2px;"></i></a>
                             </div>
@@ -1451,46 +1497,51 @@
         </div>
 
     </div>
-</form>
 
-<!-- MODALS -->
-<div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px;">
-            <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid var(--theme-border); border-radius: 12px 12px 0 0; padding: 20px 24px;">
-                <h5 class="modal-title fw-bold" id="noteModalLabel" style="color: var(--theme-navy-primary); font-size: 1.15rem;">
-                    <i class="fa-regular fa-pen-to-square text-primary me-2"></i> Add New Note
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" style="padding: 24px;">
-                <div class="row">
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Note Owner</label>
-                        <select id="modalNoteOwner" class="sf-select"><option value="System User">System User</option></select>
-                    </div>
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Date & Time</label>
-                        <input type="text" id="modalNoteDateTime" class="sf-input" style="background-color: #f1f5f9; color: var(--theme-text-muted);" readonly />
-                    </div>
-                    <div class="col-md-12 form-group">
-                        <label class="sf-label">Attachment</label>
-                        <input type="file" id="modalNoteFile" class="sf-input" style="padding: 5px 12px;" />
-                    </div>
-                    <div class="col-md-12 form-group m-0">
-                        <label class="sf-label">Note Description</label>
-                        <textarea id="modalNoteDesc" class="sf-input" style="height: auto; resize: vertical;" rows="4" placeholder="Write your note details here..."></textarea>
+    <!-- THE MODAL HTML (Moved inside the form so file uploads might work if you add logic for it, but outside container is fine too as JS creates hidden inputs inside the container) -->
+    <div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg" style="border: none; border-radius: 12px;">
+                <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid var(--theme-border); border-radius: 12px 12px 0 0; padding: 20px 24px;">
+                    <h5 class="modal-title fw-bold" id="noteModalLabel" style="color: var(--theme-navy-primary); font-size: 1.15rem;">
+                        <i class="fa-regular fa-pen-to-square text-primary me-2"></i> Add New Note
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="padding: 24px;">
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Note Owner</label>
+                            <!-- Note: Using ViewBag.UsersList identical to your Create Page request -->
+                            <select id="modalNoteOwner" class="sf-select" asp-items="ViewBag.UsersList">
+                                <option value="System User">- System User -</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Date & Time</label>
+                            <input type="text" id="modalNoteDateTime" class="sf-input" style="background-color: #f1f5f9; color: var(--theme-text-muted);" readonly />
+                        </div>
+                        <div class="col-md-12 form-group">
+                            <label class="sf-label">Attachment</label>
+                            <input type="file" id="modalNoteFile" class="sf-input" style="padding: 5px 12px;" />
+                        </div>
+                        <div class="col-md-12 form-group m-0">
+                            <label class="sf-label">Note Description</label>
+                            <textarea id="modalNoteDesc" class="sf-input" style="height: auto; resize: vertical;" rows="4" placeholder="Write your note details here..."></textarea>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid var(--theme-border); border-radius: 0 0 12px 12px; padding: 16px 24px;">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500; font-size: 0.9rem;">Cancel</button>
-                <button type="button" class="btn-sf-primary" onclick="saveNote()" style="font-weight: 600; font-size: 0.9rem; padding: 8px 24px;">Save Note</button>
+                <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid var(--theme-border); border-radius: 0 0 12px 12px; padding: 16px 24px;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500; font-size: 0.9rem;">Cancel</button>
+                    <!-- Trigger the fixed JS function -->
+                    <button type="button" class="btn-sf-primary" onclick="saveNote()" style="font-weight: 600; font-size: 0.9rem; padding: 8px 24px;">Save Note</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</form>
 
+<!-- OTHER MODALS -->
 <div class="modal fade" id="directDealConfirmModal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
         <div class="modal-content shadow-lg" style="border: none; border-radius: 12px; padding: 20px;">
@@ -1539,6 +1590,137 @@
     </div>
 </div>
 
+<!-- ========================================================
+     PREMIUM PURPLE QUICK CREATE TASK MODAL (WITH MORE FIELDS)
+     ======================================================== -->
+<div class="modal fade" id="quickTaskModal" tabindex="-1" aria-labelledby="quickTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px; overflow: hidden;">
+
+            <div class="modal-header modal-purple-header" style="padding: 20px 24px;">
+                <h5 class="modal-title fw-bold" id="quickTaskModalLabel" style="font-size: 1.15rem; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-check-square"></i> Add New Task
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Form posts directly to Tasks Controller -->
+            <form asp-controller="Tasks" asp-action="Create" method="post">
+                <div class="modal-body modal-purple-body" style="padding: 24px;">
+                    <!-- CRITICAL: Associates this Task with the current Lead -->
+                    <input type="hidden" name="LeadId" value="@Model.Id" />
+
+                    <div class="row border-bottom border-light pb-3 mb-3">
+                        <div class="col-md-12 form-group mb-3">
+                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Subject <span class="text-danger">*</span></label>
+                            <input name="Subject" class="sf-input w-100 bg-white" placeholder="E.g., Follow up call..." required />
+                        </div>
+
+                        <div class="col-md-6 form-group mb-3">
+                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Due Date</label>
+                            <input name="DueDate" type="date" class="sf-input w-100 bg-white" />
+                        </div>
+
+                        <div class="col-md-6 form-group mb-3">
+                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Priority</label>
+                            <select name="Priority" class="sf-select w-100 bg-white">
+                                <option value="Highest">Highest</option>
+                                <option value="High" selected>High</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Low">Low</option>
+                                <option value="Lowest">Lowest</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 form-group mb-3">
+                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Task Owner</label>
+                            <select name="TaskOwnerId" asp-items="ViewBag.UsersList" class="sf-select w-100 bg-white">
+                                <option value="">- Assign To -</option>
+                            </select>
+                        </div>
+
+                        <!-- Toggles -->
+                        <div class="col-md-6 form-group mb-3 d-flex align-items-end pb-2">
+                            <div class="form-check form-switch d-flex align-items-center me-4">
+                                <input class="form-check-input me-2" type="checkbox" id="modalReminderToggle">
+                                <label class="form-check-label" style="font-weight: 500; color: #6b21a8;">Reminder</label>
+                            </div>
+                            <div class="form-check form-switch d-flex align-items-center">
+                                <input class="form-check-input me-2" type="checkbox" id="modalRepeatToggle">
+                                <label class="form-check-label" style="font-weight: 500; color: #6b21a8;">Repeat</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 form-group m-0">
+                            <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Description</label>
+                            <textarea name="Description" class="sf-input w-100 bg-white" rows="2" placeholder="Task details..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Expandable "More Fields" Button -->
+                    <div class="more-fields-btn shadow-sm" id="moreFieldsToggle" onclick="toggleMoreFields()">
+                        <span>More Fields</span>
+                        <i class="fa-solid fa-chevron-right" id="moreFieldsIcon"></i>
+                    </div>
+
+                    <!-- Hidden Extended Fields -->
+                    <div id="moreFieldsContainer" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Account Name</label>
+                                <select name="AccountId" class="sf-select w-100 bg-white">
+                                    <option value="">- Select Account -</option>
+                                    @if (ViewBag.AccountsList != null)
+                                    {
+                                        foreach (var acc in (SelectList)ViewBag.AccountsList)
+                                        {
+                                            <option value="@acc.Value">@acc.Text</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Mobile</label>
+                                <input name="Mobile" class="sf-input w-100 bg-white" placeholder="+1..." />
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Lead Status</label>
+                                <select name="LeadStatus" class="sf-select w-100 bg-white">
+                                    <option value="">-None-</option>
+                                    <option value="Important contact">Important contact</option>
+                                    <option value="Not a Doctor">Not a Doctor</option>
+                                    <option value="Warm">Warm</option>
+                                    <option value="Hot">Hot</option>
+                                    <option value="Not Interested">Not Interested</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-0">
+                                <label class="sf-label w-100 mb-1" style="color: #6b21a8;">Status</label>
+                                <select name="Status" class="sf-select w-100 bg-white">
+                                    <option value="Not Started" selected>Not Started</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Deferred">Deferred</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer" style="background-color: #ffffff; border-top: 1px solid #e9d5ff; padding: 16px 24px;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500;">Cancel</button>
+                    <button type="submit" class="btn-purple-primary">Save Task</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
 <!-- Bootstrap JS bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -1550,28 +1732,12 @@
     const stageSelect = document.getElementById("actualStageSelect");
     const chevronItems = document.querySelectorAll("#chevronStageBar li");
 
-    // Sync Chevron on load
+    if (stageSelect && chevronItems.length > 0) {
     updateChevronBar(stageSelect.value);
-
-    // Update Chevron when dropdown changes
-    stageSelect.addEventListener("change", function () {
-    updateChevronBar(this.value);
-    });
-
-    // Update dropdown when Chevron is clicked
-    chevronItems.forEach(item => {
-    item.addEventListener("click", function () {
-    const stageVal = this.getAttribute("data-val");
-    stageSelect.value = stageVal;
-    // Dispatch event manually to trigger your directDealConfirmModal logic
-    stageSelect.dispatchEvent(new Event('change'));
-    updateChevronBar(stageVal);
-    });
-    });
+    }
 
     function updateChevronBar(currentStage) {
     chevronItems.forEach(item => {
-    // Reset styling
     item.classList.remove("active");
     item.innerHTML = item.getAttribute("data-val");
     });
@@ -1587,19 +1753,23 @@
     });
 
     // -----------------------------------------------------------------
-    // NOTES & UI LOGIC
+    // FIXED NOTES JAVASCRIPT
     // -----------------------------------------------------------------
     function openNoteModal() {
     const now = new Date();
     document.getElementById('modalNoteDateTime').value = now.toLocaleString();
     document.getElementById('modalNoteFile').value = '';
     document.getElementById('modalNoteDesc').value = '';
-    const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+
+    const modalEl = document.getElementById('noteModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.show();
     }
 
     function saveNote() {
-    const owner = document.getElementById('modalNoteOwner').value;
+    const ownerDropdown = document.getElementById('modalNoteOwner');
+    const ownerId = ownerDropdown.value;
+    const ownerName = ownerId && ownerDropdown.selectedIndex !== -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : "System User";
     const dateTime = document.getElementById('modalNoteDateTime').value;
     const desc = document.getElementById('modalNoteDesc').value;
     const fileInput = document.getElementById('modalNoteFile');
@@ -1610,39 +1780,80 @@
     return;
     }
 
-    let fileHtml = fileName ? `<div class="mt-2" style="font-size: 0.75rem;"><a href="#" style="color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-paperclip me-1"></i>${fileName}</a></div>` : '';
+    let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem; background: var(--theme-navy-light); padding: 4px 8px; border-radius: 4px; display: inline-block;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
 
-    // Format date to match sidebar UI (e.g., "Sept 11")
-    const dateObj = new Date();
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
-    const formattedDate = monthNames[dateObj.getMonth()] + " " + dateObj.getDate();
-
-    // Exact match to the sidebar UI design
-    const noteHtml = `
-    <div class="note-card">
-    <div class="note-header">${formattedDate} &bull; ${owner}</div>
-    <div class="note-body">${desc}</div>
+    // 1. Generate HTML with the hidden inputs for the Main Tab.
+    // This ensures the data is physically inside your <form> tag and gets submitted to your backend.
+    const mainNoteHtml = `
+    <div class="mb-2 p-3 bg-white border rounded shadow-sm d-flex justify-content-between" style="border-left: 4px solid #1e3a8a !important;">
+    <div>
+    <strong style="color: var(--theme-navy-primary); font-size: 0.9rem;">${ownerName} <span class="badge bg-primary ms-2" style="font-size: 0.65rem;">New Note</span></strong>
+    <div style="font-size: 0.85rem; color: var(--theme-text-main); margin-top:4px; white-space: pre-wrap;">${desc}</div>
     ${fileHtml}
-    <input type="hidden" name="SavedNoteOwner[]" value="${owner}" />
+    </div>
+    <span class="text-muted" style="font-size: 0.75rem;">Just Now</span>
+    <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
     <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
     <input type="hidden" name="SavedNoteDesc[]" value="${desc}" />
     </div>`;
 
-    document.getElementById('savedNotesContainer').insertAdjacentHTML('afterbegin', noteHtml);
-    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('noteModal'));
-    modalInstance.hide();
+    // 2. Generate a visual-only copy for the Sidebar (no hidden inputs to prevent double-submitting)
+    const sidebarNoteHtml = `
+    <div class="note-card" style="border-left-color: #1e3a8a;">
+    <div class="note-header">Just Now &bull; ${ownerName}</div>
+    <div class="note-body">${desc}</div>
+    ${fileHtml}
+    </div>`;
+
+    // 3. Append to Main Tab
+    const mainContainer = document.getElementById('notesContainer');
+    if (mainContainer) {
+    mainContainer.insertAdjacentHTML('afterbegin', mainNoteHtml);
+    } else {
+    console.error("Main notes container not found!");
     }
 
-    document.getElementById('DataSources').addEventListener('change', function () {
+    // 4. Append to Sidebar
+    const sidebarContainer = document.getElementById('savedNotesContainer');
+    if (sidebarContainer) {
+    sidebarContainer.insertAdjacentHTML('afterbegin', sidebarNoteHtml);
+    }
+
+    // Remove the "No notes found" placeholder if it exists
+    const placeholder = document.getElementById('noNotesPlaceholder');
+    if (placeholder) placeholder.remove();
+
+    // 5. Hide Modal cleanly
+    const modalEl = document.getElementById('noteModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) {
+    modalInstance.hide();
+    }
+    }
+
+    // -----------------------------------------------------------------
+    // OTHER EXISTING SCRIPTS
+    // -----------------------------------------------------------------
+    const dataSourcesEl = document.getElementById('DataSources');
+    if (dataSourcesEl) {
+    dataSourcesEl.addEventListener('change', function () {
     const val = this.value;
-    document.getElementById('divMetaCampaign').style.display = (val === 'Meta Ads') ? 'block' : 'none';
-    document.getElementById('divSeminarName').style.display = (val === 'Seminar Conference') ? 'block' : 'none';
+    const divMeta = document.getElementById('divMetaCampaign');
+    const divSeminar = document.getElementById('divSeminarName');
+    if (divMeta) divMeta.style.display = (val === 'Meta Ads') ? 'block' : 'none';
+    if (divSeminar) divSeminar.style.display = (val === 'Seminar Conference') ? 'block' : 'none';
     });
+    }
 
     function verifyPhone(fieldId) {
-    const phone = document.getElementById(fieldId).value.trim();
-    const mainMobile = document.getElementById('MobileNumber').value.trim();
-    const altMobile = document.getElementById('AlternateMobile').value.trim();
+    const phoneEl = document.getElementById(fieldId);
+    const mainMobileEl = document.getElementById('MobileNumber');
+    const altMobileEl = document.getElementById('AlternateMobile');
+
+    if (!phoneEl) return;
+    const phone = phoneEl.value.trim();
+    const mainMobile = mainMobileEl ? mainMobileEl.value.trim() : '';
+    const altMobile = altMobileEl ? altMobileEl.value.trim() : '';
 
     if (!phone) {
     alert('Please enter a phone number first before verifying.');
@@ -1667,43 +1878,70 @@
     }
 
     let isDirectDealConfirmed = false;
+    const leadForm = document.getElementById('leadForm');
 
-    document.getElementById('leadForm').addEventListener('submit', function (e) {
-    const stageValue = document.getElementById('actualStageSelect').value;
+    if (leadForm) {
+    leadForm.addEventListener('submit', function (e) {
+    const stageSelect = document.getElementById('actualStageSelect');
+    if (stageSelect) {
+    const stageValue = stageSelect.value;
     if (stageValue === 'Direct Deal' && !isDirectDealConfirmed) {
     e.preventDefault();
     const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealConfirmModal'));
     confirmModal.show();
     }
+    }
     });
+    }
 
-    document.getElementById('btnCancelDirectDeal').addEventListener('click', function () {
-    document.getElementById('actualStageSelect').value = '';
-    document.getElementById('actualStageSelect').dispatchEvent(new Event('change'));
+    const btnCancelDirectDeal = document.getElementById('btnCancelDirectDeal');
+    if (btnCancelDirectDeal) {
+    btnCancelDirectDeal.addEventListener('click', function () {
+    const stageSelect = document.getElementById('actualStageSelect');
+    if (stageSelect) {
+    stageSelect.value = '';
+    stageSelect.dispatchEvent(new Event('change'));
+    }
     });
+    }
 
-    document.getElementById('btnConfirmDirectDeal').addEventListener('click', function () {
+    const btnConfirmDirectDeal = document.getElementById('btnConfirmDirectDeal');
+    if (btnConfirmDirectDeal) {
+    btnConfirmDirectDeal.addEventListener('click', function () {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealConfirmModal')).hide();
     const paymentRows = document.querySelectorAll('#paymentTbody .payment-row');
     let hasValidPayment = false;
 
     paymentRows.forEach(row => {
-    const productName = row.querySelector('input[name*="ProductName"]')?.value.trim() || '';
-    const total = parseFloat(row.querySelector('.total')?.value) || 0;
+    const productNameInput = row.querySelector('input[name*="ProductName"]');
+    const totalInput = row.querySelector('.total');
+
+    const productName = productNameInput ? productNameInput.value.trim() : '';
+    const total = totalInput ? parseFloat(totalInput.value) : 0;
+
     if (productName !== '' && total > 0) hasValidPayment = true;
     });
 
     if (!hasValidPayment) {
-    document.getElementById('actualStageSelect').value = '';
-    document.getElementById('actualStageSelect').dispatchEvent(new Event('change'));
+    const stageSelect = document.getElementById('actualStageSelect');
+    if (stageSelect) {
+    stageSelect.value = '';
+    stageSelect.dispatchEvent(new Event('change'));
+    }
     bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealErrorModal')).show();
     } else {
     isDirectDealConfirmed = true;
-    document.getElementById('leadForm').submit();
+    if (leadForm) leadForm.submit();
     }
     });
+    }
 
-    const productPrices = @Html.Raw(Json.Serialize(ViewBag.ProductPrices ?? new Dictionary<int, decimal>()));
+    let productPrices = {};
+    try {
+    productPrices = @Html.Raw(Json.Serialize(ViewBag.ProductPrices ?? new Dictionary<int, decimal>()));
+    } catch(e) {
+    console.error("Failed to parse product prices", e);
+    }
 
     const productOptionsHtml = `
     <option value="0">-Select Product-</option>
@@ -1719,6 +1957,7 @@
     let rowCount = @(Model?.PaymentRow != null && Model.PaymentRow.Count > 0 ? Model.PaymentRow.Count : 1);
     function addRow() {
     const tbody = document.getElementById('paymentTbody');
+    if(!tbody) return;
     const tr = document.createElement('tr');
     tr.className = 'payment-row';
     tr.innerHTML = `
@@ -1750,25 +1989,35 @@
     }
 
     const priceInput = row.querySelector('.price');
+    if(priceInput) {
     priceInput.value = price;
     calcRow(priceInput);
     }
+    }
 
     function removeRow(btn) {
-    btn.closest('tr').remove();
+    const row = btn.closest('tr');
+    if(row) {
+    row.remove();
     calcGrand();
+    }
     }
 
     function calcRow(input) {
     const row = input.closest('tr');
+    if(!row) return;
     const qty = parseFloat(row.querySelector('.qty').value) || 0;
     const price = parseFloat(row.querySelector('.price').value) || 0;
     const disc = parseFloat(row.querySelector('.disc').value) || 0;
     const total = qty * price;
     const discountAmt = total * (disc / 100);
     const finalAmt = total - discountAmt;
-    row.querySelector('.total').value = total.toFixed(2);
-    row.querySelector('.final').value = finalAmt.toFixed(2);
+
+    const totalEl = row.querySelector('.total');
+    const finalEl = row.querySelector('.final');
+    if(totalEl) totalEl.value = total.toFixed(2);
+    if(finalEl) finalEl.value = finalAmt.toFixed(2);
+
     calcGrand();
     }
 
@@ -1777,12 +2026,19 @@
     document.querySelectorAll('.final').forEach(el => {
     sub += parseFloat(el.value) || 0;
     });
-    document.getElementById('subTotal').value = sub.toFixed(2);
+    const subTotalEl = document.getElementById('subTotal');
+    if(subTotalEl) subTotalEl.value = sub.toFixed(2);
+
     const taxAmount = sub * 0.18;
-    document.getElementById('taxes').value = taxAmount.toFixed(2);
-    const adj = parseFloat(document.getElementById('adjustment').value) || 0;
+    const taxesEl = document.getElementById('taxes');
+    if(taxesEl) taxesEl.value = taxAmount.toFixed(2);
+
+    const adjEl = document.getElementById('adjustment');
+    const adj = adjEl ? (parseFloat(adjEl.value) || 0) : 0;
+
     const grand = sub + taxAmount - adj;
-    document.getElementById('grandTotal').value = grand.toFixed(2);
+    const grandTotalEl = document.getElementById('grandTotal');
+    if(grandTotalEl) grandTotalEl.value = grand.toFixed(2);
     }
 
     let globalRegionData = [];
@@ -1846,6 +2102,19 @@
     if (stateObj.name === selectedStateValue) option.selected = true;
     stateSelect.appendChild(option);
     });
+    }
+    }
+
+    function toggleMoreFields() {
+    const container = document.getElementById("moreFieldsContainer");
+    const btn = document.getElementById("moreFieldsToggle");
+
+    if (container.style.display === "none") {
+    container.style.display = "block";
+    btn.classList.add("expanded");
+    } else {
+    container.style.display = "none";
+    btn.classList.remove("expanded");
     }
     }
 </script>

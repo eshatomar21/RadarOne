@@ -290,9 +290,10 @@
         <!-- 1. Header -->
         <div class="sf-header">
             <div class="sf-header-title">
-                <button type="button" class="sf-close-btn">
+                <!-- Replace your current <button> line with this -->
+                <a asp-controller="Accounts" asp-action="Index" class="sf-close-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
+                </a>
                 <h1><span class="entity-type">Account</span> New Account</h1>
             </div>
         </div>
@@ -383,7 +384,13 @@
                         </select>
                     </div>
 
-             
+                    <!-- FIX: Removed the extra nested <div class="row"> here -->
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Group Name</label>
+                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                            <option value="">-Select Group Name-</option>
+                        </select>
+                    </div>
 
                     <div class="col-md-6 form-group">
                         <label class="sf-label">Current Status</label>
@@ -402,11 +409,9 @@
                     </div>
 
                     <div class="col-md-6 form-group" id="LeadStatus">
-                        <label class="sf-label">LeadStatus</label>
-                        <input name="LeadStatus" class="sf-input" placeholder="Enter seminar name..." readonly />
+                        <label class="sf-label">Lead Status</label>
+                        <input name="LeadStatus" class="sf-input" placeholder="Enter Lead Status..." readonly />
                     </div>
-
-
 
                     <!-- Hidden Date of Entry field -->
                     <div class="col-md-6 form-group" style="display: none;">

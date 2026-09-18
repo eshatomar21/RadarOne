@@ -31,6 +31,10 @@ namespace Radar_CRM.Data
 
         public DbSet<DealNote> DealNotes { get; set; }
 
+        public DbSet<LeadChain> LeadChains { get; set; }
+
+        public DbSet<PersonalNote> PersonalNotes { get; set; }
+
         public DbSet<ProductPaymentRow> ProductPaymentRows{ get; set; }
 
         public DbSet<DealPaymentRow> DealPaymentRows { get; set; }
