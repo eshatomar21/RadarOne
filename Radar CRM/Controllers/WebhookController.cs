@@ -41,19 +41,20 @@ namespace Radar_CRM.Controllers
                 // Check if it came from Google Ads (has a GCLID)
                 if (!string.IsNullOrEmpty(formData.Gclid))
                 {
+                    // Matches the exact HTML dropdown: <option value="Google AdWords">
                     leadSource = "Google AdWords";
                 }
                 else
                 {
-                    // No GCLID means direct website traffic. Use the Form ID.
-                    leadSource = formData.FormId switch
-                    {
-                        "29a1994" => "POP UP Form",
-                        "66097b8" => "Contact Page Form",
-                        "7966888" => "Untitled Form",
-                        _ => string.IsNullOrEmpty(formData.FormId) ? "Website Direct" : $"Website Form (ID: {formData.FormId})"
-                    };
+                    // Matches the exact HTML dropdown: <option value="Website Direct">
+                    // We map all CF7 forms to "Website Direct" because specific form names 
+                    // like "POP UP Form" are NOT in your HTML Data Source dropdown list.
+                    leadSource = "Website Direct";
                 }
+
+                // NOTE: Replace "SITARA_USER_ID_HERE" with Sitara's actual database ID. 
+                // If your AccountOwnerId is an integer, change this to just the number (e.g., var sitaraId = 3;)
+                var sitaraId = "zcrm_1092392000000518001";
 
                 // 3. CREATE ONLY THE ACCOUNT RECORD
                 var newAccount = new Account
@@ -74,13 +75,15 @@ namespace Radar_CRM.Controllers
 
                     MetaCampaignName = formData.UtmCampaign,
 
-                    // This dynamically assigns "Google AdWords" OR the specific website form name
+                    // This now strictly matches your HTML dropdown values ("Google AdWords" or "Website Direct")
                     DataSource = leadSource,
 
                     CurrentStatus = "Non-User",
                     DateOfEntry = DateTime.Now,
 
-                    // Assigning to Sitara for both Google Ads and Website Direct scenarios
+                    // THIS links the record to Sitara as the owner in the CRM UI
+                    AccountOwnerId = sitaraId,
+
                     CreatedBy = "Sitara",
                     ModifiedBy = "Sitara"
                 };
@@ -91,7 +94,7 @@ namespace Radar_CRM.Controllers
                 return Ok(new
                 {
                     success = true,
-                    message = "Account created successfully. Lead skipped.",
+                    message = "Account created successfully. Lead creation skipped.",
                     accountId = newAccount.Id
                 });
             }
