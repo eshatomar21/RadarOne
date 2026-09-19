@@ -35,6 +35,8 @@ namespace Radar_CRM.Data
 
         public DbSet<PersonalNote> PersonalNotes { get; set; }
 
+        public DbSet<AssignmentRule> AssignmentRules { get; set; }
+
         public DbSet<ProductPaymentRow> ProductPaymentRows{ get; set; }
 
         public DbSet<DealPaymentRow> DealPaymentRows { get; set; }

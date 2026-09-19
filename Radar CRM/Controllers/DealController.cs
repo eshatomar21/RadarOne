@@ -275,10 +275,14 @@ namespace Radar_CRM.Controllers
                     {
                         if (!string.IsNullOrWhiteSpace(SavedNoteDesc[i]))
                         {
+                            // 🚀 SAFE FK CHECK: Converts empty strings to actual 'null' to prevent SQL FK crashes
+                            string safeOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i && !string.IsNullOrWhiteSpace(SavedNoteOwner[i]))
+                                                 ? SavedNoteOwner[i]
+                                                 : null;
+
                             deal.Notes.Add(new Notes
                             {
-                                // 🚀 Map to the new Foreign Key and Date properties
-                                NoteOwnerId = SavedNoteOwner != null && SavedNoteOwner.Length > i ? SavedNoteOwner[i] : null,
+                                NoteOwnerId = safeOwnerId,
                                 CreatedDateTime = DateTime.TryParse(SavedNoteDateTime[i], out DateTime parsedDate) ? parsedDate : DateTime.Now,
                                 Description = SavedNoteDesc[i]
                             });
@@ -555,6 +559,8 @@ namespace Radar_CRM.Controllers
         {
             try
             {
+                // 🚀 SAFE FK CHECK: Prevents "System" from crashing the database
+                string safeOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId;
                 var newNote = new DealNote
                 {
                     DealId = dealId,
@@ -621,11 +627,16 @@ namespace Radar_CRM.Controllers
                         {
                             if (!string.IsNullOrWhiteSpace(SavedNoteDesc[i]))
                             {
+                                // 🚀 SAFE FK CHECK: Replaces "System" or empty strings with 'null'
+                                string safeOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i && !string.IsNullOrWhiteSpace(SavedNoteOwner[i]))
+                                                     ? SavedNoteOwner[i]
+                                                     : null;
+
                                 _context.DealNotes.Add(new DealNote
                                 {
                                     DealId = deal.Id,
-                                    Owner = SavedNoteOwner != null && SavedNoteOwner.Length > i ? SavedNoteOwner[i] : "System",
-                                    DateTime = DateTime.Parse(SavedNoteDateTime[i]),
+                                    Owner = safeOwnerId,
+                                    DateTime = DateTime.TryParse(SavedNoteDateTime[i], out DateTime parsedDate) ? parsedDate : DateTime.Now,
                                     Description = SavedNoteDesc[i]
                                 });
                             }

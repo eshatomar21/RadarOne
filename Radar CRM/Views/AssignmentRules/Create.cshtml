@@ -1,0 +1,326 @@
+﻿@model Radar_CRM.Models.AssignmentRule
+
+@{
+    ViewData["Title"] = "Assignment Rules";
+    var existingRules = ViewBag.ExistingRules as List<Radar_CRM.Models.AssignmentRule>;
+}
+
+<style>
+    /* Modern SaaS Dashboard - Navy, Coral, & Cream */
+    body {
+        background-color: #FDFBF7;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .saas-container {
+        max-width: 1300px;
+        margin: 0 auto;
+        padding: 40px 15px;
+    }
+
+    .saas-card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(11, 37, 69, 0.06), 0 2px 8px rgba(11, 37, 69, 0.04);
+        padding: 32px;
+        border: 1px solid #EAE6DF;
+        height: 100%;
+    }
+
+    .saas-header {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0B2545;
+        margin-bottom: 24px;
+        border-bottom: 2px solid #F0F4F8;
+        padding-bottom: 12px;
+    }
+
+    .saas-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #4A5568;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: block;
+    }
+
+    .saas-input {
+        font-size: 0.875rem;
+        padding: 8px 12px;
+        height: 38px;
+        border-radius: 6px;
+        border: 1px solid #D1D5DB;
+        background-color: #FCFBFA;
+        color: #111827;
+        transition: all 0.2s ease-in-out;
+    }
+
+        .saas-input:focus {
+            outline: none;
+            border-color: #0B2545;
+            box-shadow: 0 0 0 3px rgba(11, 37, 69, 0.1);
+            background-color: #ffffff;
+        }
+
+    .condition-wrapper {
+        background-color: #F4F6F9;
+        border: 1px dashed #CBD5E0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+
+    .btn-saas-primary {
+        background-color: #FF6B6B;
+        color: #ffffff;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 8px 24px;
+        border-radius: 6px;
+        border: none;
+        transition: background-color 0.2s;
+    }
+
+        .btn-saas-primary:hover {
+            background-color: #FA5252;
+            color: #ffffff;
+        }
+
+    /* Table Styles */
+    .saas-table {
+        width: 100%;
+        font-size: 0.875rem;
+    }
+
+        .saas-table th {
+            color: #4A5568;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #F0F4F8;
+        }
+
+        .saas-table td {
+            padding: 12px 0;
+            color: #0B2545;
+            border-bottom: 1px solid #F0F4F8;
+            vertical-align: middle;
+        }
+
+    .badge-module {
+        background-color: #E2E8F0;
+        color: #4A5568;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="saas-container">
+    <div class="row g-4">
+
+        <!-- LEFT COLUMN: CREATE FORM -->
+        <div class="col-lg-5">
+            <div class="saas-card">
+                <h2 class="saas-header">Create New Rule</h2>
+
+                <form asp-action="Create" method="post">
+                    <div class="mb-3">
+                        <label asp-for="RuleName" class="saas-label">Rule Name</label>
+                        <input asp-for="RuleName" class="form-control saas-input" placeholder="e.g., Enterprise Lead Routing" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="TargetModule" class="saas-label">Apply to Module</label>
+                        <select asp-for="TargetModule" asp-items="ViewBag.Modules" class="form-select saas-input" id="ModuleDropdown" required>
+                            <option value="">-- Select Module --</option>
+                        </select>
+                    </div>
+
+                    <div class="condition-wrapper">
+                        <div class="saas-label mb-3" style="color: #0B2545;">Condition Criteria</div>
+                        <div class="mb-3">
+                            <label asp-for="ConditionField" class="saas-label">Field</label>
+                            <select asp-for="ConditionField" class="form-select saas-input" id="FieldDropdown" required disabled>
+                                <option value="">Select module first...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="ConditionOperator" class="saas-label">Operator</label>
+                            <select asp-for="ConditionOperator" class="form-select saas-input" id="OperatorDropdown" required disabled></select>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="ConditionValue" class="saas-label">Value</label>
+                            <input asp-for="ConditionValue" type="text" class="form-control saas-input" id="ValueInput" required disabled />
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="AssignToUserId" class="saas-label">Assign Record To</label>
+                        <select asp-for="AssignToUserId" asp-items="ViewBag.UsersList" class="form-select saas-input" required>
+                            <option value="">-- Select Owner --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" asp-for="IsActive" checked>
+                        <label class="form-check-label saas-label ms-1 mt-1" asp-for="IsActive">Activate rule immediately</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-saas-primary w-100">Save Rule</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: SAVED RULES LIST -->
+        <div class="col-lg-7">
+            <div class="saas-card">
+                <h2 class="saas-header">Active Assignment Rules</h2>
+
+                @if (existingRules != null && existingRules.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="saas-table">
+                            <thead>
+                                <tr>
+                                    <th>Rule Name</th>
+                                    <th>Module</th>
+                                    <th>Conditions</th>
+                                    <th>Assigned To</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rule in existingRules)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">@rule.RuleName</td>
+                                        <td><span class="badge-module">@rule.TargetModule</span></td>
+                                        <td>
+                                            <span style="font-size: 0.75rem;">
+                                                @rule.ConditionField <br />
+                                                <span class="text-muted">@rule.ConditionOperator</span>
+                                                <strong>@rule.ConditionValue</strong>
+                                            </span>
+                                        </td>
+                                        <td>@rule.AssignToUserId</td>
+                                        <td class="text-end">
+                                            <form asp-action="Delete" asp-route-id="@rule.Id" method="post" onsubmit="return confirm('Delete this rule?');">
+                                                <button type="submit" class="btn btn-sm text-danger" style="background: none; border: none;">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-clipboard-list fa-3x mb-3" style="color: #CBD5E0;"></i>
+                        <p>No assignment rules created yet.</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        const moduleSchema = @Html.Raw(ViewBag.ModuleSchemaJson ?? "{}");
+
+        const operators = {
+            "string": ["is", "isn't", "contains", "doesn't contain", "starts with", "ends with", "is empty", "is not empty"],
+            "date": ["is", "isn't", "is before", "is after", "between", "not between", "Today"],
+            "number": ["equals", "not equal to", "greater than", "less than"],
+            "boolean": ["is"]
+        };
+
+        const modSelect = document.getElementById("ModuleDropdown");
+        const fldSelect = document.getElementById("FieldDropdown");
+        const opSelect = document.getElementById("OperatorDropdown");
+        const valInput = document.getElementById("ValueInput");
+
+        let currentFields = [];
+
+        modSelect.addEventListener("change", function () {
+            const selectedModule = this.value;
+            fldSelect.innerHTML = '<option value="">-- Select Field --</option>';
+            opSelect.innerHTML = '<option value="">Select a field first...</option>';
+            valInput.value = "";
+            valInput.disabled = true;
+            opSelect.disabled = true;
+
+            if (selectedModule && moduleSchema[selectedModule]) {
+                currentFields = moduleSchema[selectedModule];
+                currentFields.forEach(f => {
+                    let opt = document.createElement("option");
+                    opt.value = f.name;
+                    opt.textContent = f.name;
+                    fldSelect.appendChild(opt);
+                });
+                fldSelect.disabled = false;
+            } else {
+                fldSelect.disabled = true;
+            }
+        });
+
+        fldSelect.addEventListener("change", function () {
+            const selectedFieldName = this.value;
+            opSelect.innerHTML = '<option value="">-- Select Operator --</option>';
+
+            if (selectedFieldName) {
+                const fieldData = currentFields.find(f => f.name === selectedFieldName);
+                const fieldType = fieldData ? fieldData.type : "string";
+
+                const validOperators = operators[fieldType] || operators["string"];
+
+                validOperators.forEach(op => {
+                    let opt = document.createElement("option");
+                    opt.value = op;
+                    opt.textContent = op;
+                    opSelect.appendChild(opt);
+                });
+
+                if (fieldType === "date") {
+                    valInput.type = "date";
+                } else if (fieldType === "number") {
+                    valInput.type = "number";
+                } else {
+                    valInput.type = "text";
+                }
+
+                opSelect.disabled = false;
+                valInput.disabled = false;
+            } else {
+                opSelect.disabled = true;
+                valInput.disabled = true;
+            }
+        });
+
+        opSelect.addEventListener("change", function() {
+            const op = this.value;
+            if (op === "is empty" || op === "is not empty" || op === "Today") {
+                valInput.value = "";
+                valInput.disabled = true;
+                valInput.required = false;
+            } else {
+                valInput.disabled = false;
+                valInput.required = true;
+            }
+        });
+    </script>
+}

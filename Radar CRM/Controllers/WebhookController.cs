@@ -3,6 +3,7 @@ using Radar_CRM.Data;
 using Radar_CRM.Models;
 using System;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace Radar_CRM.Controllers
 {
@@ -52,11 +53,20 @@ namespace Radar_CRM.Controllers
                     leadSource = "Website Direct";
                 }
 
-                // NOTE: Replace "SITARA_USER_ID_HERE" with Sitara's actual database ID. 
-                // If your AccountOwnerId is an integer, change this to just the number (e.g., var sitaraId = 3;)
-                var sitaraId = "zcrm_1092392000000518001";
+                // 3. DYNAMIC ASSIGNMENT LOGIC (Replaces Hardcoded ID)
+                // Query the database for an active rule that matches this exact Data Source
+                var matchedRule = await _context.AssignmentRules.FirstOrDefaultAsync(r =>
+                    r.IsActive == true &&
+                    r.TargetModule == "Accounts" &&
+                    r.ConditionField == "DataSource" &&
+                    r.ConditionValue == leadSource
+                );
 
-                // 3. CREATE ONLY THE ACCOUNT RECORD
+                // If a rule matches, assign that specific user. 
+                // If no rule is found, it will safely leave the owner blank.
+                string assignedOwnerId = matchedRule != null ? matchedRule.AssignToUserId : null;
+
+                // 4. CREATE ONLY THE ACCOUNT RECORD
                 var newAccount = new Account
                 {
                     AccountName = formData.Name,
@@ -81,11 +91,11 @@ namespace Radar_CRM.Controllers
                     CurrentStatus = "Non-User",
                     DateOfEntry = DateTime.Now,
 
-                    // THIS links the record to Sitara as the owner in the CRM UI
-                    AccountOwnerId = sitaraId,
+                    // 🚀 THIS links the record to the dynamically found user in the CRM UI
+                    AccountOwnerId = assignedOwnerId,
 
-                    CreatedBy = "Sitara",
-                    ModifiedBy = "Sitara"
+                    CreatedBy = "Webhook System",
+                    ModifiedBy = "Webhook System"
                 };
 
                 _context.Accounts.Add(newAccount);
