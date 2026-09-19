@@ -266,6 +266,9 @@ namespace Radar_CRM.Controllers
 
             if (ModelState.IsValid)
             {
+                // 🚀 Cache valid user IDs to prevent Database Foreign Key crashes
+                var validUserIds = _context.Users.Select(u => u.Id).ToHashSet();
+
                 // 🚀 Use the unified Notes list instead of DealNote
                 deal.Notes ??= new List<Notes>();
 
@@ -275,9 +278,11 @@ namespace Radar_CRM.Controllers
                     {
                         if (!string.IsNullOrWhiteSpace(SavedNoteDesc[i]))
                         {
-                            // 🚀 SAFE FK CHECK: Converts empty strings to actual 'null' to prevent SQL FK crashes
-                            string safeOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i && !string.IsNullOrWhiteSpace(SavedNoteOwner[i]))
-                                                 ? SavedNoteOwner[i]
+                            string rawOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i) ? SavedNoteOwner[i]?.Trim() : null;
+
+                            // 🚀 STRICT FK CHECK: Only assign if the ID actually exists in the Users table.
+                            string safeOwnerId = (!string.IsNullOrWhiteSpace(rawOwnerId) && validUserIds.Contains(rawOwnerId))
+                                                 ? rawOwnerId
                                                  : null;
 
                             deal.Notes.Add(new Notes
@@ -528,19 +533,21 @@ namespace Radar_CRM.Controllers
         {
             try
             {
-                // Note: Using DealNotes based on your Edit POST method
-                var rawNotes = await _context.DealNotes
+                // 🚀 FIXED: Query _context.Note instead of _context.DealNotes
+                var rawNotes = await _context.Note
+                    .Include(n => n.NoteOwner) // Join the user to get the name safely
                     .Where(n => n.DealId == dealId)
-                    .OrderByDescending(n => n.DateTime)
+                    .OrderByDescending(n => n.CreatedDateTime)
                     .ToListAsync();
 
                 var notes = rawNotes.Select(n => new
                 {
                     id = n.Id,
-                    ownerName = string.IsNullOrEmpty(n.Owner) ? "System" : n.Owner,
-                    createdDateTime = n.DateTime.ToString("dd-MM-yyyy HH:mm"),
+                    // Assuming your User table has a fullName or FirstName property 
+                    ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
+                    createdDateTime = n.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
                     description = n.Description,
-                    attachmentFileName = "" // If DealNote has no attachment column, leave blank
+                    attachmentFileName = ""
                 });
 
                 return Json(notes);
@@ -550,7 +557,6 @@ namespace Radar_CRM.Controllers
                 return Json(new List<object>());
             }
         }
-
         // ==========================================
         // 🚀 AJAX: SAVE NEW NOTE FROM SIDE PANEL
         // ==========================================
@@ -559,17 +565,26 @@ namespace Radar_CRM.Controllers
         {
             try
             {
-                // 🚀 SAFE FK CHECK: Prevents "System" from crashing the database
-                string safeOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId;
-                var newNote = new DealNote
+                // 🚀 STRICT FK CHECK: Confirm the ownerId is an actual User ID in the database
+                string safeOwnerId = null;
+                if (!string.IsNullOrWhiteSpace(ownerId))
+                {
+                    if (await _context.Users.AnyAsync(u => u.Id == ownerId))
+                    {
+                        safeOwnerId = ownerId;
+                    }
+                }
+
+                // 🚀 FIXED: Use 'Notes' entity instead of 'DealNote'
+                var newNote = new Notes
                 {
                     DealId = dealId,
                     Description = description,
-                    Owner = string.IsNullOrWhiteSpace(ownerId) ? "System" : ownerId,
-                    DateTime = DateTime.Now
+                    NoteOwnerId = safeOwnerId,
+                    CreatedDateTime = DateTime.Now
                 };
 
-                _context.DealNotes.Add(newNote);
+                _context.Note.Add(newNote); // FIXED: Save to _context.Note
                 await _context.SaveChangesAsync();
 
                 return Json(new
@@ -577,8 +592,8 @@ namespace Radar_CRM.Controllers
                     success = true,
                     note = new
                     {
-                        ownerName = newNote.Owner,
-                        createdDateTime = newNote.DateTime.ToString("dd-MM-yyyy HH:mm"),
+                        ownerName = safeOwnerId != null ? safeOwnerId : "System",
+                        createdDateTime = newNote.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
                         description = newNote.Description,
                         attachmentFileName = ""
                     }
@@ -589,7 +604,6 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
-
         // ==========================================
         // EDIT: POST 
         // ==========================================
@@ -621,22 +635,28 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
+                    // 🚀 Cache valid user IDs to prevent Database Foreign Key crashes
+                    var validUserIds = _context.Users.Select(u => u.Id).ToHashSet();
+
                     if (SavedNoteDesc != null)
                     {
                         for (int i = 0; i < SavedNoteDesc.Length; i++)
                         {
                             if (!string.IsNullOrWhiteSpace(SavedNoteDesc[i]))
                             {
-                                // 🚀 SAFE FK CHECK: Replaces "System" or empty strings with 'null'
-                                string safeOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i && !string.IsNullOrWhiteSpace(SavedNoteOwner[i]))
-                                                     ? SavedNoteOwner[i]
+                                string rawOwnerId = (SavedNoteOwner != null && SavedNoteOwner.Length > i) ? SavedNoteOwner[i]?.Trim() : null;
+
+                                // 🚀 STRICT FK CHECK: Only assign if the ID actually exists in the Users table.
+                                string safeOwnerId = (!string.IsNullOrWhiteSpace(rawOwnerId) && validUserIds.Contains(rawOwnerId))
+                                                     ? rawOwnerId
                                                      : null;
 
-                                _context.DealNotes.Add(new DealNote
+                                // 🚀 FIXED: Save to the unified _context.Note instead of _context.DealNotes
+                                _context.Note.Add(new Notes
                                 {
                                     DealId = deal.Id,
-                                    Owner = safeOwnerId,
-                                    DateTime = DateTime.TryParse(SavedNoteDateTime[i], out DateTime parsedDate) ? parsedDate : DateTime.Now,
+                                    NoteOwnerId = safeOwnerId, // FIXED: Maps to NoteOwnerId
+                                    CreatedDateTime = DateTime.TryParse(SavedNoteDateTime[i], out DateTime parsedDate) ? parsedDate : DateTime.Now, // FIXED: Maps to CreatedDateTime
                                     Description = SavedNoteDesc[i]
                                 });
                             }
@@ -653,7 +673,7 @@ namespace Radar_CRM.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            ViewBag.UsersList = new SelectList(_context.Users, "FullName", "FullName");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             return View(deal);
         }
     }
