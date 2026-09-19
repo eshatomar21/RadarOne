@@ -35,23 +35,34 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                // 2. IDENTIFY THE EXACT SOURCE BASED ON FORM ID
-                string leadSource = formData.FormId switch
-                {
-                    "29a1994" => "POP UP Form",
-                    "66097b8" => "Contact Page Form",
-                    "7966888" => "Untitled Form", // From the new form you provided
-                    _ => string.IsNullOrEmpty(formData.FormId) ? "Website Direct" : $"Website Form (ID: {formData.FormId})"
-                };
+                // 2. IDENTIFY DATA SOURCE
+                string leadSource = "";
 
-                // 3. CREATE THE ACCOUNT RECORD
+                // Check if it came from Google Ads (has a GCLID)
+                if (!string.IsNullOrEmpty(formData.Gclid))
+                {
+                    leadSource = "Google AdWords";
+                }
+                else
+                {
+                    // No GCLID means direct website traffic. Use the Form ID.
+                    leadSource = formData.FormId switch
+                    {
+                        "29a1994" => "POP UP Form",
+                        "66097b8" => "Contact Page Form",
+                        "7966888" => "Untitled Form",
+                        _ => string.IsNullOrEmpty(formData.FormId) ? "Website Direct" : $"Website Form (ID: {formData.FormId})"
+                    };
+                }
+
+                // 3. CREATE ONLY THE ACCOUNT RECORD
                 var newAccount = new Account
                 {
                     AccountName = formData.Name,
                     ContactPersonName = formData.Name,
                     Email = formData.Email,
                     MobileNumber = formData.Phone,
-                    IsHomeopathicDoctor = formData.DoctorRole, // Mapped from form dropdown
+                    IsHomeopathicDoctor = formData.DoctorRole,
 
                     Description = $"Message: {formData.Message}\n\n" +
                                   $"--- Tracking Info ---\n" +
@@ -62,44 +73,26 @@ namespace Radar_CRM.Controllers
                                   $"GCLID: {formData.Gclid}",
 
                     MetaCampaignName = formData.UtmCampaign,
+
+                    // This dynamically assigns "Google AdWords" OR the specific website form name
                     DataSource = leadSource,
+
                     CurrentStatus = "Non-User",
                     DateOfEntry = DateTime.Now,
+
+                    // Assigning to Sitara for both Google Ads and Website Direct scenarios
+                    CreatedBy = "Sitara",
+                    ModifiedBy = "Sitara"
                 };
 
                 _context.Accounts.Add(newAccount);
                 await _context.SaveChangesAsync();
 
-                // 4. CREATE THE CONTACT RECORD 
-                // Both forms will automatically generate the connected Contact record
-                var newContact = new Lead
-                {
-                    AccountId = newAccount.Id,
-                    ContactName = formData.Name,
-                    LeadName = formData.Name,
-                    EmailID = formData.Email,
-                    MobileNumber = formData.Phone,
-                    IsHomeopathicDoctor = formData.DoctorRole, // Mapped from form dropdown
-
-                    DataSources = leadSource,
-                    CampaignSource = leadSource,
-                    Description = formData.Message,
-
-                    Stage = "Open",
-                    CurrentStatus = "Non-User",
-                    CreatedDateAndTime = DateTime.Now,
-                    LeadCreatedTime = DateTime.Now
-                };
-
-                _context.Leads.Add(newContact);
-                await _context.SaveChangesAsync();
-
                 return Ok(new
                 {
                     success = true,
-                    message = "Account and Contact created successfully",
-                    accountId = newAccount.Id,
-                    contactId = newContact.Id
+                    message = "Account created successfully. Lead skipped.",
+                    accountId = newAccount.Id
                 });
             }
             catch (Exception ex)

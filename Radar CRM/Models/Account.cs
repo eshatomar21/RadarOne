@@ -106,6 +106,10 @@ namespace Radar_CRM.Models
         public string? PaymentType { get; set; }
         public string? PaymentStatus { get; set; }
 
+        public string? CreatedBy { get; set; }
+
+        public string? ModifiedBy { get; set; }
+
         // Inside your Account or Lead class...
         [NotMapped] // Tells Entity Framework not to create a direct SQL column for this
         public List<Notes> Notes { get; set; } = new List<Notes>();
