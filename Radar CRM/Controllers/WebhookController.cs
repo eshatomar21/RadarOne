@@ -64,7 +64,22 @@ namespace Radar_CRM.Controllers
 
                 // If a rule matches, assign that specific user. 
                 // If no rule is found, it will safely leave the owner blank.
-                string assignedOwnerId = matchedRule != null ? matchedRule.AssignToUserId : null;
+                string assignedOwnerId = null;
+
+                // 🚀 STRICT FK CHECK: Prevent database crash!
+                // Validate that the rule's Assigned User ID actually exists in the database.
+                if (matchedRule != null && !string.IsNullOrWhiteSpace(matchedRule.AssignToUserId))
+                {
+                    bool userExists = await _context.Users.AnyAsync(u => u.Id == matchedRule.AssignToUserId);
+                    if (userExists)
+                    {
+                        assignedOwnerId = matchedRule.AssignToUserId;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"WEBHOOK WARNING: Assignment Rule {matchedRule.Id} contains an invalid User ID: {matchedRule.AssignToUserId}. Falling back to unassigned.");
+                    }
+                }
 
                 // 4. CREATE ONLY THE ACCOUNT RECORD
                 var newAccount = new Account
