@@ -531,7 +531,10 @@
 
         try {
             alert("Uploading vendor data, please wait...");
-            const response = await fetch('/Vendors/UploadFile', { method: 'POST', body: formData });
+                const response = await fetch('@Url.Action("UploadFile", "Vendors")', {
+        method: 'POST',
+        body: formData
+    })
             if (response.ok) {
                 alert("Vendor data uploaded successfully!");
                 window.location.reload();

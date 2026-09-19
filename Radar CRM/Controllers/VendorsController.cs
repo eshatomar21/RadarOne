@@ -104,7 +104,7 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // UPLOAD FILE: POST 
         // ==========================================
-        [HttpPost]
+        [HttpPost("Vendors/UploadFile")]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0)
