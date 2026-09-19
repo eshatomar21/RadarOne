@@ -173,12 +173,23 @@ namespace Radar_CRM.Controllers
                     }
                     await _context.SaveChangesAsync();
                 }
-                return Ok();
+
+                return Ok(new { success = true, message = "Vendors uploaded successfully" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                return StatusCode(500, "An error occurred while processing the file.");
+                // 1. Extract the actual database or code error (InnerException usually holds SQL errors)
+                string actualError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                // 2. Log it to the console for your reference
+                Console.WriteLine("VENDOR UPLOAD ERROR: " + actualError);
+
+                // 3. Return the exact error to the frontend so you can see exactly what went wrong
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = $"Upload failed: {actualError}"
+                });
             }
         }
 
