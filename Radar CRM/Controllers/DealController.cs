@@ -497,6 +497,86 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
+        // 🚀 AJAX: MASS UPDATE
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> BulkUpdate([FromBody] MassUpdateRequest request)
+        {
+            if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrWhiteSpace(request.FieldName))
+            {
+                return Json(new { success = false, message = "Invalid request or no records selected." });
+            }
+
+            try
+            {
+                // 1. Fetch all deals that match the selected IDs
+                var dealsToUpdate = await _context.Deals
+                    .Where(d => request.Ids.Contains(d.Id))
+                    .ToListAsync();
+
+                if (!dealsToUpdate.Any())
+                {
+                    return Json(new { success = false, message = "No matching records found." });
+                }
+
+                // 2. Use Reflection to find the exact property the user wants to update
+                var propertyInfo = typeof(Deal).GetProperty(request.FieldName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
+
+                if (propertyInfo == null)
+                {
+                    return Json(new { success = false, message = $"Field '{request.FieldName}' does not exist on the Deal model." });
+                }
+
+                // 3. Determine target type (handle nullable types gracefully)
+                Type targetType = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+                object targetValue = null;
+
+                // 4. Safely parse the incoming string value to the actual C# property type
+                if (!string.IsNullOrWhiteSpace(request.NewValue))
+                {
+                    if (targetType == typeof(int))
+                    {
+                        if (int.TryParse(request.NewValue, out int intVal)) targetValue = intVal;
+                    }
+                    else if (targetType == typeof(decimal))
+                    {
+                        if (decimal.TryParse(request.NewValue, out decimal decVal)) targetValue = decVal;
+                    }
+                    else if (targetType == typeof(DateTime))
+                    {
+                        if (DateTime.TryParse(request.NewValue, out DateTime dtVal)) targetValue = dtVal;
+                    }
+                    else if (targetType == typeof(bool))
+                    {
+                        if (bool.TryParse(request.NewValue, out bool boolVal)) targetValue = boolVal;
+                    }
+                    else
+                    {
+                        // Fallback for strings and standard types
+                        targetValue = Convert.ChangeType(request.NewValue, targetType);
+                    }
+                }
+
+                // 5. Apply the value to all selected records
+                foreach (var deal in dealsToUpdate)
+                {
+                    propertyInfo.SetValue(deal, targetValue);
+                    _context.Entry(deal).State = EntityState.Modified;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                // Capture inner exception for detailed DB constraint errors
+                string errorMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = errorMsg });
+            }
+        }
+
+        // ==========================================
         // HELPER METHODS FOR CSV PARSING
         // ==========================================
         private string GetVal(string[] values, int index)
@@ -685,4 +765,11 @@ namespace Radar_CRM.Controllers
         public string Value { get; set; }
         public bool IsDate { get; set; }
     }
+}
+
+public class MassUpdateRequest
+{
+    public List<int> Ids { get; set; }
+    public string FieldName { get; set; }
+    public string NewValue { get; set; }
 }

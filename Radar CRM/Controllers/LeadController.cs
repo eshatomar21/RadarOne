@@ -224,6 +224,78 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
+        // BULK UPDATE FOR LEADS: AJAX POST
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken] // Prevents 405/400 Anti-forgery mismatch with fetch()
+        public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
+        {
+            if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrEmpty(request.FieldName))
+            {
+                return Json(new { success = false, message = "Invalid selection or field." });
+            }
+
+            try
+            {
+                var leadsToUpdate = await _context.Leads.Where(l => request.Ids.Contains(l.Id)).ToListAsync();
+
+                // Locate the property dynamically via reflection
+                var propertyInfo = typeof(Lead).GetProperty(request.FieldName,
+                    System.Reflection.BindingFlags.IgnoreCase |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+
+                if (propertyInfo == null)
+                    return Json(new { success = false, message = $"Field '{request.FieldName}' not found on Lead entity." });
+
+                foreach (var lead in leadsToUpdate)
+                {
+                    object safeValue = null;
+                    Type targetType = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+
+                    if (!string.IsNullOrWhiteSpace(request.NewValue))
+                    {
+                        if (targetType == typeof(DateTime))
+                        {
+                            if (DateTime.TryParse(request.NewValue, out DateTime parsedDate)) safeValue = parsedDate;
+                        }
+                        else if (targetType == typeof(DateOnly))
+                        {
+                            if (DateOnly.TryParse(request.NewValue, out DateOnly parsedDateOnly)) safeValue = parsedDateOnly;
+                        }
+                        else if (targetType == typeof(bool))
+                        {
+                            if (bool.TryParse(request.NewValue, out bool parsedBool)) safeValue = parsedBool;
+                        }
+                        else
+                        {
+                            safeValue = Convert.ChangeType(request.NewValue, targetType);
+                        }
+                    }
+
+                    propertyInfo.SetValue(lead, safeValue, null);
+                }
+
+                _context.UpdateRange(leadsToUpdate);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                string message = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = message });
+            }
+        }
+
+        public class BulkUpdateRequest
+        {
+            public List<int> Ids { get; set; }
+            public string FieldName { get; set; }
+            public string NewValue { get; set; }
+        }
+
+        // ==========================================
         // HELPER METHOD (Add this to the bottom of the LeadsController)
         // ==========================================
         private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)

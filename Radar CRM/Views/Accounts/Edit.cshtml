@@ -775,12 +775,7 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Co-Owner</label>
-                        <select asp-for="CoOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
-                            <option value="">- Select Co-Owner -</option>
-                        </select>
-                    </div>
+                    
 
 
                     <!-- Conditional Fields (Hidden by default) -->
@@ -805,9 +800,9 @@
                     </div>
 
                     <!-- FIX: Removed the extra nested <div class="row"> here -->
-                    <div class="col-md-6 form-group">
+                    <div class="col-md-6 form-group" id="divGroupName" style="display: none;">
                         <label class="sf-label">Group Name</label>
-                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select" id="GroupName">
                             <option value="">-Select Group Name-</option>
                         </select>
                     </div>
@@ -828,29 +823,49 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6 form-group" id="LeadStatus">
-                        <label class="sf-label">LeadStatus</label>
-                        <input name="LeadStatus" class="sf-input" placeholder="Enter seminar name..." readonly />
-                    </div>
+                    @if (!string.IsNullOrEmpty(Model?.LeadStatus))
+                    {
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Lead Status</label>
+                            <input asp-for="LeadStatus" class="sf-input" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
+                        </div>
+                    } 
 
 
-
-                    <!-- Hidden Date of Entry field -->
-                    <div class="col-md-6 form-group" style="display: none;">
+                    <!-- Date of Entry -->
+                    <div class="col-md-6 form-group">
                         <label class="sf-label">Date of Entry</label>
-                        <input asp-for="DateOfEntry" class="sf-input" type="datetime-local" />
+                        <input type="text" class="sf-input" value="@(Model?.DateOfEntry != null && Model.DateOfEntry != DateTime.MinValue ? Model.DateOfEntry.ToString("MMM dd, yyyy - hh:mm tt") : "N/A")" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
+
+                        <!-- Hidden input to retain actual DateTime value on form submission -->
+                        <input type="hidden" asp-for="DateOfEntry" />
                     </div>
-                </div>
 
-                <div class="form-group mb-3">
-                    <label asp-for="CreatedBy" class="control-label"></label>
-                    <input asp-for="CreatedBy" class="form-control" readonly />
-                </div>
+                    <!-- Created By -->
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Created By</label>
+                        @{
+                            string creatorName = !string.IsNullOrEmpty(Model?.CreatedBy) ? Model.CreatedBy : "System User";
+                        }
+                        <input type="text" class="sf-input" value="@creatorName" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
 
-                <div class="form-group mb-3">
-                    <label asp-for="ModifiedBy" class="control-label"></label>
-                    <input asp-for="ModifiedBy" class="form-control" readonly />
-                </div>
+                        <!-- Hidden input to retain data so it doesn't erase on form save -->
+                        <input type="hidden" asp-for="CreatedBy" />
+                    </div>
+
+                    <!-- Modified By (Current) -->
+                    <div class="col-md-6 form-group">
+                        <label class="sf-label">Modified By (Current)</label>
+                        @{
+                            // Grabs the currently logged-in user & live time
+                            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(User.Identity.Name) ? User.Identity.Name : "Current User";
+                            string modifiedDisplay = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                        }
+                        <input type="text" class="sf-input" value="@modifiedDisplay" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
+
+                        <!-- Submits the logged-in user name back to the database as the modifier -->
+                        <input type="hidden" name="ModifiedBy" value="@currentUser" />
+                    </div>
 
                 <!-- Primary Details -->
                 <h3 class="pane-section-title" style="margin-top: 12px;">Primary Details</h3>
@@ -991,7 +1006,7 @@
                     </div>
                 </div>
             </div>
-
+        </div>
             <!-- ADDRESS TAB -->
             <div class="tab-pane fade" id="address" role="tabpanel" style="padding: 32px 40px;">
                 <div class="row">
@@ -1156,7 +1171,7 @@
                         </select>
                     </div>
 
-                    <div class="col-md-3 form-group"><label class="sf-label">Has Computer</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Have computer/Laptop?</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
                     <div class="col-md-3 form-group"><label class="sf-label">Years of Practice</label><input asp-for="YearsOfPractice" type="number" class="sf-input" /></div>
                     <div class="col-md-3 form-group"><label class="sf-label">Patients per Day</label><input asp-for="PatientsPerDay" type="number" class="sf-input" /></div>
                     <div class="col-md-3 form-group">
@@ -1764,6 +1779,36 @@
     }
     }
     });
+
+    // ==========================================
+    // TOGGLE GROUP NAME BASED ON ACCOUNT TYPE
+    // ==========================================
+    function toggleAccountTypeFields() {
+    const accountTypeSelect = document.getElementById('AccountType');
+    const divGroupName = document.getElementById('divGroupName');
+
+    if (accountTypeSelect && divGroupName) {
+    // Show only if 'Group' is selected, otherwise hide
+    if (accountTypeSelect.value === 'Group') {
+    divGroupName.style.display = 'block';
+    } else {
+    divGroupName.style.display = 'none';
+
+    // Optional: Automatically clear the Group Name selection if they change the type away from Group
+    const groupNameInput = document.getElementById('GroupName');
+    if(groupNameInput) groupNameInput.value = '';
+    }
+    }
+    }
+
+    // Attach the event listener to the dropdown
+    const accountTypeEl = document.getElementById('AccountType');
+    if (accountTypeEl) {
+    accountTypeEl.addEventListener('change', toggleAccountTypeFields);
+
+    // Run once on page load to ensure the correct visibility when editing an existing record
+    document.addEventListener("DOMContentLoaded", toggleAccountTypeFields);
+    }
 
     // ==========================================
     // 2. EXISTING PAGE LOGIC

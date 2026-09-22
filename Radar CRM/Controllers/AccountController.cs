@@ -256,6 +256,101 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
+        // DYNAMIC FIELD OPTIONS FOR MASS UPDATE
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> GetFieldOptions(string fieldName)
+        {
+            try
+            {
+                var propertyInfo = typeof(Account).GetProperty(fieldName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                // If the field isn't a string (dropdowns are usually strings), return empty so JS shows a textbox
+                if (propertyInfo == null || propertyInfo.PropertyType != typeof(string))
+                {
+                    return Json(new string[] { });
+                }
+
+                // 🚀 Query the DB for all unique, non-null values that currently exist for this column
+                var distinctValues = await _context.Accounts
+                    .Select(a => EF.Property<string>(a, propertyInfo.Name))
+                    .Where(v => !string.IsNullOrEmpty(v))
+                    .Distinct()
+                    .OrderBy(v => v)
+                    .ToListAsync();
+
+                return Json(distinctValues);
+            }
+            catch
+            {
+                return Json(new string[] { });
+            }
+        }
+
+        // ==========================================
+        // BULK UPDATE: AJAX POST
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken] // 🚀 FIX: Added this to prevent 400 Bad Request errors from anti-forgery mismatches in AJAX
+        public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
+        {
+            if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrEmpty(request.FieldName))
+            {
+                return Json(new { success = false, message = "Invalid data provided." });
+            }
+
+            try
+            {
+                var accountsToUpdate = await _context.Accounts.Where(a => request.Ids.Contains(a.Id)).ToListAsync();
+
+                // Use reflection to find the property dynamically
+                var propertyInfo = typeof(Account).GetProperty(request.FieldName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                if (propertyInfo == null)
+                    return Json(new { success = false, message = "Field not found in database." });
+
+                foreach (var account in accountsToUpdate)
+                {
+                    // Handle Types Safely
+                    object safeValue = null;
+                    Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+
+                    if (!string.IsNullOrWhiteSpace(request.NewValue))
+                    {
+                        if (t == typeof(DateTime))
+                        {
+                            if (DateTime.TryParse(request.NewValue, out DateTime d)) safeValue = d;
+                        }
+                        else
+                        {
+                            safeValue = Convert.ChangeType(request.NewValue, t);
+                        }
+                    }
+
+                    propertyInfo.SetValue(account, safeValue, null);
+                }
+
+                _context.UpdateRange(accountsToUpdate);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = trueError });
+            }
+        }
+
+        // 🚀 Ensure this class is defined inside the controller for the JSON binding to work
+        public class BulkUpdateRequest
+        {
+            public List<int> Ids { get; set; }
+            public string FieldName { get; set; }
+            public string NewValue { get; set; }
+        }
+
+        // ==========================================
         // AJAX: GET NOTES FOR OFFCANVAS
         // ==========================================
         [HttpGet]
@@ -389,19 +484,26 @@ namespace Radar_CRM.Controllers
 
             // 1. Fetch Existing Notes
             ViewBag.ExistingNotes = await _context.Note
-                .Include(n => n.NoteOwner) // 🚀 ADD THIS LINE to load the User data
-               .Where(n => n.AccountId == id)
+                .Include(n => n.NoteOwner)
+                .Where(n => n.AccountId == id)
                 .OrderByDescending(n => n.CreatedDateTime)
                 .ToListAsync();
 
             // 2. Fetch Automatically Linked Leads (Contacts)
-            // This finds any Lead in the database where AccountId matches this Account
-            ViewBag.RelatedLeads = await _context.Leads
+            var relatedLeads = await _context.Leads
                 .Where(l => l.AccountId == id)
                 .ToListAsync();
 
+            ViewBag.RelatedLeads = relatedLeads;
+
+            // 🚀 NEW: Safely pull the LeadStatus from the linked Lead into the Account
+            var linkedLeadWithStatus = relatedLeads.FirstOrDefault(l => !string.IsNullOrEmpty(l.LeadStatus));
+            if (linkedLeadWithStatus != null)
+            {
+                account.LeadStatus = linkedLeadWithStatus.LeadStatus;
+            }
+
             // 3. Fetch Automatically Linked Deals
-            // This finds any Deal in the database where AccountId matches this Account
             ViewBag.RelatedDeals = await _context.Set<Deal>()
                 .Where(d => d.AccountId == id)
                 .ToListAsync();
@@ -413,9 +515,9 @@ namespace Radar_CRM.Controllers
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
+
             return View(account);
         }
-
         // ==========================================
         // EDIT: POST (Saves changes back to the DB)
         // ==========================================
@@ -786,39 +888,61 @@ namespace Radar_CRM.Controllers
             var account = await _context.Accounts.FindAsync(id);
             if (account != null)
             {
-                // 🚀 FIX: Find and delete related DEALS first to clear the database constraint
-                var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId == id).ToListAsync();
-                if (relatedDeals.Any())
-                {
-                    _context.Set<Deal>().RemoveRange(relatedDeals);
-                }
+                // 1. Delete Tasks
+                var relatedTasks = await _context.Set<Radar_CRM.Models.Task>().Where(t => t.AccountId == id).ToListAsync();
+                if (relatedTasks.Any()) _context.Set<Radar_CRM.Models.Task>().RemoveRange(relatedTasks);
 
-                // 🚀 FIX: Find and delete related Leads
+                // 2. Delete Deals
+                var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId == id).ToListAsync();
+                if (relatedDeals.Any()) _context.Set<Deal>().RemoveRange(relatedDeals);
+
+                // 3. 🚀 FIX: Find Leads, delete their Notes FIRST, then delete Leads
                 if (_context.Leads != null)
                 {
                     var relatedLeads = await _context.Leads.Where(l => l.AccountId == id).ToListAsync();
                     if (relatedLeads.Any())
                     {
+                        var leadIds = relatedLeads.Select(l => l.Id).ToList();
+
+                        // Delete Notes attached to these Leads to satisfy FK_Note_Leads_LeadId
+                        if (_context.Note != null)
+                        {
+                            var leadNotes = await _context.Note.Where(n => n.LeadId != null && leadIds.Contains((int)n.LeadId)).ToListAsync();
+                            if (leadNotes.Any()) _context.Note.RemoveRange(leadNotes);
+                        }
+
                         _context.Leads.RemoveRange(relatedLeads);
                     }
                 }
 
-                // 🚀 FIX: Find and delete related Notes
+                // 4. Delete Notes attached directly to the Account
                 if (_context.Note != null)
                 {
                     var relatedNotes = await _context.Note.Where(n => n.AccountId == id).ToListAsync();
-                    if (relatedNotes.Any())
-                    {
-                        _context.Note.RemoveRange(relatedNotes);
-                    }
+                    if (relatedNotes.Any()) _context.Note.RemoveRange(relatedNotes);
                 }
 
-                // Now it's safe to remove the account!
+                // 5. Now it's safe to remove the account!
                 _context.Accounts.Remove(account);
                 await _context.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
         }
+
+        [HttpGet]
+        public async Task<IActionResult> CheckEmailDuplicate(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Json(new { isDuplicate = false });
+            }
+
+            // REPLACE '_context.Users' with the correct table you are checking against (e.g., _context.Leads)
+            bool exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLower().Trim());
+
+            return Json(new { isDuplicate = exists });
+        }
+
         // ==========================================
         // BULK DELETE: AJAX POST
         // ==========================================
@@ -833,49 +957,46 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                var accountsToDelete = await _context.Accounts
-                                                     .Where(a => ids.Contains(a.Id))
-                                                     .ToListAsync();
+                var accountsToDelete = await _context.Accounts.Where(a => ids.Contains(a.Id)).ToListAsync();
 
                 if (accountsToDelete != null && accountsToDelete.Any())
                 {
-                    // 🚀 FIX: Safely remove associated DEALS first to clear the database constraint
-                    var relatedDeals = await _context.Set<Deal>()
-                        .Where(d => d.AccountId != null && ids.Contains((int)d.AccountId))
-                        .ToListAsync();
+                    // 1. Delete Tasks
+                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>().Where(t => t.AccountId != null && ids.Contains((int)t.AccountId)).ToListAsync();
+                    if (relatedTasks.Any()) _context.Set<Radar_CRM.Models.Task>().RemoveRange(relatedTasks);
 
-                    if (relatedDeals.Any())
-                    {
-                        _context.Set<Deal>().RemoveRange(relatedDeals);
-                    }
+                    // 2. Delete Deals
+                    var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId != null && ids.Contains((int)d.AccountId)).ToListAsync();
+                    if (relatedDeals.Any()) _context.Set<Deal>().RemoveRange(relatedDeals);
 
-                    // Safely remove associated LEADS 
+                    // 3. 🚀 FIX: Find Leads, delete their Notes FIRST, then delete Leads
                     if (_context.Leads != null)
                     {
-                        var relatedLeads = await _context.Leads
-                            .Where(l => l.AccountId != null && ids.Contains((int)l.AccountId))
-                            .ToListAsync();
+                        var relatedLeads = await _context.Leads.Where(l => l.AccountId != null && ids.Contains((int)l.AccountId)).ToListAsync();
 
                         if (relatedLeads != null && relatedLeads.Any())
                         {
+                            var leadIds = relatedLeads.Select(l => l.Id).ToList();
+
+                            // Delete Notes attached to these Leads to satisfy FK_Note_Leads_LeadId
+                            if (_context.Note != null)
+                            {
+                                var leadNotes = await _context.Note.Where(n => n.LeadId != null && leadIds.Contains((int)n.LeadId)).ToListAsync();
+                                if (leadNotes.Any()) _context.Note.RemoveRange(leadNotes);
+                            }
+
                             _context.Leads.RemoveRange(relatedLeads);
                         }
                     }
 
-                    // Safely remove associated NOTES
+                    // 4. Delete Notes attached directly to the Account
                     if (_context.Note != null)
                     {
-                        var relatedNotes = await _context.Note
-                            .Where(n => n.AccountId != null && ids.Contains((int)n.AccountId))
-                            .ToListAsync();
-
-                        if (relatedNotes != null && relatedNotes.Any())
-                        {
-                            _context.Note.RemoveRange(relatedNotes);
-                        }
+                        var relatedNotes = await _context.Note.Where(n => n.AccountId != null && ids.Contains((int)n.AccountId)).ToListAsync();
+                        if (relatedNotes != null && relatedNotes.Any()) _context.Note.RemoveRange(relatedNotes);
                     }
 
-                    // Finally, remove the Accounts!
+                    // 5. Finally, remove the Accounts!
                     _context.Accounts.RemoveRange(accountsToDelete);
                     await _context.SaveChangesAsync();
                 }
@@ -884,10 +1005,8 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // This grabs the deepest, most specific database error
                 var errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 Console.WriteLine("DELETE ERROR: " + errorMessage);
-
                 return StatusCode(500, errorMessage);
             }
         }
@@ -902,6 +1021,31 @@ namespace Radar_CRM.Controllers
             bool exists = await _context.Accounts.AnyAsync(a => a.MobileNumber == phone || a.AlternateMobile == phone);
 
             return Json(new { isDuplicate = exists });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> CheckMobileDuplicate(string mobile)
+        {
+            if (string.IsNullOrWhiteSpace(mobile))
+            {
+                return Json(new { success = true, isDuplicate = false });
+            }
+
+            try
+            {
+                string cleanMobile = mobile.Trim();
+
+                // REPLACE '_context.Leads' with the actual table you are checking (e.g., _context.Users or _context.Accounts)
+                bool exists = await _context.Leads.AnyAsync(l => l.MobileNumber == cleanMobile);
+
+                return Json(new { success = true, isDuplicate = exists });
+            }
+            catch (Exception ex)
+            {
+                // This will capture the exact SQL/Connection error on your live server
+                string errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = "DB Connection Error: " + errorMessage });
+            }
         }
 
         // ==========================================

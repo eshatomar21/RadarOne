@@ -355,13 +355,7 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Co-Owner</label>
-                        <select asp-for="CoOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
-                            <option value="">- Select Co-Owner -</option>
-                        </select>
-                    </div>
-
+                 
 
                     <!-- Conditional Fields (Hidden by default) -->
                     <div class="col-md-6 form-group" id="divMetaCampaign" style="display:none;">
@@ -385,9 +379,9 @@
                     </div>
 
                     <!-- FIX: Removed the extra nested <div class="row"> here -->
-                    <div class="col-md-6 form-group">
+                    <div class="col-md-6 form-group" id="divGroupName" style="display: none;">
                         <label class="sf-label">Group Name</label>
-                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select" id="GroupName">
                             <option value="">-Select Group Name-</option>
                         </select>
                     </div>
@@ -397,7 +391,7 @@
                         <select asp-for="CurrentStatus" class="sf-select">
                             <option value="None">None</option>
                             <option value="User">User</option>
-                            <option value="Non-User">Non-User</option>
+                            <option value="Non-User" selected>Non-User</option>
                         </select>
                     </div>
 
@@ -408,10 +402,7 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6 form-group" id="LeadStatus">
-                        <label class="sf-label">Lead Status</label>
-                        <input name="LeadStatus" class="sf-input" placeholder="Enter Lead Status..." readonly />
-                    </div>
+       
 
                     <!-- Hidden Date of Entry field -->
                     <div class="col-md-6 form-group" style="display: none;">
@@ -442,7 +433,7 @@
                         </div>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label class="sf-label">Email</label>
+                        <label class="sf-label">Email  <span class="text-danger">*</span></label>
                         <input asp-for="Email" class="sf-input" style="color: #1a56db;" placeholder="email@example.com" />
                     </div>
 
@@ -488,7 +479,7 @@
                         <div class="row">
                             <div class="col-md-6 form-group">
                                 <label class="sf-label">Profile Status</label>
-                                <select asp-for="Profilestatus" class="sf-select">
+                                <select asp-for="Profilestatus" class="sf-select" disabled>
                                     <option value="">-None-</option>
                                     <option value="Completed">Completed</option>
                                     <option value="Strongly Completed">Strongly Completed</option>
@@ -552,8 +543,8 @@
                                         </select>
                                     </div>
                                     <div class="col-md-6 form-group mb-3">
-                                        <label class="sf-label">State <span class="text-danger">*</span></label>
-                                        <select asp-for="Addr1_State" class="sf-select" id="Addr1_State" required>
+                                        <label class="sf-label">State <span class="text-danger"></span></label>
+                                        <select asp-for="Addr1_State" class="sf-select" id="Addr1_State">
                                             <option value="">- Select State -</option>
                                         </select>
                                     </div>
@@ -696,7 +687,7 @@
                         </select>
                     </div>
 
-                    <div class="col-md-3 form-group"><label class="sf-label">Has Computer</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="col-md-3 form-group"><label class="sf-label">Have computer/Laptop?</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
                     <div class="col-md-3 form-group"><label class="sf-label">Years of Practice</label><input asp-for="YearsOfPractice" type="number" class="sf-input" /></div>
                     <div class="col-md-3 form-group"><label class="sf-label">Patients per Day</label><input asp-for="PatientsPerDay" type="number" class="sf-input" /></div>
                     <div class="col-md-3 form-group">
@@ -895,6 +886,27 @@
     </div>
 </div>
 
+<!-- MANDATORY FIELDS MISSING MODAL -->
+<div class="modal fade" id="mandatoryFieldsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header" style="background-color: #fef2f2; border-bottom: 1px solid #fee2e2;">
+                <h5 class="modal-title fw-bold" style="color: #b91c1c;">
+                    <i class="fa-solid fa-circle-exclamation me-2"></i> Missing Information
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px; font-size: 0.95rem;">
+                You have missed some mandatory fields! <br><br>
+                Please fill in all fields marked with a red asterisk (<span class="text-danger">*</span>) before saving the account.
+            </div>
+            <div class="modal-footer" style="background-color: #f8fafc;">
+                <button type="button" class="btn-sf-primary" data-bs-dismiss="modal" style="width: 100%;">Okay, I will fix it</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Bootstrap JS bundle required for Tab switching & Modals -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -965,6 +977,8 @@
     const modalInstance = bootstrap.Modal.getInstance(modalEl);
     modalInstance.hide();
     }
+
+
     // ==========================================
     // 2. EXISTING PAGE LOGIC (Untouched)
     // ==========================================
@@ -1220,23 +1234,84 @@
     }
 
     // ==========================================
+    // TOGGLE GROUP NAME BASED ON ACCOUNT TYPE
+    // ==========================================
+    function toggleAccountTypeFields() {
+    const accountTypeSelect = document.getElementById('AccountType');
+    const divGroupName = document.getElementById('divGroupName');
+
+    if (accountTypeSelect && divGroupName) {
+    // Show only if 'Group' is selected, otherwise hide
+    if (accountTypeSelect.value === 'Group') {
+    divGroupName.style.display = 'block';
+    } else {
+    divGroupName.style.display = 'none';
+
+    // Optional: Automatically clear the Group Name selection if they change the type away from Group
+    const groupNameInput = document.getElementById('GroupName');
+    if(groupNameInput) groupNameInput.value = '';
+    }
+    }
+    }
+
+    // Attach the event listener to the dropdown
+    const accountTypeEl = document.getElementById('AccountType');
+    if (accountTypeEl) {
+    accountTypeEl.addEventListener('change', toggleAccountTypeFields);
+
+    // Run once on page load to ensure the correct visibility when editing an existing record
+    document.addEventListener("DOMContentLoaded", toggleAccountTypeFields);
+    }
+
+    // ==========================================
     // 5. PROFILE PENDING REASON POPUP VALIDATION
     // ==========================================
+    // ==========================================
+    // 5. FORM SUBMISSION & VALIDATION POPUPS
+    // ==========================================
     document.getElementById('accountForm').addEventListener('submit', function (e) {
-    // Bulletproof value extractor
+
+    // --- STEP 1: CHECK ALL MANDATORY FIELDS FIRST ---
+    let isMandatoryValid = true;
+    // Grabs every input/select on the form that has the 'required' attribute
+    const requiredFields = this.querySelectorAll('[required]');
+
+    requiredFields.forEach(field => {
+    if (!field.value.trim()) {
+    isMandatoryValid = false;
+    // Highlight the missing field in red
+    field.style.boxShadow = "0 0 0 3px #ef4444";
+    setTimeout(() => field.style.boxShadow = "none", 3500);
+    }
+    });
+
+    if (!isMandatoryValid) {
+    e.preventDefault(); // Stop submission
+
+    // Trigger the Missing Fields Modal
+    const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
+    if (mandatoryModalEl) {
+    const mandatoryModal = new bootstrap.Modal(mandatoryModalEl);
+    mandatoryModal.show();
+    } else {
+    alert("Please fill in all mandatory fields marked with an asterisk (*).");
+    }
+    return; // Stop executing further code until they fix the missing fields
+    }
+
+
+    // --- STEP 2: EXISTING PROFILE PENDING REASON CHECK ---
     function getFieldValue(fieldName) {
     const el = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
     return el ? el.value.trim() : "";
     }
 
-    // 1. Safely get all field values
     const q1 = getFieldValue('IsHomeopathicDoctor');
     const q2 = getFieldValue('WorkType');
     const q3 = getFieldValue('ClinicType');
     const q4 = getFieldValue('HasComputer');
     const reasonValue = getFieldValue('ProfilePendingReason');
 
-    // 2. Evaluate if the profile is incomplete
     const isProfileIncomplete = (
     q1 === "" || q1 === "-None-" || q1 === "false" ||
     q2 === "" || q2 === "-None-" || q2 === "false" ||
@@ -1244,11 +1319,9 @@
     q4 === "" || q4 === "-None-" || q4 === "false"
     );
 
-    // 3. Stop submission and show popup if incomplete with no reason
     if (isProfileIncomplete && (reasonValue === "" || reasonValue === "-None-")) {
-    e.preventDefault(); // 🛑 THIS STOPS THE FORM SUBMISSION
+    e.preventDefault(); // Stop submission
 
-    // Trigger the Bootstrap Modal
     const modalEl = document.getElementById('pendingReasonModal');
     if (modalEl) {
     const myModal = new bootstrap.Modal(modalEl);
@@ -1257,13 +1330,11 @@
     alert("Your profile is incomplete! Please select a Profile Pending Reason.");
     }
 
-    // Auto-switch to the Main Tab
     const mainTab = document.getElementById('main-tab');
     if (mainTab) {
     new bootstrap.Tab(mainTab).show();
     }
 
-    // Highlight the Reason field in red
     const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
     if (reasonField) {
     reasonField.focus();

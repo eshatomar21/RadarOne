@@ -107,7 +107,7 @@ namespace Radar_CRM.Controllers
                     DateOfEntry = DateTime.Now,
 
                     // 🚀 THIS links the record to the dynamically found user in the CRM UI
-                    AccountOwnerId = assignedOwnerId,
+                    AccountOwnerId = "zcrm_1092392000000518001",
 
                     CreatedBy = "Webhook System",
                     ModifiedBy = "Webhook System"
