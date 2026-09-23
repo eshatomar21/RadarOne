@@ -28,6 +28,8 @@ namespace Radar_CRM.Models
         public string? Priority { get; set; }
         public DateTime? ClosedTime { get; set; }
 
+        public DateTime? CreatedDateAndTime { get; set; }
+
         // Scheduling
         public string? Repeat { get; set; }
         public DateTime? Reminder { get; set; }

@@ -887,10 +887,14 @@
                             <button type="button" class="btn-verify" onclick="verifyPhone('MobileNumber')">Verify</button>
                         </div>
                     </div>
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Email</label>
-                        <input asp-for="Email" class="sf-input" style="color: #1a56db;" placeholder="email@example.com" />
-                    </div>
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Email  <span class="text-danger">*</span></label>
+                            <!-- 🚀 ADDED verify-group container -->
+                            <div class="verify-group">
+                                <input asp-for="Email" class="sf-input" id="Email" style="color: #1a56db;" placeholder="email@example.com" required />
+                                <button type="button" class="btn-verify" onclick="verifyEmail('Email')">Verify</button>
+                            </div>
+                        </div>
 
                     <div class="col-md-6 form-group">
                         <label class="sf-label">Alternate Mobile</label>
@@ -900,11 +904,14 @@
                         </div>
                     </div>
 
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Alternate Email ID</label>
-                        <input asp-for="AlternateEmailID" class="sf-input" placeholder="Optional..." />
-                    </div>
-
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Alternate Email</label>
+                            <!-- 🚀 ADDED verify-group container -->
+                            <div class="verify-group">
+                                <input asp-for="AlternateEmailID" class="sf-input" id="AlternateEmailID" placeholder="Alternate email..." />
+                                <button type="button" class="btn-verify" onclick="verifyEmail('AlternateEmailID')">Verify</button>
+                            </div>
+                        </div>
                     <div class="row">
                         <div class="col-md-6 form-group">
                             <label class="sf-label">Profile Pending Reason</label>
@@ -2013,4 +2020,119 @@
     btn.classList.remove("expanded");
     }
     }
+
+    // ==========================================
+    // PHONE & EMAIL VERIFICATION (EDIT PAGE)
+    // ==========================================
+
+    window.verifyPhone = function(fieldId) {
+    const phoneInput = document.getElementById(fieldId);
+    if (!phoneInput) {
+    alert("Error: Input field not found.");
+    return;
+    }
+
+    const phone = phoneInput.value.trim();
+    const mainMobile = document.getElementById('MobileNumber')?.value?.trim() || '';
+    const altMobile = document.getElementById('AlternateMobile')?.value?.trim() || '';
+
+    if (!phone) {
+    alert('Please enter a phone number first before verifying.');
+    return;
+    }
+
+    if (fieldId === 'AlternateMobile' && mainMobile && altMobile && mainMobile === altMobile) {
+    alert('❌ Mobile Number and Alternate Mobile cannot be the exact same!');
+    return;
+    }
+
+    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
+    let originalBtnText = 'Verify';
+    if (btn) {
+    originalBtnText = btn.innerText;
+    btn.innerText = '...';
+    btn.disabled = true;
+    }
+
+    fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
+    .then(async response => {
+    if (!response.ok) throw new Error("HTTP Status " + response.status);
+    return response.json();
+    })
+    .then(data => {
+    if (data.error) {
+    alert('⚠️ Database Error: ' + data.message);
+    } else if (data.isDuplicate) {
+    alert('⚠️ WARNING: This phone number exists in the database!\n\n(Note: If this is the current number for this account, you can ignore this warning).');
+    } else {
+    alert('✅ This number is valid and unique in the system.');
+    }
+    })
+    .catch(error => {
+    console.error("Error verifying phone:", error);
+    alert("Could not connect to the server. Check your browser console (F12) for details.");
+    })
+    .finally(() => {
+    if (btn) {
+    btn.innerText = originalBtnText;
+    btn.disabled = false;
+    }
+    });
+    };
+
+    window.verifyEmail = function(fieldId) {
+    const emailInput = document.getElementById(fieldId) || document.querySelector(`[name="${fieldId}"]`);
+
+    if (!emailInput) {
+    alert("Error: Input field not found. Check HTML IDs.");
+    return;
+    }
+
+    const email = (emailInput.value || '').trim();
+    const mainEmail = document.getElementById('Email')?.value?.trim() || '';
+    const altEmail = document.getElementById('AlternateEmailID')?.value?.trim() || '';
+
+    if (!email) {
+    alert('Please enter an email address first before verifying.');
+    return;
+    }
+
+    if (fieldId === 'AlternateEmailID' && mainEmail && altEmail && mainEmail.toLowerCase() === altEmail.toLowerCase()) {
+    alert('❌ Email and Alternate Email cannot be the exact same!');
+    return;
+    }
+
+    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
+    let originalBtnText = 'Verify';
+    if (btn) {
+    originalBtnText = btn.innerText;
+    btn.innerText = '...';
+    btn.disabled = true;
+    }
+
+    fetch('@Url.Action("CheckEmailDuplicate", "Accounts")?email=' + encodeURIComponent(email))
+    .then(async response => {
+    if (!response.ok) throw new Error("HTTP Status " + response.status);
+    return response.json();
+    })
+    .then(data => {
+    if (data.error) {
+    alert('⚠️ Database Error: ' + data.message);
+    } else if (data.isDuplicate) {
+    alert('⚠️ WARNING: This email exists in the database!\n\n(Note: If this is the current email for this account, you can ignore this warning).');
+    } else {
+    alert('✅ This email is valid and unique in the system.');
+    }
+    })
+    .catch(error => {
+    console.error("Error verifying email:", error);
+    alert("Could not connect to the server. Check your browser console (F12) for details.");
+    })
+    .finally(() => {
+    if (btn) {
+    btn.innerText = originalBtnText;
+    btn.disabled = false;
+    }
+    });
+    };
 </script>

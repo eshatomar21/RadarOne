@@ -291,7 +291,7 @@ namespace Radar_CRM.Controllers
         // BULK UPDATE: AJAX POST
         // ==========================================
         [HttpPost]
-        [IgnoreAntiforgeryToken] // 🚀 FIX: Added this to prevent 400 Bad Request errors from anti-forgery mismatches in AJAX
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
             if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrEmpty(request.FieldName))
@@ -302,16 +302,15 @@ namespace Radar_CRM.Controllers
             try
             {
                 var accountsToUpdate = await _context.Accounts.Where(a => request.Ids.Contains(a.Id)).ToListAsync();
-
-                // Use reflection to find the property dynamically
                 var propertyInfo = typeof(Account).GetProperty(request.FieldName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo == null)
                     return Json(new { success = false, message = "Field not found in database." });
 
+                var updatedAccountNames = new List<string>();
+
                 foreach (var account in accountsToUpdate)
                 {
-                    // Handle Types Safely
                     object safeValue = null;
                     Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
 
@@ -328,10 +327,18 @@ namespace Radar_CRM.Controllers
                     }
 
                     propertyInfo.SetValue(account, safeValue, null);
+                    updatedAccountNames.Add(account.AccountName ?? "Unknown Account");
                 }
 
                 _context.UpdateRange(accountsToUpdate);
                 await _context.SaveChangesAsync();
+
+                // 🚀 TRIGGER EMAIL IF OWNER WAS CHANGED
+                if (request.FieldName.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(request.NewValue))
+                {
+                    // Run notification asynchronously so it doesn't slow down the UI response
+                    _ = NotifyNewOwnerAsync(request.NewValue, updatedAccountNames);
+                }
 
                 return Json(new { success = true });
             }
@@ -341,7 +348,6 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = trueError });
             }
         }
-
         // 🚀 Ensure this class is defined inside the controller for the JSON binding to work
         public class BulkUpdateRequest
         {
@@ -549,14 +555,21 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
+                    // 🚀 Check if the Owner changed by comparing against the original database value
+                    string originalOwnerId = (string)_context.Entry(account).Property("AccountOwnerId").OriginalValue;
+                    bool ownerChanged = account.AccountOwnerId != originalOwnerId;
+
                     _context.Update(account);
                     await _context.SaveChangesAsync();
 
-                    // 🚀 UPDATED CALL: Passing 6 parameters including "Account" and SavedNoteFiles
                     await SaveNotesAsync(account.Id, "Account", SavedNoteOwner, SavedNoteDateTime, SavedNoteDesc, SavedNoteFiles);
-
-                    // TRIGGER AUTO-CONTACT CREATION CHECK 
                     await CheckAndCreateContactFromAccountAsync(account);
+
+                    // 🚀 TRIGGER EMAIL IF OWNER WAS CHANGED
+                    if (ownerChanged && !string.IsNullOrWhiteSpace(account.AccountOwnerId))
+                    {
+                        _ = NotifyNewOwnerAsync(account.AccountOwnerId, new List<string> { account.AccountName ?? "Unknown Account" });
+                    }
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -932,82 +945,92 @@ namespace Radar_CRM.Controllers
         [HttpGet]
         public async Task<IActionResult> CheckEmailDuplicate(string email)
         {
-            if (string.IsNullOrWhiteSpace(email))
+            if (string.IsNullOrWhiteSpace(email)) return Json(new { isDuplicate = false });
+
+            try
             {
-                return Json(new { isDuplicate = false });
+                string cleanEmail = email.Trim().ToLower();
+                // 🚀 FIX: Checking the Accounts table instead of Users
+                bool exists = await _context.Accounts.AnyAsync(a => a.Email != null && a.Email.ToLower() == cleanEmail);
+                return Json(new { isDuplicate = exists });
             }
-
-            // REPLACE '_context.Users' with the correct table you are checking against (e.g., _context.Leads)
-            bool exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == email.ToLower().Trim());
-
-            return Json(new { isDuplicate = exists });
+            catch (Exception ex)
+            {
+                return Json(new { isDuplicate = false, error = true, message = ex.Message });
+            }
         }
 
         // ==========================================
-        // BULK DELETE: AJAX POST
+        // BULK DELETE: AJAX POST (Safely deletes all linked data)
         // ==========================================
         [HttpPost]
+        [IgnoreAntiforgeryToken] // 🚀 FIX: Prevents 400 Bad Request "Network Errors" in AJAX
         public async Task<IActionResult> BulkDelete([FromBody] List<int> ids)
         {
             if (ids == null || !ids.Any())
                 return Json(new { success = false, message = "No records selected." });
 
-            if (_context == null || _context.Accounts == null)
-                return Json(new { success = false, message = "Database context is not initialized." });
-
             try
             {
                 var accountsToDelete = await _context.Accounts.Where(a => ids.Contains(a.Id)).ToListAsync();
+                if (!accountsToDelete.Any()) return Json(new { success = true });
 
-                if (accountsToDelete != null && accountsToDelete.Any())
+                // 1. Delete Tasks linked to Accounts
+                var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                    .Where(t => t.AccountId != null && ids.Contains((int)t.AccountId)).ToListAsync();
+                if (relatedTasks.Any()) _context.Set<Radar_CRM.Models.Task>().RemoveRange(relatedTasks);
+
+                // 2. Delete Deals (AND any Notes attached to those Deals)
+                var relatedDeals = await _context.Set<Deal>()
+                    .Where(d => d.AccountId != null && ids.Contains((int)d.AccountId)).ToListAsync();
+                if (relatedDeals.Any())
                 {
-                    // 1. Delete Tasks
-                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>().Where(t => t.AccountId != null && ids.Contains((int)t.AccountId)).ToListAsync();
-                    if (relatedTasks.Any()) _context.Set<Radar_CRM.Models.Task>().RemoveRange(relatedTasks);
-
-                    // 2. Delete Deals
-                    var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId != null && ids.Contains((int)d.AccountId)).ToListAsync();
-                    if (relatedDeals.Any()) _context.Set<Deal>().RemoveRange(relatedDeals);
-
-                    // 3. 🚀 FIX: Find Leads, delete their Notes FIRST, then delete Leads
-                    if (_context.Leads != null)
-                    {
-                        var relatedLeads = await _context.Leads.Where(l => l.AccountId != null && ids.Contains((int)l.AccountId)).ToListAsync();
-
-                        if (relatedLeads != null && relatedLeads.Any())
-                        {
-                            var leadIds = relatedLeads.Select(l => l.Id).ToList();
-
-                            // Delete Notes attached to these Leads to satisfy FK_Note_Leads_LeadId
-                            if (_context.Note != null)
-                            {
-                                var leadNotes = await _context.Note.Where(n => n.LeadId != null && leadIds.Contains((int)n.LeadId)).ToListAsync();
-                                if (leadNotes.Any()) _context.Note.RemoveRange(leadNotes);
-                            }
-
-                            _context.Leads.RemoveRange(relatedLeads);
-                        }
-                    }
-
-                    // 4. Delete Notes attached directly to the Account
+                    var dealIds = relatedDeals.Select(d => d.Id).ToList();
                     if (_context.Note != null)
                     {
-                        var relatedNotes = await _context.Note.Where(n => n.AccountId != null && ids.Contains((int)n.AccountId)).ToListAsync();
-                        if (relatedNotes != null && relatedNotes.Any()) _context.Note.RemoveRange(relatedNotes);
+                        var dealNotes = await _context.Note.Where(n => n.DealId != null && dealIds.Contains((int)n.DealId)).ToListAsync();
+                        if (dealNotes.Any()) _context.Note.RemoveRange(dealNotes);
                     }
-
-                    // 5. Finally, remove the Accounts!
-                    _context.Accounts.RemoveRange(accountsToDelete);
-                    await _context.SaveChangesAsync();
+                    _context.Set<Deal>().RemoveRange(relatedDeals);
                 }
+
+                // 3. Delete Leads (AND any Notes attached to those Leads)
+                if (_context.Leads != null)
+                {
+                    var relatedLeads = await _context.Leads
+                        .Where(l => l.AccountId != null && ids.Contains((int)l.AccountId)).ToListAsync();
+
+                    if (relatedLeads.Any())
+                    {
+                        var leadIds = relatedLeads.Select(l => l.Id).ToList();
+                        if (_context.Note != null)
+                        {
+                            var leadNotes = await _context.Note.Where(n => n.LeadId != null && leadIds.Contains((int)n.LeadId)).ToListAsync();
+                            if (leadNotes.Any()) _context.Note.RemoveRange(leadNotes);
+                        }
+                        _context.Leads.RemoveRange(relatedLeads);
+                    }
+                }
+
+                // 4. Delete Notes attached directly to the Account
+                if (_context.Note != null)
+                {
+                    var relatedNotes = await _context.Note
+                        .Where(n => n.AccountId != null && ids.Contains((int)n.AccountId)).ToListAsync();
+                    if (relatedNotes.Any()) _context.Note.RemoveRange(relatedNotes);
+                }
+
+                // 5. Finally, remove the Accounts safely!
+                _context.Accounts.RemoveRange(accountsToDelete);
+                await _context.SaveChangesAsync();
 
                 return Json(new { success = true });
             }
             catch (Exception ex)
             {
-                var errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                Console.WriteLine("DELETE ERROR: " + errorMessage);
-                return StatusCode(500, errorMessage);
+                // Returns clean JSON instead of crashing so your frontend can show the exact SQL error
+                string errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = "DB Error: " + errorMessage });
             }
         }
         // ==========================================
@@ -1018,9 +1041,16 @@ namespace Radar_CRM.Controllers
         {
             if (string.IsNullOrEmpty(phone)) return Json(new { isDuplicate = false });
 
-            bool exists = await _context.Accounts.AnyAsync(a => a.MobileNumber == phone || a.AlternateMobile == phone);
-
-            return Json(new { isDuplicate = exists });
+            try
+            {
+                string cleanPhone = phone.Trim();
+                bool exists = await _context.Accounts.AnyAsync(a => a.MobileNumber == cleanPhone || a.AlternateMobile == cleanPhone);
+                return Json(new { isDuplicate = exists });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { isDuplicate = false, error = true, message = ex.Message });
+            }
         }
 
         [HttpGet]
@@ -1049,7 +1079,92 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // UPLOAD FILE (With Advanced Error Tracking)
+        // NOTIFICATION HELPER: Email & In-App Popup
+        // ==========================================
+        private async Task NotifyNewOwnerAsync(string newOwnerId, List<string> accountNames)
+        {
+            if (string.IsNullOrEmpty(newOwnerId) || accountNames == null || !accountNames.Any()) return;
+
+            var newOwner = await _context.Users.FindAsync(newOwnerId);
+            if (newOwner == null || string.IsNullOrEmpty(newOwner.Email)) return;
+
+            string ownerName = newOwner.fullName ?? newOwner.FirstName ?? "Team Member";
+            bool isBulk = accountNames.Count > 1;
+
+            string subject = isBulk
+                ? $"Action Required: {accountNames.Count} Accounts Assigned to You"
+                : $"Action Required: Account '{accountNames.First()}' Assigned to You";
+
+            // 1. Build Email Body
+            string accountListHtml = string.Join("", accountNames.Select(name => $"<li><strong>{name}</strong></li>"));
+            string body = $@"
+                <div style='font-family: Arial, sans-serif; color: #333;'>
+                    <h3>Hi {ownerName},</h3>
+                    <p>You have been assigned as the new owner for the following {(isBulk ? "accounts" : "account")}:</p>
+                    <ul>{accountListHtml}</ul>
+                    <p>Please log in to the CRM to review your new assignments.</p>
+                    <br/>
+                    <p><small>This is an automated notification from Radar CRM.</small></p>
+                </div>";
+
+            // 2. Send Email via Resend API
+            try
+            {
+                string apiKey = "re_CrkNv4AQ_HZFdmVLLNa5aXMBRny6XQVZT";
+                string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
+
+                var emailPayload = new Dictionary<string, object>
+                {
+                    { "from", senderEmail },
+                    { "to", new List<string> { newOwner.Email.Trim() } },
+                    { "subject", subject },
+                    { "html", body }
+                };
+
+                using (var client = new HttpClient())
+                {
+                    var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+                    requestMessage.Headers.Add("Authorization", $"Bearer {apiKey}");
+                    requestMessage.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(emailPayload), System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(requestMessage);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Resend API Error: {errorContent}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
+            }
+
+            // 3. Create In-App Notification for Popup (Assuming you have a Task or Notification table)
+            // If you have a specific Notification table, change this to your exact model.
+            try
+            {
+                var systemTask = new Radar_CRM.Models.Task
+                {
+                    Subject = isBulk ? $"You have been assigned {accountNames.Count} new accounts." : $"You are the new owner of {accountNames.First()}.",
+                    Status = "Not Started",
+                    Priority = "High",
+                    TaskOwnerId = newOwnerId,
+                    CreatedDateAndTime = DateTime.Now,
+                    DueDate = DateTime.Now.AddDays(1)
+                };
+
+                _context.Set<Radar_CRM.Models.Task>().Add(systemTask);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"In-App Notification Failed: {ex.Message}");
+            }
+        }
+
+        // ==========================================
+        // UPLOAD FILE (With Duplicate Checking)
         // ==========================================
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
@@ -1057,9 +1172,21 @@ namespace Radar_CRM.Controllers
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var accountsToInsert = new List<Account>();
+            var skippedRecords = new List<string>(); // 🚀 Track skipped duplicate rows
             int currentRow = 1; // Start at 1 for the header
-            // NEW: Fetch all valid User IDs into a super-fast lookup list
+
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
+
+            // 🚀 Pre-load existing mobiles and emails for ultra-fast duplicate checking
+            var existingMobiles = new HashSet<string>(await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.MobileNumber))
+                .Select(a => a.MobileNumber)
+                .ToListAsync());
+
+            var existingEmails = new HashSet<string>(await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.Email))
+                .Select(a => a.Email.ToLower())
+                .ToListAsync());
 
             try
             {
@@ -1077,7 +1204,24 @@ namespace Radar_CRM.Controllers
 
                         if (values.Length >= 4)
                         {
-                            // 🚀 FIX: Used indexes 1 and 64 to get the actual ID, not the Name string
+                            string mobile = GetVal(values, 7);
+                            string email = GetVal(values, 5)?.ToLower();
+
+                            // 🚀 Duplicate Check Logic
+                            bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
+                            bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
+
+                            if (isMobileDup || isEmailDup)
+                            {
+                                string dupType = isMobileDup && isEmailDup ? "Mobile & Email" : (isMobileDup ? "Mobile" : "Email");
+                                skippedRecords.Add($"Row {currentRow}: Skipped ({dupType} already exists)");
+                                continue; // Skip inserting this row
+                            }
+
+                            // Add to our hashsets so we catch duplicates WITHIN the CSV file itself
+                            if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
+                            if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+
                             string rawOwnerId = GetVal(values, 1);
                             string rawCoOwnerId = GetVal(values, 64);
 
@@ -1172,27 +1316,28 @@ namespace Radar_CRM.Controllers
                     }
                 }
 
-                // Turn off change tracking for fast bulk insert
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
-
                 await _context.Accounts.AddRangeAsync(accountsToInsert);
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                // This digs into the database to find the EXACT error message
                 string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-
-                // Returns the row number and the exact error to your JavaScript popup
                 return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
             }
             finally
             {
-                // Always turn tracking back on safely
                 _context.ChangeTracker.AutoDetectChangesEnabled = true;
             }
 
-            return Ok();
+            // 🚀 NEW: Return detailed JSON with counts
+            return Json(new
+            {
+                success = true,
+                insertedCount = accountsToInsert.Count,
+                skippedCount = skippedRecords.Count,
+                skippedMessages = skippedRecords
+            });
         }
 
         private string GetVal(string[] values, int index)

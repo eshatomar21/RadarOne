@@ -434,7 +434,11 @@
                     </div>
                     <div class="col-md-6 form-group">
                         <label class="sf-label">Email  <span class="text-danger">*</span></label>
-                        <input asp-for="Email" class="sf-input" style="color: #1a56db;" placeholder="email@example.com" />
+                        <!-- 🚀 ADDED verify-group container -->
+                        <div class="verify-group">
+                            <input asp-for="Email" class="sf-input" id="Email" style="color: #1a56db;" placeholder="email@example.com" required />
+                            <button type="button" class="btn-verify" onclick="verifyEmail('Email')">Verify</button>
+                        </div>
                     </div>
 
                     <!-- Removed the duplicate <div class="col-md-6"> that was breaking your grid here! -->
@@ -447,8 +451,12 @@
                     </div>
 
                     <div class="col-md-6 form-group">
-                        <label class="sf-label">Alternate Email ID</label>
-                        <input asp-for="AlternateEmailID" class="sf-input" placeholder="Optional..." />
+                        <label class="sf-label">Alternate Email</label>
+                        <!-- 🚀 ADDED verify-group container -->
+                        <div class="verify-group">
+                            <input asp-for="AlternateEmailID" class="sf-input" id="AlternateEmailID" placeholder="Alternate email..." />
+                            <button type="button" class="btn-verify" onclick="verifyEmail('AlternateEmailID')">Verify</button>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -1001,15 +1009,21 @@
     return;
     }
 
-    if (mainMobile && altMobile && mainMobile === altMobile) {
+    if (fieldId === 'AlternateMobile' && mainMobile && altMobile && mainMobile === altMobile) {
     alert('❌ Mobile Number and Alternate Mobile cannot be the exact same!');
     return;
     }
 
-    fetch('/Accounts/CheckDuplicatePhone?phone=' + encodeURIComponent(phone))
-    .then(response => response.json())
+    // 🚀 FIX: Using Url.Action for safe server routing
+    fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
+    .then(async response => {
+    if (!response.ok) throw new Error("HTTP Status " + response.status);
+    return response.json();
+    })
     .then(data => {
-    if (data.isDuplicate) {
+    if (data.error) {
+    alert('⚠️ Database Error: ' + data.message);
+    } else if (data.isDuplicate) {
     alert('⚠️ WARNING: This phone number already exists in another account record!');
     } else {
     alert('✅ This number is valid and unique in the system.');
@@ -1017,7 +1031,7 @@
     })
     .catch(error => {
     console.error("Error verifying phone:", error);
-    alert("Could not connect to the database to verify.");
+    alert("Could not connect to the server. Check your browser console (F12) for details.");
     });
     }
 
@@ -1348,4 +1362,64 @@
     function openAccountLookup() {
     alert("Lookup UI would open here!");
     }
+
+    // 🚀 NEW: Email Verification Logic
+    window.verifyEmail = function(fieldId) {
+    // Safely find the input by ID
+    const emailInput = document.getElementById(fieldId);
+
+    if (!emailInput) {
+    alert("Error: Input field not found. Check HTML IDs.");
+    return;
+    }
+
+    const email = (emailInput.value || '').trim();
+    const mainEmail = document.getElementById('Email')?.value?.trim() || '';
+    const altEmail = document.getElementById('AlternateEmailID')?.value?.trim() || '';
+
+    if (!email) {
+    alert('Please enter an email address first before verifying.');
+    return;
+    }
+
+    // Prevent Main Email and Alternate Email from being identical
+    if (fieldId === 'AlternateEmailID' && mainEmail && altEmail && mainEmail.toLowerCase() === altEmail.toLowerCase()) {
+    alert('❌ Email and Alternate Email cannot be the exact same!');
+    return;
+    }
+
+    // Add a small loading indicator to the button
+    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
+    let originalBtnText = 'Verify';
+    if (btn) {
+    originalBtnText = btn.innerText;
+    btn.innerText = '...';
+    btn.disabled = true;
+    }
+
+    fetch('@Url.Action("CheckEmailDuplicate", "Accounts")?email=' + encodeURIComponent(email))
+    .then(async response => {
+    if (!response.ok) throw new Error("HTTP Status " + response.status);
+    return response.json();
+    })
+    .then(data => {
+    if (data.error) {
+    alert('⚠️ Database Error: ' + data.message);
+    } else if (data.isDuplicate) {
+    alert('⚠️ WARNING: This email already exists in another account record!');
+    } else {
+    alert('✅ This email is valid and unique in the system.');
+    }
+    })
+    .catch(error => {
+    console.error("Error verifying email:", error);
+    alert("Could not connect to the server. Check your browser console (F12) for details.");
+    })
+    .finally(() => {
+    if (btn) {
+    btn.innerText = originalBtnText;
+    btn.disabled = false;
+    }
+    });
+    };
 </script>
