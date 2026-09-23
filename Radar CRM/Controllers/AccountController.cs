@@ -16,11 +16,15 @@ namespace Radar_CRM.Controllers
     public class AccountsController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AccountsController(ApplicationDbContext context)
+        public AccountsController(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
+
+       
 
         // ==========================================
         // INDEX: GET (Hierarchical List View)
@@ -306,8 +310,7 @@ namespace Radar_CRM.Controllers
 
                 if (propertyInfo == null)
                     return Json(new { success = false, message = "Field not found in database." });
-
-                var updatedAccountNames = new List<string>();
+                var updatedAccountsList = new Dictionary<int, string>();
 
                 foreach (var account in accountsToUpdate)
                 {
@@ -327,7 +330,9 @@ namespace Radar_CRM.Controllers
                     }
 
                     propertyInfo.SetValue(account, safeValue, null);
-                    updatedAccountNames.Add(account.AccountName ?? "Unknown Account");
+
+                    // Add ID and Name to dictionary
+                    updatedAccountsList[account.Id] = account.AccountName ?? "Unknown Account";
                 }
 
                 _context.UpdateRange(accountsToUpdate);
@@ -336,8 +341,7 @@ namespace Radar_CRM.Controllers
                 // 🚀 TRIGGER EMAIL IF OWNER WAS CHANGED
                 if (request.FieldName.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(request.NewValue))
                 {
-                    // Run notification asynchronously so it doesn't slow down the UI response
-                    _ = NotifyNewOwnerAsync(request.NewValue, updatedAccountNames);
+                    await NotifyNewOwnerAsync(request.NewValue, updatedAccountsList);
                 }
 
                 return Json(new { success = true });
@@ -555,10 +559,14 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
-                    // 🚀 Check if the Owner changed by comparing against the original database value
-                    string originalOwnerId = (string)_context.Entry(account).Property("AccountOwnerId").OriginalValue;
-                    bool ownerChanged = account.AccountOwnerId != originalOwnerId;
+                    // 🚀 FIX: Fetch the original record from the database to check the old owner
+                    
+                    var existingAccount = await _context.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == account.Id);
 
+                    // Compare the database owner to the new form owner
+                    bool ownerChanged = existingAccount != null && existingAccount.AccountOwnerId != account.AccountOwnerId;
+
+                    // Save the new changes
                     _context.Update(account);
                     await _context.SaveChangesAsync();
 
@@ -568,7 +576,8 @@ namespace Radar_CRM.Controllers
                     // 🚀 TRIGGER EMAIL IF OWNER WAS CHANGED
                     if (ownerChanged && !string.IsNullOrWhiteSpace(account.AccountOwnerId))
                     {
-                        _ = NotifyNewOwnerAsync(account.AccountOwnerId, new List<string> { account.AccountName ?? "Unknown Account" });
+                        var accountDict = new Dictionary<int, string> { { account.Id, account.AccountName ?? "Unknown Account" } };
+                        await NotifyNewOwnerAsync(account.AccountOwnerId, accountDict);
                     }
                 }
                 catch (DbUpdateConcurrencyException)
@@ -1081,28 +1090,35 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // NOTIFICATION HELPER: Email & In-App Popup
         // ==========================================
-        private async Task NotifyNewOwnerAsync(string newOwnerId, List<string> accountNames)
+        // 🚀 FIX: Changed List<string> to Dictionary<int, string> to hold both ID and Name
+        private async Task NotifyNewOwnerAsync(string newOwnerId, Dictionary<int, string> assignedAccounts)
         {
-            if (string.IsNullOrEmpty(newOwnerId) || accountNames == null || !accountNames.Any()) return;
+            if (string.IsNullOrEmpty(newOwnerId) || assignedAccounts == null || !assignedAccounts.Any()) return;
 
             var newOwner = await _context.Users.FindAsync(newOwnerId);
             if (newOwner == null || string.IsNullOrEmpty(newOwner.Email)) return;
 
             string ownerName = newOwner.fullName ?? newOwner.FirstName ?? "Team Member";
-            bool isBulk = accountNames.Count > 1;
+            bool isBulk = assignedAccounts.Count > 1;
 
             string subject = isBulk
-                ? $"Action Required: {accountNames.Count} Accounts Assigned to You"
-                : $"Action Required: Account '{accountNames.First()}' Assigned to You";
+                ? $"Action Required: {assignedAccounts.Count} Accounts Assigned to You"
+                : $"Action Required: Account '{assignedAccounts.Values.First()}' Assigned to You";
 
-            // 1. Build Email Body
-            string accountListHtml = string.Join("", accountNames.Select(name => $"<li><strong>{name}</strong></li>"));
+            // 🚀 FIX: Get the live Base URL of the application to build absolute links
+            string baseUrl = $"{Request.Scheme}://{Request.Host}";
+
+            // 🚀 FIX: Build Email Body with clickable links targeting the Edit page
+            string accountListHtml = string.Join("", assignedAccounts.Select(acc =>
+                $"<li style='margin-bottom: 8px;'><a href='{baseUrl}/Accounts/Edit/{acc.Key}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{acc.Value}</a></li>"
+            ));
+
             string body = $@"
                 <div style='font-family: Arial, sans-serif; color: #333;'>
                     <h3>Hi {ownerName},</h3>
                     <p>You have been assigned as the new owner for the following {(isBulk ? "accounts" : "account")}:</p>
                     <ul>{accountListHtml}</ul>
-                    <p>Please log in to the CRM to review your new assignments.</p>
+                    <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
                     <br/>
                     <p><small>This is an automated notification from Radar CRM.</small></p>
                 </div>";
@@ -1110,7 +1126,7 @@ namespace Radar_CRM.Controllers
             // 2. Send Email via Resend API
             try
             {
-                string apiKey = "re_CrkNv4AQ_HZFdmVLLNa5aXMBRny6XQVZT";
+                string apiKey = _configuration["Resend:ApiKey"];
                 string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
 
                 var emailPayload = new Dictionary<string, object>
@@ -1140,13 +1156,12 @@ namespace Radar_CRM.Controllers
                 Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
             }
 
-            // 3. Create In-App Notification for Popup (Assuming you have a Task or Notification table)
-            // If you have a specific Notification table, change this to your exact model.
+            // 3. Create In-App Notification for Popup
             try
             {
                 var systemTask = new Radar_CRM.Models.Task
                 {
-                    Subject = isBulk ? $"You have been assigned {accountNames.Count} new accounts." : $"You are the new owner of {accountNames.First()}.",
+                    Subject = isBulk ? $"You have been assigned {assignedAccounts.Count} new accounts." : $"You are the new owner of {assignedAccounts.Values.First()}.",
                     Status = "Not Started",
                     Priority = "High",
                     TaskOwnerId = newOwnerId,
@@ -1162,7 +1177,6 @@ namespace Radar_CRM.Controllers
                 Console.WriteLine($"In-App Notification Failed: {ex.Message}");
             }
         }
-
         // ==========================================
         // UPLOAD FILE (With Duplicate Checking)
         // ==========================================

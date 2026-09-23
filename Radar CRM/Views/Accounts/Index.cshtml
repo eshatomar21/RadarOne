@@ -2328,23 +2328,26 @@
     // ==========================================
     // MASS UPDATE
     // ==========================================
-    const massUpdateOptionsMap = {
-        "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
-        "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
-        "CurrentStatus": ["User", "Non-User"],
-        "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
-        "ProfilePendingReason": ["Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times"],
-        "QualificationStatus": ["Qualified", "Notqualified"],
-        "Profilestatus": ["Completed", "Strongly Completed", "Not Completed", "Not-Qualified"],
-        "IsHomeopathicDoctor": ["Yes — MD(Homeopathy)", "मैं होम्योपैथी डॉक्टर हूँ।", "हां- बीएचएमएस", "नहीं", "बीएचएमएस की पढ़ाई कर रहा हूँ", "Yes - BHMS", "Not a Homeopath Doctor", "Yes", "No", "Not a Homeopathy Doctor", "Pursuing BHMS"],
-        "WorkType": ["Practicing", "Job", "Research", "others"],
-        "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
-        "HasComputer": ["Yes", "No"],
-        "Qualification": ["BHMS", "MD", "BAMS", "Student"],
-        "PaymentType": ["Upfront", "EMI - 3Months", "EMI - 6Months"],
-        "PaymentStatus": ["Paid", "Pending", "Partial", "Refunded"],
-        "CurrentlyUsingSoftware": ["Yes", "No"]
-    };
+       const massUpdateOptionsMap = {
+            "AccountOwnerId": ownerOptionsList,       // 🚀 Injecting Users here
+            "CoOwnerId": ownerOptionsList,            // 🚀 Injecting Users here
+            "GroupName": vendorOptionsList,           // 🚀 Injecting Vendors here
+            "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
+            "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
+            "CurrentStatus": ["User", "Non-User"],
+            "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
+            "ProfilePendingReason": ["Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times"],
+            "QualificationStatus": ["Qualified", "Notqualified"],
+            "Profilestatus": ["Completed", "Strongly Completed", "Not Completed", "Not-Qualified"],
+            "IsHomeopathicDoctor": ["Yes — MD(Homeopathy)", "मैं होम्योपैथी डॉक्टर हूँ।", "हां- बीएचएमएस", "नहीं", "बीएचएमएस की पढ़ाई कर रहा हूँ", "Yes - BHMS", "Not a Homeopath Doctor", "Yes", "No", "Not a Homeopathy Doctor", "Pursuing BHMS"],
+            "WorkType": ["Practicing", "Job", "Research", "others"],
+            "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
+            "HasComputer": ["Yes", "No"],
+            "Qualification": ["BHMS", "MD", "BAMS", "Student"],
+            "PaymentType": ["Upfront", "EMI - 3Months", "EMI - 6Months"],
+            "PaymentStatus": ["Paid", "Pending", "Partial", "Refunded"],
+            "CurrentlyUsingSoftware": ["Yes", "No"]
+        };
 
     function renderMassUpdateInput() {
         const fieldSelect = document.getElementById('massUpdateField');
