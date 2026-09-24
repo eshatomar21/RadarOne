@@ -463,6 +463,10 @@ namespace Radar_CRM.Controllers
             account.DateOfEntry = DateTime.Now;
             ModelState.Remove("DateOfEntry");
 
+            // 🚀 SET "CREATED BY" WITH CURRENT LOGGED-IN USER & TIME
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            account.CreatedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+            ModelState.Remove("CreatedBy");
 
             if (ModelState.IsValid)
             {
@@ -559,9 +563,19 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
-                    // 🚀 FIX: Fetch the original record from the database to check the old owner
-                    
+                    // 🚀 SET "MODIFIED BY" WITH CURRENT LOGGED-IN USER & TIME
+                    string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+                    account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                    ModelState.Remove("ModifiedBy");
+
+                    // 🚀 Fetch the original record from the database to check the old owner
                     var existingAccount = await _context.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == account.Id);
+
+                    // Ensure CreatedBy is not accidentally erased during an edit
+                    if (existingAccount != null && string.IsNullOrEmpty(account.CreatedBy))
+                    {
+                        account.CreatedBy = existingAccount.CreatedBy;
+                    }
 
                     // Compare the database owner to the new form owner
                     bool ownerChanged = existingAccount != null && existingAccount.AccountOwnerId != account.AccountOwnerId;
@@ -587,7 +601,6 @@ namespace Radar_CRM.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-
             ViewBag.ExistingNotes = await _context.Note
      .Where(n => n.AccountId == id)
      .OrderByDescending(n => n.CreatedDateTime)
@@ -1110,9 +1123,12 @@ namespace Radar_CRM.Controllers
 
             // 🚀 FIX: Build Email Body with clickable links targeting the Edit page
             string accountListHtml = string.Join("", assignedAccounts.Select(acc =>
-                $"<li style='margin-bottom: 8px;'><a href='{baseUrl}/Accounts/Edit/{acc.Key}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{acc.Value}</a></li>"
-            ));
+            {
+                // This builds the full URL (e.g., https://yourdomain.com/Accounts/Edit/5)
+                string linkUrl = Url.Action("Edit", "Accounts", new { id = acc.Key }, Request.Scheme);
 
+                return $"<li style='margin-bottom: 8px;'><a href='{linkUrl}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{acc.Value}</a></li>";
+            }));
             string body = $@"
                 <div style='font-family: Arial, sans-serif; color: #333;'>
                     <h3>Hi {ownerName},</h3>

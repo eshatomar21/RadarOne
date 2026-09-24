@@ -915,6 +915,65 @@ namespace Radar_CRM.Migrations
                     b.ToTable("PersonalNotes");
                 });
 
+            modelBuilder.Entity("Radar_CRM.Models.Postcode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Currency")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("EmailOptOut")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool?>("IsRecordDuplicate")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("Locked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("RecordStatus")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SecondaryEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("State_Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("State_Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Tag")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ZipCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Postcodes");
+                });
+
             modelBuilder.Entity("Radar_CRM.Models.Product", b =>
                 {
                     b.Property<int>("Id")

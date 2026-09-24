@@ -1,0 +1,236 @@
+﻿@model IEnumerable<Radar_CRM.Models.Postcode>
+
+@{
+    ViewData["Title"] = "Postcodes & Locations";
+}
+
+<!-- DataTables CSS for Pagination and Fast Loading -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+
+<style>
+    body {
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Cream Background */
+    .page-bg {
+        background-color: #fdfbf7;
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    /* Crisp white card with Light Blue accent */
+    .upload-card {
+        background-color: #ffffff;
+        border-left: 5px solid #38bdf8; /* Light Blue Accent */
+        border-radius: 8px;
+    }
+
+    /* Light Blue Buttons */
+    .btn-lightblue {
+        background-color: #0ea5e9;
+        color: #ffffff;
+        font-weight: 500;
+        border: none;
+        transition: background-color 0.2s ease;
+    }
+
+        .btn-lightblue:hover {
+            background-color: #0284c7;
+            color: #ffffff;
+        }
+
+    /* Soft Blue Table Headers */
+    .table-header-blue {
+        background-color: #f0f9ff !important;
+        color: #0c4a6e !important;
+        font-weight: 600;
+        border-bottom: 2px solid #bae6fd !important;
+        white-space: nowrap;
+    }
+
+    .table-custom {
+        border-color: #e0f2fe;
+    }
+
+        .table-custom td {
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+    /* Custom DataTables Styling */
+    .dataTables_wrapper .row {
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="page-bg">
+    <div class="container-fluid">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold" style="color: #0c4a6e; letter-spacing: -0.5px;">Postcodes Directory</h2>
+            <a asp-action="Create" class="btn btn-lightblue shadow-sm px-4"><i class="bi bi-plus"></i> Add New Entry</a>
+        </div>
+
+        <!-- Alert Messages -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert" style="background-color: #f0fdf4; border-color: #bbf7d0; color: #166534;">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert" style="background-color: #fef2f2; border-color: #fecaca; color: #991b1b;">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- CSV Upload Section -->
+        <div class="card upload-card mb-4 shadow-sm border-0">
+            <div class="card-body p-4">
+                <h6 class="card-title fw-bold mb-3" style="color: #0c4a6e;">Bulk Import Postcodes Data</h6>
+                <form asp-controller="Postcode" asp-action="ImportCsv" method="post" enctype="multipart/form-data">
+                    <div class="row align-items-center">
+                        <div class="col-md-9">
+                            <input type="file" name="file" class="form-control" style="background-color: #f8fafc;" accept=".csv" required />
+                        </div>
+                        <div class="col-md-3 mt-3 mt-md-0">
+                            <button class="btn btn-lightblue w-100 shadow-sm" type="submit">
+                                <i class="bi bi-upload"></i> Upload CSV
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Data Table Section (Wrapped in Delete Form) -->
+        <form asp-controller="Postcode" asp-action="DeleteSelected" method="post" id="bulkDeleteForm">
+            <div class="card shadow-sm border-0" style="border-radius: 8px; background-color: #ffffff;">
+
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold" style="color: #0c4a6e;">Stored Records</h6>
+                    <button type="submit" class="btn btn-outline-danger btn-sm fw-medium" onclick="return confirm('Are you sure you want to delete all selected records? This cannot be undone.');">
+                        <i class="bi bi-trash"></i> Delete Selected
+                    </button>
+                </div>
+
+                <div class="card-body p-3">
+                    <div class="table-responsive">
+                        <!-- Added 'id="postcodeTable"' for DataTables initialization -->
+                        <table id="postcodeTable" class="table table-custom table-hover align-middle mb-0 w-100">
+                            <thead>
+                                <tr>
+                                    <th class="table-header-blue py-3 px-3 text-center" style="width: 40px;">
+                                        <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
+                                    </th>
+                                    <th class="table-header-blue py-3">Status</th>
+                                    <th class="table-header-blue py-3">Country</th>
+                                    <th class="table-header-blue py-3">Zip Code</th>
+                                    <th class="table-header-blue py-3">City</th>
+                                    <th class="table-header-blue py-3">State Name</th>
+                                    <th class="table-header-blue py-3">State Code</th>
+                                    <th class="table-header-blue py-3">Email</th>
+                                    <th class="table-header-blue py-3">Sec. Email</th>
+                                    <th class="table-header-blue py-3">Opt Out</th>
+                                    <th class="table-header-blue py-3">Currency</th>
+                                    <th class="table-header-blue py-3">Exchange Rate</th>
+                                    <th class="table-header-blue py-3">Tag</th>
+                                    <th class="table-header-blue py-3">Locked</th>
+                                    <th class="table-header-blue py-3">Duplicate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model != null && Model.Any())
+                                {
+                                    foreach (var item in Model)
+                                    {
+                                        <tr>
+                                            <td class="px-3 text-center">
+                                                <input class="form-check-input record-checkbox" type="checkbox" name="selectedIds" value="@item.Id">
+                                            </td>
+                                            <td>
+                                                @if (item.RecordStatus == "Active")
+                                                {
+                                                    <span class="badge rounded-pill bg-success">@item.RecordStatus</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge rounded-pill bg-secondary">@item.RecordStatus</span>
+                                                }
+                                            </td>
+                                            <td>@item.Country</td>
+                                            <td><span class="badge" style="background-color: #e0f2fe; color: #0369a1;">@item.ZipCode</span></td>
+                                            <td>@item.City</td>
+                                            <td>@item.State_Name</td>
+                                            <td>@item.State_Code</td>
+                                            <td>@item.Email</td>
+                                            <td>@item.SecondaryEmail</td>
+                                            <td>@(item.EmailOptOut == true ? "Yes" : "No")</td>
+                                            <td>@item.Currency</td>
+                                            <td>@item.ExchangeRate</td>
+                                            <td>@item.Tag</td>
+                                            <td>@(item.Locked == true ? "Yes" : "No")</td>
+                                            <td>
+                                                @if (item.IsRecordDuplicate == true)
+                                                {
+                                                    <span class="badge bg-danger">Duplicate</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>No</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@section Scripts {
+    <!-- DataTables JS for Lazy Rendering & Pagination -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+        // Initialize DataTable to handle pagination and prevent browser freezing
+        var table = $('#postcodeTable').DataTable({
+        "pageLength": 15,
+        "lengthMenu": [15, 50, 100, 500],
+        "deferRender": true, // Enables lazy loading of DOM elements
+        "order": [[3, "asc"]], // Sort by Zip Code initially
+        "columnDefs": [
+        { "orderable": false, "targets": 0 } // Disable sorting on the checkbox column
+        ]
+        });
+
+        // Select All Checkbox Logic (works across DataTable pages)
+        $('#selectAllCheckbox').on('change', function () {
+        var isChecked = $(this).prop('checked');
+        // Target all checkboxes in the table, even those on other pages
+        $('.record-checkbox', table.rows().nodes()).prop('checked', isChecked);
+        });
+
+        // Manage intermediate state for Select All
+        $('#postcodeTable tbody').on('change', '.record-checkbox', function () {
+        var allNodes = $('.record-checkbox', table.rows().nodes());
+        var allChecked = allNodes.length === allNodes.filter(':checked').length;
+        var someChecked = allNodes.filter(':checked').length > 0;
+
+        $('#selectAllCheckbox').prop('checked', allChecked);
+        $('#selectAllCheckbox').prop('indeterminate', someChecked && !allChecked);
+        });
+        });
+    </script>
+}

@@ -1035,8 +1035,8 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">State <span class="text-danger">*</span></label>
-                                    <select asp-for="Addr1_State" class="sf-select" id="Addr1_State" required>
+                                    <label class="sf-label">State <span class="text-danger"></span></label>
+                                    <select asp-for="Addr1_State" class="sf-select" id="Addr1_State">
                                         <option value="">- Select State -</option>
                                     </select>
                                 </div>
@@ -1044,14 +1044,18 @@
                                 <!-- Group 2: City & Zip Code -->
                                 <div class="col-md-6 form-group mb-3">
                                     <label class="sf-label">City</label>
-                                    <input asp-for="Addr1_City" class="sf-input" placeholder="Enter city" />
+                                    <select asp-for="Addr1_City" class="sf-select" id="Addr1_City">
+                                        <option value="">- Select City -</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-6 form-group mb-3">
                                     <label class="sf-label">Zip / Postal Code</label>
-                                    <input asp-for="Addr1_Zip" class="sf-input" placeholder="e.g. 10001" />
+                                    <select asp-for="Addr1_Zip" class="sf-select" id="Addr1_Zip">
+                                        <option value="">- Select Zip Code -</option>
+                                    </select>
                                 </div>
 
-                                <!-- Group 3: Street Details (Proportional Widths) -->
+                                <!-- Group 3: Street Details -->
                                 <div class="col-md-4 form-group mb-3">
                                     <label class="sf-label">Flat / House No.</label>
                                     <input asp-for="Addr1_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
@@ -1071,7 +1075,6 @@
                                     <input asp-for="Addr1_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
                                 </div>
                             </div>
-
                         </div>
                     </div>
 
@@ -1101,14 +1104,18 @@
                                 <!-- Group 2: City & Zip Code -->
                                 <div class="col-md-6 form-group mb-3">
                                     <label class="sf-label">City</label>
-                                    <input asp-for="Addr2_City" class="sf-input" placeholder="Enter city" />
+                                    <select asp-for="Addr2_City" class="sf-select" id="Addr2_City">
+                                        <option value="">- Select City -</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-6 form-group mb-3">
                                     <label class="sf-label">Zip / Postal Code</label>
-                                    <input asp-for="Addr2_Zip" class="sf-input" placeholder="e.g. 10001" />
+                                    <select asp-for="Addr2_Zip" class="sf-select" id="Addr2_Zip">
+                                        <option value="">- Select Zip Code -</option>
+                                    </select>
                                 </div>
 
-                                <!-- Group 3: Street Details (Proportional Widths) -->
+                                <!-- Group 3: Street Details -->
                                 <div class="col-md-4 form-group mb-3">
                                     <label class="sf-label">Flat / House No.</label>
                                     <input asp-for="Addr2_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
@@ -1128,12 +1135,11 @@
                                     <input asp-for="Addr2_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
                                 </div>
                             </div>
-
                         </div>
                     </div>
 
-                </div> <!-- THIS CLOSES THE MAIN ROW -->
-            </div> <!-- THIS CLOSES THE ADDRESS TAB -->
+                </div>
+            </div>
             <!-- PROFESSIONAL TAB -->
             <div class="tab-pane fade" id="professional" role="tabpanel" style="padding: 32px 40px;">
                 <h3 class="pane-section-title">Professional Profile</h3>
@@ -1870,91 +1876,136 @@
 
     let globalRegionData = [];
 
-    document.addEventListener("DOMContentLoaded", async function () {
-    toggleDataSourceFields();
+    // ==========================================
+    // DYNAMIC CASCADING ADDRESS DROPDOWNS
+    // ==========================================
+    document.addEventListener("DOMContentLoaded", function () {
 
-    try {
-    const response = await fetch('https://countriesnow.space/api/v0.1/countries/states');
-    const result = await response.json();
+    // Read existing values from the model if editing a saved account
+    const existingCountry1 = '@Html.Raw(Model?.Addr1_Country ?? "")';
+    const existingCountry2 = '@Html.Raw(Model?.Addr2_Country ?? "")';
+    const existingState1 = '@Html.Raw(Model?.Addr1_State ?? "")';
+    const existingState2 = '@Html.Raw(Model?.Addr2_State ?? "")';
+    const existingCity1 = '@Html.Raw(Model?.Addr1_City ?? "")';
+    const existingCity2 = '@Html.Raw(Model?.Addr2_City ?? "")';
+    const existingZip1 = '@Html.Raw(Model?.Addr1_Zip ?? "")';
+    const existingZip2 = '@Html.Raw(Model?.Addr2_Zip ?? "")';
 
-    if (!result.error) {
-    globalRegionData = result.data;
-    populateCountryDropdown();
-    }
-    } catch (error) {
-    console.error("Failed to load country data from API:", error);
-    }
+    // 1. Fetch Countries on page load
+    fetch('/Postcode/GetCountries')
+    .then(res => {
+    if (!res.ok) throw new Error("Server returned status: " + res.status);
+    return res.json();
+    })
+    .then(countries => {
+    populateDropdown('Addr1_Country', countries, 'Select Country', existingCountry1);
+    populateDropdown('Addr2_Country', countries, 'Select Country', existingCountry2);
+
+    // Trigger the cascade automatically if editing a saved record
+    if (existingCountry1) triggerChange('Addr1_Country');
+    if (existingCountry2) triggerChange('Addr2_Country');
+    })
+    .catch(err => console.error("Error loading countries:", err));
+
+    // 2. Initialize Cascading Logic for both addresses
+    setupCascadingDropdowns('Addr1_Country', 'Addr1_State', 'Addr1_City', 'Addr1_Zip', existingState1, existingCity1, existingZip1);
+    setupCascadingDropdowns('Addr2_Country', 'Addr2_State', 'Addr2_City', 'Addr2_Zip', existingState2, existingCity2, existingZip2);
     });
 
-    function populateCountryDropdown() {
-    const country1 = document.getElementById('Addr1_Country');
-    const country2 = document.getElementById('Addr2_Country');
+    // Helper function to build dropdown options and pre-select if editing
+    function populateDropdown(dropdownId, dataList, defaultText, selectedValue = "") {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
 
-    const existingCountry1 = '@(Model?.Addr1_Country ?? "")';
-    const existingCountry2 = '@(Model?.Addr2_Country ?? "")';
-
-    if (country1) country1.innerHTML = '<option value="">-None-</option>';
-    if (country2) country2.innerHTML = '<option value="">-None-</option>';
-
-    globalRegionData.forEach(countryObj => {
-    if (country1) {
-    const opt1 = document.createElement('option');
-    opt1.value = countryObj.name;
-    opt1.textContent = countryObj.name;
-    if (countryObj.name === existingCountry1) opt1.selected = true;
-    country1.appendChild(opt1);
-    }
-
-    if (country2) {
-    const opt2 = document.createElement('option');
-    opt2.value = countryObj.name;
-    opt2.textContent = countryObj.name;
-    if (countryObj.name === existingCountry2) opt2.selected = true;
-    country2.appendChild(opt2);
-    }
-    });
-
-    if (existingCountry1) updateStateDropdown(existingCountry1, '@(Model?.Addr1_State ?? "")', 'Addr1_State');
-    if (existingCountry2) updateStateDropdown(existingCountry2, '@(Model?.Addr2_State ?? "")', 'Addr2_State');
-    }
-
-    function updateStateDropdown(countryName, existingState, targetDropdownId) {
-    const stateDropdown = document.getElementById(targetDropdownId);
-    if (!stateDropdown) return;
-
-    stateDropdown.innerHTML = '<option value="">-None-</option>';
-
-    if (!countryName) return;
-
-    const countryObj = globalRegionData.find(c => c.name === countryName);
-
-    if (countryObj && countryObj.states) {
-    countryObj.states.forEach(state => {
+    dropdown.innerHTML = '<option value="">- ' + defaultText + ' -</option>';
+    dataList.forEach(item => {
     const opt = document.createElement('option');
-    opt.value = state.name;
-    opt.textContent = state.name;
-
-    if (state.name === existingState) {
+    opt.value = item;
+    opt.textContent = item;
+    if (item === selectedValue) {
     opt.selected = true;
     }
-
-    stateDropdown.appendChild(opt);
-    });
-    }
-    }
-
-    const c1 = document.getElementById('Addr1_Country');
-    if (c1) {
-    c1.addEventListener('change', function() {
-    updateStateDropdown(this.value, "", 'Addr1_State');
+    dropdown.appendChild(opt);
     });
     }
 
-    const c2 = document.getElementById('Addr2_Country');
-    if (c2) {
-    c2.addEventListener('change', function() {
-    updateStateDropdown(this.value, "", 'Addr2_State');
+    // Helper to manually trigger a change event programmatically
+    function triggerChange(elementId) {
+    const el = document.getElementById(elementId);
+    if (el) el.dispatchEvent(new Event('change'));
+    }
+
+    // Master function to handle the Country -> State -> City -> Zip flow
+    function setupCascadingDropdowns(countryId, stateId, cityId, zipId, defaultState = "", defaultCity = "", defaultZip = "") {
+    const countryEl = document.getElementById(countryId);
+    const stateEl = document.getElementById(stateId);
+    const cityEl = document.getElementById(cityId);
+    const zipEl = document.getElementById(zipId);
+
+    // Country Change -> Load States
+    if (countryEl) {
+    countryEl.addEventListener('change', function () {
+    const country = this.value;
+    if (stateEl) stateEl.innerHTML = '<option value="">- Select State -</option>';
+    if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
+    if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+
+    if (country) {
+    fetch('/Postcode/GetStates?country=' + encodeURIComponent(country))
+    .then(res => res.json())
+    .then(states => {
+    populateDropdown(stateId, states, 'Select State', defaultState);
+    if (defaultState) {
+    triggerChange(stateId);
+    defaultState = ""; // clear after first load
+    }
+    })
+    .catch(err => console.error("Error fetching States:", err));
+    }
     });
+    }
+
+    // State Change -> Load Cities
+    if (stateEl) {
+    stateEl.addEventListener('change', function () {
+    const state = this.value;
+    if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
+    if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+
+    if (state) {
+    fetch('/Postcode/GetCities?state=' + encodeURIComponent(state))
+    .then(res => res.json())
+    .then(cities => {
+    populateDropdown(cityId, cities, 'Select City', defaultCity);
+    if (defaultCity) {
+    triggerChange(cityId);
+    defaultCity = ""; // clear after first load
+    }
+    })
+    .catch(err => console.error("Error fetching Cities:", err));
+    }
+    });
+    }
+
+    // City Change -> Fetch and Populate Zip Code Dropdown
+    if (cityEl) {
+    cityEl.addEventListener('change', function () {
+    const city = this.value;
+    const state = stateEl ? stateEl.value : '';
+
+    if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+
+    if (city && state) {
+    fetch('/Postcode/GetZipCodes?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
+    .then(res => res.json())
+    .then(zipCodes => {
+    populateDropdown(zipId, zipCodes, 'Select Zip Code', defaultZip);
+    defaultZip = ""; // clear after first load
+    })
+    .catch(err => console.error("Error fetching Zip Codes:", err));
+    }
+    });
+    }
     }
 
     const accountForm = document.getElementById('accountForm');

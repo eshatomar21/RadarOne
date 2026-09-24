@@ -231,3 +231,4 @@ C:\Users\ADMIN\source\repos\Radar CRM\Radar CRM\obj\Debug\net10.0\Radar CRM.pdb
 C:\Users\ADMIN\source\repos\Radar CRM\Radar CRM\obj\Debug\net10.0\Radar CRM.genruntimeconfig.cache
 C:\Users\ADMIN\source\repos\Radar CRM\Radar CRM\obj\Debug\net10.0\ref\Radar CRM.dll
 C:\Users\ADMIN\source\repos\Radar CRM\Radar CRM\obj\Debug\net10.0\Radar CRM.sourcelink.json
+C:\Users\ADMIN\source\repos\Radar CRM\Radar CRM\bin\Debug\net10.0\CsvHelper.dll
