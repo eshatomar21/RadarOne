@@ -842,7 +842,7 @@
         <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
             <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
         </button>
-        <a href="@Url.Action("Create", "Deals")" class="btn-saas-primary">
+        <a href="@Url.Action("Create", "Deals")" class="btn-saas-primary" Hidden>
             <i class="fa-solid fa-plus"></i> Create Deal
         </a>
     </div>
@@ -868,6 +868,15 @@
         </div>
 
         <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
+            
+            <!-- 🚀 NEW FEATURE: SAVED FILTERS SECTION -->
+            <div id="savedFiltersSection" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f0fdf4; padding-bottom: 8px;">
+                <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                    <i class="fa-solid fa-bookmark me-2"></i> SAVED FILTERS
+                </div>
+                <div id="savedFiltersContainer" class="px-3 pb-2 d-flex flex-wrap gap-2"></div>
+            </div>
+
             <!-- FREQUENTLY USED SECTION -->
             <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
@@ -877,17 +886,36 @@
                 <div id="pinnedItemsContainer"></div>
             </div>
 
-            <!-- UNPINNED LIST -->
+           <!-- UNPINNED LIST -->
             <div id="sidebarList">
+                @{
+                    var predefinedLists = new Dictionary<string, string[]>
+                    {
+                        { "Stage", new[] { "Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost" } },
+                        { "PaymentStatus", new[] { "Paid", "Pending", "Partial", "Refunded" } },
+                        { "PaymentMode", new[] { "Cash", "Card", "UPI", "Bank Transfer", "Cheque" } },
+                        { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } }
+                    };
+                }
+
                 @foreach (var prop in tableProps)
                 {
-                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date");
+                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.PropertyType == typeof(DateOnly) || prop.PropertyType == typeof(DateOnly?) || prop.Name.Contains("Date") || prop.Name.Contains("Time");
+                    bool isUserField = prop.Name.Contains("Owner") || prop.Name == "CreatedBy" || prop.Name == "ModifiedBy";
+                    bool isPredefined = predefinedLists.ContainsKey(prop.Name);
+                    bool isAccountField = prop.Name.Contains("Account") && !prop.Name.Contains("Type");
 
                     <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
                         <div class="d-flex align-items-center m-0 w-100">
+                            <!-- Star Pin Icon -->
                             <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
                                style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
                                onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
+
+                            <!-- Save Filter Icon -->
+                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2"
+                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
+                               onclick="saveFieldFilter(event, this, '@prop.Name')" title="Save this filter setting"></i>
 
                             <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
 
@@ -899,41 +927,90 @@
                         <div class="filter-expanded-area">
                             @if (isDate)
                             {
+                                <!-- Full Date Conditions Matching Images -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
-                                    <option value="on" selected>On</option>
+                                    <option value="age in">age in</option>
+                                    <option value="due in">due in</option>
+                                    <option value="Previous">Previous</option>
+                                    <option value="Next">Next</option>
+                                    <option value="On" selected>On</option>
                                     <option value="before">before</option>
+                                    <option value="not between">not between</option>
                                     <option value="after">after</option>
                                     <option value="between">between</option>
-                                    <option value="today">Today</option>
-                                    <option value="this_month">This Month</option>
+                                    <option value="Today">Today</option>
+                                    <option value="Tomorrow">Tomorrow</option>
+                                    <option value="Till Yesterday">Till Yesterday</option>
+                                    <option value="Starting tomorrow">Starting tomorrow</option>
+                                    <option value="Yesterday">Yesterday</option>
+                                    <option value="This Week">This Week</option>
+                                    <option value="This Month">This Month</option>
+                                    <option value="This Year">This Year</option>
+                                    <option value="Previous Week">Previous Week</option>
+                                    <option value="Previous Month">Previous Month</option>
+                                    <option value="Previous Year">Previous Year</option>
+                                    <option value="Current FY">Current FY</option>
+                                    <option value="Previous FY">Previous FY</option>
+                                    <option value="Current FQ">Current FQ</option>
                                 </select>
                                 <div class="d-flex flex-column gap-2">
                                     <input type="date" class="form-control form-control-sm condition-val date-val-1" />
                                     <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
                                 </div>
                             }
-                            else if (prop.Name.Contains("Owner") || prop.Name.Contains("Account"))
+                            else if (isPredefined)
                             {
+                                <!-- Predefined Options -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="contains" selected>contains</option>
-                                    <option value="does_not_contain">does not contain</option>
-                                    <option value="starts_with">starts with</option>
-                                    <option value="ends_with">ends with</option>
-                                    <option value="is">is exactly</option>
+                                    <option value="is" selected>is</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type..." />
+                                <select class="form-select form-select-sm condition-val">
+                                    <option value="" disabled selected>- Select @prop.Name -</option>
+                                    @foreach (var opt in predefinedLists[prop.Name])
+                                    {
+                                        <option value="@opt">@opt</option>
+                                    }
+                                </select>
+                            }
+                            else if (isUserField)
+                            {
+                                <!-- User Field with User Options -->
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is" selected>is</option>
+                                    <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
+                                </select>
+                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
                                 <datalist id="dl_users_@prop.Name">
-                                    @if (prop.Name.Contains("Owner") && ViewBag.UsersList != null)
+                                    @if (ViewBag.UsersList != null)
                                     {
                                         foreach (var user in (SelectList)ViewBag.UsersList)
                                         {
                                             <option value="@user.Text">@user.Text</option>
                                         }
                                     }
-                                    else if (prop.Name.Contains("Account") && ViewBag.AccountsList != null)
+                                </datalist>
+                            }
+                            else if (isAccountField)
+                            {
+                                <!-- Account Field Dropdown -->
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is">is exactly</option>
+                                    <option value="is_not">isn't</option>
+                                    <option value="contains" selected>contains</option>
+                                    <option value="does_not_contain">does not contain</option>
+                                    <option value="starts_with">starts with</option>
+                                    <option value="ends_with">ends with</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
+                                </select>
+                                <input type="text" list="dl_acc_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select Account..." />
+                                <datalist id="dl_acc_@prop.Name">
+                                    @if (ViewBag.AccountsList != null)
                                     {
                                         foreach (var acc in (SelectList)ViewBag.AccountsList)
                                         {
@@ -944,13 +1021,14 @@
                             }
                             else
                             {
+                                <!-- Text Field for Large Data -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is">is exactly</option>
+                                    <option value="is_not">isn't</option>
                                     <option value="contains" selected>contains</option>
                                     <option value="does_not_contain">does not contain</option>
                                     <option value="starts_with">starts with</option>
                                     <option value="ends_with">ends with</option>
-                                    <option value="is">is exactly</option>
-                                    <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
@@ -1221,9 +1299,6 @@
     </div>
 </div>
 
-<!-- ========================================================
-     MODERN SAAS QUICK CREATE TASK MODAL
-     ======================================================== -->
 <!-- ========================================================
      MODERN SAAS QUICK CREATE TASK MODAL
      ======================================================== -->
@@ -1523,18 +1598,10 @@
 
                             <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;">
                                 <option value="" disabled selected>None</option>
-                                <option value="is">is exactly</option>
-                                <option value="is_not">isn't</option>
-                                <option value="contains">contains</option>
-                                <option value="does_not_contain">does not contain</option>
-                                <option value="starts_with">starts with</option>
-                                <option value="ends_with">ends with</option>
-                                <option value="is_empty">is empty</option>
-                                <option value="is_not_empty">is not empty</option>
                             </select>
 
                             <div class="cv-value-container d-flex" style="flex-grow:1;">
-                                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width: 100%;">
+                                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width: 100%;" disabled>
                             </div>
 
                             <button type="button" class="btn btn-link text-success p-1 add" onclick="addCriteriaRow()"><i class="fa-solid fa-circle-plus fs-5"></i></button>
@@ -1587,6 +1654,7 @@
                         <div class="columns-box-wrapper w-50">
                             <label class="text-muted fw-semibold mb-2" style="font-size: 0.85rem;">Selected</label>
                             <div class="columns-box border rounded p-2" id="selectedColumnsBox" style="height: 250px; overflow-y: auto; background: #ffffff;">
+                                <!-- Default starting items -->
                                 <div class="column-item p-2 mb-1 border rounded d-flex justify-content-between align-items-center" style="background: #f1f5f9; cursor: pointer; font-size: 0.85rem;" onclick="moveColumn(this, 'availableColumnsBox')">
                                     <i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">DealName</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>
                                 </div>
@@ -1608,11 +1676,15 @@
     // 1. GLOBAL VARIABLES & INITIALIZATION
     // ==========================================
     const defaultVisibleColumns = ["DealName", "AccountName", "DealOwner", "PaymentMode", "PaymentStatus", "GrandTotal"];
-    let currentNoteLeadId = null;
+    let currentNoteDealId = null;
 
     let allRows = [];
     let currentVisibleRows = [];
     let hiddenCols = new Set();
+
+    // ID TRANSLATION MAPS (Kept exactly as requested)
+    const userLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.UsersList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
+    const accountLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.AccountsList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
 
     // Map of fields to selectable dropdown arrays for Deals
     const criteriaFilterOptionsMap = {
@@ -1621,10 +1693,6 @@
         "PaymentMode": ["Cash", "Card", "UPI", "Bank Transfer", "Cheque"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"]
     };
-
-    // ID TRANSLATION MAPS (Kept exactly as requested)
-    const userLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.UsersList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
-    const accountLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.AccountsList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
 
     function formatUserAndAccountIDs() {
         console.log("⚙️ Translating User and Account IDs to Names...");
@@ -1666,6 +1734,10 @@
         restorePinnedFilters();
 
         renderCustomViews();
+        renderSavedSidebarFilters();
+        
+        // Restore Sidebar filters on load
+        restoreSidebarFiltersFromUrl();
     });
 
     // ==========================================
@@ -1736,9 +1808,27 @@
 
     function toggleDateInputs(selectElement) {
         const wrapper = selectElement.closest('.filter-expanded-area');
+        const val1 = wrapper.querySelector('.date-val-1');
         const val2 = wrapper.querySelector('.date-val-2');
-        if (val2) {
-            val2.style.display = selectElement.value === 'between' ? 'block' : 'none';
+        
+        if (val1 && val2) {
+            const condition = selectElement.value;
+            
+            // Show two inputs for between / not between
+            if (condition === 'between' || condition === 'not between') {
+                val1.style.display = 'block';
+                val2.style.display = 'block';
+            } 
+            // Hide both inputs for predefined date ranges
+            else if (['Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'].includes(condition)) {
+                val1.style.display = 'none';
+                val2.style.display = 'none';
+            } 
+            // Show only one input for exact dates (On, before, after)
+            else {
+                val1.style.display = 'block';
+                val2.style.display = 'none';
+            }
         }
     }
 
@@ -1770,15 +1860,137 @@
     }
 
     // ==========================================
+    // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
+    // ==========================================
+    function saveFieldFilter(event, iconEl, fieldName) {
+        event.stopPropagation();
+        
+        const item = iconEl.closest('.filter-field-item');
+        const cb = item.querySelector('.field-checkbox');
+        
+        if(!cb.checked) {
+            alert("Please check the box and set a value before saving this filter.");
+            return;
+        }
+
+        const condition = item.querySelector('.condition-select').value;
+        const isDate = item.dataset.fieldType === "date";
+        let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
+
+        if(!val && condition !== 'is_empty' && condition !== 'is_not_empty') {
+            alert("Please enter a value before saving.");
+            return;
+        }
+
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_deals') || '[]');
+        savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
+        localStorage.setItem('crm_saved_sidebar_filters_deals', JSON.stringify(savedFilters));
+        
+        renderSavedSidebarFilters();
+    }
+
+    function renderSavedSidebarFilters() {
+        const section = document.getElementById('savedFiltersSection');
+        const container = document.getElementById('savedFiltersContainer');
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_deals') || '[]');
+
+        if(savedFilters.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        container.innerHTML = '';
+        savedFilters.forEach(f => {
+            const badge = document.createElement('div');
+            badge.className = 'badge bg-white text-dark border shadow-sm p-2 d-flex align-items-center gap-2';
+            badge.innerHTML = `
+                <span onclick="applySavedSidebarFilter(${f.id})" style="cursor:pointer;" title="Click to instantly apply this filter">
+                    <i class="fa-solid fa-filter text-primary me-1"></i> ${f.fieldName} ${f.condition} <span class="text-primary">${f.val}</span>
+                </span>
+                <i class="fa-solid fa-xmark text-danger" style="cursor:pointer; opacity: 0.6;" onclick="deleteSavedSidebarFilter(${f.id}, event)" title="Remove"></i>
+            `;
+            container.appendChild(badge);
+        });
+    }
+
+    function applySavedSidebarFilter(id) {
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_deals') || '[]');
+        let f = savedFilters.find(x => x.id === id);
+        if(!f) return;
+
+        const activeFilters = [{
+            LogicalOperator: "",
+            ColumnName: f.fieldName,
+            Condition: f.condition,
+            Value: f.val,
+            IsDate: f.isDate
+        }];
+
+        document.body.style.cursor = 'wait';
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('advancedFilters', JSON.stringify(activeFilters));
+        urlParams.set('page', 1);
+        urlParams.set('_t', Date.now());
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function deleteSavedSidebarFilter(id, event) {
+        event.stopPropagation();
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_deals') || '[]');
+        savedFilters = savedFilters.filter(x => x.id !== id);
+        localStorage.setItem('crm_saved_sidebar_filters_deals', JSON.stringify(savedFilters));
+        renderSavedSidebarFilters();
+    }
+
+    function restoreSidebarFiltersFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const filtersParam = urlParams.get('advancedFilters');
+        
+        if (filtersParam) {
+            try {
+                const activeFilters = JSON.parse(filtersParam);
+                activeFilters.forEach(f => {
+                    const chk = document.getElementById('chk_' + f.ColumnName);
+                    if (chk) {
+                        chk.checked = true;
+                        const item = chk.closest('.filter-field-item');
+                        item.classList.add('active'); 
+
+                        const condSelect = item.querySelector('.condition-select');
+                        if (condSelect) condSelect.value = f.Condition;
+
+                        if (f.IsDate) {
+                            const date1 = item.querySelector('.date-val-1');
+                            if (date1) date1.value = f.Value;
+                        } else {
+                            const textVal = item.querySelector('.condition-val');
+                            if (textVal) textVal.value = f.Value;
+                        }
+                    }
+                });
+            } catch(e) { console.error("Error restoring filters", e); }
+        }
+    }
+
+
+    // ==========================================
     // 🚀 DYNAMIC CUSTOM VIEWS & CRITERIA BUILDER
     // ==========================================
     function openCustomViewModal() {
         const modalEl = document.getElementById('createCustomViewModal');
         if (!modalEl) return;
         document.body.appendChild(modalEl);
-        modalEl.style.zIndex = "1055";
-        const myModal = new bootstrap.Modal(modalEl);
-        myModal.show();
+        modalEl.style.zIndex = "9999";
+        
+        try {
+            const myModal = new bootstrap.Modal(modalEl);
+            myModal.show();
+        } catch (error) {
+            if (typeof $ !== 'undefined') {
+                $(modalEl).modal('show');
+            }
+        }
     }
 
     function renderCustomViews() {
@@ -1825,48 +2037,106 @@
         });
     }
 
-    function handleCriteriaFieldChange(selectEl) {
+   function handleCriteriaFieldChange(selectEl) {
         const row = selectEl.closest('.criteria-row-builder');
         const fieldName = selectEl.value;
         const valueContainer = row.querySelector('.cv-value-container');
+        const conditionSelect = row.querySelector('.cv-condition');
+
+        let conditionOptions = '';
 
         if (!fieldName) {
-            valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">`;
+            valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled>`;
             return;
         }
 
         // 1. Static Dropdowns (Stage, PaymentStatus, PaymentMode, AccountType, etc.)
         if (criteriaFilterOptionsMap[fieldName]) {
+            conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             let opts = '<option value="" disabled selected>- Select Value -</option>';
             criteriaFilterOptionsMap[fieldName].forEach(o => {
                 opts += `<option value="${o}">${o}</option>`;
             });
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
-        // 2. User/Owner Fields Dropdown (DealOwner, DemoOwner, etc.)
-        else if (fieldName.toLowerCase().includes('owner') || fieldName.toLowerCase().includes('user')) {
-            let opts = '<option value="" disabled selected>- Select User -</option>';
+        // 2. User/Owner Fields Dropdown (DealOwner, DemoOwner, CreatedBy, etc.)
+        else if (fieldName.toLowerCase().includes('owner') || fieldName.toLowerCase().includes('user') || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
+            conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
+            let datalistId = "dl_cv_owner_" + Date.now();
+            let opts = `<datalist id="${datalistId}">`;
             for (const [id, name] of Object.entries(userLookup)) {
                 opts += `<option value="${name}">${name}</option>`;
             }
-            valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
+            opts += `</datalist>`;
+            valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select or type user..." style="width:100%;">${opts}`;
         }
-        // 3. Account Fields Dropdown (AccountName, AccountId, etc. - ignoring AccountType)
+        // 3. Date Fields
+        else if (fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('time')) {
+            conditionOptions = `
+                <option value="age in">age in</option>
+                <option value="due in">due in</option>
+                <option value="Previous">Previous</option>
+                <option value="Next">Next</option>
+                <option value="On" selected>On</option>
+                <option value="before">before</option>
+                <option value="not between">not between</option>
+                <option value="after">after</option>
+                <option value="between">between</option>
+                <option value="Today">Today</option>
+                <option value="Tomorrow">Tomorrow</option>
+                <option value="Till Yesterday">Till Yesterday</option>
+                <option value="Starting tomorrow">Starting tomorrow</option>
+                <option value="Yesterday">Yesterday</option>
+                <option value="This Week">This Week</option>
+                <option value="This Month">This Month</option>
+                <option value="This Year">This Year</option>
+                <option value="Previous Week">Previous Week</option>
+                <option value="Previous Month">Previous Month</option>
+                <option value="Previous Year">Previous Year</option>
+                <option value="Current FY">Current FY</option>
+                <option value="Previous FY">Previous FY</option>
+                <option value="Current FQ">Current FQ</option>
+            `;
+            valueContainer.innerHTML = `
+                <div class="d-flex gap-2 w-100">
+                    <input type="date" class="form-control criteria-builder-input cv-value date-val-1" style="width:100%;">
+                    <input type="date" class="form-control criteria-builder-input cv-value date-val-2" style="display:none; width:100%;">
+                </div>`;
+            
+            // Attach unique listener to toggle second input dynamically in the builder
+            conditionSelect.onchange = function() {
+                const v2 = valueContainer.querySelector('.date-val-2');
+                const v1 = valueContainer.querySelector('.date-val-1');
+                if(this.value === 'between' || this.value === 'not between') {
+                    v2.style.display = 'block';
+                    v1.style.display = 'block';
+                } else if (['Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'].includes(this.value)) {
+                    v1.style.display = 'none';
+                    v2.style.display = 'none';
+                } else {
+                    v1.style.display = 'block';
+                    v2.style.display = 'none';
+                }
+            };
+        }
+        // 4. Account Fields Dropdown
         else if (fieldName.toLowerCase().includes('account') && !fieldName.toLowerCase().includes('type')) {
-            let opts = '<option value="" disabled selected>- Select Account -</option>';
+            conditionOptions = '<option value="is">is exactly</option><option value="is_not">isn\'t</option><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
+            let datalistId = "dl_acc_" + Date.now();
+            let opts = `<datalist id="${datalistId}">`;
             for (const [id, name] of Object.entries(accountLookup)) {
                 opts += `<option value="${name}">${name}</option>`;
             }
-            valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
-        }
-        // 4. Date Fields
-        else if (fieldName.toLowerCase().includes('date')) {
-            valueContainer.innerHTML = `<input type="date" class="form-control criteria-builder-input cv-value" style="width:100%;">`;
+            opts += `</datalist>`;
+            valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select Account..." style="width:100%;">${opts}`;
         }
         // 5. Default to Text Input for everything else (GrandTotal, DealName, etc.)
         else {
+            conditionOptions = '<option value="is">is exactly</option><option value="is_not">isn\'t</option><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">`;
         }
+
+        conditionSelect.innerHTML = conditionOptions;
     }
 
     function updateCriteriaPattern() {
@@ -1919,19 +2189,11 @@
             </select>
 
             <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;">
-                <option value="" disabled selected>None</option>
-                <option value="is">is exactly</option>
-                <option value="is_not">isn't</option>
-                <option value="contains">contains</option>
-                <option value="does_not_contain">does not contain</option>
-                <option value="starts_with">starts with</option>
-                <option value="ends_with">ends with</option>
-                <option value="is_empty">is empty</option>
-                <option value="is_not_empty">is not empty</option>
+                <option value="" disabled selected>Select Field First</option>
             </select>
 
             <div class="cv-value-container d-flex" style="flex-grow:1;">
-                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">
+                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled>
             </div>
 
             <button type="button" class="btn btn-link text-success p-1 add" onclick="addCriteriaRow()"><i class="fa-solid fa-circle-plus fs-5"></i></button>
@@ -1959,32 +2221,6 @@
         updateCriteriaPattern();
     }
 
-    function moveColumn(item, targetBoxId) {
-        const targetBox = document.getElementById(targetBoxId);
-        const fieldName = item.innerText.trim();
-
-        if (targetBoxId === 'selectedColumnsBox') {
-            item.innerHTML = `<i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>`;
-            item.style.background = "#f1f5f9";
-            item.onclick = function() { moveColumn(this, 'availableColumnsBox'); };
-        } else {
-            item.innerHTML = `<span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-arrow-right text-primary"></i>`;
-            item.style.background = "#ffffff";
-            item.onclick = function() { moveColumn(this, 'selectedColumnsBox'); };
-        }
-
-        targetBox.appendChild(item);
-    }
-
-    function filterColumns(boxId, inputId) {
-        const q = document.getElementById(inputId).value.toLowerCase();
-        const items = document.querySelectorAll(`#${boxId} .column-item`);
-        items.forEach(item => {
-            const text = item.innerText.toLowerCase();
-            item.style.display = text.includes(q) ? 'flex' : 'none';
-        });
-    }
-
     function saveAndApplyCustomView() {
         const viewName = document.getElementById('customViewName').value.trim();
         if (!viewName) {
@@ -2000,37 +2236,34 @@
             const val = row.querySelector('.cv-value').value;
 
             let logicOperator = "AND";
-            if (row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
+            if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
             }
 
             if (field && condition) {
+                if (!val && !condition.includes('empty')) return; // Skip incomplete
+
                 activeFilters.push({
                     LogicalOperator: index === 0 ? "" : logicOperator,
                     ColumnName: field,
                     Condition: condition,
-                    Value: val,
-                    IsDate: field.toLowerCase().includes('date')
+                    Value: val || "",
+                    IsDate: field.toLowerCase().includes('date') || field.toLowerCase().includes('time')
                 });
             }
         });
 
         if (activeFilters.length === 0) {
-            alert("Please specify at least one valid criteria to create a view.");
+            alert("Please specify at least one valid complete criteria.");
             return;
         }
 
         let savedViews = JSON.parse(localStorage.getItem('crm_user_views_deals')) || [];
         savedViews = savedViews.filter(v => v.name !== viewName);
-        savedViews.push({
-            name: viewName,
-            isPinned: true,
-            filters: activeFilters
-        });
+        savedViews.push({ name: viewName, isPinned: true, filters: activeFilters });
         localStorage.setItem('crm_user_views_deals', JSON.stringify(savedViews));
 
         bootstrap.Modal.getInstance(document.getElementById('createCustomViewModal')).hide();
-
         applyCustomView(viewName, activeFilters);
     }
 
@@ -2085,64 +2318,99 @@
     }
 
     // ==========================================
-    // 4. MODALS (Task, Note, Columns, Mass Update)
+    // MODALS & HELPERS
     // ==========================================
-    function openTaskModal() {
-         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-         const dealDropdown = document.getElementById('taskModalDealId');
-         const accountDropdown = document.getElementById('taskModalAccountId');
-         const mobileInput = document.getElementById('taskModalMobile');
+    function moveColumn(item, targetBoxId) {
+        const targetBox = document.getElementById(targetBoxId);
+        const fieldName = item.innerText.trim();
 
-         // Reset fields first
-         if (dealDropdown) dealDropdown.value = "";
-         if (accountDropdown) accountDropdown.value = "";
-         if (mobileInput) mobileInput.value = "";
+        if (targetBoxId === 'selectedColumnsBox') {
+            item.innerHTML = `<i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>`;
+            item.style.background = "#f1f5f9";
+            item.onclick = function() { moveColumn(this, 'availableColumnsBox'); };
+        } else {
+            item.innerHTML = `<span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-arrow-right text-primary"></i>`;
+            item.style.background = "#ffffff";
+            item.onclick = function() { moveColumn(this, 'selectedColumnsBox'); };
+        }
 
-         if (selectedCbs.length > 0) {
-             const selectedRow = selectedCbs[0].closest('tr');
+        targetBox.appendChild(item);
+    }
 
-             // 1. Auto-select Deal
-             if (dealDropdown) dealDropdown.value = selectedCbs[0].value;
+    function filterColumns(boxId, inputId) {
+        const q = document.getElementById(inputId).value.toLowerCase();
+        const items = document.querySelectorAll(`#${boxId} .column-item`);
+        items.forEach(item => {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(q) ? 'flex' : 'none';
+        });
+    }
 
-             // 2. Auto-select Account Name (Matches text from the table to the Dropdown)
-             if (accountDropdown) {
-                 // Find the index of the "AccountName" column dynamically
-                 const accountTh = document.querySelector('th[data-col-name="AccountName"]');
-                 if (accountTh) {
-                     const colIndex = accountTh.getAttribute('data-col-index');
-                     const accountTd = selectedRow.querySelector(`td[data-col-index="${colIndex}"]`);
+    function applyFilters() {
+        const activeFilters = [];
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                const colName = cb.value;
+                const condition = item.querySelector('.condition-select').value;
+                const isDate = item.dataset.fieldType === "date";
 
-                     if (accountTd) {
-                         const accountText = accountTd.innerText.trim();
-                         // Find the corresponding option in the dropdown and set it
-                         const optionToSelect = Array.from(accountDropdown.options).find(opt => opt.text === accountText);
-                         if (optionToSelect) {
-                             accountDropdown.value = optionToSelect.value;
-                         }
-                     }
-                 }
-             }
+                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
 
-             // 3. Auto-fill Mobile (If you have a mobile column on Deals)
-             if (mobileInput) {
-                 const mobileTh = document.querySelector('th[data-col-name="Mobile"]');
-                 if (mobileTh) {
-                     const colIndex = mobileTh.getAttribute('data-col-index');
-                     const mobileTd = selectedRow.querySelector(`td[data-col-index="${colIndex}"]`);
-                     if (mobileTd) {
-                         mobileInput.value = mobileTd.innerText.trim();
-                     }
-                 }
-             }
-         }
+                activeFilters.push({
+                    LogicalOperator: "AND", // Sidebar logic defaults to AND
+                    ColumnName: colName,
+                    Condition: condition,
+                    Value: val1,
+                    IsDate: isDate
+                });
+            }
+        });
 
-         const modalEl = document.getElementById('quickTaskModal');
-         document.body.appendChild(modalEl);
-         modalEl.style.zIndex = "1055";
-         const taskModal = new bootstrap.Modal(modalEl);
-         taskModal.show();
-     }
+      if (activeFilters.length === 0) {
+            window.location.href = window.location.pathname;
+            return;
+        }
 
+        const filterStr = JSON.stringify(activeFilters);
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('advancedFilters', filterStr);
+        urlParams.set('page', 1);
+
+        urlParams.set('_t', Date.now());
+
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function clearFilters() {
+         document.body.style.cursor = 'wait';
+         window.location.href = window.location.pathname;
+    }
+
+    function goToPage(pageNumber) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', pageNumber);
+        urlParams.set('_t', Date.now());
+
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function filterSingleColumn(inputEl, colIndex) {
+        const filterValue = inputEl.value.toLowerCase().trim();
+        allRows.forEach(row => {
+            if(!row.classList.contains('filtered-out')) {
+                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                if (td) {
+                    const text = td.textContent.trim().toLowerCase();
+                    row.classList.toggle('filtered-out', !text.includes(filterValue));
+                }
+            }
+        });
+        refreshVisibleRows();
+    }
+    
     function toggleMoreFields() {
         const container = document.getElementById("moreFieldsContainer");
         const btn = document.getElementById("moreFieldsToggle");
@@ -2197,131 +2465,8 @@
         }
     });
 
-    // Mass Update logic
-    function renderMassUpdateInput() {
-         const fieldSelect = document.getElementById('massUpdateField');
-         const container = document.getElementById('massUpdateValueContainer');
-         const inputArea = document.getElementById('dynamicInputArea');
-         const selectedField = fieldSelect.value;
-         const fieldType = fieldSelect.options[fieldSelect.selectedIndex]?.getAttribute('data-type') || '';
-
-         if (!selectedField) {
-             container.style.display = 'none';
-             return;
-         }
-
-         container.style.display = 'block';
-         inputArea.innerHTML = '';
-
-         // 1. Static Dropdowns (Stage, PaymentStatus, PaymentMode, etc.)
-         if (criteriaFilterOptionsMap[selectedField]) {
-             let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>`;
-             selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
-             criteriaFilterOptionsMap[selectedField].forEach(opt => {
-                 selectHTML += `<option value="${opt}">${opt}</option>`;
-             });
-             selectHTML += `</select>`;
-             inputArea.innerHTML = selectHTML;
-         }
-         // 2. User/Owner Fields Dropdown (DealOwner, DemoOwner, etc.)
-         else if (selectedField.toLowerCase().includes('owner') || selectedField.toLowerCase().includes('user')) {
-             let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select User -</option>`;
-             selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
-
-             // Loop through the existing userLookup dictionary mapped from ViewBag
-             for (const [id, name] of Object.entries(userLookup)) {
-                 // Using 'name' as the value assuming the visible field expects the string name.
-                 // Change value="${name}" to value="${id}" if your backend expects the database ID instead.
-                 selectHTML += `<option value="${name}">${name}</option>`;
-             }
-             selectHTML += `</select>`;
-             inputArea.innerHTML = selectHTML;
-         }
-         // 3. Account Fields Dropdown (AccountName, Account, etc.)
-         else if (selectedField.toLowerCase().includes('account') && !selectedField.toLowerCase().includes('type')) {
-             let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Account -</option>`;
-             selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
-
-             // Loop through the existing accountLookup dictionary mapped from ViewBag
-             for (const [id, name] of Object.entries(accountLookup)) {
-                 selectHTML += `<option value="${name}">${name}</option>`;
-             }
-             selectHTML += `</select>`;
-             inputArea.innerHTML = selectHTML;
-         }
-         // 4. Date Fields
-         else if (fieldType.includes('DateTime')) {
-             inputArea.innerHTML = `<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />`;
-         }
-         // 5. Numeric Fields
-         else if (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double')) {
-             inputArea.innerHTML = `<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />`;
-         }
-         // 6. Default Text Input
-         else {
-             inputArea.innerHTML = `<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />`;
-         }
-     }
-
-    function executeMassUpdateAjax() {
-         const field = document.getElementById('massUpdateField').value;
-         const valInput = document.getElementById('massUpdateValue');
-         let val = valInput ? valInput.value : '';
-
-         if (val === "CLEAR_VALUE_COMMAND") val = "";
-
-         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-         const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-         if (!field || selectedIds.length === 0) {
-             alert("Please select a field and ensure records are checked.");
-             return;
-         }
-
-         if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
-             return;
-         }
-
-         const btn = document.getElementById('btnExecuteMassUpdate');
-         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-         btn.disabled = true;
-
-         fetch('@Url.Action("BulkUpdate", "Deals")', {
-             method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-                 'Accept': 'application/json'
-             },
-             body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
-         })
-         .then(async response => {
-             if (!response.ok) {
-                 const errorText = await response.text();
-                 throw new Error(errorText || `HTTP Error ${response.status}`);
-             }
-             return response.json();
-         })
-         .then(data => {
-             if (data.success) {
-                 bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
-                 alert(`Successfully updated ${selectedIds.length} records!`);
-                 window.location.reload();
-             } else {
-                 alert("Update failed: " + data.message);
-                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-                 btn.disabled = false;
-             }
-         })
-         .catch((err) => {
-             console.error("Mass Update Error:", err);
-             alert("Connection error! Please check the browser console (F12) for exact details.");
-             btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-             btn.disabled = false;
-         });
-    }
-
     // ==========================================
-    // 5. BULK ACTIONS, EXPORT & DELETE
+    // BULK EXPORT/DELETE LOGIC
     // ==========================================
     function toggleAllRowCheckboxes(sourceCb) {
         currentVisibleRows.forEach(row => {
@@ -2337,9 +2482,7 @@
         document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
 
         const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-        if (massUpdateCountDisplay) {
-            massUpdateCountDisplay.innerText = selected;
-        }
+        if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selected;
 
         const totalVisible = currentVisibleRows.length;
         const selectAllCb = document.getElementById('selectAllCb');
@@ -2386,22 +2529,14 @@
         }
     }
 
-    // Existing function logic from Deals just in case called somewhere explicitly
-    function deleteSingleRecord(element, id) {
-        if(confirm('Are you sure you want to delete this record?')) {
-            fetch('@Url.Action("BulkDelete", "Deals")', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([parseInt(id)])
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    window.location.reload();
-                } else alert("Database Error: " + data.message);
-            }).catch(() => alert("Network error. Check console."));
-        }
-    }
-
     function exportTableToCSV(filename) {
+        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
+        
+        if (checkedCbs.length === 0) {
+            alert("Please select at least one record using the checkboxes before exporting.");
+            return;
+        }
+
         let csv = [];
         let headerRow = [];
         const table = document.getElementById("dealsTable");
@@ -2412,12 +2547,7 @@
         csv.push(headerRow.join(","));
 
         let targetRows = [];
-        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-        if (checkedCbs.length > 0) {
-            checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
-        } else {
-            targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
-        }
+        checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
 
         targetRows.forEach(tr => {
             let rowData = [];
@@ -2440,9 +2570,82 @@
         document.body.removeChild(downloadLink);
     }
 
-    // ==========================================
-    // 6. COLUMN MANAGEMENT & DRAG-DROP
-    // ==========================================
+    function setupFileUpload() {
+        const fileInput = document.getElementById('fileUploadInput');
+        if(!fileInput) return;
+
+        fileInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('uploadedFile', file);
+
+            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+            const originalHtml = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+            uploadBtn.disabled = true;
+
+            fetch('@Url.Action("UploadFile", "Deals")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                if (response.ok) {
+                    alert("Data uploaded successfully!");
+                    window.location.reload();
+                } else {
+                    alert("Upload Failed: " + await response.text());
+                    uploadBtn.innerHTML = originalHtml;
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert("Network error during upload.");
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            });
+            this.value = '';
+        });
+    }
+
+    function setupLazyDatalists() {
+        document.querySelectorAll('.condition-val').forEach(input => {
+            input.addEventListener('focus', function() {
+                const listId = this.getAttribute('list');
+                if(!listId) return;
+
+                const datalist = document.getElementById(listId);
+
+                if(datalist && datalist.children.length === 0) {
+                    const colName = listId.replace('dl_', '');
+                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+                    if(th) {
+                        const colIndex = th.getAttribute('data-col-index');
+                        let uniqueValues = new Set();
+
+                        allRows.forEach(row => {
+                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                            if(td) {
+                                const text = td.innerText.trim();
+                                if(text && !text.startsWith("zcrm_")) uniqueValues.add(text);
+                            }
+                        });
+
+                        let fragment = document.createDocumentFragment();
+                        uniqueValues.forEach(val => {
+                            let option = document.createElement("option");
+                            option.value = val;
+                            fragment.appendChild(option);
+                        });
+                        datalist.appendChild(fragment);
+                    }
+                }
+            });
+        });
+    }
+
     function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
         const idxStr = idx.toString();
         if(isVisible) hiddenCols.delete(idxStr);
@@ -2571,268 +2774,5 @@
             }
             requestAnimationFrame(processChunk);
         }, 10);
-    }
-
-    // ==========================================
-    // 7. FILE UPLOAD & LAZY DATALISTS
-    // ==========================================
-    function setupFileUpload() {
-        const fileInput = document.getElementById('fileUploadInput');
-        if(!fileInput) return;
-
-        fileInput.addEventListener('change', function () {
-            const file = this.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('uploadedFile', file);
-
-            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
-            const originalHtml = uploadBtn.innerHTML;
-            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
-            uploadBtn.disabled = true;
-
-            fetch('@Url.Action("UploadFile", "Deals")', {
-                method: 'POST',
-                body: formData
-            })
-            .then(async response => {
-                if (response.ok) {
-                    alert("Data uploaded successfully!");
-                    window.location.reload();
-                } else {
-                    alert("Upload Failed: " + await response.text());
-                    uploadBtn.innerHTML = originalHtml;
-                    uploadBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                alert("Network error during upload.");
-                uploadBtn.innerHTML = originalHtml;
-                uploadBtn.disabled = false;
-            });
-            this.value = '';
-        });
-    }
-
-    function setupLazyDatalists() {
-        document.querySelectorAll('.condition-val').forEach(input => {
-            input.addEventListener('focus', function() {
-                const listId = this.getAttribute('list');
-                if(!listId) return;
-
-                const datalist = document.getElementById(listId);
-
-                if(datalist && datalist.children.length === 0) {
-                    const colName = listId.replace('dl_', '');
-                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
-
-                    if(th) {
-                        const colIndex = th.getAttribute('data-col-index');
-                        let uniqueValues = new Set();
-
-                        allRows.forEach(row => {
-                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                            if(td) {
-                                const text = td.innerText.trim();
-                                if(text && !text.startsWith("zcrm_")) uniqueValues.add(text);
-                            }
-                        });
-
-                        let fragment = document.createDocumentFragment();
-                        uniqueValues.forEach(val => {
-                            let option = document.createElement("option");
-                            option.value = val;
-                            fragment.appendChild(option);
-                        });
-                        datalist.appendChild(fragment);
-                    }
-                }
-            });
-        });
-    }
-
-    // ==========================================
-    // 8. NOTES PANEL UI (AJAX ENABLED)
-    // ==========================================
-    async function openNotesPanel(dealId, dealName) {
-        currentNoteDealId = dealId;
-        document.getElementById('noteAccountName').innerText = dealName;
-        document.getElementById('newNoteText').value = '';
-        document.getElementById('noteAttachment').value = '';
-
-        const list = document.getElementById('notesTimelineList');
-        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-        new bootstrap.Offcanvas(document.getElementById('notesPanel')).show();
-
-        try {
-            const response = await fetch(`/Deals/GetNotes?dealId=${dealId}`);
-            const notes = await response.json();
-
-            list.innerHTML = '';
-
-            if (notes.length > 0) {
-                notes.forEach(n => appendNoteToUI(n.ownerName, n.createdDateTime, n.description, n.attachmentFileName));
-            } else {
-                list.innerHTML = `
-                    <div class="position-relative mb-4">
-                        <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
-                        <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
-                    </div>`;
-            }
-        } catch(e) {
-            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes.</p>';
-        }
-    }
-
-    async function saveNoteAjax() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-        const ownerId = document.getElementById('noteOwnerId').value;
-        const btn = document.getElementById('btnSaveNote');
-
-        if (!text.trim() && !attachment) return;
-
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append('dealId', currentNoteDealId);
-        formData.append('description', text);
-        formData.append('ownerId', ownerId);
-        if (attachment) formData.append('attachment', attachment);
-
-        try {
-            const response = await fetch('/Deals/SaveNoteAjax', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-                if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
-
-                appendNoteToUI(data.note.ownerName, data.note.createdDateTime, data.note.description, data.note.attachmentFileName);
-
-                document.getElementById('newNoteText').value = '';
-                document.getElementById('noteAttachment').value = '';
-            } else {
-                alert("Failed to save note: " + data.message);
-            }
-        } catch(e) {
-            alert("Network error while saving note.");
-        } finally {
-            btn.innerHTML = 'Save Note';
-            btn.disabled = false;
-        }
-    }
-
-    function appendNoteToUI(ownerName, timeString, text, fileName) {
-        let attachmentHtml = fileName ? `
-            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155; transition: 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#cbd5e1'">
-                <i class="fa-solid fa-file-lines text-muted"></i>
-                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
-            </div>` : '';
-
-        const noteHtml = `
-            <div class="position-relative mb-4">
-                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                <i class="fa-solid fa-user"></i>
-                            </div>
-                            ${ownerName}
-                        </div>
-                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
-                            <i class="fa-regular fa-clock me-1"></i>${timeString}
-                        </span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
-                    ${attachmentHtml}
-                </div>
-            </div>`;
-
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-    }
-
-    function sortTableByCol(colIndex, direction) {
-        document.body.style.cursor = 'wait';
-        setTimeout(() => {
-            const tbody = document.getElementById("tableBody");
-
-            allRows.sort((a, b) => {
-                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
-
-                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
-                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
-
-                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-                }
-
-                if (aText < bText) return direction === 'asc' ? -1 : 1;
-                if (aText > bText) return direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            allRows.forEach(row => tbody.appendChild(row));
-            refreshVisibleRows();
-            document.body.style.cursor = 'default';
-        }, 10);
-    }
-
-    function applyFilters() {
-        const activeFilters = [];
-        document.querySelectorAll('.filter-field-item.active').forEach(item => {
-            const cb = item.querySelector('.field-checkbox');
-            if (cb && cb.checked) {
-                const colName = cb.value;
-                const condition = item.querySelector('.condition-select').value;
-                const isDate = item.dataset.fieldType === "date";
-
-                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
-
-                activeFilters.push({
-                    ColumnName: colName,
-                    Condition: condition,
-                    Value: val1,
-                    IsDate: isDate
-                });
-            }
-        });
-
-        if (activeFilters.length === 0) {
-            window.location.href = window.location.pathname;
-            return;
-        }
-
-        const filterStr = JSON.stringify(activeFilters);
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('advancedFilters', filterStr);
-        urlParams.set('page', 1);
-
-        urlParams.set('_t', Date.now());
-
-        document.body.style.cursor = 'wait';
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
-    }
-
-    function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase().trim();
-        allRows.forEach(row => {
-            if(!row.classList.contains('filtered-out')) {
-                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                if (td) {
-                    const text = td.textContent.trim().toLowerCase();
-                    row.classList.toggle('filtered-out', !text.includes(filterValue));
-                }
-            }
-        });
-        refreshVisibleRows();
     }
 </script>

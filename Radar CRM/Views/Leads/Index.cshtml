@@ -834,7 +834,7 @@
         <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
             <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
         </button>
-        <a href="@Url.Action("Create", "Leads")" class="btn-saas-primary">
+        <a href="@Url.Action("Create", "Leads")" class="btn-saas-primary" Hidden>
             <i class="fa-solid fa-plus"></i> Create Lead
         </a>
     </div>
@@ -860,6 +860,14 @@
         </div>
 
         <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
+            <!-- 🚀 NEW FEATURE: SAVED FILTERS SECTION -->
+            <div id="savedFiltersSection" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f0fdf4; padding-bottom: 8px;">
+                <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                    <i class="fa-solid fa-bookmark me-2"></i> SAVED FILTERS
+                </div>
+                <div id="savedFiltersContainer" class="px-3 pb-2 d-flex flex-wrap gap-2"></div>
+            </div>
+
             <!-- FREQUENTLY USED SECTION -->
             <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
@@ -871,15 +879,43 @@
 
             <!-- UNPINNED LIST -->
             <div id="sidebarList">
+                @{
+                    var predefinedLists = new Dictionary<string, string[]>
+                    {
+                        { "LeadStatus", new[] { "Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made" } },
+                        { "Stage", new[] { "Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost" } },
+                        { "CurrentStatus", new[] { "User", "Non-User" } },
+                        { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
+                        { "DataSources", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "Website Direct", "YouTube", "LinkedIn", "Cold Calling", "WhatsApp Campaign" } },
+                        { "CampaignSource", new[] { "Meta Ads", "Google AdWords", "Webinar", "Outreach", "Direct" } },
+                        { "IsHomeopathicDoctor", new[] { "Yes — MD(Homeopathy)", "Yes - BHMS", "Pursuing BHMS", "Not a Homeopath Doctor", "Yes", "No" } },
+                        { "ClinicType", new[] { "Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics" } },
+                        { "WorkType", new[] { "Practicing", "Job", "Research", "others" } },
+                        { "HasComputer", new[] { "Yes", "No" } },
+                        { "Qualification", new[] { "BHMS", "MD", "BAMS", "Student" } },
+                        { "PaymentType", new[] { "Upfront", "EMI - 3Months", "EMI - 6Months" } },
+                        { "PaymentStatus", new[] { "Paid", "Pending", "Partial", "Refunded" } },
+                        { "CurrentlyUsingSoftware", new[] { "Yes", "No" } }
+                    };
+                }
+
                 @foreach (var prop in tableProps)
                 {
-                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date");
+                    bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date") || prop.Name.Contains("Time");
+                    bool isUserField = prop.Name.Contains("Owner") || prop.Name == "CreatedBy" || prop.Name == "ModifiedBy";
+                    bool isPredefined = predefinedLists.ContainsKey(prop.Name);
 
                     <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
                         <div class="d-flex align-items-center m-0 w-100">
+                            <!-- Star Pin Icon -->
                             <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
                                style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
                                onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
+
+                            <!-- 🚀 NEW: Save Filter Icon -->
+                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2"
+                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
+                               onclick="saveFieldFilter(event, this, '@prop.Name')" title="Save this filter setting"></i>
 
                             <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
 
@@ -891,32 +927,64 @@
                         <div class="filter-expanded-area">
                             @if (isDate)
                             {
+                                <!-- Full Date Conditions Matching Accounts Update -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
-                                    <option value="on" selected>On</option>
+                                    <option value="On" selected>On</option>
                                     <option value="before">before</option>
                                     <option value="after">after</option>
                                     <option value="between">between</option>
-                                    <option value="today">Today</option>
-                                    <option value="this_month">This Month</option>
+                                    <option value="not between">not between</option>
+                                    <option value="Previous">Previous</option>
+                                    <option value="Next">Next</option>
+                                    <option value="Today">Today</option>
+                                    <option value="Tomorrow">Tomorrow</option>
+                                    <option value="Yesterday">Yesterday</option>
+                                    <option value="Till Yesterday">Till Yesterday</option>
+                                    <option value="Starting tomorrow">Starting tomorrow</option>
+                                    <option value="This Week">This Week</option>
+                                    <option value="This Month">This Month</option>
+                                    <option value="This Year">This Year</option>
+                                    <option value="Previous Week">Previous Week</option>
+                                    <option value="Previous Month">Previous Month</option>
+                                    <option value="Previous Year">Previous Year</option>
+                                    <option value="Current FY">Current FY</option>
+                                    <option value="Previous FY">Previous FY</option>
+                                    <option value="Current FQ">Current FQ</option>
+                                    <option value="age in">age in</option>
+                                    <option value="due in">due in</option>
                                 </select>
                                 <div class="d-flex flex-column gap-2">
                                     <input type="date" class="form-control form-control-sm condition-val date-val-1" />
                                     <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
                                 </div>
                             }
-                            else if (prop.Name.Contains("Owner"))
+                            else if (isPredefined)
                             {
+                                <!-- Predefined Options -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="contains" selected>contains</option>
-                                    <option value="does_not_contain">does not contain</option>
-                                    <option value="starts_with">starts with</option>
-                                    <option value="ends_with">ends with</option>
-                                    <option value="is">is exactly</option>
+                                    <option value="is" selected>is</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type..." />
+                                <select class="form-select form-select-sm condition-val">
+                                    <option value="" disabled selected>- Select @prop.Name -</option>
+                                    @foreach (var opt in predefinedLists[prop.Name])
+                                    {
+                                        <option value="@opt">@opt</option>
+                                    }
+                                </select>
+                            }
+                            else if (isUserField)
+                            {
+                                <!-- User Field with User Options -->
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+                                    <option value="is" selected>is</option>
+                                    <option value="is_not">is not</option>
+                                    <option value="is_empty">is empty</option>
+                                    <option value="is_not_empty">is not empty</option>
+                                </select>
+                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
                                 <datalist id="dl_users_@prop.Name">
                                     @if (ViewBag.UsersList != null)
                                     {
@@ -929,13 +997,14 @@
                             }
                             else
                             {
+                                <!-- Text Field for Large Data -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="contains" selected>contains</option>
                                     <option value="does_not_contain">does not contain</option>
                                     <option value="starts_with">starts with</option>
                                     <option value="ends_with">ends with</option>
                                     <option value="is">is exactly</option>
-                                    <option value="is_not">is not</option>
+                                    <option value="is_not">isn't</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
@@ -1413,11 +1482,11 @@
                         <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn-task-save">Save Task</button>
                     </div>
-                </form>
-
-            </div>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
 <!-- Notes Offcanvas Panel -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
@@ -1502,14 +1571,6 @@
 
                             <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;">
                                 <option value="" disabled selected>None</option>
-                                <option value="is">is exactly</option>
-                                <option value="is_not">isn't</option>
-                                <option value="contains">contains</option>
-                                <option value="does_not_contain">does not contain</option>
-                                <option value="starts_with">starts with</option>
-                                <option value="ends_with">ends with</option>
-                                <option value="is_empty">is empty</option>
-                                <option value="is_not_empty">is not empty</option>
                             </select>
 
                             <div class="cv-value-container d-flex" style="flex-grow:1;">
@@ -1566,6 +1627,7 @@
                         <div class="columns-box-wrapper w-50">
                             <label class="text-muted fw-semibold mb-2" style="font-size: 0.85rem;">Selected</label>
                             <div class="columns-box border rounded p-2" id="selectedColumnsBox" style="height: 250px; overflow-y: auto; background: #ffffff;">
+                                <!-- Default starting items -->
                                 <div class="column-item p-2 mb-1 border rounded d-flex justify-content-between align-items-center" style="background: #f1f5f9; cursor: pointer; font-size: 0.85rem;" onclick="moveColumn(this, 'availableColumnsBox')">
                                     <i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">LeadName</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>
                                 </div>
@@ -1584,6 +1646,26 @@
 
 <script>
     // ==========================================
+    // 🚀 INJECT C# DATA ARRAYS DIRECTLY INTO JS
+    // ==========================================
+    const ownerOptionsList = [
+        @if (ViewBag.UsersList != null) {
+            foreach (var user in (SelectList)ViewBag.UsersList) {
+                <text>"@Html.Raw(user.Text)",</text>
+            }
+        }
+    ];
+
+    // 🚀 ADD THIS MISSING ARRAY TO FIX THE CRASH:
+    const vendorOptionsList = [
+        @if (ViewBag.VendorsList != null) {
+            foreach (var vendor in (SelectList)ViewBag.VendorsList) {
+                <text>"@Html.Raw(vendor.Text)",</text>
+            }
+        }
+    ];
+
+    // ==========================================
     // 1. GLOBAL VARIABLES & INITIALIZATION
     // ==========================================
     const defaultVisibleColumns = ["LeadName", "MobileNumber", "LeadStatus", "Stage", "CreatedDateAndTime"];
@@ -1595,6 +1677,7 @@
 
     // Map of fields to selectable dropdown arrays
     const criteriaFilterOptionsMap = {
+        "GroupName": vendorOptionsList,
         "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made"],
         "Stage": ["Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost"],
         "CurrentStatus": ["User", "Non-User"],
@@ -1631,6 +1714,10 @@
         restorePinnedFilters();
 
         renderCustomViews();
+        renderSavedSidebarFilters();
+        
+        // Restore Sidebar filters on load
+        restoreSidebarFiltersFromUrl();
     });
 
     // ==========================================
@@ -1735,15 +1822,137 @@
     }
 
     // ==========================================
+    // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
+    // ==========================================
+    function saveFieldFilter(event, iconEl, fieldName) {
+        event.stopPropagation();
+        
+        const item = iconEl.closest('.filter-field-item');
+        const cb = item.querySelector('.field-checkbox');
+        
+        if(!cb.checked) {
+            alert("Please check the box and set a value before saving this filter.");
+            return;
+        }
+
+        const condition = item.querySelector('.condition-select').value;
+        const isDate = item.dataset.fieldType === "date";
+        let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
+
+        if(!val && condition !== 'is_empty' && condition !== 'is_not_empty') {
+            alert("Please enter a value before saving.");
+            return;
+        }
+
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_leads') || '[]');
+        savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
+        localStorage.setItem('crm_saved_sidebar_filters_leads', JSON.stringify(savedFilters));
+        
+        renderSavedSidebarFilters();
+    }
+
+    function renderSavedSidebarFilters() {
+        const section = document.getElementById('savedFiltersSection');
+        const container = document.getElementById('savedFiltersContainer');
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_leads') || '[]');
+
+        if(savedFilters.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        container.innerHTML = '';
+        savedFilters.forEach(f => {
+            const badge = document.createElement('div');
+            badge.className = 'badge bg-white text-dark border shadow-sm p-2 d-flex align-items-center gap-2';
+            badge.innerHTML = `
+                <span onclick="applySavedSidebarFilter(${f.id})" style="cursor:pointer;" title="Click to instantly apply this filter">
+                    <i class="fa-solid fa-filter text-primary me-1"></i> ${f.fieldName} ${f.condition} <span class="text-primary">${f.val}</span>
+                </span>
+                <i class="fa-solid fa-xmark text-danger" style="cursor:pointer; opacity: 0.6;" onclick="deleteSavedSidebarFilter(${f.id}, event)" title="Remove"></i>
+            `;
+            container.appendChild(badge);
+        });
+    }
+
+    function applySavedSidebarFilter(id) {
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_leads') || '[]');
+        let f = savedFilters.find(x => x.id === id);
+        if(!f) return;
+
+        const activeFilters = [{
+            LogicalOperator: "",
+            ColumnName: f.fieldName,
+            Condition: f.condition,
+            Value: f.val,
+            IsDate: f.isDate
+        }];
+
+        document.body.style.cursor = 'wait';
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('advancedFilters', JSON.stringify(activeFilters));
+        urlParams.set('page', 1);
+        urlParams.set('_t', Date.now());
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function deleteSavedSidebarFilter(id, event) {
+        event.stopPropagation();
+        let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_leads') || '[]');
+        savedFilters = savedFilters.filter(x => x.id !== id);
+        localStorage.setItem('crm_saved_sidebar_filters_leads', JSON.stringify(savedFilters));
+        renderSavedSidebarFilters();
+    }
+
+    function restoreSidebarFiltersFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const filtersParam = urlParams.get('advancedFilters');
+        
+        if (filtersParam) {
+            try {
+                const activeFilters = JSON.parse(filtersParam);
+                activeFilters.forEach(f => {
+                    const chk = document.getElementById('chk_' + f.ColumnName);
+                    if (chk) {
+                        chk.checked = true;
+                        const item = chk.closest('.filter-field-item');
+                        item.classList.add('active'); 
+
+                        const condSelect = item.querySelector('.condition-select');
+                        if (condSelect) condSelect.value = f.Condition;
+
+                        if (f.IsDate) {
+                            const date1 = item.querySelector('.date-val-1');
+                            if (date1) date1.value = f.Value;
+                        } else {
+                            const textVal = item.querySelector('.condition-val');
+                            if (textVal) textVal.value = f.Value;
+                        }
+                    }
+                });
+            } catch(e) { console.error("Error restoring filters", e); }
+        }
+    }
+
+
+    // ==========================================
     // 🚀 DYNAMIC CUSTOM VIEWS & CRITERIA BUILDER
     // ==========================================
     function openCustomViewModal() {
         const modalEl = document.getElementById('createCustomViewModal');
         if (!modalEl) return;
         document.body.appendChild(modalEl);
-        modalEl.style.zIndex = "1055";
-        const myModal = new bootstrap.Modal(modalEl);
-        myModal.show();
+        modalEl.style.zIndex = "9999";
+        
+        try {
+            const myModal = new bootstrap.Modal(modalEl);
+            myModal.show();
+        } catch (error) {
+            if (typeof $ !== 'undefined') {
+                $(modalEl).modal('show');
+            }
+        }
     }
 
     function renderCustomViews() {
@@ -1790,22 +1999,63 @@
         });
     }
 
+    // Contextual dropdown builder based on field selected
     function handleCriteriaFieldChange(selectEl) {
         const row = selectEl.closest('.criteria-row-builder');
         const fieldName = selectEl.value;
         const valueContainer = row.querySelector('.cv-value-container');
+        const conditionSelect = row.querySelector('.cv-condition');
 
-        if (criteriaFilterOptionsMap[fieldName]) {
+        let conditionOptions = '';
+
+        if (fieldName.includes("Owner") || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
+            conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
+            let datalistId = "dl_cv_owner_" + Date.now();
+            let opts = `<datalist id="${datalistId}">`;
+            ownerOptionsList.forEach(o => { opts += `<option value="${o}">${o}</option>`; });
+            opts += `</datalist>`;
+            valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select or type user..." style="width:100%;">${opts}`;
+        }
+        else if (criteriaFilterOptionsMap[fieldName]) {
+            conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             let opts = '<option value="" disabled selected>Select Value</option>';
             criteriaFilterOptionsMap[fieldName].forEach(o => { opts += `<option value="${o}">${o}</option>`; });
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
-        else if (fieldName.toLowerCase().includes('date')) {
+        else if (fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('time')) {
+            conditionOptions = `
+                <option value="on">On</option>
+                <option value="before">before</option>
+                <option value="after">after</option>
+                <option value="between">between</option>
+                <option value="not between">not between</option>
+                <option value="Previous">Previous</option>
+                <option value="Next">Next</option>
+                <option value="Today">Today</option>
+                <option value="Tomorrow">Tomorrow</option>
+                <option value="Yesterday">Yesterday</option>
+                <option value="Till Yesterday">Till Yesterday</option>
+                <option value="Starting tomorrow">Starting tomorrow</option>
+                <option value="This Week">This Week</option>
+                <option value="This Month">This Month</option>
+                <option value="This Year">This Year</option>
+                <option value="Previous Week">Previous Week</option>
+                <option value="Previous Month">Previous Month</option>
+                <option value="Previous Year">Previous Year</option>
+                <option value="Current FY">Current FY</option>
+                <option value="Previous FY">Previous FY</option>
+                <option value="Current FQ">Current FQ</option>
+                <option value="age in">age in</option>
+                <option value="due in">due in</option>
+            `;
             valueContainer.innerHTML = `<input type="date" class="form-control criteria-builder-input cv-value" style="width:100%;">`;
         }
         else {
+            conditionOptions = '<option value="is">is exactly</option><option value="is_not">isn\'t</option><option value="contains">contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">`;
         }
+
+        conditionSelect.innerHTML = conditionOptions;
     }
 
     function updateCriteriaPattern() {
@@ -1858,19 +2108,11 @@
             </select>
 
             <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;">
-                <option value="" disabled selected>None</option>
-                <option value="is">is exactly</option>
-                <option value="is_not">isn't</option>
-                <option value="contains">contains</option>
-                <option value="does_not_contain">does not contain</option>
-                <option value="starts_with">starts with</option>
-                <option value="ends_with">ends with</option>
-                <option value="is_empty">is empty</option>
-                <option value="is_not_empty">is not empty</option>
+                <option value="" disabled selected>Select Field First</option>
             </select>
 
             <div class="cv-value-container d-flex" style="flex-grow:1;">
-                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">
+                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled>
             </div>
 
             <button type="button" class="btn btn-link text-success p-1 add" onclick="addCriteriaRow()"><i class="fa-solid fa-circle-plus fs-5"></i></button>
@@ -1898,32 +2140,6 @@
         updateCriteriaPattern();
     }
 
-    function moveColumn(item, targetBoxId) {
-        const targetBox = document.getElementById(targetBoxId);
-        const fieldName = item.innerText.trim();
-
-        if (targetBoxId === 'selectedColumnsBox') {
-            item.innerHTML = `<i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>`;
-            item.style.background = "#f1f5f9";
-            item.onclick = function() { moveColumn(this, 'availableColumnsBox'); };
-        } else {
-            item.innerHTML = `<span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-arrow-right text-primary"></i>`;
-            item.style.background = "#ffffff";
-            item.onclick = function() { moveColumn(this, 'selectedColumnsBox'); };
-        }
-
-        targetBox.appendChild(item);
-    }
-
-    function filterColumns(boxId, inputId) {
-        const q = document.getElementById(inputId).value.toLowerCase();
-        const items = document.querySelectorAll(`#${boxId} .column-item`);
-        items.forEach(item => {
-            const text = item.innerText.toLowerCase();
-            item.style.display = text.includes(q) ? 'flex' : 'none';
-        });
-    }
-
     function saveAndApplyCustomView() {
         const viewName = document.getElementById('customViewName').value.trim();
         if (!viewName) {
@@ -1939,37 +2155,34 @@
             const val = row.querySelector('.cv-value').value;
 
             let logicOperator = "AND";
-            if (row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
+            if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
             }
 
             if (field && condition) {
+                if (!val && !condition.includes('empty')) return; // Skip incomplete
+
                 activeFilters.push({
                     LogicalOperator: index === 0 ? "" : logicOperator,
                     ColumnName: field,
                     Condition: condition,
-                    Value: val,
-                    IsDate: field.toLowerCase().includes('date')
+                    Value: val || "",
+                    IsDate: field.toLowerCase().includes('date') || field.toLowerCase().includes('time')
                 });
             }
         });
 
         if (activeFilters.length === 0) {
-            alert("Please specify at least one valid criteria to create a view.");
+            alert("Please specify at least one valid complete criteria.");
             return;
         }
 
         let savedViews = JSON.parse(localStorage.getItem('crm_user_views_leads')) || [];
         savedViews = savedViews.filter(v => v.name !== viewName);
-        savedViews.push({
-            name: viewName,
-            isPinned: true,
-            filters: activeFilters
-        });
+        savedViews.push({ name: viewName, isPinned: true, filters: activeFilters });
         localStorage.setItem('crm_user_views_leads', JSON.stringify(savedViews));
 
         bootstrap.Modal.getInstance(document.getElementById('createCustomViewModal')).hide();
-
         applyCustomView(viewName, activeFilters);
     }
 
@@ -2024,25 +2237,99 @@
     }
 
     // ==========================================
-    // 4. MODALS (Task, Note, Columns, Mass Update)
+    // MODALS & HELPERS
     // ==========================================
-    function openTaskModal() {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        const leadDropdown = document.getElementById('taskModalLeadId');
+    function moveColumn(item, targetBoxId) {
+        const targetBox = document.getElementById(targetBoxId);
+        const fieldName = item.innerText.trim();
 
-        if (selectedCbs.length > 0 && leadDropdown) {
-            leadDropdown.value = selectedCbs[0].value;
-        } else if (leadDropdown) {
-            leadDropdown.value = "";
+        if (targetBoxId === 'selectedColumnsBox') {
+            item.innerHTML = `<i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>`;
+            item.style.background = "#f1f5f9";
+            item.onclick = function() { moveColumn(this, 'availableColumnsBox'); };
+        } else {
+            item.innerHTML = `<span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-arrow-right text-primary"></i>`;
+            item.style.background = "#ffffff";
+            item.onclick = function() { moveColumn(this, 'selectedColumnsBox'); };
         }
 
-        const modalEl = document.getElementById('quickTaskModal');
-        document.body.appendChild(modalEl);
-        modalEl.style.zIndex = "1055";
-        const taskModal = new bootstrap.Modal(modalEl);
-        taskModal.show();
+        targetBox.appendChild(item);
     }
 
+    function filterColumns(boxId, inputId) {
+        const q = document.getElementById(inputId).value.toLowerCase();
+        const items = document.querySelectorAll(`#${boxId} .column-item`);
+        items.forEach(item => {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(q) ? 'flex' : 'none';
+        });
+    }
+
+    function applyFilters() {
+        const activeFilters = [];
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                const colName = cb.value;
+                const condition = item.querySelector('.condition-select').value;
+                const isDate = item.dataset.fieldType === "date";
+
+                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+
+                activeFilters.push({
+                    LogicalOperator: "AND", // Sidebar logic defaults to AND
+                    ColumnName: colName,
+                    Condition: condition,
+                    Value: val1,
+                    IsDate: isDate
+                });
+            }
+        });
+
+      if (activeFilters.length === 0) {
+            window.location.href = window.location.pathname;
+            return;
+        }
+
+        const filterStr = JSON.stringify(activeFilters);
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('advancedFilters', filterStr);
+        urlParams.set('page', 1);
+
+        urlParams.set('_t', Date.now());
+
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function clearFilters() {
+         document.body.style.cursor = 'wait';
+         window.location.href = window.location.pathname;
+    }
+
+    function goToPage(pageNumber) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', pageNumber);
+        urlParams.set('_t', Date.now());
+
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    }
+
+    function filterSingleColumn(inputEl, colIndex) {
+        const filterValue = inputEl.value.toLowerCase().trim();
+        allRows.forEach(row => {
+            if(!row.classList.contains('filtered-out')) {
+                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                if (td) {
+                    const text = td.textContent.trim().toLowerCase();
+                    row.classList.toggle('filtered-out', !text.includes(filterValue));
+                }
+            }
+        });
+        refreshVisibleRows();
+    }
+    
     function toggleMoreFields() {
         const container = document.getElementById("moreFieldsContainer");
         const btn = document.getElementById("moreFieldsToggle");
@@ -2097,104 +2384,8 @@
         }
     });
 
-    // Mass Update logic
-    function renderMassUpdateInput() {
-        const fieldSelect = document.getElementById('massUpdateField');
-        const container = document.getElementById('massUpdateValueContainer');
-        const inputArea = document.getElementById('dynamicInputArea');
-        const selectedField = fieldSelect.value;
-        const fieldType = fieldSelect.options[fieldSelect.selectedIndex].getAttribute('data-type');
-
-        if (!selectedField) {
-            container.style.display = 'none';
-            return;
-        }
-
-        container.style.display = 'block';
-        inputArea.innerHTML = '';
-
-        if (criteriaFilterOptionsMap[selectedField]) {
-            let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>`;
-            selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
-            criteriaFilterOptionsMap[selectedField].forEach(opt => {
-                selectHTML += `<option value="${opt}">${opt}</option>`;
-            });
-            selectHTML += `</select>`;
-            inputArea.innerHTML = selectHTML;
-        }
-        else if (fieldType.includes('DateTime'))
-        {
-            inputArea.innerHTML = `<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />`;
-        }
-        else if (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))
-        {
-            inputArea.innerHTML = `<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />`;
-        }
-        else
-        {
-            inputArea.innerHTML = `<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />`;
-        }
-    }
-
-    function executeMassUpdateAjax() {
-         const field = document.getElementById('massUpdateField').value;
-         const valInput = document.getElementById('massUpdateValue');
-         let val = valInput ? valInput.value : '';
-
-         if (val === "CLEAR_VALUE_COMMAND") val = "";
-
-         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-         const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-         if (!field || selectedIds.length === 0) {
-             alert("Please select a field and ensure records are checked.");
-             return;
-         }
-
-         if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
-             return;
-         }
-
-         const btn = document.getElementById('btnExecuteMassUpdate');
-         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-         btn.disabled = true;
-
-         fetch('@Url.Action("BulkUpdate", "Leads")', {
-             method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-                 'Accept': 'application/json'
-             },
-             body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
-         })
-         .then(async response => {
-             if (!response.ok) {
-                 const errorText = await response.text();
-                 throw new Error(errorText || `HTTP Error ${response.status}`);
-             }
-             return response.json();
-         })
-         .then(data => {
-             if (data.success) {
-                 bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
-                 alert(`Successfully updated ${selectedIds.length} records!`);
-                 window.location.reload();
-             } else {
-                 alert("Update failed: " + data.message);
-                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-                 btn.disabled = false;
-             }
-         })
-         .catch((err) => {
-             console.error("Mass Update Error:", err);
-             alert("Connection error! Please check the browser console (F12) for exact details.");
-             btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-             btn.disabled = false;
-         });
-    }
-
     // ==========================================
-    // 5. BULK ACTIONS, EXPORT & DELETE
+    // BULK EXPORT/DELETE LOGIC
     // ==========================================
     function toggleAllRowCheckboxes(sourceCb) {
         currentVisibleRows.forEach(row => {
@@ -2210,9 +2401,7 @@
         document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
 
         const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-        if (massUpdateCountDisplay) {
-            massUpdateCountDisplay.innerText = selected;
-        }
+        if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selected;
 
         const totalVisible = currentVisibleRows.length;
         const selectAllCb = document.getElementById('selectAllCb');
@@ -2260,6 +2449,13 @@
     }
 
     function exportTableToCSV(filename) {
+        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
+        
+        if (checkedCbs.length === 0) {
+            alert("Please select at least one record using the checkboxes before exporting.");
+            return;
+        }
+
         let csv = [];
         let headerRow = [];
         const table = document.getElementById("leadsTable");
@@ -2270,12 +2466,7 @@
         csv.push(headerRow.join(","));
 
         let targetRows = [];
-        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-        if (checkedCbs.length > 0) {
-            checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
-        } else {
-            targetRows = allRows.filter(r => !r.classList.contains('filtered-out'));
-        }
+        checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
 
         targetRows.forEach(tr => {
             let rowData = [];
@@ -2298,9 +2489,82 @@
         document.body.removeChild(downloadLink);
     }
 
-    // ==========================================
-    // 6. COLUMN MANAGEMENT & DRAG-DROP
-    // ==========================================
+    function setupFileUpload() {
+        const fileInput = document.getElementById('fileUploadInput');
+        if(!fileInput) return;
+
+        fileInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('uploadedFile', file);
+
+            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
+            const originalHtml = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+            uploadBtn.disabled = true;
+
+            fetch('@Url.Action("UploadFile", "Leads")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                if (response.ok) {
+                    alert("Data uploaded successfully!");
+                    window.location.reload();
+                } else {
+                    alert("Upload Failed: " + await response.text());
+                    uploadBtn.innerHTML = originalHtml;
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert("Network error during upload.");
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            });
+            this.value = '';
+        });
+    }
+
+    function setupLazyDatalists() {
+        document.querySelectorAll('.condition-val').forEach(input => {
+            input.addEventListener('focus', function() {
+                const listId = this.getAttribute('list');
+                if(!listId) return;
+
+                const datalist = document.getElementById(listId);
+
+                if(datalist && datalist.children.length === 0) {
+                    const colName = listId.replace('dl_', '');
+                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
+
+                    if(th) {
+                        const colIndex = th.getAttribute('data-col-index');
+                        let uniqueValues = new Set();
+
+                        allRows.forEach(row => {
+                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
+                            if(td) {
+                                const text = td.innerText.trim();
+                                if(text) uniqueValues.add(text);
+                            }
+                        });
+
+                        let fragment = document.createDocumentFragment();
+                        uniqueValues.forEach(val => {
+                            let option = document.createElement("option");
+                            option.value = val;
+                            fragment.appendChild(option);
+                        });
+                        datalist.appendChild(fragment);
+                    }
+                }
+            });
+        });
+    }
+
     function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
         const idxStr = idx.toString();
         if(isVisible) hiddenCols.delete(idxStr);
@@ -2429,319 +2693,5 @@
             }
             requestAnimationFrame(processChunk);
         }, 10);
-    }
-
-    // ==========================================
-    // 7. FILE UPLOAD & LAZY DATALISTS
-    // ==========================================
-    function setupFileUpload() {
-        const fileInput = document.getElementById('fileUploadInput');
-        if(!fileInput) return;
-
-        fileInput.addEventListener('change', function () {
-            const file = this.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('uploadedFile', file);
-
-            const uploadBtn = document.querySelector('button[onclick*="fileUploadInput"]');
-            const originalHtml = uploadBtn.innerHTML;
-            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
-            uploadBtn.disabled = true;
-
-            fetch('@Url.Action("UploadFile", "Leads")', {
-                method: 'POST',
-                body: formData
-            })
-            .then(async response => {
-                if (response.ok) {
-                    alert("Data uploaded successfully!");
-                    window.location.reload();
-                } else {
-                    alert("Upload Failed: " + await response.text());
-                    uploadBtn.innerHTML = originalHtml;
-                    uploadBtn.disabled = false;
-                }
-            })
-            .catch(error => {
-                alert("Network error during upload.");
-                uploadBtn.innerHTML = originalHtml;
-                uploadBtn.disabled = false;
-            });
-            this.value = '';
-        });
-    }
-
-    function setupLazyDatalists() {
-        document.querySelectorAll('.condition-val').forEach(input => {
-            input.addEventListener('focus', function() {
-                const listId = this.getAttribute('list');
-                if(!listId) return;
-
-                const datalist = document.getElementById(listId);
-
-                if(datalist && datalist.children.length === 0) {
-                    const colName = listId.replace('dl_', '');
-                    const th = document.querySelector(`th[data-col-name="${colName}"]`);
-
-                    if(th) {
-                        const colIndex = th.getAttribute('data-col-index');
-                        let uniqueValues = new Set();
-
-                        allRows.forEach(row => {
-                            const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                            if(td) {
-                                const text = td.innerText.trim();
-                                if(text) uniqueValues.add(text);
-                            }
-                        });
-
-                        let fragment = document.createDocumentFragment();
-                        uniqueValues.forEach(val => {
-                            let option = document.createElement("option");
-                            option.value = val;
-                            fragment.appendChild(option);
-                        });
-                        datalist.appendChild(fragment);
-                    }
-                }
-            });
-        });
-    }
-
-    // ==========================================
-    // 8. NOTES PANEL UI (AJAX ENABLED)
-    // ==========================================
-        async function openNotesPanel(leadId, leadName) {
-            currentNoteLeadId = leadId;
-            document.getElementById('noteAccountName').innerText = leadName || 'Lead';
-            document.getElementById('newNoteText').value = '';
-            document.getElementById('noteAttachment').value = '';
-
-            const list = document.getElementById('notesTimelineList');
-            list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-            // 1. Safe Bootstrap Offcanvas Trigger (Escapes CSS clipping traps)
-            const panelEl = document.getElementById('notesPanel');
-            document.body.appendChild(panelEl);
-            panelEl.style.zIndex = "1055";
-
-            let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl);
-            if (!bsOffcanvas) {
-                bsOffcanvas = new bootstrap.Offcanvas(panelEl);
-            }
-            bsOffcanvas.show();
-
-            try {
-                const response = await fetch(`/Leads/GetNotes?leadId=${leadId}`);
-                if (!response.ok) throw new Error("Failed to fetch");
-
-                const responseData = await response.json();
-
-                // 2. Safely extract array whether wrapped in an object or returned raw
-                const notesArray = Array.isArray(responseData)
-                    ? responseData
-                    : (responseData.data || responseData.notes || responseData.Data || responseData.Notes || []);
-
-                if (notesArray && notesArray.length > 0) {
-                    let allNotesHtml = '';
-
-                    // 3. Build HTML directly to avoid external function scope failures
-                    notesArray.forEach(n => {
-                        const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
-                        const time = n.createdDateTime || n.CreatedDateTime || n.createdDate || 'Unknown Date';
-                        const desc = n.description || n.Description || n.noteText || '';
-                        const file = n.attachmentFileName || n.AttachmentFileName || null;
-
-                        let attachmentHtml = file ? `
-                            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155;">
-                                <i class="fa-solid fa-file-lines text-muted"></i>
-                                <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
-                            </div>` : '';
-
-                        allNotesHtml += `
-                            <div class="position-relative mb-4">
-                                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                                <i class="fa-solid fa-user"></i>
-                                            </div>
-                                            ${owner}
-                                        </div>
-                                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
-                                            <i class="fa-regular fa-clock me-1"></i>${time}
-                                        </span>
-                                    </div>
-                                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
-                                    ${attachmentHtml}
-                                </div>
-                            </div>`;
-                    });
-
-                    list.innerHTML = allNotesHtml;
-                } else {
-                    list.innerHTML = `
-                        <div class="position-relative mb-4">
-                            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
-                            <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
-                        </div>`;
-                }
-            } catch(e) {
-                console.error("Notes rendering error:", e);
-                list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes. Check console for details.</p>';
-            }
-        }
-
-    async function saveNoteAjax() {
-        const text = document.getElementById('newNoteText').value;
-        const attachment = document.getElementById('noteAttachment').files[0];
-        const ownerId = document.getElementById('noteOwnerId').value;
-        const btn = document.getElementById('btnSaveNote');
-
-        if (!text.trim() && !attachment) return;
-
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append('leadId', currentNoteLeadId);
-        formData.append('description', text);
-        formData.append('ownerId', ownerId);
-        if (attachment) formData.append('attachment', attachment);
-
-        try {
-            const response = await fetch('/Leads/SaveNoteAjax', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-                if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
-
-                appendNoteToUI(data.note.ownerName, data.note.createdDateTime, data.note.description, data.note.attachmentFileName);
-
-                document.getElementById('newNoteText').value = '';
-                document.getElementById('noteAttachment').value = '';
-            } else {
-                alert("Failed to save note: " + data.message);
-            }
-        } catch(e) {
-            alert("Network error while saving note.");
-        } finally {
-            btn.innerHTML = 'Save Note';
-            btn.disabled = false;
-        }
-    }
-
-    function appendNoteToUI(ownerName, timeString, text, fileName) {
-        let attachmentHtml = fileName ? `
-            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155; transition: 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#cbd5e1'">
-                <i class="fa-solid fa-file-lines text-muted"></i>
-                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
-            </div>` : '';
-
-        const noteHtml = `
-            <div class="position-relative mb-4">
-                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                <i class="fa-solid fa-user"></i>
-                            </div>
-                            ${ownerName}
-                        </div>
-                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
-                            <i class="fa-regular fa-clock me-1"></i>${timeString}
-                        </span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
-                    ${attachmentHtml}
-                </div>
-            </div>`;
-
-        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-    }
-
-    function sortTableByCol(colIndex, direction) {
-        document.body.style.cursor = 'wait';
-        setTimeout(() => {
-            const tbody = document.getElementById("tableBody");
-
-            allRows.sort((a, b) => {
-                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
-
-                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
-                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
-
-                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-                }
-
-                if (aText < bText) return direction === 'asc' ? -1 : 1;
-                if (aText > bText) return direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            allRows.forEach(row => tbody.appendChild(row));
-            refreshVisibleRows();
-            document.body.style.cursor = 'default';
-        }, 10);
-    }
-
-    function applyFilters() {
-        const activeFilters = [];
-        document.querySelectorAll('.filter-field-item.active').forEach(item => {
-            const cb = item.querySelector('.field-checkbox');
-            if (cb && cb.checked) {
-                const colName = cb.value;
-                const condition = item.querySelector('.condition-select').value;
-                const isDate = item.dataset.fieldType === "date";
-
-                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
-
-                activeFilters.push({
-                    ColumnName: colName,
-                    Condition: condition,
-                    Value: val1,
-                    IsDate: isDate
-                });
-            }
-        });
-
-        if (activeFilters.length === 0) {
-            window.location.href = window.location.pathname;
-            return;
-        }
-
-        const filterStr = JSON.stringify(activeFilters);
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('advancedFilters', filterStr);
-        urlParams.set('page', 1);
-
-        urlParams.set('_t', Date.now());
-
-        document.body.style.cursor = 'wait';
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
-    }
-
-    function filterSingleColumn(inputEl, colIndex) {
-        const filterValue = inputEl.value.toLowerCase().trim();
-        allRows.forEach(row => {
-            if(!row.classList.contains('filtered-out')) {
-                const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
-                if (td) {
-                    const text = td.textContent.trim().toLowerCase();
-                    row.classList.toggle('filtered-out', !text.includes(filterValue));
-                }
-            }
-        });
-        refreshVisibleRows();
     }
 </script>

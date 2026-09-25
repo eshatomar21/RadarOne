@@ -606,12 +606,11 @@
 
                 <div class="tab-content" id="leadTabsContent" style="padding: 24px 40px; flex-grow: 1; overflow-y: auto;">
 
-                    <!-- ==============================
-                 1. MAIN INFO TAB
-            =============================== -->
-                    <div class="tab-pane fade show active" id="main" role="tabpanel">
+                    <div class="tab-pane fade show active" id="main" role="tabpanel" style="padding: 32px 40px;">
+
                         <h3 class="pane-section-title">Master Details</h3>
                         <div class="row">
+                            <!-- ROW 1: Ownership (4 + 4 + 4 = 12) -->
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Lead Owner</label>
                                 <select asp-for="LeadOwnerId" asp-items="@ViewBag.UsersList" class="sf-select">
@@ -631,31 +630,23 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">Demo Owner</label>
-                                <select asp-for="DemoOwnerId" asp-items="@ViewBag.UsersList" class="sf-select">
-                                    <option value="">- Select -</option>
-                                </select>
-                            </div>
+                            <!-- ROW 2: Core Identifiers (4 + 4 + 4 = 12) -->
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Lead Name <span class="text-danger">*</span></label>
                                 <input asp-for="LeadName" class="sf-input" required style="font-weight: 600;" />
                             </div>
                             <div class="col-md-4 form-group">
-                                <label class="sf-label">Created Date & Time</label>
-                                <input asp-for="CreatedDateAndTime" type="datetime-local" class="sf-input" />
+                                <label class="sf-label">Contact Name</label>
+                                <input asp-for="ContactName" class="sf-input" />
                             </div>
-
-                            <div class="col-md-6 form-group">
+                            <div class="col-md-4 form-group">
                                 <label class="sf-label">Account Name (Lookup)</label>
                                 <select asp-for="AccountId" asp-items="ViewBag.AccountsList" class="sf-select">
                                     <option value="">- Select Account -</option>
                                 </select>
                             </div>
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">Contact Name</label>
-                                <input asp-for="ContactName" class="sf-input" />
-                            </div>
+
+                            <!-- ROW 3: Classification (4 + 4 + 4 = 12) -->
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Account Type</label>
                                 <select asp-for="AccountType" class="sf-select">
@@ -666,22 +657,33 @@
                                     <option value="Government Organisation">Government Organisation</option>
                                 </select>
                             </div>
-
-                            <div class="col-md-6 form-group">
-                                <label class="sf-label">Group Name</label>
-                                <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
-                                    <option value="">-Select Group Name-</option>
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Current Status</label>
+                                <select asp-for="CurrentStatus" class="sf-select">
+                                    <option value="None">-None-</option>
+                                    <option value="User">User</option>
+                                    <option value="Non-User">Non-User</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Pipeline <span class="text-danger">*</span></label>
+                                <select asp-for="Pipeline" class="sf-select" required>
+                                    <option value="">-None-</option>
+                                    <option value="New Software">New Software</option>
+                                    <option value="Upgrade Software">Upgrade Software</option>
+                                    <option value="Sales Support">Sales Support</option>
                                 </select>
                             </div>
 
-                            <div class="col-md-4 form-group">
+                            <!-- ROW 4: Phones (6 + 6 = 12) -->
+                            <div class="col-md-6 form-group">
                                 <label class="sf-label">Mobile Number</label>
                                 <div class="verify-group">
                                     <input asp-for="MobileNumber" class="sf-input" id="MobileNumber" placeholder="+1 202-555-0117" />
                                     <button type="button" class="btn-verify" onclick="verifyPhone('MobileNumber')">Verify</button>
                                 </div>
                             </div>
-                            <div class="col-md-4 form-group">
+                            <div class="col-md-6 form-group">
                                 <label class="sf-label">Alternate Mobile</label>
                                 <div class="verify-group">
                                     <input asp-for="AlternateMobile" class="sf-input" id="AlternateMobile" placeholder="Optional..." />
@@ -689,6 +691,7 @@
                                 </div>
                             </div>
 
+                            <!-- ROW 5: Emails & Social (4 + 4 + 4 = 12) -->
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Email ID</label>
                                 <input asp-for="EmailID" class="sf-input" style="color: var(--theme-navy-primary);" placeholder="email@example.com" />
@@ -702,32 +705,7 @@
                                 <input asp-for="SocialLeadID" class="sf-input" />
                             </div>
 
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">Pipeline <span class="text-danger">*</span></label>
-                                <select asp-for="Pipeline" class="sf-select" required>
-                                    <option value="">-None-</option>
-                                    <option value="New Software">New Software</option>
-                                    <option value="Upgrade Software">Upgrade Software</option>
-                                    <option value="Sales Support">Sales Support</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">Campaign Source</label>
-                                <input asp-for="CampaignSource" class="sf-input" />
-                            </div>
-                            <div class="col-md-4 form-group" id="divMetaCampaign" style="display:none;">
-                                <label class="sf-label">Meta Campaign Name</label>
-                                <input asp-for="MetaCampaignName" class="sf-input" placeholder="Enter campaign name..." />
-                            </div>
-
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">Current Status</label>
-                                <select asp-for="CurrentStatus" class="sf-select">
-                                    <option value="None">-None-</option>
-                                    <option value="User">User</option>
-                                    <option value="Non-User">Non-User</option>
-                                </select>
-                            </div>
+                            <!-- ROW 6: Sourcing & Demo (4 + 4 + 4 = 12) -->
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Data Sources <span class="text-danger">*</span></label>
                                 <select asp-for="DataSources" class="sf-select" id="DataSources" required>
@@ -758,25 +736,41 @@
                                     <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
                                 </select>
                             </div>
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Campaign Source</label>
+                                <input asp-for="CampaignSource" class="sf-input" />
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Demo Owner</label>
+                                <select asp-for="DemoOwnerId" asp-items="@ViewBag.UsersList" class="sf-select">
+                                    <option value="">- Select -</option>
+                                </select>
+                            </div>
+
+                            <!-- ROW 7: Groups & Conditional Fields (4 + 4 + 4 = 12) -->
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Group Name</label>
+                                <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select">
+                                    <option value="">-Select Group Name-</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 form-group" id="divMetaCampaign" style="display:none;">
+                                <label class="sf-label">Meta Campaign Name</label>
+                                <input asp-for="MetaCampaignName" class="sf-input" placeholder="Enter campaign name..." />
+                            </div>
                             <div class="col-md-4 form-group" id="divSeminarName" style="display:none;">
                                 <label class="sf-label">Seminar Name</label>
                                 <input asp-for="SeminarName" class="sf-input" placeholder="Enter seminar name..." />
                             </div>
                         </div>
 
-                        <h3 class="pane-section-title">Other Details</h3>
-                        <div class="row">
-                            <div class="col-md-4 form-group">
-                                <label class="sf-label">New Software</label>
-                                <input asp-for="NewSoftware" class="sf-input" />
-                            </div>
-                        </div>
+                        <hr style="border-top: 1px solid var(--theme-border); margin: 16px 0 32px 0;" />
 
+                        <!-- Lead Information Section -->
                         <h3 class="pane-section-title">Lead Information</h3>
                         <div class="row">
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Stage (Linked to Top Bar)</label>
-                                <!-- The underlying Select element required for form submission -->
                                 <select asp-for="Stage" class="sf-select" id="actualStageSelect">
                                     <option value="">-None-</option>
                                     <option value="Open">Open</option>
@@ -788,17 +782,14 @@
                                     <option value="Lost">Lost</option>
                                 </select>
                             </div>
-
                             <div class="col-md-4 form-group dynamic-stage-field demo-fields" style="display: none;">
                                 <label class="sf-label">Demo Scheduled Date & Time</label>
                                 <input asp-for="DemoScheduledDate" type="datetime-local" class="sf-input" />
                             </div>
-
                             <div class="col-md-4 form-group dynamic-stage-field trial-fields" style="display: none;">
                                 <label class="sf-label">Trial Start Date</label>
                                 <input asp-for="TrialStartDate" type="date" class="sf-input" />
                             </div>
-
                             <div class="col-md-4 form-group dynamic-stage-field trial-fields" style="display: none;">
                                 <label class="sf-label">Trial End Date</label>
                                 <input asp-for="TrialEndDate" type="date" class="sf-input" />
@@ -820,7 +811,6 @@
                                 <label class="sf-label">Budget</label>
                                 <input asp-for="Budget" type="number" class="sf-input" />
                             </div>
-
                             <div class="col-md-4 form-group">
                                 <label class="sf-label">Time period to Buy</label>
                                 <input asp-for="TimePeriodToBuy" class="sf-input" />
@@ -835,7 +825,42 @@
                             </div>
                         </div>
 
-                        <!-- Fixed Notes Section Target ID -->
+                        <hr style="border-top: 1px solid var(--theme-border); margin: 16px 0 32px 0;" />
+
+                        <!-- System Auditing Section (AT THE BOTTOM OF MAIN TAB) -->
+                        <h3 class="pane-section-title">System Auditing</h3>
+                        <div class="row">
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Created Date & Time</label>
+                                <!-- Made readonly properly formatted -->
+                                <input type="text" class="sf-input" value="@(Model?.CreatedDateAndTime != null ? Model.CreatedDateAndTime.Value.ToString("MMM dd, yyyy - hh:mm tt") : "N/A")" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                                <input type="hidden" asp-for="CreatedDateAndTime" />
+                            </div>
+
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Created By</label>
+                                @{
+                                    string creatorName = !string.IsNullOrEmpty(Model?.CreatedBy) ? Model.CreatedBy : "System User";
+                                }
+                                <input type="text" class="sf-input" value="@creatorName" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                                <!-- Hidden input to retain data so it doesn't erase on form save -->
+                                <input type="hidden" asp-for="CreatedBy" />
+                            </div>
+
+                            <div class="col-md-4 form-group">
+                                <label class="sf-label">Modified By (Current)</label>
+                                @{
+                                    // Grabs the currently logged-in user & live time
+                                    string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "Current User";
+                                    string modifiedDisplay = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                                }
+                                <input type="text" class="sf-input" value="@modifiedDisplay" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                                <!-- Submits the logged-in user name back to the database as the modifier -->
+                                <input type="hidden" name="ModifiedBy" value="@currentUser" />
+                            </div>
+                        </div>
+
+                        <!-- Notes Section -->
                         <div class="notes-section" style="max-width: 100%; margin-top: 30px; border-radius: 8px; border: 1px solid var(--theme-border); background-color: var(--theme-bg-cream); padding: 24px;">
                             <div class="notes-header d-flex justify-content-between align-items-center">
                                 <h5 style="color: var(--theme-navy-primary); font-weight: 600; margin: 0;">Notes & Attachments</h5>
@@ -844,7 +869,6 @@
                                 </button>
                             </div>
                             <hr style="border-color: var(--theme-border);" />
-                            <!-- The ID must be notesContainer for the JS to append correctly -->
                             <div id="notesContainer">
                                 @if (ViewBag.ExistingNotes != null)
                                 {
@@ -878,15 +902,13 @@
                                 }
                             </div>
                         </div>
-                    </div>
 
+                    </div> <!-- // END OF MAIN TAB -->
                     <!-- ==============================
-                 2. ADDRESS INFO TAB
+               2. ADDRESS INFO TAB
             =============================== -->
-                    <!-- ADDRESS TAB -->
                     <div class="tab-pane fade" id="address" role="tabpanel" style="padding: 32px 40px;">
                         <div class="row">
-
                             <!-- Address 1 Card -->
                             <div class="col-lg-6 mb-4">
                                 <div class="sf-card h-100">
@@ -894,9 +916,7 @@
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
                                         Primary Address
                                     </div>
-
                                     <div class="row">
-                                        <!-- Group 1: Country & State -->
                                         <div class="col-md-6 form-group mb-3">
                                             <label class="sf-label">Country</label>
                                             <select asp-for="Addr1_Country" class="sf-select" id="Addr1_Country">
@@ -909,8 +929,6 @@
                                                 <option value="">- Select State -</option>
                                             </select>
                                         </div>
-
-                                        <!-- Group 2: City & Zip Code -->
                                         <div class="col-md-6 form-group mb-3">
                                             <label class="sf-label">City</label>
                                             <select asp-for="Addr1_City" class="sf-select" id="Addr1_City">
@@ -923,8 +941,6 @@
                                                 <option value="">- Select Zip Code -</option>
                                             </select>
                                         </div>
-
-                                        <!-- Group 3: Street Details -->
                                         <div class="col-md-4 form-group mb-3">
                                             <label class="sf-label">Flat / House No.</label>
                                             <input asp-for="Addr1_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
@@ -933,10 +949,8 @@
                                             <label class="sf-label">Street Address</label>
                                             <input asp-for="Addr1_Street" class="sf-input" placeholder="Street name and number" />
                                         </div>
-
-                                        <!-- Group 4: Map Coordinates -->
                                        
-                                        
+                                       
                                     </div>
                                 </div>
                             </div>
@@ -948,9 +962,7 @@
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
                                         Secondary Address
                                     </div>
-
                                     <div class="row">
-                                        <!-- Group 1: Country & State -->
                                         <div class="col-md-6 form-group mb-3">
                                             <label class="sf-label">Country</label>
                                             <select asp-for="Addr2_Country" class="sf-select" id="Addr2_Country">
@@ -963,8 +975,6 @@
                                                 <option value="">- Select State -</option>
                                             </select>
                                         </div>
-
-                                        <!-- Group 2: City & Zip Code -->
                                         <div class="col-md-6 form-group mb-3">
                                             <label class="sf-label">City</label>
                                             <select asp-for="Addr2_City" class="sf-select" id="Addr2_City">
@@ -977,8 +987,6 @@
                                                 <option value="">- Select Zip Code -</option>
                                             </select>
                                         </div>
-
-                                        <!-- Group 3: Street Details -->
                                         <div class="col-md-4 form-group mb-3">
                                             <label class="sf-label">Flat / House No.</label>
                                             <input asp-for="Addr2_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
@@ -987,17 +995,13 @@
                                             <label class="sf-label">Street Address</label>
                                             <input asp-for="Addr2_Street" class="sf-input" placeholder="Street name and number" />
                                         </div>
-
-                                        <!-- Group 4: Map Coordinates -->
                                         
-                                        
+                                       
                                     </div>
                                 </div>
                             </div>
-
                         </div>
-                    </div>
-
+                    </div> <!-- // END OF ADDRESS TAB -->
                     <!-- ==============================
                  3. PROFESSIONAL DETAILS TAB
             =============================== -->
@@ -1452,23 +1456,49 @@
                     </div>
                     <div class="sidebar-content">
 
-                        <!-- CONTACTS SECTION -->
-                        <div class="sidebar-section">
-                            <div class="sidebar-section-title">Contacts</div>
-                            <div class="contact-card">
-                                <div class="d-flex align-items-center gap-3">
-                                    <i class="fa-solid fa-user" style="color: #1e3a8a;"></i>
-                                    <span>@(string.IsNullOrEmpty(Model?.ContactName) ? "No linked contact" : Model.ContactName)</span>
-                                </div>
-                                <i class="fa-solid fa-chevron-right text-muted" style="font-size: 0.8rem;"></i>
-                            </div>
-                        </div>
+                 <!-- ACCOUNT SECTION -->
+      <div class="sidebar-section">
+          <div class="sidebar-section-title">Account</div>
+          @if (Model?.AccountId != null && Model.AccountId > 0)
+          {
+              <!-- CHANGED "Details" TO "Edit" -->
+              <a href="@Url.Action("Edit", "Accounts", new { id = Model.AccountId })" style="text-decoration: none;">
+                  <div class="contact-card">
+                      <div class="d-flex align-items-center gap-3">
+                          <i class="fa-solid fa-building" style="color: #1e3a8a;"></i>
+                          <span>@(string.IsNullOrEmpty(Model.AccountName) ? "View Account" : Model.AccountName)</span>
+                      </div>
+                      <i class="fa-solid fa-chevron-right text-muted" style="font-size: 0.8rem;"></i>
+                  </div>
+              </a>
+          }
+          else
+          {
+              <div class="sidebar-empty">No linked account</div>
+          }
+      </div>
 
-                        <!-- DEALS SECTION -->
-                        <div class="sidebar-section">
-                            <div class="sidebar-section-title">Deals</div>
-                            <div class="sidebar-empty">No linked deals</div>
-                        </div>
+      <!-- DEALS SECTION -->
+      <div class="sidebar-section">
+          <div class="sidebar-section-title">Deals</div>
+          @if (!string.IsNullOrEmpty(Model?.DealName))
+          {
+              <!-- CHANGED "Details" TO "Edit" -->
+              <a href="@Url.Action("Edit", "Deals", new { id = Model.DealId })" style="text-decoration: none;">
+                  <div class="contact-card">
+                      <div class="d-flex align-items-center gap-3">
+                          <i class="fa-solid fa-handshake" style="color: #1e3a8a;"></i>
+                          <span>@Model.DealName</span>
+                      </div>
+                      <i class="fa-solid fa-chevron-right text-muted" style="font-size: 0.8rem;"></i>
+                  </div>
+              </a>
+          }
+          else
+          {
+              <div class="sidebar-empty">No linked deals</div>
+          }
+      </div>
 
                         <div class="sidebar-section-title">
                             Tasks
@@ -1892,7 +1922,7 @@
     return;
     }
 
-    fetch('/Leads/CheckDuplicatePhone?phone=' + encodeURIComponent(phone))
+   fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
     .then(response => response.json())
     .then(data => {
     if (data.isDuplicate) alert('⚠️ WARNING: This phone number already exists in another lead record!');
@@ -2085,7 +2115,7 @@
     const existingZip2 = '@Html.Raw(Model?.Addr2_Zip ?? "")';
 
     // 1. Fetch Countries on page load
-    fetch('/Postcode/GetCountries')
+  fetch('@Url.Action("GetCountries", "Postcode")')
     .then(res => {
     if (!res.ok) throw new Error("Server returned status: " + res.status);
     return res.json();
@@ -2144,7 +2174,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (country) {
-    fetch('/Postcode/GetStates?country=' + encodeURIComponent(country))
+  fetch('@Url.Action("GetStates", "Postcode")?country=' + encodeURIComponent(country))
     .then(res => res.json())
     .then(states => {
     populateDropdown(stateId, states, 'Select State', defaultState);
@@ -2166,7 +2196,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (state) {
-    fetch('/Postcode/GetCities?state=' + encodeURIComponent(state))
+    fetch('@Url.Action("GetCities", "Postcode")?state=' + encodeURIComponent(state))
     .then(res => res.json())
     .then(cities => {
     populateDropdown(cityId, cities, 'Select City', defaultCity);
@@ -2189,7 +2219,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (city && state) {
-    fetch('/Postcode/GetZipCodes?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
+    fetch('@Url.Action("GetZipCodes", "Postcode")?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
     .then(res => res.json())
     .then(zipCodes => {
     populateDropdown(zipId, zipCodes, 'Select Zip Code', defaultZip);

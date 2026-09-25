@@ -606,6 +606,34 @@
                         <label class="sf-label">Demo Owner</label>
                         <select asp-for="DemoOwner" asp-items="ViewBag.UsersList" class="sf-select"><option value="">- Select -</option></select>
                     </div>
+
+                    <!-- System Auditing Section -->
+                        <h3 class="pane-section-title mt-4">System Auditing</h3>
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label class="sf-label">Created By</label>
+                                <input type="text" class="sf-input" value="@(string.IsNullOrEmpty(Model?.CreatedBy) ? "System User" : Model.CreatedBy)" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                                <!-- Hidden input retains the value during form submission -->
+                                <input type="hidden" asp-for="CreatedBy" />
+                            </div>
+
+                            <div class="col-md-6 form-group">
+                                <label class="sf-label">Last Modified By</label>
+                                <input type="text" class="sf-input" value="@(string.IsNullOrEmpty(Model?.ModifiedBy) ? "Not modified yet" : Model.ModifiedBy)" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                                <!-- Hidden input retains the value during form submission -->
+                                <input type="hidden" asp-for="ModifiedBy" />
+                            </div>
+
+                      <!-- Date Of Entry Field -->
+                        <div class="col-md-6 form-group">
+                            <label class="sf-label">Date of Entry</label>
+                            <input type="text" class="sf-input" 
+                                   value="@(Model != null && Model.DateOfEntry != DateTime.MinValue ? Model.DateOfEntry.ToString("MMM dd, yyyy - hh:mm tt") : DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt"))" 
+                                   readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                            <!-- Hidden input retains the value during form submission -->
+                            <input type="hidden" asp-for="DateOfEntry" />
+                        </div>
+                        </div>
                 </div>
 
                 <!-- NOTES UI -->
@@ -806,9 +834,9 @@
 
     </form>
 
-    <!-- ==========================================
-         PREMIUM NAVY & CREAM SIDEBAR (RIGHT SIDE)
-         ========================================== -->
+    <!-- ==========================================         
+         PREMIUM NAVY & CREAM SIDEBAR (RIGHT SIDE)         
+    ========================================== -->
     <div class="sf-sidebar">
         <!-- Navy Header -->
         <div class="sidebar-header-box">
@@ -818,26 +846,45 @@
         <!-- Cream Body -->
         <div class="sidebar-body-box">
 
-            <!-- 1. Linked Leads / Contacts -->
+            <!-- 1. Linked Account -->
             <div class="mb-4">
-                <div class="sidebar-section-title">Linked Contacts</div>
-                @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
+                <div class="sidebar-section-title">Linked Account</div>
+                @if (Model?.AccountId != null && Model.AccountId > 0)
                 {
-                    foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
-                    {
-                        <a href="@Url.Action("Edit", "Leads", new { id = lead.Id })" class="rl-item">
-                            <span><i class="fa-solid fa-user main-icon me-2"></i> @(string.IsNullOrEmpty(lead.LeadName) ? "No Name" : lead.LeadName)</span>
-                            <i class="fa-solid fa-chevron-right chevron-icon"></i>
-                        </a>
-                    }
+                    <a href="@Url.Action("Edit", "Accounts", new { id = Model.AccountId })" class="rl-item" style="text-decoration: none;">
+                        <span class="text-truncate" style="max-width: 200px;">
+                            <i class="fa-solid fa-building main-icon me-2"></i> 
+                            @(string.IsNullOrEmpty(Model.AccountName) ? "View Account" : Model.AccountName)
+                        </span>
+                        <i class="fa-solid fa-chevron-right chevron-icon"></i>
+                    </a>
                 }
                 else
                 {
-                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No linked contacts</div>
+                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No linked account</div>
                 }
             </div>
 
-            <!-- 2. Related Tasks -->
+            <!-- 2. Linked Lead -->
+            <div class="mb-4">
+                <div class="sidebar-section-title">Linked Lead</div>
+                @if (Model?.LeadId != null && Model.LeadId > 0)
+                {
+                    <a href="@Url.Action("Edit", "Leads", new { id = Model.LeadId })" class="rl-item" style="text-decoration: none;">
+                        <span class="text-truncate" style="max-width: 200px;">
+                            <i class="fa-solid fa-user main-icon me-2"></i> 
+                            @(string.IsNullOrEmpty(Model.LeadName) ? "View Lead" : Model.LeadName)
+                        </span>
+                        <i class="fa-solid fa-chevron-right chevron-icon"></i>
+                    </a>
+                }
+                else
+                {
+                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No linked lead</div>
+                }
+            </div>
+
+            <!-- 3. Related Tasks -->
             <div class="mb-4">
                 <div class="sidebar-section-title">
                     <span>Tasks</span>
@@ -862,7 +909,7 @@
                 }
             </div>
 
-            <!-- 3. Notes Preview -->
+            <!-- 4. Notes Preview -->
             <div class="mb-2">
                 <div class="sidebar-section-title">
                     <span>Recent Notes</span>
@@ -891,7 +938,6 @@
             </div>
         </div>
     </div>
-</div>
 
 <!-- ========================================================
      MODALS

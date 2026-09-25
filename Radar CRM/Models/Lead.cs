@@ -26,6 +26,10 @@ namespace Radar_CRM.Models
         public DateOnly? TrialStartDate { get; set; }
         public DateOnly? TrialEndDate { get; set; }
 
+        public string? CreatedBy { get; set; }
+
+        public string? ModifiedBy { get; set; }
+
         public DateTime? DemoScheduledDate { get; set; }
         public string? ContactName { get; set; }
         public string? GroupName { get; set; }
@@ -66,6 +70,8 @@ namespace Radar_CRM.Models
 
         public virtual ICollection<Notes> Notes { get; set; } = new List<Notes>();
         public virtual ICollection<Task> Tasks { get; set; } = new List<Task>();
+
+        public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>();
 
         // --- Relational Links ---
         public int? AccountId { get; set; }
@@ -152,6 +158,7 @@ namespace Radar_CRM.Models
         // 🚀 FIXED: Changed to virtual ICollection and explicitly mapped the InverseProperty
         [InverseProperty("Lead")]
         public virtual IList<ProductPaymentRow> PaymentRow { get; set; } = new List<ProductPaymentRow>();
+
         // --- Payment Details ---
         public string? PaymentMode { get; set; }
         public string? Remarks { get; set; }
@@ -165,8 +172,6 @@ namespace Radar_CRM.Models
         public string? Contact2Phone { get; set; }
         public string? Contact3Phone { get; set; }
 
-        // 🚀 FIXED: Changed to virtual ICollection and explicitly mapped the InverseProperty
-      
         // --- Conversation Details ---
         [DataType(DataType.Date)]
         public DateTime? FirstCallDate { get; set; }
@@ -178,6 +183,20 @@ namespace Radar_CRM.Models
         public string? InterestedPackage { get; set; }
         public string? LostReason { get; set; }
         public string? LeadProfile { get; set; }
+
+        
+
+        // ==============================================
+        // UI Display Properties (Not saved in DB)
+        // ==============================================
+        [NotMapped]
+        public int? DealId { get; set; }
+
+        [NotMapped]
+        public string? DealName { get; set; }
+
+        [NotMapped]
+        public string? AccountName { get; set; }
 
         // --- Description ---
         public string? Description { get; set; }
@@ -200,6 +219,9 @@ namespace Radar_CRM.Models
 
         [ForeignKey("AccountId")]
         public virtual Account? Account { get; set; }
+
+        [NotMapped]
+        public string? AccountName { get; set; }
 
         // --- 3. Product Relationship (NEW) ---
         public int? ProductId { get; set; }

@@ -88,7 +88,8 @@
         <div class="tab-content" id="dealTabsContent" style="padding: 32px 40px; flex-grow: 1; overflow-y:auto;">
 
             <!-- 1. MAIN TAB -->
-            <div class="tab-pane fade show active" id="main" role="tabpanel">
+            <div class="tab-pane fade show active" id="main" role="tabpanel" style="padding: 32px 40px;">
+
                 <h3 class="pane-section-title">Core Details</h3>
                 <div class="row">
                     <div class="col-md-4 form-group">
@@ -97,12 +98,10 @@
                     </div>
                     <div class="col-md-4 form-group">
                         <label class="sf-label">Account Name (Lookup)</label>
-
                         <!-- 🚀 Binds to the Lookup ID so the data flows properly -->
                         <select asp-for="AccountId" asp-items="ViewBag.AccountsList" class="sf-select">
                             <option value="">- Select Account -</option>
                         </select>
-
                         <!-- Optional: If you strictly need the text name saved as well, capture it in a hidden field -->
                         <input type="hidden" asp-for="AccountName" />
                     </div>
@@ -144,13 +143,11 @@
                     </div>
                     <div class="col-md-4 form-group">
                         <label class="sf-label">Deal Owner</label>
-
                         <!-- 🚀 Binds to DealOwnerId and populates with ViewBag.UsersList -->
                         <select asp-for="DealOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
                             <option value="">- Select Owner -</option>
                         </select>
                     </div>
-
                     <div class="col-md-4 form-group">
                         <label class="sf-label">Account Owner</label>
                         <select asp-for="AccountOwner" asp-items="ViewBag.UsersList" class="sf-select"><option value="">- Select -</option></select>
@@ -161,20 +158,36 @@
                         <select asp-for="DemoOwner" asp-items="ViewBag.UsersList" class="sf-select"><option value="">- Select -</option></select>
                     </div>
 
-                </div>
+                    <!-- 🚀 ADDED: System Auditing Fields (Read Only) -->
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Created By</label>
+                        @{
+                            string creatorName = !string.IsNullOrEmpty(Model?.CreatedBy) ? Model.CreatedBy : "System User";
+                        }
+                        <input type="text" class="sf-input" value="@creatorName" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                        <input type="hidden" asp-for="CreatedBy" />
+                    </div>
 
-                
-
-                <!-- NOTES UI -->
+                    <div class="col-md-4 form-group">
+                        <label class="sf-label">Last Modified By</label>
+                        @{
+                            string modifierName = !string.IsNullOrEmpty(Model?.ModifiedBy) ? Model.ModifiedBy : "Not modified yet";
+                        }
+                        <input type="text" class="sf-input" value="@modifierName" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+                    </div>
+                </div> <!-- END OF ROW -->
+                <!-- NOTES UI IS NOW SAFELY INSIDE THE TAB -->
                 <div class="d-flex justify-content-between align-items-center mt-4 pb-2 mb-3" style="border-bottom: 1px solid var(--theme-border);">
                     <h3 class="pane-section-title border-0 m-0 p-0">Notes & Attachments</h3>
                     <button type="button" class="btn btn-sm" onclick="openNoteModal()" style="background-color: var(--theme-navy-light); color: var(--theme-navy-primary); font-weight: 600; border-radius: 6px; font-size: 0.8rem; padding: 6px 14px; border: 1px solid var(--theme-border); transition: all 0.2s;">
                         <i class="fa-solid fa-plus me-1"></i> Add Note
                     </button>
                 </div>
+
                 <!-- Container where saved notes will dynamically appear -->
                 <div id="savedNotesContainer" class="mb-4"></div>
-            </div>
+
+            </div> <!-- THIS IS WHERE THE MAIN TAB ACTUALLY CLOSES -->
 
             <!-- 2. FINANCIALS TAB -->
             <div class="tab-pane fade" id="financials" role="tabpanel">

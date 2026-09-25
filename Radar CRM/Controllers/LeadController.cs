@@ -85,92 +85,111 @@ namespace Radar_CRM.Controllers
                     }
 
                     var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
 
-                    foreach (var f in filters)
+                    // 🚀 FIX: Use the new LeadFilterCriteria class here
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<LeadFilterCriteria>>(jsonString, options);
+
+                    if (filters != null && filters.Any())
                     {
-                        if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+                        var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Lead), "l");
+                        System.Linq.Expressions.Expression combinedPredicate = null;
 
-                        var propertyInfo = typeof(Lead).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (propertyInfo == null) continue;
-
-                        string dbColName = propertyInfo.Name;
-
-                        // Switch complex navigation properties to their Foreign Key (Id)
-                        if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                        foreach (var f in filters)
                         {
-                            var idProp = typeof(Lead).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            if (idProp != null)
+                            if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                            var propertyInfo = typeof(Lead).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (propertyInfo == null) continue;
+
+                            string dbColName = propertyInfo.Name;
+
+                            // Handle Foreign Keys gracefully
+                            if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
                             {
-                                dbColName = idProp.Name;
-                                propertyInfo = idProp;
+                                var idProp = typeof(Lead).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (idProp != null)
+                                {
+                                    dbColName = idProp.Name;
+                                    propertyInfo = idProp;
+                                }
+                                else continue;
                             }
-                            else continue;
-                        }
 
-                        if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
-                        {
-                            if (DateTime.TryParse(f.Value, out DateTime dVal))
+                            var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
+                            System.Linq.Expressions.Expression conditionExpr = null;
+
+                            // STRING & DROPDOWN FILTERING
+                            if (propertyInfo.PropertyType == typeof(string))
                             {
-                                if (f.Condition == "on") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == dVal.Date);
-                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < dVal.Date);
-                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > dVal.Date);
-                            }
-                        }
-                        else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var searchValue = f.Value?.ToLower().Trim() ?? "";
-                            var matchingUserIds = _context.Users
-                                .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
-                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
-                                .Select(u => u.Id)
-                                .ToList();
+                                var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                var startsWithMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
+                                var endsWithMethod = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
 
-                            if (f.Condition == "contains" || f.Condition == "is")
-                                query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
-                                query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_empty")
-                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_not_empty")
-                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                        }
-                        else if (propertyInfo.PropertyType == typeof(string))
-                        {
-                            var searchValue = f.Value.ToLower().Trim();
-                            if (f.Condition == "contains") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
-                            else if (f.Condition == "does_not_contain") query = query.Where(a => EF.Property<string>(a, dbColName) == null || !EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
-                            else if (f.Condition == "starts_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().StartsWith(searchValue));
-                            else if (f.Condition == "ends_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().EndsWith(searchValue));
-                            else if (f.Condition == "is") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower() == searchValue);
-                            else if (f.Condition == "is_not") query = query.Where(a => EF.Property<string>(a, dbColName) != searchValue);
-                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                        }
-                        else
-                        {
-                            if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                                var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+                                var lowerVal = System.Linq.Expressions.Expression.Constant(f.Value?.ToLower().Trim() ?? "");
+
+                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
+                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, endsWithMethod, lowerVal);
+                                else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                            }
+                            // NUMBERS & DECIMALS
+                            else if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
                             {
                                 if (int.TryParse(f.Value, out int numVal))
                                 {
-                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
+                                    var valExpr = System.Linq.Expressions.Expression.Constant(numVal, typeof(int?));
+                                    if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
                                 }
                             }
                             else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
                             {
                                 if (decimal.TryParse(f.Value, out decimal decVal))
                                 {
-                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
+                                    var valExpr = System.Linq.Expressions.Expression.Constant(decVal, typeof(decimal?));
+                                    if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
                                 }
                             }
+
+                            if (conditionExpr != null)
+                            {
+                                if (combinedPredicate == null)
+                                {
+                                    combinedPredicate = conditionExpr;
+                                }
+                                else
+                                {
+                                    // 🚀 Dynamically branch on AND vs OR
+                                    if (string.Equals(f.LogicalOperator, "OR", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        combinedPredicate = System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr);
+                                    }
+                                    else
+                                    {
+                                        combinedPredicate = System.Linq.Expressions.Expression.AndAlso(combinedPredicate, conditionExpr);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (combinedPredicate != null)
+                        {
+                            var lambda = System.Linq.Expressions.Expression.Lambda<Func<Lead, bool>>(combinedPredicate, parameter);
+                            query = query.Where(lambda);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("FILTER CRASH AVOIDED: " + ex.Message);
+                    Console.WriteLine("FILTER ENGINE ERROR: " + ex.Message);
                 }
             }
 
@@ -219,6 +238,8 @@ namespace Radar_CRM.Controllers
             ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            // 🚀 ADD THIS LINE TO FIX THE CRASH:
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
 
             return View(leads);
         }
@@ -295,6 +316,16 @@ namespace Radar_CRM.Controllers
             public string NewValue { get; set; }
         }
 
+        // 🚀 ADD THIS NEW UNIQUE CLASS HERE:
+        public class LeadFilterCriteria
+        {
+            public string LogicalOperator { get; set; }
+            public string ColumnName { get; set; }
+            public string Condition { get; set; }
+            public string Value { get; set; }
+            public bool IsDate { get; set; }
+        }
+
         // ==========================================
         // HELPER METHOD (Add this to the bottom of the LeadsController)
         // ==========================================
@@ -341,6 +372,10 @@ namespace Radar_CRM.Controllers
                 ModelState.Remove(key);
             }
             ModelState.Remove("PaymentRow");
+
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            lead.CreatedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+            ModelState.Remove("CreatedBy");
 
             if (ModelState.IsValid)
             {
@@ -557,9 +592,35 @@ namespace Radar_CRM.Controllers
                 .Where(n => n.LeadId == id)
                 .OrderByDescending(n => n.CreatedDateTime)
                 .ToListAsync();
+
+            // =========================================================
+            // POPULATE THE SIDEBAR ACCOUNT & DEAL
+            // =========================================================
+
+            // 1. Get the Account Name
+            if (lead.AccountId != null && lead.AccountId > 0)
+            {
+                var account = await _context.Accounts.FindAsync(lead.AccountId);
+                lead.AccountName = account?.AccountName;
+            }
+
+            // 2. Get the linked Deal (Grabbing the most recent deal created for this lead)
+            if (!string.IsNullOrEmpty(lead.LeadName))
+            {
+                var linkedDeal = await _context.Deals
+                    .Where(d => d.LeadName == lead.LeadName)
+                    .OrderByDescending(d => d.Id)
+                    .FirstOrDefaultAsync();
+
+                if (linkedDeal != null)
+                {
+                    lead.DealId = linkedDeal.Id;
+                    lead.DealName = linkedDeal.DealName;
+                }
+            }
+
             return View(lead);
         }
-
         // POST: Leads/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -579,6 +640,18 @@ namespace Radar_CRM.Controllers
 
             if (ModelState.IsValid)
             {
+
+                // 🚀 1. SET "MODIFIED BY" WITH CURRENT LOGGED-IN USER & TIME
+                string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+                lead.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                ModelState.Remove("ModifiedBy");
+
+                // 🚀 2. FETCH ORIGINAL RECORD TO PREVENT "CREATED BY" FROM BEING ERASED
+                var existingLead = await _context.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.Id == lead.Id);
+                if (existingLead != null && string.IsNullOrEmpty(lead.CreatedBy))
+                {
+                    lead.CreatedBy = existingLead.CreatedBy;
+                }
                 if (lead.CurrentStatus == "User")
                 {
                     lead.Pipeline = "Upgrade Software";
@@ -701,6 +774,7 @@ namespace Radar_CRM.Controllers
                             // --- Ownership Mapping ---
                             linkedAccount.AccountOwnerId = lead.AccountOwnerId;
                             linkedAccount.CoOwnerId = lead.CoOwnerId;
+                            
 
                             // --- Source Mapping ---
                             linkedAccount.DataSource = lead.DataSources;
@@ -783,6 +857,7 @@ namespace Radar_CRM.Controllers
 
                             var newDeal = new Deal
                             {
+                                LeadId = lead.Id,
                                 DealName = lead.LeadName + " - Direct Deal",
                                 AccountId = lead.AccountId,
                                 ContactPersonName = lead.ContactName,
@@ -792,6 +867,10 @@ namespace Radar_CRM.Controllers
                                 AccountOwner = lead.AccountOwnerId,
                                 DemoOwner = lead.DemoOwnerId,
                                 AccountType = lead.AccountType,
+                                CreatedBy=lead.CreatedBy,
+
+                                // 🚀 FIX: Assign proper DateTime object, not a string
+                                DateOfEntry = DateTime.Now,
                                 MetaCampaignName = lead.MetaCampaignName,
                                 PaymentMode = lead.PaymentMode,
                                 PaymentType = lead.PaymentType,

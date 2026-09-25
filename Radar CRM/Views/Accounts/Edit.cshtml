@@ -1892,7 +1892,7 @@
     const existingZip2 = '@Html.Raw(Model?.Addr2_Zip ?? "")';
 
     // 1. Fetch Countries on page load
-    fetch('/Postcode/GetCountries')
+   fetch('@Url.Action("GetCountries", "Postcode")')
     .then(res => {
     if (!res.ok) throw new Error("Server returned status: " + res.status);
     return res.json();
@@ -1951,7 +1951,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (country) {
-    fetch('/Postcode/GetStates?country=' + encodeURIComponent(country))
+   fetch('@Url.Action("GetStates", "Postcode")?country=' + encodeURIComponent(country))
     .then(res => res.json())
     .then(states => {
     populateDropdown(stateId, states, 'Select State', defaultState);
@@ -1973,7 +1973,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (state) {
-    fetch('/Postcode/GetCities?state=' + encodeURIComponent(state))
+  fetch('@Url.Action("GetCities", "Postcode")?state=' + encodeURIComponent(state))
     .then(res => res.json())
     .then(cities => {
     populateDropdown(cityId, cities, 'Select City', defaultCity);
@@ -1996,7 +1996,7 @@
     if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
     if (city && state) {
-    fetch('/Postcode/GetZipCodes?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
+   fetch('@Url.Action("GetZipCodes", "Postcode")?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
     .then(res => res.json())
     .then(zipCodes => {
     populateDropdown(zipId, zipCodes, 'Select Zip Code', defaultZip);
@@ -2105,7 +2105,7 @@
     btn.disabled = true;
     }
 
-    fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
+ fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
     .then(async response => {
     if (!response.ok) throw new Error("HTTP Status " + response.status);
     return response.json();

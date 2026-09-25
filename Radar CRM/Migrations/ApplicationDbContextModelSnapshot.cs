@@ -332,6 +332,12 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("ContactPersonName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("DateOfEntry")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("DealName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -345,6 +351,9 @@ namespace Radar_CRM.Migrations
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int?>("LeadId")
+                        .HasColumnType("int");
+
                     b.Property<string>("LeadName")
                         .HasColumnType("nvarchar(max)");
 
@@ -352,6 +361,9 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MetaCampaignName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PaymentMode")
@@ -380,6 +392,8 @@ namespace Radar_CRM.Migrations
                     b.HasIndex("AccountId");
 
                     b.HasIndex("DealOwnerId");
+
+                    b.HasIndex("LeadId");
 
                     b.ToTable("Deals");
                 });
@@ -601,6 +615,9 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("ConversationRemarks")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("CreatedDateAndTime")
                         .HasColumnType("datetime2");
 
@@ -689,6 +706,9 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MobileNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("NewSoftware")
@@ -845,10 +865,16 @@ namespace Radar_CRM.Migrations
                     b.Property<int?>("AccountId")
                         .HasColumnType("int");
 
+                    b.Property<string>("AccountName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AttachmentFileName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("AttachmentFilePath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedDateTime")
@@ -857,6 +883,9 @@ namespace Radar_CRM.Migrations
                     b.Property<int?>("DealId")
                         .HasColumnType("int");
 
+                    b.Property<string>("DealName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -864,11 +893,29 @@ namespace Radar_CRM.Migrations
                     b.Property<int?>("LeadId")
                         .HasColumnType("int");
 
+                    b.Property<string>("LeadName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NoteContent")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("NoteOwnerId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("NoteTitle")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("TaskId")
                         .HasColumnType("int");
+
+                    b.Property<string>("TaskName")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ZohoRecordId")
                         .HasColumnType("nvarchar(max)");
@@ -1583,6 +1630,10 @@ namespace Radar_CRM.Migrations
                         .WithMany("OwnedDeals")
                         .HasForeignKey("DealOwnerId");
 
+                    b.HasOne("Radar_CRM.Models.Lead", null)
+                        .WithMany("Deals")
+                        .HasForeignKey("LeadId");
+
                     b.Navigation("Account");
 
                     b.Navigation("DealOwner");
@@ -1771,6 +1822,8 @@ namespace Radar_CRM.Migrations
 
             modelBuilder.Entity("Radar_CRM.Models.Lead", b =>
                 {
+                    b.Navigation("Deals");
+
                     b.Navigation("Notes");
 
                     b.Navigation("PaymentRow");

@@ -264,6 +264,13 @@ namespace Radar_CRM.Controllers
                 ModelState.AddModelError("DealName", "Deal Name is required.");
             }
 
+            // 🚀 SET "CREATED BY" AUTOMATICALLY
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            deal.CreatedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("ModifiedBy");
+
             if (ModelState.IsValid)
             {
                 // 🚀 Cache valid user IDs to prevent Database Foreign Key crashes
@@ -699,6 +706,20 @@ namespace Radar_CRM.Controllers
             {
                 ModelState.AddModelError("DealName", "Deal Name is required.");
             }
+
+            // 🚀 SET "MODIFIED BY" ONLY WHEN SAVE IS CLICKED
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            deal.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+
+            // Fetch original record to ensure CreatedBy isn't accidentally erased during save
+            var existingDeal = await _context.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deal.Id);
+            if (existingDeal != null && string.IsNullOrEmpty(deal.CreatedBy))
+            {
+                deal.CreatedBy = existingDeal.CreatedBy;
+            }
+
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("ModifiedBy");
 
             if (ModelState.IsValid)
             {

@@ -1,0 +1,386 @@
+﻿@model IEnumerable<Radar_CRM.Models.Notes>
+
+@{
+    ViewData["Title"] = "Notes Master";
+}
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>@ViewData["Title"] - Radar CRM</title>
+
+<style>
+    /* Premium Enterprise SaaS Theme */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --bg-body: #f8fafc;
+        --bg-surface: #ffffff;
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --text-dark: #0f172a;
+        --text-main: #334155;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --btn-depth: 2px;
+    }
+
+    body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-family: 'Inter', -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Page Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        background: var(--bg-surface);
+        padding: 20px 28px;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        letter-spacing: -0.02em;
+    }
+
+    .page-title i {
+        color: #eab308; /* distinct color for notes */
+    }
+
+    /* Action Buttons (3D SaaS Style) */
+    .btn-saas {
+        background-color: var(--bg-surface);
+        color: var(--text-dark);
+        border: 1px solid #cbd5e1;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
+        transform: translateY(0);
+        text-decoration: none;
+    }
+
+    .btn-saas:hover {
+        background-color: #f1f5f9;
+        color: var(--text-dark);
+    }
+
+    .btn-saas:active {
+        transform: translateY(var(--btn-depth));
+        box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .btn-saas-primary {
+        background-color: var(--primary-blue);
+        color: white;
+        font-weight: 600;
+        border: 1px solid var(--primary-hover);
+        border-radius: var(--radius-md);
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+    }
+
+    .btn-saas-primary:hover {
+        color: white;
+        background-color: var(--primary-hover);
+    }
+
+    .btn-saas-primary:active {
+        transform: translateY(var(--btn-depth));
+        box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
+    }
+
+    /* Table Container */
+    .table-container {
+        background: var(--bg-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-soft);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .table-toolbar {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--bg-surface);
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+        max-height: calc(100vh - 280px);
+    }
+
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+    }
+
+    .table thead th {
+        background-color: #f8fafc;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid var(--border-soft);
+        padding: 14px 16px;
+    }
+
+    .table tbody td {
+        padding: 16px;
+        vertical-align: middle;
+        color: var(--text-dark);
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .table tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    /* Badges for Entities */
+    .badge-entity {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .badge-lead { background: #fee2e2; color: #b91c1c; }
+    .badge-deal { background: #dcfce3; color: #166534; }
+    .badge-account { background: #e0e7ff; color: #3730a3; }
+    .badge-task { background: #fef3c7; color: #92400e; }
+    .badge-unassigned { background: #f1f5f9; color: #475569; }
+
+    /* Search input */
+    .search-input {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        width: 250px;
+        outline: none;
+        transition: 0.2s;
+    }
+    
+    .search-input:focus {
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+</style>
+
+<!-- Hidden File Upload Input -->
+<input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
+
+<!-- Top Action Header -->
+<div class="page-header">
+    <h1 class="page-title"><i class="fa-solid fa-note-sticky"></i> Notes Master</h1>
+
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <a href="@Url.Action("Index", "Home")" class="btn-saas">
+            <i class="fa-solid fa-house"></i> Back to Dashboard
+        </a>
+        
+        <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();" id="btnUpload">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
+        </button>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div class="table-container">
+    
+    <!-- Table Toolbar -->
+    <div class="table-toolbar">
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
+                <i class="fa-solid fa-database me-2"></i> Total Notes: <span id="topTotalCount">@(Model?.Count() ?? 0)</span>
+            </span>
+        </div>
+        
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-magnifying-glass text-muted position-absolute ms-3"></i>
+            <input type="text" id="tableSearchInput" class="search-input ps-5" placeholder="Quick search notes..." onkeyup="filterNotesTable()">
+        </div>
+    </div>
+
+    <!-- The Data Table -->
+    <div class="table-responsive">
+        <table class="table" id="notesTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Related To</th>
+                    <th>Note Owner</th>
+                    <th>Created On</th>
+                    <th>Attachment</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var item in Model)
+                    {
+                        <tr class="note-row">
+                            <td class="text-muted">#@item.Id</td>
+                            <td class="fw-bold text-dark">@(string.IsNullOrEmpty(item.NoteTitle) ? "Untitled Note" : item.NoteTitle)</td>
+                            
+                            <!-- Truncated Description -->
+                            <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="@item.Description">
+                                @item.Description
+                            </td>
+
+                            <!-- Polymorphic Related To Logic -->
+                            <td>
+                                @if (!string.IsNullOrEmpty(item.LeadName))
+                                {
+                                    <span class="badge-entity badge-lead"><i class="fa-solid fa-user"></i> @item.LeadName</span>
+                                }
+                                else if (!string.IsNullOrEmpty(item.DealName))
+                                {
+                                    <span class="badge-entity badge-deal"><i class="fa-solid fa-handshake"></i> @item.DealName</span>
+                                }
+                                else if (!string.IsNullOrEmpty(item.AccountName))
+                                {
+                                    <span class="badge-entity badge-account"><i class="fa-solid fa-building"></i> @item.AccountName</span>
+                                }
+                                else if (!string.IsNullOrEmpty(item.TaskName))
+                                {
+                                    <span class="badge-entity badge-task"><i class="fa-solid fa-list-check"></i> @item.TaskName</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-entity badge-unassigned">Unassigned</span>
+                                }
+                            </td>
+
+                            <td>@(item.NoteOwner?.FirstName ?? item.CreatedBy ?? "System")</td>
+                            <td>@item.CreatedDateTime.ToString("MMM dd, yyyy - hh:mm tt")</td>
+                            
+                            <td>
+                                @if (!string.IsNullOrEmpty(item.AttachmentFileName))
+                                {
+                                    <span class="text-primary" style="cursor:pointer;" title="@item.AttachmentFileName">
+                                        <i class="fa-solid fa-paperclip"></i> View File
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted" style="font-size: 0.8rem;">None</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr id="noRecordsRow">
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fa-regular fa-note-sticky mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                            <br /><span class="fw-semibold fs-5 text-dark">No notes found.</span>
+                            <p class="mt-1">Upload your notes data to see them here.</p>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Simple Frontend Quick Search Logic for Notes
+    function filterNotesTable() {
+        const input = document.getElementById("tableSearchInput");
+        const filter = input.value.toLowerCase();
+        const rows = document.querySelectorAll("#tableBody .note-row");
+
+        rows.forEach(row => {
+            // Checks Title, Description, and Related To columns
+            const textContent = row.innerText.toLowerCase();
+            row.style.display = textContent.includes(filter) ? "" : "none";
+        });
+    }
+
+    // AJAX File Upload Logic
+    document.getElementById('fileUploadInput').addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('uploadedFile', file);
+
+        const uploadBtn = document.getElementById('btnUpload');
+        const originalHtml = uploadBtn.innerHTML;
+        uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+        uploadBtn.disabled = true;
+
+        fetch('@Url.Action("UploadFile", "Notes")', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async response => {
+            if (response.ok) {
+                alert("Notes uploaded successfully!");
+                window.location.reload();
+            } else {
+                alert("Upload Failed: " + await response.text());
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            alert("Network error during upload.");
+            uploadBtn.innerHTML = originalHtml;
+            uploadBtn.disabled = false;
+        });
+        
+        this.value = '';
+    });
+</script>
