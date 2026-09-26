@@ -876,9 +876,15 @@
             <div class="vr mx-2 d-none d-md-block"></div>
         </div>
 
-        <button class="btn-saas" onclick="exportTableToCSV('Accounts_Export.csv')">
-            <i class="fa-solid fa-file-csv"></i> Export
-        </button>
+        <div class="dropdown">
+    <button class="btn-saas dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fa-solid fa-file-export"></i> Export
+    </button>
+    <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
+        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'csv')"><i class="fa-solid fa-file-csv me-2 text-primary"></i>Export as CSV</a></li>
+        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'xlsx')"><i class="fa-solid fa-file-excel me-2 text-success"></i>Export as Excel</a></li>
+    </ul>
+</div>
         <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
             <i class="fa-solid fa-cloud-arrow-up"></i> Upload
         </button>

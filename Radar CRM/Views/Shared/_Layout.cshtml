@@ -848,6 +848,103 @@
             })
             .catch(err => console.error("Error marking read:", err));
             };
+
+                        function exportTableData(moduleName, format) {
+                // 1. Map module names to their respective table IDs
+                const tableMap = {
+                    'Accounts': 'accountsTable',
+                    'Deals': 'dealsTable',
+                    'Leads': 'leadsTable',
+                    'Products': 'productsTable',
+                    'Tasks': 'tasksTable',
+                    'Vendors': 'vendorsTable'
+                };
+
+                const tableId = tableMap[moduleName];
+                const table = document.getElementById(tableId);
+
+                if (!table) {
+                    alert("Table not found for module: " + moduleName);
+                    return;
+                }
+
+                // 2. Gather target rows based on selection
+                let targetRows = [];
+                const checkedCbs = table.querySelectorAll("tbody .row-cb:checked");
+
+                if (checkedCbs.length > 0) {
+                    checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+                } else {
+                    // Vendor logic: Export all visible if none checked. Others: Require checkboxes.
+                    if (moduleName === 'Vendors') {
+                        table.querySelectorAll("tbody tr").forEach(tr => {
+                            if (!tr.classList.contains('filtered-out') && tr.style.display !== 'none') {
+                                targetRows.push(tr);
+                            }
+                        });
+                    } else {
+                        alert("Please select at least one record using the checkboxes before exporting.");
+                        return;
+                    }
+                }
+
+                if (targetRows.length === 0) {
+                    alert("No data available to export.");
+                    return;
+                }
+
+                // 3. Extract Headers
+                let dataMatrix = [];
+                let headerRow = [];
+                table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+                    if(th.style.display !== 'none') {
+                        let span = th.querySelector('span');
+                        headerRow.push(span ? span.innerText.trim() : th.innerText.trim());
+                    }
+                });
+                dataMatrix.push(headerRow);
+
+                // 4. Extract Row Data
+                targetRows.forEach(tr => {
+                    let rowData = [];
+                    tr.querySelectorAll("td[data-col-index]").forEach(td => {
+                        if(td.style.display !== 'none') {
+                            rowData.push(td.innerText.trim());
+                        }
+                    });
+                    dataMatrix.push(rowData);
+                });
+
+                // 5. Format filename with current date
+                const dateStr = new Date().toISOString().slice(0, 10);
+                const filename = `${moduleName}_Export_${dateStr}`;
+
+                // 6. Generate File
+                if (format === 'csv') {
+                    let csvContent = dataMatrix.map(row =>
+                        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+                    ).join("\n");
+
+                    let blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                    let link = document.createElement("a");
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = filename + ".csv";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+                else if (format === 'xlsx') {
+                    if (typeof XLSX === 'undefined') {
+                        alert("Excel export library is currently loading or unavailable.");
+                        return;
+                    }
+                    let worksheet = XLSX.utils.aoa_to_sheet(dataMatrix);
+                    let workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, moduleName);
+                    XLSX.writeFile(workbook, filename + ".xlsx");
+                }
+            }
+
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

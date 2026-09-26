@@ -193,15 +193,21 @@ namespace Radar_CRM.Controllers
                         if (values.Length >= 9)
                         {
                             string rawRecordId = GetVal(values, 0);         // Record Id
-                            string rawCreatedBy = GetVal(values, 3);        // Created By
-                            string rawCreatedTime = GetVal(values, 4);      // Created Time
-                            string rawModifiedBy = GetVal(values, 6);       // Modified By
-                            string rawModifiedTime = GetVal(values, 7);     // Modified Time
-                            string rawDescription = GetVal(values, 8);      // Note Content
-                            string rawNoteOwnerId = GetVal(values, 9);      // Note Owner.id
-                            string rawNoteOwner = GetVal(values, 10);       // Note Owner
-                            string rawNoteTitle = GetVal(values, 11);       // Note Title
-                            string rawAccountName = GetVal(values, 13);     // AccountName
+                            string rawCreatedById = GetVal(values, 1);
+                            string rawCreatedBy = GetVal(values, 2);        // Created By
+                            string rawCreatedTime = GetVal(values, 3);      // Created Time
+                            string rawModifiedById = GetVal(values, 4);
+                            string rawModifiedBy = GetVal(values, 5);       // Modified By
+                            string rawModifiedTime = GetVal(values, 6);     // Modified Time
+                            string rawNoteContent = GetVal(values, 7);
+                            string rawNoteOwnerId= GetVal(values, 8);
+                            string rawNoteOwner = GetVal(values, 9);
+                            string rawNoteTitle = GetVal(values, 10);
+                            string rawAccountId = GetVal(values, 11);
+                            string rawAccountName = GetVal(values, 12);
+                            string rawDescription = GetVal(values, 13);      // Note Content
+
+                      
 
                             // Fallback if Description is blank (Prevents EF Core from crashing on [Required] tags)
                             if (string.IsNullOrWhiteSpace(rawDescription))
