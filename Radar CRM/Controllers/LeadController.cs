@@ -98,13 +98,11 @@ namespace Radar_CRM.Controllers
                         {
                             if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
 
-                            var propertyInfo = typeof(Lead).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            if (propertyInfo == null) continue;
+                            string dbColName = f.ColumnName;
 
-                            string dbColName = propertyInfo.Name;
-
-                            // Handle Foreign Keys gracefully
-                            if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                            // 1. FOREIGN KEY TRANSLATION
+                            var propertyInfo = typeof(Lead).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
                             {
                                 var idProp = typeof(Lead).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                                 if (idProp != null)
@@ -112,14 +110,72 @@ namespace Radar_CRM.Controllers
                                     dbColName = idProp.Name;
                                     propertyInfo = idProp;
                                 }
-                                else continue;
                             }
+
+                            if (propertyInfo == null) continue;
 
                             var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
                             System.Linq.Expressions.Expression conditionExpr = null;
+                            string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
 
-                            // STRING & DROPDOWN FILTERING
-                            if (propertyInfo.PropertyType == typeof(string))
+                            // 2. DATES
+                            if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
+                            {
+                                string[] dates = safeValue.Split('|');
+                                if (DateTime.TryParse(dates[0], out DateTime dVal))
+                                {
+                                    DateTime dVal2 = dates.Length > 1 && DateTime.TryParse(dates[1], out var d2) ? d2 : dVal;
+
+                                    var startOfDay = dVal.Date;
+                                    var endOfDay = dVal.Date.AddDays(1).AddTicks(-1);
+                                    var endOfDay2 = dVal2.Date.AddDays(1).AddTicks(-1);
+
+                                    var constStart = System.Linq.Expressions.Expression.Constant(startOfDay, propertyInfo.PropertyType);
+                                    var constEnd = System.Linq.Expressions.Expression.Constant(endOfDay, propertyInfo.PropertyType);
+                                    var constEnd2 = System.Linq.Expressions.Expression.Constant(endOfDay2, propertyInfo.PropertyType);
+
+                                    if (f.Condition == "on" || f.Condition == "On")
+                                    {
+                                        var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
+                                        var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd);
+                                        conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
+                                    }
+                                    else if (f.Condition == "before")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
+                                    }
+                                    else if (f.Condition == "after")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
+                                    }
+                                    else if (f.Condition == "between")
+                                    {
+                                        var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
+                                        var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd2);
+                                        conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
+                                    }
+                                }
+                            }
+                            // 3. OWNER / USER MAPPING (AccountOwnerId, LeadOwnerId, etc.)
+                            else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
+                            {
+                                var searchValue = safeValue.ToLower();
+                                var matchingUserIds = _context.Users
+                                    .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
+                                                (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                    .Select(u => u.Id)
+                                    .ToList();
+
+                                var listExpr = System.Linq.Expressions.Expression.Constant(matchingUserIds);
+                                var containsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+
+                                if (f.Condition == "contains" || f.Condition == "is")
+                                    conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr);
+                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr));
+                            }
+                            // 4. REGULAR STRINGS (Like LeadName, AccountType, CurrentStatus)
+                            else if (propertyInfo.PropertyType == typeof(string))
                             {
                                 var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
                                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
@@ -128,7 +184,7 @@ namespace Radar_CRM.Controllers
 
                                 var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
                                 var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
-                                var lowerVal = System.Linq.Expressions.Expression.Constant(f.Value?.ToLower().Trim() ?? "");
+                                var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
                                 if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
                                 else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
@@ -139,23 +195,26 @@ namespace Radar_CRM.Controllers
                                 else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
                                 else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
                             }
-                            // NUMBERS & DECIMALS
-                            else if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                            // 5. NUMBERS
+                            else
                             {
-                                if (int.TryParse(f.Value, out int numVal))
+                                if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
                                 {
-                                    var valExpr = System.Linq.Expressions.Expression.Constant(numVal, typeof(int?));
-                                    if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    if (int.TryParse(safeValue, out int numVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(numVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
                                 }
-                            }
-                            else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
-                            {
-                                if (decimal.TryParse(f.Value, out decimal decVal))
+                                else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
                                 {
-                                    var valExpr = System.Linq.Expressions.Expression.Constant(decVal, typeof(decimal?));
-                                    if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    if (decimal.TryParse(safeValue, out decimal decVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(decVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
                                 }
                             }
 
@@ -167,7 +226,7 @@ namespace Radar_CRM.Controllers
                                 }
                                 else
                                 {
-                                    // 🚀 Dynamically branch on AND vs OR
+                                    // 🚀 Ensure AND conditions stack properly without overwriting
                                     if (string.Equals(f.LogicalOperator, "OR", StringComparison.OrdinalIgnoreCase))
                                     {
                                         combinedPredicate = System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr);
@@ -179,7 +238,6 @@ namespace Radar_CRM.Controllers
                                 }
                             }
                         }
-
                         if (combinedPredicate != null)
                         {
                             var lambda = System.Linq.Expressions.Expression.Lambda<Func<Lead, bool>>(combinedPredicate, parameter);
@@ -850,6 +908,10 @@ namespace Radar_CRM.Controllers
                         System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Checking if Deal exists for LeadName: '{lead.LeadName}'...");
                         bool dealExists = _context.Deals.Any(d => d.LeadName == lead.LeadName);
 
+                        // 🚀 1. AUTOMATICALLY CHANGE LEAD STAGE TO 'WON'
+                        lead.Stage = "Won";
+                        _context.Update(lead);
+
                         if (!dealExists)
                         {
                             System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Deal does NOT exist. Proceeding to create Deal for Lead ID: {lead.Id}");
@@ -996,21 +1058,61 @@ namespace Radar_CRM.Controllers
         // BULK UPLOAD EXCEL/CSV (HIGH PERFORMANCE)
         // ==========================================
         [HttpPost]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var leadsToInsert = new List<Lead>();
+            var leadsToUpdate = new List<Lead>();
+            var skippedRecords = new List<string>();
             int currentRow = 1;
 
+            // Load Maps for fast Upsert checking and Relationship mapping
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
-            var validAccountIds = new HashSet<int>(_context.Accounts.Select(a => a.Id));
+
+            var existingLeadsDb = await _context.Leads
+                .Where(l => !string.IsNullOrEmpty(l.ZohoRecordId))
+                .AsNoTracking()
+                .GroupBy(l => l.ZohoRecordId)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
+
+            var existingMobiles = new HashSet<string>(await _context.Leads.Where(l => !string.IsNullOrEmpty(l.MobileNumber)).Select(l => l.MobileNumber).ToListAsync());
+            var existingEmails = new HashSet<string>(await _context.Leads.Where(l => !string.IsNullOrEmpty(l.EmailID)).Select(l => l.EmailID.ToLower()).ToListAsync());
+
+            var accountLookup = _context.Accounts.Where(a => a.ZohoRecordId != null).ToDictionary(a => a.ZohoRecordId, a => a.Id);
+
+            // Country Normalizer
+            string NormalizeCountry(string input)
+            {
+                if (string.IsNullOrWhiteSpace(input)) return null;
+                string upper = input.Trim().ToUpper();
+                return (upper.Contains("INDIA") || upper == "IND" || upper == "IN") ? "INDIA" : upper;
+            }
 
             try
             {
                 using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    var headerLine = await reader.ReadLineAsync(); // Skip header
+                    var headerLine = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
+
+                    var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
+
+                    string GetValSafe(string[] vals, string colName)
+                    {
+                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
+
+                    decimal? GetDecimalSafe(string[] vals, string colName)
+                    {
+                        string raw = GetValSafe(vals, colName);
+                        if (string.IsNullOrWhiteSpace(raw)) return null;
+                        string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
+                        return decimal.TryParse(clean, out decimal result) ? result : null;
+                    }
 
                     while (!reader.EndOfStream)
                     {
@@ -1020,154 +1122,238 @@ namespace Radar_CRM.Controllers
 
                         var values = ParseCsvLine(line);
 
-                        if (values.Length >= 5)
+                        string zohoRecordId = GetValSafe(values, "RecordId");
+                        string mobile = GetValSafe(values, "MobileNumber");
+                        string email = GetValSafe(values, "EmailID")?.ToLower();
+
+                        bool isUpdate = false;
+                        Lead lead;
+
+                        // 🚀 UPSERT LOGIC
+                        if (!string.IsNullOrEmpty(zohoRecordId) && existingLeadsDb.TryGetValue(zohoRecordId, out var existingLead))
                         {
-                            string rawLeadOwnerId = GetVal(values, 1);
-                            string rawCoOwnerId = GetVal(values, 52);
-                            string rawAccountOwnerId = GetVal(values, 126);
-                            string rawDemoOwnerId = GetVal(values, 128);
-
-                            int? parsedAccountId = int.TryParse(GetVal(values, 100), out int accId) ? accId : null;
-
-                            var newLead = new Lead
-                            {
-                                // --- Relational IDs ---
-                                LeadOwnerId = validUserIds.Contains(rawLeadOwnerId) ? rawLeadOwnerId : null,
-                                CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null,
-                                AccountOwnerId = validUserIds.Contains(rawAccountOwnerId) ? rawAccountOwnerId : null,
-                                DemoOwnerId = validUserIds.Contains(rawDemoOwnerId) ? rawDemoOwnerId : null,
-                                AccountId = parsedAccountId.HasValue && validAccountIds.Contains(parsedAccountId.Value) ? parsedAccountId.Value : null,
-
-                                // --- Basic Info ---
-                                LeadName = GetVal(values, 4),
-                                MobileNumber = GetVal(values, 71),
-                                EmailID = GetVal(values, 74),
-                                SocialLeadID = GetVal(values, 28),
-                                DataSources = GetVal(values, 8),
-                                CampaignSource = GetVal(values, 10),
-                                CurrentStatus = GetVal(values, 116),
-                                MetaCampaignName = GetVal(values, 50),
-                                Pipeline = GetVal(values, 23),
-                                ContactName = GetVal(values, 94),
-                                GroupName = GetVal(values, 124),
-                                AlternateMobile = GetVal(values, 73),
-                                AlternateEmailID = GetVal(values, 125),
-                                Description = GetVal(values, 22),
-                                AccountType = GetVal(values, 114),
-
-                                // --- Status & Financials ---
-                                Stage = GetVal(values, 5),
-                                LeadStatus = GetVal(values, 115),
-                                Budget = decimal.TryParse(GetVal(values, 3), out decimal budget) ? budget : null,
-                                ExpectedRevenue = decimal.TryParse(GetVal(values, 7), out decimal expRev) ? expRev : null,
-                                Probability = decimal.TryParse(GetVal(values, 6), out decimal prob) ? prob : null,
-                                TimePeriodToBuy = GetVal(values, 60),
-
-                                // --- Professional Info ---
-                                IsHomeopathicDoctor = GetVal(values, 102),
-                                ClinicType = GetVal(values, 82),
-                                WorkType = GetVal(values, 81),
-                                HasComputer = GetVal(values, 63),
-                                Qualification = GetVal(values, 83),
-                                YearOfPassing = GetVal(values, 76),
-                                CollegeName = GetVal(values, 72),
-                                Age = int.TryParse(GetVal(values, 69), out int age) ? age : null,
-                                YearOfPractice = int.TryParse(GetVal(values, 97), out int yop) ? yop : null,
-                                TotalExperience = int.TryParse(GetVal(values, 68), out int tExp) ? tExp : null,
-                                AveragePatientFee = decimal.TryParse(GetVal(values, 77), out decimal apf) ? apf : null,
-                                NumberOfClinics = int.TryParse(GetVal(values, 70), out int noc) ? noc : null,
-                                PatientsPerDay = int.TryParse(GetVal(values, 75), out int ppd) ? ppd : null,
-
-                                // --- Dates ---
-                                DateOfBirth = DateTime.TryParse(GetVal(values, 67), out DateTime dob) ? dob : null,
-                                CreatedDateAndTime = DateTime.TryParse(GetVal(values, 54), out DateTime cdt) ? cdt : DateTime.Now,
-                                LeadCreatedTime = DateTime.TryParse(GetVal(values, 51), out DateTime lct) ? lct : DateTime.Now,
-                                DemoScheduledDate = DateTime.TryParse(GetVal(values, 56), out DateTime demo) ? demo : null,
-                                FirstCallDate = DateTime.TryParse(GetVal(values, 55), out DateTime fcd) ? fcd : null,
-                                NextFollowUpDate = DateTime.TryParse(GetVal(values, 57), out DateTime nfd) ? nfd : null,
-                                LastContactDate = DateTime.TryParse(GetVal(values, 58), out DateTime lcd) ? lcd : null,
-                                PurchaseDate = DateTime.TryParse(GetVal(values, 65), out DateTime pd) ? pd : null,
-
-                                TrialStartDate = DateOnly.TryParse(GetVal(values, 109), out DateOnly tsd) ? tsd : null,
-                                TrialEndDate = DateOnly.TryParse(GetVal(values, 110), out DateOnly ted) ? ted : null,
-
-                                // --- Software & Purchasing ---
-                                CurrentlyUsingSoftware = GetVal(values, 78),
-                                CurrentSoftwareName = GetVal(values, 64),
-                                RadarOpusVersion = GetVal(values, 112),
-                                RadarOpusLicenseNo = GetVal(values, 111),
-                                ProductPackage = GetVal(values, 96),
-                                PurchaseValue = decimal.TryParse(GetVal(values, 66), out decimal pVal) ? pVal : null,
-                                PaymentStatus = GetVal(values, 79),
-                                CustomerStatus = GetVal(values, 80),
-
-                                // --- Deals/Payments ---
-                                DealType = GetVal(values, 107),
-                                DealValue = decimal.TryParse(GetVal(values, 105), out decimal dVal) ? dVal : null,
-                                PackageSelected = GetVal(values, 106),
-                                Discount = decimal.TryParse(GetVal(values, 104), out decimal disc) ? disc : null,
-                                PaymentMode = GetVal(values, 108),
-                                Remarks = GetVal(values, 103),
-                                PaymentType = GetVal(values, 113),
-                                SubTotal = decimal.TryParse(GetVal(values, 130), out decimal subTot) ? subTot : null,
-                                Adjustment = decimal.TryParse(GetVal(values, 131), out decimal adj) ? adj : null,
-                                Taxes = decimal.TryParse(GetVal(values, 132), out decimal tax) ? tax : null,
-                                GrandTotal = decimal.TryParse(GetVal(values, 133), out decimal grandTot) ? grandTot : null,
-
-                                // --- Address 1 ---
-                                Addr1_Country = GetVal(values, 135),
-                                Addr1_FlatHouse = GetVal(values, 136),
-                                Addr1_Street = GetVal(values, 137),
-                                Addr1_City = GetVal(values, 138),
-                                Addr1_State = GetVal(values, 139),
-                                Addr1_Zip = GetVal(values, 140),
-                                Addr1_Coordinates = GetVal(values, 141) + " " + GetVal(values, 142),
-
-                                // --- Address 2 ---
-                                Addr2_Country = GetVal(values, 143),
-                                Addr2_FlatHouse = GetVal(values, 144),
-                                Addr2_Street = GetVal(values, 145),
-                                Addr2_City = GetVal(values, 146),
-                                Addr2_State = GetVal(values, 147),
-                                Addr2_Zip = GetVal(values, 148),
-                                Addr2_Coordinates = GetVal(values, 149) + " " + GetVal(values, 150),
-
-                                // --- Secondary Contacts ---
-                                ContactPerson1 = GetVal(values, 117),
-                                ContactPerson2 = GetVal(values, 118),
-                                ContactPerson3 = GetVal(values, 120),
-                                Contact1Phone = GetVal(values, 119),
-                                Contact2Phone = GetVal(values, 121),
-                                Contact3Phone = GetVal(values, 122),
-
-                                // --- Other Remarks ---
-                                ConversationRemarks = GetVal(values, 59),
-                                InterestedPackage = GetVal(values, 62),
-                                LostReason = GetVal(values, 61),
-                                LeadProfile = GetVal(values, 95)
-                            };
-
-                            leadsToInsert.Add(newLead);
+                            lead = existingLead; // Found it -> Update
+                            isUpdate = true;
                         }
+                        else
+                        {
+                            // Duplication Check for purely new records
+                            bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
+                            bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
+
+                            if (isMobileDup || isEmailDup)
+                            {
+                                skippedRecords.Add($"Row {currentRow}: Skipped (Mobile or Email exists)");
+                                continue;
+                            }
+
+                            lead = new Lead(); // Doesn't exist -> Insert
+                            if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
+                            if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+                        }
+
+                        // --- Extract Owners & Relations ---
+                        string rawLeadOwnerId = GetValSafe(values, "LeadOwner.id");
+                        string rawAccountOwnerId = GetValSafe(values, "AccountOwner.id");
+                        string rawCoOwnerId = GetValSafe(values, "Co-Owner.id");
+                        string rawDemoOwnerId = GetValSafe(values, "DemoOwner.id");
+                        string rawAccountId = GetValSafe(values, "AccountName.id");
+
+                        // --- Core Identity ---
+                        lead.ZohoRecordId = zohoRecordId;
+                        lead.LeadName = GetValSafe(values, "LeadName");
+                        lead.EmailID = GetValSafe(values, "EmailID");
+                        lead.MobileNumber = mobile;
+                        lead.AlternateMobile = GetValSafe(values, "AlternateMobile");
+                        lead.AlternateEmailID = GetValSafe(values, "AlternateEmailID");
+                        lead.LeadOwnerId = validUserIds.Contains(rawLeadOwnerId) ? rawLeadOwnerId : null;
+                        lead.AccountOwnerId = validUserIds.Contains(rawAccountOwnerId) ? rawAccountOwnerId : null;
+                        lead.CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null;
+                        lead.DemoOwnerId = validUserIds.Contains(rawDemoOwnerId) ? rawDemoOwnerId : null;
+
+                        // MAPPING TO ACCOUNT VIA LOOKUP
+                        lead.AccountId = accountLookup.TryGetValue(rawAccountId, out int accId) ? accId : null;
+
+                        // --- Status & Pipeline ---
+                        lead.Stage = GetValSafe(values, "Stage");
+                        lead.Probability = GetDecimalSafe(values, "Probability(%)");
+                        lead.LeadStatus = GetValSafe(values, "LeadStatus");
+                        lead.CurrentStatus = GetValSafe(values, "CurrentStatus");
+                        lead.Pipeline = GetValSafe(values, "Pipeline");
+                        lead.DataSources = GetValSafe(values, "DataSources");
+                        lead.CampaignSource = GetValSafe(values, "CampaignSource");
+                        lead.MetaCampaignName = GetValSafe(values, "MetaCampaignName");
+                        lead.Description = GetValSafe(values, "Description");
+                        lead.Remarks = GetValSafe(values, "Remarks");
+                        lead.ConversationRemarks = GetValSafe(values, "Remarks/Notes");
+
+                        // --- Tracking & Financials ---
+                        lead.Budget = GetDecimalSafe(values, "Budget");
+                        lead.ExpectedRevenue = GetDecimalSafe(values, "ExpectedRevenue");
+                        lead.TimePeriodToBuy = GetValSafe(values, "TimeperiodtoBuy");
+                        lead.LostReason = GetValSafe(values, "LostReason");
+                        lead.NotInterestedReason = GetValSafe(values, "NotInterestedReason");
+
+                        // --- Professional Info ---
+                        lead.IsHomeopathicDoctor = GetValSafe(values, "AreyouaHomopathicDoctor");
+                        lead.ClinicType = GetValSafe(values, "ClinicType");
+                        lead.WorkType = GetValSafe(values, "WorkType");
+                        lead.HasComputer = GetValSafe(values, "HavingComputer/Laptop");
+                        lead.Qualification = GetValSafe(values, "Qualification");
+                        lead.YearOfPassing = GetValSafe(values, "Yearofpassing");
+                        lead.CollegeName = GetValSafe(values, "CollegeName");
+                        lead.Age = int.TryParse(GetValSafe(values, "Age"), out int age) ? age : null;
+                        lead.YearOfPractice = int.TryParse(GetValSafe(values, "Yearofpractice"), out int yop) ? yop : null;
+                        lead.TotalExperience = int.TryParse(GetValSafe(values, "Totalexperience"), out int te) ? te : null;
+                        lead.AveragePatientFee = GetDecimalSafe(values, "AveragePatientFee");
+                        lead.NumberOfClinics = int.TryParse(GetValSafe(values, "NumberofClinics"), out int noc) ? noc : null;
+                        lead.PatientsPerDay = int.TryParse(GetValSafe(values, "PatientsperDay"), out int ppd) ? ppd : null;
+                        lead.LeadProfile = GetValSafe(values, "Leadprofie");
+                        lead.GroupName = GetValSafe(values, "GroupName");
+
+                        // --- Software & Purchases ---
+                        lead.CurrentlyUsingSoftware = GetValSafe(values, "CurrentlyUsingSoftware");
+                        lead.CurrentSoftwareName = GetValSafe(values, "CurrentSoftwareName");
+                        lead.NewSoftware = GetValSafe(values, "NewSoftware");
+                        lead.RadarOpusVersion = GetValSafe(values, "RadarOpusversion");
+                        lead.RadarOpusLicenseNo = GetValSafe(values, "RadarOpusLicenseno");
+                        lead.ProductPackage = GetValSafe(values, "Product/Packagepackage");
+                        lead.PurchaseValue = GetDecimalSafe(values, "PurchaseValue(â‚¹)");
+                        lead.PaymentStatus = GetValSafe(values, "PaymentStatus");
+                        lead.PaymentType = GetValSafe(values, "PaymentType");
+                        lead.PaymentMode = GetValSafe(values, "PaymentMode");
+                        lead.CustomerStatus = GetValSafe(values, "CustomerStatus");
+
+                        // --- Deal Info directly on Lead ---
+                        lead.DealType = GetValSafe(values, "DealType");
+                        lead.DealValue = GetDecimalSafe(values, "DealValue(â‚¹)");
+                        lead.Discount = GetDecimalSafe(values, "Discount");
+                        lead.PackageSelected = GetValSafe(values, "PackageSelected");
+                        lead.SubTotal = GetDecimalSafe(values, "SubTotal");
+                        lead.Adjustment = GetDecimalSafe(values, "adjustment.");
+                        lead.Taxes = GetDecimalSafe(values, "taxs.");
+                        lead.GrandTotal = GetDecimalSafe(values, "grandtotal");
+
+                        // --- Dates ---
+                        lead.DateOfBirth = DateTime.TryParse(GetValSafe(values, "DateofBirth"), out DateTime dob) ? dob : null;
+                        lead.CreatedDateAndTime = DateTime.TryParse(GetValSafe(values, "CreatedTime"), out DateTime cdt) ? cdt : DateTime.Now;
+                        lead.ModifiedTime = DateTime.TryParse(GetValSafe(values, "ModifiedTime"), out DateTime mdt) ? mdt : null;
+                        lead.LeadCreatedTime = DateTime.TryParse(GetValSafe(values, "Lead-Created-Time"), out DateTime lct) ? lct : DateTime.Now;
+                        lead.DemoScheduledDate = DateTime.TryParse(GetValSafe(values, "Demoscheduleddateandtime"), out DateTime dsdt) ? dsdt : null;
+                        lead.FirstCallDate = DateTime.TryParse(GetValSafe(values, "FirstcallDate"), out DateTime fcd) ? fcd : null;
+                        lead.NextFollowUpDate = DateTime.TryParse(GetValSafe(values, "Nextfollow-upDate"), out DateTime nfd) ? nfd : null;
+                        lead.LastContactDate = DateTime.TryParse(GetValSafe(values, "LastContactDate"), out DateTime lcd) ? lcd : null;
+                        lead.PurchaseDate = DateTime.TryParse(GetValSafe(values, "PurchaseDate"), out DateTime pd) ? pd : null;
+                        lead.TrialStartDate = DateOnly.TryParse(GetValSafe(values, "TrialStartDate"), out DateOnly tsd) ? tsd : null;
+                        lead.TrialEndDate = DateOnly.TryParse(GetValSafe(values, "TrialEndDate"), out DateOnly ted) ? ted : null;
+                        lead.CreatedBy = GetValSafe(values, "CreatedBy");
+                        lead.ModifiedBy = GetValSafe(values, "ModifiedBy");
+
+                        // --- Address 1 Mapping ---
+                        // If Address 1 exists, use it. If not, fallback to generic Country/Region/City columns
+                        string addr1Country = GetValSafe(values, "Address1-Country/Region");
+                        lead.Addr1_Country = NormalizeCountry(!string.IsNullOrEmpty(addr1Country) ? addr1Country : GetValSafe(values, "Country/Region"));
+
+                        string addr1Street = GetValSafe(values, "Address1-StreetAddress");
+                        lead.Addr1_Street = !string.IsNullOrEmpty(addr1Street) ? addr1Street : GetValSafe(values, "StreetAddress");
+
+                        string addr1City = GetValSafe(values, "Address1-City");
+                        lead.Addr1_City = !string.IsNullOrEmpty(addr1City) ? addr1City : GetValSafe(values, "City");
+
+                        string addr1State = GetValSafe(values, "Address1-State/Province");
+                        lead.Addr1_State = !string.IsNullOrEmpty(addr1State) ? addr1State : GetValSafe(values, "State/Province");
+
+                        string addr1Zip = GetValSafe(values, "Address1-Zip/PostalCode");
+                        lead.Addr1_Zip = !string.IsNullOrEmpty(addr1Zip) ? addr1Zip : GetValSafe(values, "Zip/PostalCode");
+
+                        string addr1Flat = GetValSafe(values, "Address1-Flat/HouseNo./Building/ApartmentName");
+                        lead.Addr1_FlatHouse = !string.IsNullOrEmpty(addr1Flat) ? addr1Flat : GetValSafe(values, "Flat/HouseNo./Building/ApartmentName");
+
+                        lead.Addr1_Coordinates = GetValSafe(values, "Address1-Latitude") + " " + GetValSafe(values, "Address1-Longitude");
+
+                        // --- Address 2 Mapping ---
+                        string addr2Country = GetValSafe(values, "Address2-Country/Region");
+                        lead.Addr2_Country = NormalizeCountry(!string.IsNullOrEmpty(addr2Country) ? addr2Country : GetValSafe(values, "Country/Region2"));
+
+                        string addr2Street = GetValSafe(values, "Address2-StreetAddress");
+                        lead.Addr2_Street = !string.IsNullOrEmpty(addr2Street) ? addr2Street : GetValSafe(values, "StreetAddress2");
+
+                        string addr2City = GetValSafe(values, "Address2-City");
+                        lead.Addr2_City = !string.IsNullOrEmpty(addr2City) ? addr2City : GetValSafe(values, "City2");
+
+                        string addr2State = GetValSafe(values, "Address2-State/Province");
+                        lead.Addr2_State = !string.IsNullOrEmpty(addr2State) ? addr2State : GetValSafe(values, "State/Province2");
+
+                        string addr2Zip = GetValSafe(values, "Address2-Zip/PostalCode");
+                        lead.Addr2_Zip = !string.IsNullOrEmpty(addr2Zip) ? addr2Zip : GetValSafe(values, "Zip/PostalCode2");
+
+                        string addr2Flat = GetValSafe(values, "Address2-Flat/HouseNo./Building/ApartmentName");
+                        lead.Addr2_FlatHouse = !string.IsNullOrEmpty(addr2Flat) ? addr2Flat : GetValSafe(values, "Flat/HouseNo./Building/ApartmentName2");
+
+                        lead.Addr2_Coordinates = GetValSafe(values, "Address2-Latitude") + " " + GetValSafe(values, "Address2-Longitude");
+
+                        // --- Secondary Contacts ---
+                        lead.ContactName = GetValSafe(values, "ContactName");
+                        lead.ContactPerson1 = GetValSafe(values, "ContactPersonName1");
+                        lead.ContactPerson2 = GetValSafe(values, "ContactPersonName2");
+                        lead.ContactPerson3 = GetValSafe(values, "ContactPersonName3");
+                        lead.Contact1Phone = GetValSafe(values, "Contact1PhoneNumber");
+                        lead.Contact2Phone = GetValSafe(values, "Contact2PhoneNumber");
+                        lead.Contact3Phone = GetValSafe(values, "Contact3PhoneNumber");
+
+                        // 🚀 --- AD TRACKING --- 🚀
+                        lead.SocialLeadID = GetValSafe(values, "SocialLeadID");
+                        lead.Gclid = GetValSafe(values, "GCLID");
+                        lead.Zcampaignid = GetValSafe(values, "ZCAMPAIGNID");
+                        lead.Adgroupid = GetValSafe(values, "ADGROUPID");
+                        lead.Adid = GetValSafe(values, "ADID");
+                        lead.Keywordid = GetValSafe(values, "KEYWORDID");
+                        lead.Keyword = GetValSafe(values, "Keyword");
+                        lead.ClickType = GetValSafe(values, "ClickType");
+                        lead.DeviceType = GetValSafe(values, "DeviceType");
+                        lead.AdNetwork = GetValSafe(values, "AdNetwork");
+                        lead.SearchPartnerNetwork = GetValSafe(values, "SearchPartnerNetwork");
+                        lead.AdCampaignName = GetValSafe(values, "AdCampaignName");
+                        lead.AdGroupName = GetValSafe(values, "AdGroupName");
+                        lead.Ad = GetValSafe(values, "Ad");
+                        lead.Gadconfigid = GetValSafe(values, "GADCONFIGID");
+                        lead.AdClickDate = DateTime.TryParse(GetValSafe(values, "AdClickDate"), out DateTime acd) ? acd : null;
+                        lead.CostPerClick = GetDecimalSafe(values, "CostperClick");
+                        lead.CostPerConversion = GetDecimalSafe(values, "CostperConversion");
+                        lead.ConversionExportedOn = DateTime.TryParse(GetValSafe(values, "ConversionExportedOn"), out DateTime ceo) ? ceo : null;
+                        lead.ConversionExportStatus = GetValSafe(values, "ConversionExportStatus");
+                        lead.ReasonForConversionFailure = GetValSafe(values, "ReasonforConversionFailure");
+
+                        // Route to correct list
+                        if (isUpdate) leadsToUpdate.Add(lead);
+                        else leadsToInsert.Add(lead);
                     }
                 }
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
-                await _context.Leads.AddRangeAsync(leadsToInsert);
+
+                // 🚀 Execute Inserts & Updates
+                if (leadsToInsert.Any()) await _context.Leads.AddRangeAsync(leadsToInsert);
+                if (leadsToUpdate.Any()) _context.Leads.UpdateRange(leadsToUpdate);
+
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
+                return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
             }
-            finally
-            {
-                _context.ChangeTracker.AutoDetectChangesEnabled = true;
-            }
+            finally { _context.ChangeTracker.AutoDetectChangesEnabled = true; }
 
-            return Ok();
+            return Json(new
+            {
+                success = true,
+                insertedCount = leadsToInsert.Count,
+                updatedCount = leadsToUpdate.Count,
+                skippedCount = skippedRecords.Count
+            });
         }
+
+
 
         private string GetVal(string[] values, int index)
         {

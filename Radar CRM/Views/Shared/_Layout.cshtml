@@ -163,7 +163,7 @@
             .nav-item-link:hover:not(.active) {
                 background-color: var(--sidebar-hover-bg);
                 color: var(--sidebar-hover-text);
-                transform: translateX(4px);
+                /* Removed translateX to fix the hover disappearing glitch */
                 box-shadow: 0 4px 10px rgba(30, 58, 138, 0.15);
             }
 
@@ -242,12 +242,14 @@
             }
 
             .content-area {
-                flex-grow: 1;
-                overflow-y: auto;
-                padding: 2rem;
-                background-color: var(--bg-light);
-            }
-
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    background-color: var(--bg-light);
+    /* 🚀 FIX 2: Trap the table's checkboxes and sticky headers in a low-level layer */
+    position: relative;
+    z-index: 1; 
+}
             /* --- Global Search Bar --- */
             .search-wrapper {
                 position: relative;
@@ -292,7 +294,7 @@
                         }
 
             /* --- Global Search Bar Updates --- */
-.search-results-dropdown {
+        .search-results-dropdown {
     display: none;
     position: absolute;
     top: 110%;
@@ -301,62 +303,63 @@
     background: white;
     border: 1px solid var(--navbar-border);
     border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    z-index: 1050;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25); 
+    /* 🚀 FIX 4: Nuclear option with !important to absolutely guarantee it sits in front */
+    z-index: 999999 !important; 
     max-height: 450px;
     overflow-y: auto;
 }
 
-.search-result-item {
-    padding: 10px 16px;
-    border-bottom: 1px solid #f1f5f9;
-    cursor: pointer;
-    transition: background 0.1s;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    text-decoration: none;
-    color: inherit;
-}
+            .search-result-item {
+                padding: 10px 16px;
+                border-bottom: 1px solid #f1f5f9;
+                cursor: pointer;
+                transition: background 0.1s;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                text-decoration: none;
+                color: inherit;
+            }
 
-.search-result-item:last-child {
-    border-bottom: none;
-}
+            .search-result-item:last-child {
+                border-bottom: none;
+            }
 
-.search-result-item:hover {
-    background: #f8fafc;
-}
+            .search-result-item:hover {
+                background: #f8fafc;
+            }
 
-.search-result-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+            .search-result-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
 
-.search-result-icon i {
-    color: #64748b;
-    font-size: 1.1rem;
-}
+            .search-result-icon i {
+                color: #64748b;
+                font-size: 1.1rem;
+            }
 
-.search-result-details h6 {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #1e293b;
-}
+            .search-result-details h6 {
+                margin: 0;
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: #1e293b;
+            }
 
-.search-result-details p {
-    margin: 2px 0 0 0;
-    font-size: 0.75rem;
-    color: #64748b;
-}
+            .search-result-details p {
+                margin: 2px 0 0 0;
+                font-size: 0.75rem;
+                color: #64748b;
+            }
 
-/* Mimics Zoho's right-aligned module name */
-.search-result-module {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    font-weight: 500;
-}
+            /* Mimics Zoho's right-aligned module name */
+            .search-result-module {
+                font-size: 0.75rem;
+                color: #94a3b8;
+                font-weight: 500;
+            }
 
             .search-badge {
                 font-size: 0.65rem;
@@ -466,14 +469,27 @@
                     opacity: 1;
                 }
 
-                .top-navbar {
-                    padding: 0 1rem;
-                    gap: 10px;
-                }
+            .top-navbar {
+    height: 70px;
+    background-color: var(--navbar-bg);
+    border-bottom: 1px solid var(--navbar-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    flex-shrink: 0;
+    /* 🚀 FIX 1: Set position and a massive z-index */
+    position: relative; 
+    z-index: 99999; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
 
                 .search-wrapper {
-                    width: 100%;
-                }
+    position: relative;
+    width: 480px;
+    /* 🚀 FIX 3: Ensure the wrapper itself stays on top */
+    z-index: 99999; 
+}
 
                 .search-results-dropdown {
                     width: calc(100vw - 2rem);
@@ -523,6 +539,13 @@
                     <div class="nav-item-link-content"><i class="fa-solid fa-list-check icon-3d" style="color: #ef4444;"></i> Tasks</div>
                 </a>
 
+                <!-- Notes moved above Other Modules -->
+                <a asp-controller="Notes" asp-action="Index" class="nav-item-link">
+                    <div class="nav-item-link-content">
+                        <i class="fa-solid fa-note-sticky icon-3d" style="color: #eab308;"></i> Notes
+                    </div>
+                </a>
+
                 <a href="#otherModulesMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="otherModulesMenu">
                     <div class="nav-item-link-content"><i class="fa-solid fa-layer-group icon-3d" style="color: #06b6d4;"></i> Other Modules</div>
                     <i class="fa-solid fa-chevron-down toggle-arrow"></i>
@@ -530,19 +553,9 @@
                 <div class="collapse sub-menu" id="otherModulesMenu">
                     <a asp-controller="Products" asp-action="Index" class="nav-item-link">Products</a>
                     <a asp-controller="Vendors" asp-action="Index" class="nav-item-link">Vendors</a>
+                    <!-- Postcodes moved inside Other Modules submenu -->
+                    <a asp-controller="Postcode" asp-action="Index" class="nav-item-link" hidden>Postcodes</a>
                 </div>
-
-                <a asp-controller="Postcode" asp-action="Index" class="nav-item-link" hidden>
-                    <div class="nav-item-link-content">
-                        <i class="fa-solid fa-map-location-dot icon-3d" style="color: #2e7d32;"></i> Postcodes
-                    </div>
-                </a>
-
-                <a asp-controller="Notes" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content">
-                        <i class="fa-solid fa-note-sticky icon-3d" style="color: #eab308;"></i> Notes
-                    </div>
-                </a>
 
                 <div class="nav-section-title">Administration</div>
                 <a href="#adminMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="adminMenu">

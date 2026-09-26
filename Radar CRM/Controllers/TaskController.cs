@@ -338,6 +338,161 @@ namespace Radar_CRM.Controllers
 
             return View(taskModel);
         }
+
+        [HttpPost]
+        [DisableRequestSizeLimit] // Prevents 30MB upload limit errors
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
+        public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
+        {
+            if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
+
+            // 🚀 Explicitly specify Radar_CRM.Models.Task 
+            var tasksToInsert = new List<Radar_CRM.Models.Task>();
+            int currentRow = 1;
+            int skippedCount = 0; // 🚀 Added to track skipped records
+
+            // Load Maps for Polymorphic linking
+            var accountLookup = _context.Accounts.Where(a => a.ZohoRecordId != null).ToDictionary(a => a.ZohoRecordId, a => a.Id);
+            var leadLookup = _context.Leads.Where(l => l.ZohoRecordId != null).ToDictionary(l => l.ZohoRecordId, l => l.Id);
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id));
+
+            // 🚀 NEW: Load existing Tasks ZohoRecordIds to skip duplicates ultra-fast
+            var existingTasks = new HashSet<string>(
+                await _context.Tasks
+                    .Where(t => !string.IsNullOrEmpty(t.ZohoRecordId))
+                    .Select(t => t.ZohoRecordId)
+                    .ToListAsync()
+            );
+
+            try
+            {
+                using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
+                {
+                    var headerLine = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
+
+                    var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
+
+                    string GetValSafe(string[] vals, string colName)
+                    {
+                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
+
+                    while (!reader.EndOfStream)
+                    {
+                        currentRow++;
+                        var line = await reader.ReadLineAsync();
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        var values = ParseCsvLine(line);
+
+                        string zohoRecordId = GetValSafe(values, "RecordId");
+
+                        // 🚀 SKIP LOGIC: If the task already exists in the database, skip it entirely
+                        if (!string.IsNullOrEmpty(zohoRecordId) && existingTasks.Contains(zohoRecordId))
+                        {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        // Zoho Tasks link using "Related To.id" or "Contact Name.id"
+                        string relatedId = GetValSafe(values, "RelatedTo.id");
+                        string contactId = GetValSafe(values, "ContactName.id");
+                        string targetZohoId = !string.IsNullOrEmpty(relatedId) ? relatedId : contactId;
+
+                        // Map the text fields so TaskOwner, CreatedBy, etc., are not Null
+                        var newTask = new Radar_CRM.Models.Task
+                        {
+                            ZohoRecordId = zohoRecordId,
+                            Subject = GetValSafe(values, "Subject"),
+                            Status = GetValSafe(values, "Status"),
+                            Priority = GetValSafe(values, "Priority"),
+                            DueDate = DateTime.TryParse(GetValSafe(values, "DueDate"), out DateTime due) ? due : null,
+
+                            // IDs
+                            TaskOwnerId = validUserIds.Contains(GetValSafe(values, "TaskOwner.id")) ? GetValSafe(values, "TaskOwner.id") : null,
+                            CreatedById = GetValSafe(values, "CreatedBy.id"),
+                            ModifiedById = GetValSafe(values, "ModifiedBy.id"),
+
+                            // Text Names (Fixes the Null issues)
+                            TaskOwner = GetValSafe(values, "TaskOwner"),
+                            CreatedBy = GetValSafe(values, "CreatedBy"),
+                            ModifiedBy = GetValSafe(values, "ModifiedBy"),
+                            RelatedTo = GetValSafe(values, "RelatedTo"),
+
+                            // Dates
+                            CreatedTime = DateTime.TryParse(GetValSafe(values, "CreatedTime"), out DateTime ct) ? ct : DateTime.Now,
+                            ModifiedTime = DateTime.TryParse(GetValSafe(values, "ModifiedTime"), out DateTime mt) ? mt : null,
+                        };
+
+                        // DYNAMIC POLYMORPHIC LINKING
+                        if (!string.IsNullOrEmpty(targetZohoId))
+                        {
+                            if (accountLookup.TryGetValue(targetZohoId, out int aId)) newTask.AccountId = aId;
+                            else if (leadLookup.TryGetValue(targetZohoId, out int lId)) newTask.LeadId = lId;
+                        }
+
+                        // 🚀 Add to HashSet to prevent duplicate inserts if the CSV file itself contains duplicate rows
+                        if (!string.IsNullOrEmpty(zohoRecordId))
+                        {
+                            existingTasks.Add(zohoRecordId);
+                        }
+
+                        tasksToInsert.Add(newTask);
+                    }
+                }
+                _context.ChangeTracker.AutoDetectChangesEnabled = false;
+                await _context.Tasks.AddRangeAsync(tasksToInsert);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
+            }
+            finally { _context.ChangeTracker.AutoDetectChangesEnabled = true; }
+
+            // 🚀 Return counts so the UI knows what happened
+            return Json(new { success = true, insertedCount = tasksToInsert.Count, skippedCount = skippedCount });
+        }
+
+        // 🚀 FIX 2: Add the missing ParseCsvLine method inside the controller class
+        private string[] ParseCsvLine(string line)
+        {
+            var result = new List<string>();
+            bool inQuotes = false;
+            var currentItem = new System.Text.StringBuilder();
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '\"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '\"')
+                    {
+                        currentItem.Append('\"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    result.Add(currentItem.ToString());
+                    currentItem.Clear();
+                }
+                else
+                {
+                    currentItem.Append(c);
+                }
+            }
+            result.Add(currentItem.ToString());
+            return result.ToArray();
+        }
+
+
         // ==========================================
         // BULK DELETE
         // ==========================================

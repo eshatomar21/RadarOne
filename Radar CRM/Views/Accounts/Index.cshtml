@@ -937,6 +937,8 @@
                 @{
                     var predefinedLists = new Dictionary<string, string[]>
                     {
+                        { "AdCampaignName", new[] { "Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach" } },
+                        { "MetaCampaignName", new[] { "Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach" } },
                         { "DataSource", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
                         { "CurrentStatus", new[] { "User", "Non-User" } },
@@ -1778,6 +1780,8 @@
 
     // Global options list used for dynamic dropdown creation
     const criteriaFilterOptionsMap = {
+        "AdCampaignName": ["Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach"],
+        "MetaCampaignName": ["Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach"],
         "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
         "CurrentStatus": ["User", "Non-User"],
@@ -1952,7 +1956,7 @@
     }
 
     // 🚀 FIX 2: Properly construct AND/OR array without sending empty strings crashing the backend
-   function saveAndApplyCustomView() {
+ function saveAndApplyCustomView() {
         const viewName = document.getElementById('customViewName').value.trim();
         if (!viewName) {
             alert("Please enter a Custom View Name.");
@@ -1962,11 +1966,15 @@
         const activeFilters = [];
 
         document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').forEach((row, index) => {
-            const field = row.querySelector('.cv-field').value;
+            let field = row.querySelector('.cv-field').value;
             const condition = row.querySelector('.cv-condition').value;
             const val = row.querySelector('.cv-value').value;
 
-            // Ensure AND/OR is captured properly for the backend
+            // 🚀 FIX: Map navigational names to Foreign Keys
+            if (field === "AccountOwner" || field === "CoOwner" || field === "LeadOwner" || field === "DemoOwner") {
+                field += "Id";
+            }
+
             let logicOperator = "AND"; 
             if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
@@ -2051,7 +2059,7 @@
     }
 
     // 🚀 NEW: Restores the checked state of filters in the sidebar after page load
-    function restoreSidebarFiltersFromUrl() {
+   function restoreSidebarFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const filtersParam = urlParams.get('advancedFilters');
         
@@ -2059,21 +2067,37 @@
             try {
                 const activeFilters = JSON.parse(filtersParam);
                 activeFilters.forEach(f => {
-                    // Find the checkbox for this column
-                    const chk = document.getElementById('chk_' + f.ColumnName);
+                    // 🚀 FIX: Strip "Id" when looking for the checkbox in the UI
+                    let searchColName = f.ColumnName;
+                    if (searchColName.endsWith("Id") && !document.getElementById('chk_' + searchColName)) {
+                        searchColName = searchColName.replace("Id", "");
+                    }
+
+                    const chk = document.getElementById('chk_' + searchColName);
                     if (chk) {
                         chk.checked = true;
                         const item = chk.closest('.filter-field-item');
                         item.classList.add('active'); // Expands the row
 
-                        // Set the condition
                         const condSelect = item.querySelector('.condition-select');
-                        if (condSelect) condSelect.value = f.Condition;
+                        if (condSelect) {
+                            Array.from(condSelect.options).forEach(opt => {
+                                if (opt.value.toLowerCase() === f.Condition.toLowerCase()) condSelect.value = opt.value;
+                            });
+                        }
 
-                        // Set the value
                         if (f.IsDate) {
+                            const vals = f.Value.split('|');
                             const date1 = item.querySelector('.date-val-1');
-                            if (date1) date1.value = f.Value;
+                            if (date1) date1.value = vals[0];
+                            
+                            if (vals.length > 1) {
+                                const date2 = item.querySelector('.date-val-2');
+                                if (date2) {
+                                    date2.value = vals[1];
+                                    date2.style.display = 'block';
+                                }
+                            }
                         } else {
                             const textVal = item.querySelector('.condition-val');
                             if (textVal) textVal.value = f.Value;
@@ -2085,7 +2109,6 @@
             }
         }
     }
-
     // ==========================================
     // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
     // ==========================================
@@ -2173,7 +2196,7 @@
     // ==========================================
     // INITIALIZATION LISTENER
     // ==========================================
-  document.addEventListener("DOMContentLoaded", function () {
+ document.addEventListener("DOMContentLoaded", function () {
         allRows = Array.from(document.querySelectorAll('tbody tr.account-row'));
 
         const style = document.createElement('style');
@@ -2181,6 +2204,9 @@
         document.head.appendChild(style);
 
         allRows.forEach(r => r.style.display = 'none');
+
+        // 🚀 FIX: Restore the saved column order BEFORE building the dropdown menu
+        restoreColumnOrder();
 
         const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols') || '[]');
         hiddenCols = new Set(savedHidden);
@@ -2196,7 +2222,7 @@
         renderCustomViews();
         renderSavedSidebarFilters();
         
-        // 🚀 NEW: Call the function to re-check the boxes from the URL
+        // Call the function to re-check the boxes from the URL
         restoreSidebarFiltersFromUrl();
     });
 
@@ -2328,19 +2354,31 @@
         taskModal.show();
     }
 
-    function applyFilters() {
+   function applyFilters() {
         const activeFilters = [];
         document.querySelectorAll('.filter-field-item.active').forEach(item => {
             const cb = item.querySelector('.field-checkbox');
             if (cb && cb.checked) {
-                const colName = cb.value;
+                let colName = cb.value;
                 const condition = item.querySelector('.condition-select').value;
                 const isDate = item.dataset.fieldType === "date";
 
+                // Safely grab correct values for dates vs text
                 let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
 
+                // 🚀 FIX: Map navigational properties directly to their Foreign Keys
+                if (colName === "AccountOwner" || colName === "CoOwner" || colName === "LeadOwner" || colName === "DemoOwner") {
+                    colName += "Id";
+                }
+
+                // 🚀 FIX: Capture val2 for 'between' date conditions
+                if (isDate && condition.toLowerCase().includes('between')) {
+                    const val2 = item.querySelector('.date-val-2')?.value || '';
+                    val1 = val1 + "|" + val2;
+                }
+
                 activeFilters.push({
-                    LogicalOperator: "AND", // Standard sidebar applies AND logic
+                    LogicalOperator: "AND", // Sidebar always stacks as AND
                     ColumnName: colName,
                     Condition: condition,
                     Value: val1,
@@ -2355,10 +2393,10 @@
         }
 
         const filterStr = JSON.stringify(activeFilters);
+        // 🚀 FIX: Corrected typo 'newSearchParams' to 'new URLSearchParams'
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.set('advancedFilters', filterStr);
         urlParams.set('page', 1);
-
         urlParams.set('_t', Date.now());
 
         document.body.style.cursor = 'wait';
@@ -2517,6 +2555,9 @@
             else this.before(draggedItem);
 
             reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+            
+            // 🚀 FIX: Save the new column order to LocalStorage immediately
+            saveColumnOrder();
         }
         return false;
     }
@@ -2981,6 +3022,44 @@
                 console.error("Bootstrap is not loaded properly.", error);
             }
         }
+    }
+
+    // ==========================================
+    // 🚀 NEW: SAVE & RESTORE COLUMN ORDER
+    // ==========================================
+    function saveColumnOrder() {
+        const menu = document.getElementById("columnToggleMenu");
+        const items = menu.querySelectorAll("li.draggable-col-item");
+        const order = Array.from(items).map(li => li.dataset.colIndex);
+        localStorage.setItem('crm_col_order_accounts', JSON.stringify(order));
+    }
+
+    function restoreColumnOrder() {
+        const savedOrder = JSON.parse(localStorage.getItem('crm_col_order_accounts'));
+        if (!savedOrder || savedOrder.length === 0) return;
+
+        const table = document.querySelector("#accountsTable");
+        const theadRow = table.querySelector("thead tr");
+        const actionsTh = theadRow.querySelector('.sticky-actions');
+
+        // 1. Reorder the TH headers
+        savedOrder.forEach(colIdx => {
+            const th = theadRow.querySelector(`th[data-col-index="${colIdx}"]`);
+            if (th && actionsTh) {
+                theadRow.insertBefore(th, actionsTh);
+            }
+        });
+
+        // 2. Reorder the TD cells in all rows
+        allRows.forEach(row => {
+            const actionsTd = row.querySelector('.sticky-actions');
+            savedOrder.forEach(colIdx => {
+                const td = row.querySelector(`td[data-col-index="${colIdx}"]`);
+                if (td && actionsTd) {
+                    row.insertBefore(td, actionsTd);
+                }
+            });
+        });
     }
 
         async function openNotesPanel(accountId, accountName) {

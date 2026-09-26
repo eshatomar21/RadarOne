@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies; // 🚀 ADDED THIS
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
 using Radar_CRM.Services;
@@ -13,16 +14,28 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// 🚀 ADDED THIS: Configure Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Users/Login"; // Redirects here if not logged in
-        options.ExpireTimeSpan = TimeSpan.FromDays(1); // Keeps user logged in for 1 day
+        // FIX 1: Unique name prevents collision with HRMS
+        options.Cookie.Name = "RadarOne_SSO_Auth";
+
+        // FIX 2: Ensure the cookie applies to the whole application
+        options.Cookie.Path = "/";
+
+        options.LoginPath = "/Users/Login";
+        options.AccessDeniedPath = "/Users/Login";
     });
 
 // Add this line where your other services are registered (like builder.Services.AddControllersWithViews();)
 builder.Services.AddScoped<IHierarchyService, HierarchyService>();
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = 104857600; // 100 MB limit
+    options.MemoryBufferThreshold = int.MaxValue;
+});
 
 var app = builder.Build();
 

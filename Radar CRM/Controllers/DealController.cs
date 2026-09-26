@@ -343,34 +343,57 @@ namespace Radar_CRM.Controllers
         // UPLOAD FILE: Mapped for Deals_2026_09_10.csv
         // ==========================================
         [HttpPost]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var dealsToInsert = new List<Deal>();
+            var dealsToUpdate = new List<Deal>();
+            var skippedRecords = new List<string>();
             int currentRow = 1;
 
-            // Cache valid IDs to prevent DB hanging
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
-            var validAccountIds = new HashSet<int>(_context.Accounts.Select(a => a.Id));
+
+            // UPSERT DICTIONARY: Load existing Deals by Zoho ID
+            var existingDealsDb = await _context.Deals
+                .Where(d => !string.IsNullOrEmpty(d.ZohoRecordId))
+                .AsNoTracking()
+                .GroupBy(d => d.ZohoRecordId)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
+
+            // Lookups for linking
+            var accountLookup = _context.Accounts.Where(a => a.ZohoRecordId != null).ToDictionary(a => a.ZohoRecordId, a => a.Id);
+            var leadLookup = _context.Leads.Where(l => l.ZohoRecordId != null).ToDictionary(l => l.ZohoRecordId, l => l.Id);
 
             try
             {
-                using (var reader = new System.IO.StreamReader(uploadedFile.OpenReadStream()))
+                using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    // 🚀 SMART FIX: Dynamically read headers so it never breaks when Zoho changes column order!
                     var headerLine = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
 
-                    // Create a lowercase lookup list of the headers
-                    var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower()).ToList();
+                    // 🚀 ENCODING FIX: Strips everything except Letters and Digits so "Unit Price(â‚¹)" becomes "unitprice"
+                    var headers = ParseCsvLine(headerLine)
+                        .Select(h => new string(h.Where(char.IsLetterOrDigit).ToArray()).ToLower())
+                        .ToList();
 
-                    // Inner helper function to safely grab value by exact column name
                     string GetValSafe(string[] vals, string colName)
                     {
-                        var normalizedTarget = colName.Replace(" ", "").ToLower();
-                        var idx = headers.FindIndex(h => h.Replace(" ", "").ToLower() == normalizedTarget);
+                        // Normalize the requested column name to match the stripped headers
+                        var normalizedColName = new string(colName.Where(char.IsLetterOrDigit).ToArray()).ToLower();
+                        var idx = headers.IndexOf(normalizedColName);
                         return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
+
+                    decimal? GetDecimalSafe(string[] vals, string colName)
+                    {
+                        string raw = GetValSafe(vals, colName);
+                        if (string.IsNullOrWhiteSpace(raw)) return null;
+                        // Strip currency symbols and commas from the actual data value
+                        string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
+                        return decimal.TryParse(clean, out decimal result) ? result : null;
                     }
 
                     while (!reader.EndOfStream)
@@ -380,74 +403,114 @@ namespace Radar_CRM.Controllers
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         var values = ParseCsvLine(line);
+                        string zohoRecordId = GetValSafe(values, "RecordId");
 
-                        string rawDealOwnerId = GetValSafe(values, "DealsOwner.id");
-                        int? parsedAccountId = int.TryParse(GetValSafe(values, "AccountName.id"), out int accId) ? accId : null;
-
-                        var newDeal = new Deal
+                        if (string.IsNullOrEmpty(zohoRecordId))
                         {
-                            ZohoRecordId = GetValSafe(values, "RecordId"),
+                            skippedRecords.Add($"Row {currentRow}: Skipped (Missing Record ID)");
+                            continue;
+                        }
 
-                            // --- Core Identifiers ---
-                            DealName = GetValSafe(values, "DealName"),
+                        bool isUpdate = false;
+                        Deal deal;
 
-                            // 🚀 This will now safely capture the text name regardless of spaces in the header
-                            AccountName = GetValSafe(values, "AccountName"),
+                        // UPSERT LOGIC
+                        if (existingDealsDb.TryGetValue(zohoRecordId, out var existingDeal))
+                        {
+                            deal = existingDeal;
+                            isUpdate = true;
+                        }
+                        else
+                        {
+                            deal = new Deal();
+                        }
 
-                            // --- Relational IDs ---
-                            DealOwnerId = validUserIds.Contains(rawDealOwnerId) ? rawDealOwnerId : null,
-                            AccountId = parsedAccountId.HasValue && validAccountIds.Contains(parsedAccountId.Value) ? parsedAccountId.Value : null,
+                        // Grab relational IDs from Zoho CSV
+                        string rawAccountId = GetValSafe(values, "AccountNameid"); // Safe alphanumeric request
+                        string rawLeadId = GetValSafe(values, "LeadNameid");
+                        string rawDealOwnerId = GetValSafe(values, "DealsOwnerid");
+                        string rawDemoOwnerId = GetValSafe(values, "DemoOwnerid");
 
-                            // 🚀 Grabs the text names for the Owners
-                            DemoOwner = GetValSafe(values, "DemoOwner"),
-                            AccountOwner = GetValSafe(values, "AccountOwner"),
+                        // --- Core Identity & Mapping ---
+                        deal.ZohoRecordId = zohoRecordId;
+                        deal.DealName = GetValSafe(values, "DealName");
+                        deal.AccountId = accountLookup.TryGetValue(rawAccountId, out int accId) ? accId : null;
+                        deal.LeadId = leadLookup.TryGetValue(rawLeadId, out int lId) ? lId : null;
+                        deal.DealOwnerId = validUserIds.Contains(rawDealOwnerId) ? rawDealOwnerId : null;
+                        deal.DemoOwnerId = validUserIds.Contains(rawDemoOwnerId) ? rawDemoOwnerId : null;
 
-                            // --- Profile & Text Info ---
-                            LeadSource = GetValSafe(values, "LeadSource"),
-                            AccountType = GetValSafe(values, "AccountType"),
-                            LeadName = GetValSafe(values, "LeadName"),
-                            ContactPersonName = GetValSafe(values, "ContactPersonName"),
-                            MetaCampaignName = GetValSafe(values, "MetaCampaignName"),
+                        // --- Text Names & Ownership ---
+                        deal.AccountName = GetValSafe(values, "AccountName");
+                        deal.LeadName = GetValSafe(values, "LeadName");
+                        deal.ContactPersonName = GetValSafe(values, "ContactPersonName");
+                        deal.MetaCampaignName = GetValSafe(values, "MetaCampaignName");
+                        deal.AccountOwner = GetValSafe(values, "AccountOwner");
+                        deal.DemoOwner = GetValSafe(values, "DemoOwner");
+                        deal.CreatedBy = GetValSafe(values, "CreatedBy");
 
-                            // --- Status & Types ---
-                            PaymentStatus = GetValSafe(values, "PaymentStatus"),
-                            PaymentType = GetValSafe(values, "PaymentType"),
-                            PaymentMode = GetValSafe(values, "paymentMode"),
+                        // --- Dates ---
+                        deal.DateOfEntry = DateTime.TryParse(GetValSafe(values, "CreatedTime"), out DateTime doe) ? doe : DateTime.Now;
+                        deal.ModifiedTime = DateTime.TryParse(GetValSafe(values, "ModifiedTime"), out DateTime mod) ? mod : null;
 
-                            // --- Additional Info ---
-                            Remarks = GetValSafe(values, "Remarks"),
-                            ApprovedBy = GetValSafe(values, "ApprovedBy"),
-                            ApprovalRequired = GetValSafe(values, "ApprovalRequired?"),
+                        // --- Dropdowns & Info ---
+                        deal.AccountType = GetValSafe(values, "AccountType");
+                        deal.LeadSource = GetValSafe(values, "LeadSource");
+                        deal.DealType = GetValSafe(values, "DealType");
+                        deal.PaymentMode = GetValSafe(values, "paymentMode");
+                        deal.PaymentType = GetValSafe(values, "PaymentType");
+                        deal.PaymentStatus = GetValSafe(values, "PaymentStatus");
+                        deal.Remarks = GetValSafe(values, "Remarks");
+                        deal.ApprovalRequired = GetValSafe(values, "ApprovalRequired");
+                        deal.ApprovedBy = GetValSafe(values, "ApprovedBy");
 
-                            // --- Financials ---
-                            SubTotal = decimal.TryParse(GetValSafe(values, "SubTotal"), out decimal subTotal) ? subTotal : 0m,
-                            Taxes = decimal.TryParse(GetValSafe(values, "Taxs"), out decimal taxes) ? taxes : 0m,
-                            Adjustment = decimal.TryParse(GetValSafe(values, "Adjustment"), out decimal adj) ? adj : 0m,
-                            GrandTotal = decimal.TryParse(GetValSafe(values, "GrandTotal"), out decimal grandTot) ? grandTot : 0m
-                        };
+                        // --- Products ---
+                        deal.ProductName = GetValSafe(values, "ProductName");
+                        deal.AddonModuleName = GetValSafe(values, "AddonModuleName");
+                        deal.CurrentPackage = GetValSafe(values, "CurrentPackage");
+                        deal.Quantity = GetDecimalSafe(values, "Quantity");
+                        deal.ProductCode = GetValSafe(values, "ProductCode");
+                        deal.InvoiceNumber = GetValSafe(values, "InvoiceNumber");
 
-                        dealsToInsert.Add(newDeal);
+                        // 🚀 --- Financials (Using clean alphanumeric requests) ---
+                        deal.UnitPrice = GetDecimalSafe(values, "UnitPrice");
+                        deal.Discount = GetDecimalSafe(values, "Discount");
+                        deal.SubTotal = GetDecimalSafe(values, "SubTotal");
+                        deal.Taxes = GetDecimalSafe(values, "Taxs") ?? 0m;
+                        deal.Adjustment = GetDecimalSafe(values, "Adjustment") ?? 0m;
+                        deal.GrandTotal = GetDecimalSafe(values, "GrandTotal") ?? 0m;
+                        deal.GstAmount = GetDecimalSafe(values, "GSTAmount");
+                        deal.FinalAmount = GetDecimalSafe(values, "FinalAmount");
+                        deal.TotalWithGst = GetDecimalSafe(values, "TotalwithGST");
+
+                        // Route to correct list
+                        if (isUpdate) dealsToUpdate.Add(deal);
+                        else dealsToInsert.Add(deal);
                     }
                 }
 
-                // 🚀 Turn off tracking during bulk insert to stop EF Core from freezing
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                await _context.Deals.AddRangeAsync(dealsToInsert);
+                // Execute Inserts & Updates
+                if (dealsToInsert.Any()) await _context.Deals.AddRangeAsync(dealsToInsert);
+                if (dealsToUpdate.Any()) _context.Deals.UpdateRange(dealsToUpdate);
+
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
+                return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
             }
-            finally
-            {
-                _context.ChangeTracker.AutoDetectChangesEnabled = true;
-            }
+            finally { _context.ChangeTracker.AutoDetectChangesEnabled = true; }
 
-            return Ok();
+            return Json(new
+            {
+                success = true,
+                insertedCount = dealsToInsert.Count,
+                updatedCount = dealsToUpdate.Count,
+                skippedCount = skippedRecords.Count
+            });
         }
+
 
         // ==========================================
         // 🚀 AJAX: BULK DELETE (Fixed FK Constraint)
@@ -648,30 +711,42 @@ namespace Radar_CRM.Controllers
         // 🚀 AJAX: SAVE NEW NOTE FROM SIDE PANEL
         // ==========================================
         [HttpPost]
-        public async Task<IActionResult> SaveNoteAjax(int dealId, string description, string ownerId)
+        [IgnoreAntiforgeryToken] // Prevents 400 Bad Request with JS Fetch
+        public async Task<IActionResult> SaveNoteAjax(int dealId, string description, string ownerId, IFormFile attachment)
         {
             try
             {
-                // 🚀 STRICT FK CHECK: Confirm the ownerId is an actual User ID in the database
                 string safeOwnerId = null;
+                string ownerName = "System";
+
+                // 🚀 Lookup the actual User to get their real name instead of a GUID
                 if (!string.IsNullOrWhiteSpace(ownerId))
                 {
-                    if (await _context.Users.AnyAsync(u => u.Id == ownerId))
+                    var owner = await _context.Users.FindAsync(ownerId);
+                    if (owner != null)
                     {
-                        safeOwnerId = ownerId;
+                        safeOwnerId = owner.Id;
+                        ownerName = !string.IsNullOrWhiteSpace(owner.FirstName) ? owner.FirstName : owner.fullName;
                     }
                 }
 
-                // 🚀 FIXED: Use 'Notes' entity instead of 'DealNote'
+                string fileName = null;
+                if (attachment != null && attachment.Length > 0)
+                {
+                    fileName = attachment.FileName;
+                    // Add physical file saving logic here later if needed
+                }
+
                 var newNote = new Notes
                 {
                     DealId = dealId,
                     Description = description,
                     NoteOwnerId = safeOwnerId,
-                    CreatedDateTime = DateTime.Now
+                    CreatedDateTime = DateTime.Now,
+                    AttachmentFileName = fileName
                 };
 
-                _context.Note.Add(newNote); // FIXED: Save to _context.Note
+                _context.Note.Add(newNote);
                 await _context.SaveChangesAsync();
 
                 return Json(new
@@ -679,10 +754,10 @@ namespace Radar_CRM.Controllers
                     success = true,
                     note = new
                     {
-                        ownerName = safeOwnerId != null ? safeOwnerId : "System",
+                        ownerName = ownerName,
                         createdDateTime = newNote.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
                         description = newNote.Description,
-                        attachmentFileName = ""
+                        attachmentFileName = fileName ?? ""
                     }
                 });
             }
@@ -733,6 +808,62 @@ namespace Radar_CRM.Controllers
                         {
                             if (row.Id == 0) _context.DealPaymentRows.Add(row);
                             else _context.Update(row);
+                        }
+                    }
+
+                    // =========================================================
+                    // 🚀 NEW: SYNC FINANCIALS & PRODUCTS BACK TO THE LINKED LEAD
+                    // =========================================================
+                    if (deal.LeadId != null && deal.LeadId > 0)
+                    {
+                        var linkedLead = await _context.Leads
+                            .Include(l => l.PaymentRow) // Load the lead's payment rows
+                            .FirstOrDefaultAsync(l => l.Id == deal.LeadId);
+
+                        if (linkedLead != null)
+                        {
+                            // 1. Sync scalar financial and payment fields
+                            linkedLead.PaymentMode = deal.PaymentMode;
+                            linkedLead.PaymentType = deal.PaymentType;
+                            linkedLead.PaymentStatus = deal.PaymentStatus;
+                            linkedLead.SubTotal = deal.SubTotal;
+                            linkedLead.Taxes = deal.Taxes;
+                            linkedLead.Adjustment = deal.Adjustment;
+                            linkedLead.GrandTotal = deal.GrandTotal;
+
+                            // 2. Sync the Product Payment Rows
+                            if (deal.PaymentRows != null)
+                            {
+                                // Wipe out existing rows for this lead to perfectly mirror the Deal state
+                                if (linkedLead.PaymentRow != null && linkedLead.PaymentRow.Any())
+                                {
+                                    _context.RemoveRange(linkedLead.PaymentRow);
+                                }
+
+                                // Create fresh mirrored rows for the Lead
+                                foreach (var dealRow in deal.PaymentRows)
+                                {
+                                    _context.Add(new ProductPaymentRow
+                                    {
+                                        LeadId = linkedLead.Id,
+                                        AccountId = linkedLead.AccountId, // Keep the account link intact
+                                        ProductId = dealRow.ProductId,
+                                        ProductName = dealRow.ProductName,
+                                        DealType = dealRow.DealType,
+                                        
+                                        // 🚀 FIX: Explicitly cast the decimal? to int?
+                                        Quantity = (int?)dealRow.Quantity,
+
+                                        ProductPrice = dealRow.UnitPrice,
+                                        Total = dealRow.Amount,
+                                        DiscountPercent = dealRow.Discount,
+                                        FinalAmount = dealRow.Total
+                                    });
+                                }
+                            }
+
+                            // Flag the lead as updated
+                            _context.Update(linkedLead);
                         }
                     }
 

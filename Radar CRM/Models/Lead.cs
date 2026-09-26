@@ -16,18 +16,18 @@ namespace Radar_CRM.Models
         public string? AccountType { get; set; }
         public string? MobileNumber { get; set; }
         public string? EmailID { get; set; }
-        public string? SocialLeadID { get; set; }
         public string? CampaignSource { get; set; }
         public string? CurrentStatus { get; set; }
 
         [DataType(DataType.DateTime)]
         public DateTime? CreatedDateAndTime { get; set; }
+        [DataType(DataType.DateTime)]
+        public DateTime? ModifiedTime { get; set; }
 
         public DateOnly? TrialStartDate { get; set; }
         public DateOnly? TrialEndDate { get; set; }
 
         public string? CreatedBy { get; set; }
-
         public string? ModifiedBy { get; set; }
 
         public DateTime? DemoScheduledDate { get; set; }
@@ -70,7 +70,6 @@ namespace Radar_CRM.Models
 
         public virtual ICollection<Notes> Notes { get; set; } = new List<Notes>();
         public virtual ICollection<Task> Tasks { get; set; } = new List<Task>();
-
         public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>();
 
         // --- Relational Links ---
@@ -78,28 +77,20 @@ namespace Radar_CRM.Models
         [ForeignKey("AccountId")]
         public virtual Account? Account { get; set; }
 
-        // 1. Lead Owner
         public string? LeadOwnerId { get; set; }
-
         [ForeignKey("LeadOwnerId")]
         [InverseProperty("OwnedLeads")]
         public virtual User? LeadOwner { get; set; }
 
-        // 2. Account Owner
         public string? AccountOwnerId { get; set; }
-
         [ForeignKey("AccountOwnerId")]
         public virtual User? AccountOwner { get; set; }
 
-        // 3. Co-Owner
         public string? CoOwnerId { get; set; }
-
         [ForeignKey("CoOwnerId")]
         public virtual User? CoOwner { get; set; }
 
-        // 4. Demo Owner
         public string? DemoOwnerId { get; set; }
-
         [ForeignKey("DemoOwnerId")]
         public virtual User? DemoOwner { get; set; }
 
@@ -143,19 +134,17 @@ namespace Radar_CRM.Models
         public decimal? DealValue { get; set; }
         public string? PackageSelected { get; set; }
         public decimal? Discount { get; set; }
-
         public string? SeminarName { get; set; }
 
         [NotMapped]
         public List<Notes> Note { get; set; } = new List<Notes>();
 
-        // --- Product Payments Section (Dynamic Table Summary) ---
+        // --- Product Payments Section ---
         public decimal? SubTotal { get; set; }
         public decimal? Taxes { get; set; }
         public decimal? Adjustment { get; set; }
         public decimal? GrandTotal { get; set; }
 
-        // 🚀 FIXED: Changed to virtual ICollection and explicitly mapped the InverseProperty
         [InverseProperty("Lead")]
         public virtual IList<ProductPaymentRow> PaymentRow { get; set; } = new List<ProductPaymentRow>();
 
@@ -183,25 +172,50 @@ namespace Radar_CRM.Models
         public string? InterestedPackage { get; set; }
         public string? LostReason { get; set; }
         public string? LeadProfile { get; set; }
+        public string? NotInterestedReason { get; set; }
 
-        
+        // --- AD & CAMPAIGN TRACKING ---
+        public string? SocialLeadID { get; set; }
+        public string? Gclid { get; set; }
+        public string? Zcampaignid { get; set; }
+        public string? Adgroupid { get; set; }
+        public string? Adid { get; set; }
+        public string? Keywordid { get; set; }
+        public string? Keyword { get; set; }
+        public string? ClickType { get; set; }
+        public string? DeviceType { get; set; }
+        public string? AdNetwork { get; set; }
+        public string? SearchPartnerNetwork { get; set; }
+        public string? AdCampaignName { get; set; }
+        public string? AdGroupName { get; set; }
+        public string? Ad { get; set; }
+        public string? Gadconfigid { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? AdClickDate { get; set; }
+        public decimal? CostPerClick { get; set; }
+        public decimal? CostPerConversion { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? ConversionExportedOn { get; set; }
+        public string? ConversionExportStatus { get; set; }
+        public string? ReasonForConversionFailure { get; set; }
 
         // ==============================================
         // UI Display Properties (Not saved in DB)
         // ==============================================
         [NotMapped]
         public int? DealId { get; set; }
-
         [NotMapped]
         public string? DealName { get; set; }
-
         [NotMapped]
         public string? AccountName { get; set; }
 
         // --- Description ---
         public string? Description { get; set; }
-    }
+    } // <--- THIS CLOSES THE LEAD CLASS
 
+    // THIS MUST BE OUTSIDE THE LEAD CLASS
     public class ProductPaymentRow
     {
         [Key]
@@ -211,7 +225,7 @@ namespace Radar_CRM.Models
         public int LeadId { get; set; }
 
         [ForeignKey("LeadId")]
-        [InverseProperty("PaymentRow")] // 🚀 Must match the exact name of the ICollection in Lead.cs
+        [InverseProperty("PaymentRow")]
         public virtual Lead? Lead { get; set; }
 
         // --- 2. Account Relationship (NEW) ---
@@ -237,5 +251,5 @@ namespace Radar_CRM.Models
         public decimal? Total { get; set; }
         public decimal? DiscountPercent { get; set; }
         public decimal? FinalAmount { get; set; }
-    }
-}
+    } // <--- THIS CLOSES PRODUCTPAYMENTROW CLASS
+} // <--- THIS CLOSES THE NAMESPACE

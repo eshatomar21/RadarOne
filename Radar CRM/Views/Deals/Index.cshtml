@@ -1099,7 +1099,7 @@
         </div>
 
         <!-- The Data Table -->
-        <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow-y: auto;">
+      <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow: auto;">
             <table class="table" id="dealsTable">
                 <thead>
                     <tr>
@@ -1717,8 +1717,7 @@
             });
         }
     }
-
-    document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function () {
         allRows = Array.from(document.querySelectorAll('tbody tr.deal-row'));
 
         const style = document.createElement('style');
@@ -1726,8 +1725,9 @@
         document.head.appendChild(style);
 
         formatUserAndAccountIDs();
-
         allRows.forEach(r => r.style.display = 'none');
+
+        restoreColumnOrder(); // 🚀 RESTORES THE SAVED ORDER BEFORE BUILDING MENU
 
         const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols_deals') || '[]');
         hiddenCols = new Set(savedHidden);
@@ -1738,11 +1738,8 @@
         refreshVisibleRows();
         setupFileUpload();
         restorePinnedFilters();
-
         renderCustomViews();
         renderSavedSidebarFilters();
-        
-        // Restore Sidebar filters on load
         restoreSidebarFiltersFromUrl();
     });
 
@@ -1977,6 +1974,169 @@
                 });
             } catch(e) { console.error("Error restoring filters", e); }
         }
+    }
+
+    // ==========================================
+    // 🚀 FIX 3: NOTES PANEL ROUTED TO DEALS
+    // ==========================================
+    async function openNotesPanel(dealId, dealName) {
+        currentNoteDealId = dealId; // 🚀 Using the correct global variable
+        document.getElementById('noteAccountName').innerText = dealName || 'Deal';
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+
+        const list = document.getElementById('notesTimelineList');
+        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+        const panelEl = document.getElementById('notesPanel');
+        document.body.appendChild(panelEl);
+        panelEl.style.zIndex = "1055"; 
+
+        let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl);
+        if (!bsOffcanvas) {
+            bsOffcanvas = new bootstrap.Offcanvas(panelEl);
+        }
+        bsOffcanvas.show();
+
+        try {
+            // 🚀 Targeting Deals controller with dealId
+            const response = await fetch(`/Deals/GetNotes?dealId=${dealId}`);
+            if (!response.ok) throw new Error("Failed to fetch");
+
+            const responseData = await response.json();
+            const notesArray = Array.isArray(responseData)
+                ? responseData
+                : (responseData.data || responseData.notes || responseData.Data || responseData.Notes || []);
+
+            if (notesArray && notesArray.length > 0) {
+                let allNotesHtml = '';
+                notesArray.forEach(n => {
+                    const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
+                    const time = n.createdDateTime || n.CreatedDateTime || n.createdDate || 'Unknown Date';
+                    const desc = n.description || n.Description || n.noteText || '';
+                    const file = n.attachmentFileName || n.AttachmentFileName || null;
+
+                    let attachmentHtml = file ? `
+                        <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155;">
+                            <i class="fa-solid fa-file-lines text-muted"></i>
+                            <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
+                        </div>` : '';
+
+                    allNotesHtml += `
+                        <div class="position-relative mb-4">
+                            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                            <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                                        <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                            <i class="fa-solid fa-user"></i>
+                                        </div>
+                                        ${owner}
+                                    </div>
+                                    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                                        <i class="fa-regular fa-clock me-1"></i>${time}
+                                    </span>
+                                </div>
+                                <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
+                                ${attachmentHtml}
+                            </div>
+                        </div>`;
+                });
+                list.innerHTML = allNotesHtml;
+            } else {
+                list.innerHTML = `
+                    <div class="position-relative mb-4">
+                        <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
+                        <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
+                    </div>`;
+            }
+        } catch(e) {
+            console.error("Notes rendering error:", e);
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes. Check console for details.</p>';
+        }
+    }
+
+    async function saveNoteAjax() {
+        const text = document.getElementById('newNoteText').value;
+        const attachment = document.getElementById('noteAttachment').files[0];
+        const ownerId = document.getElementById('noteOwnerId').value;
+        const btn = document.getElementById('btnSaveNote');
+
+        if (!text.trim() && !attachment) return;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        // 🚀 Target DealId instead of AccountId
+        formData.append('dealId', currentNoteDealId);
+        formData.append('description', text);
+        formData.append('ownerId', ownerId);
+        if (attachment) formData.append('attachment', attachment);
+
+        try {
+            // 🚀 Fetch to Deals Controller
+            const response = await fetch('@Url.Action("SaveNoteAjax", "Deals")', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.note) {
+                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+                if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) {
+                    fallbackMsg.closest('.position-relative').remove();
+                }
+
+                const owner = data.note.ownerName || data.note.OwnerName || 'System';
+                const time = data.note.createdDateTime || data.note.CreatedDateTime || data.note.createdDate || data.note.CreatedDate || 'Just now';
+                const desc = data.note.description || data.note.Description || text;
+                const file = data.note.attachmentFileName || data.note.AttachmentFileName || null;
+
+                appendNoteToUI(owner, time, desc, file);
+
+                document.getElementById('newNoteText').value = '';
+                document.getElementById('noteAttachment').value = '';
+            } else {
+                alert("Failed to save note: " + (data.message || "Unknown error"));
+            }
+        } catch(e) {
+            console.error("Notes save error:", e);
+            alert("Network error while saving note.");
+        } finally {
+            btn.innerHTML = 'Save Note';
+            btn.disabled = false;
+        }
+    }
+
+    function appendNoteToUI(ownerName, timeString, text, fileName) {
+        let attachmentHtml = fileName ? `
+            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155;">
+                <i class="fa-solid fa-file-lines text-muted"></i>
+                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+            </div>` : '';
+
+        const noteHtml = `
+            <div class="position-relative mb-4">
+                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            ${ownerName}
+                        </div>
+                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                            <i class="fa-regular fa-clock me-1"></i>${timeString}
+                        </span>
+                    </div>
+                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+                    ${attachmentHtml}
+                </div>
+            </div>`;
+
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
 
 
@@ -2652,6 +2812,40 @@
         });
     }
 
+    // ==========================================
+    // 🚀 FIX 2: SAVE & RESTORE COLUMN ORDER
+    // ==========================================
+    function saveColumnOrder() {
+        const menu = document.getElementById("columnToggleMenu");
+        const items = menu.querySelectorAll("li.draggable-col-item");
+        const order = Array.from(items).map(li => li.dataset.colIndex);
+        localStorage.setItem('crm_col_order_deals', JSON.stringify(order));
+    }
+
+    function restoreColumnOrder() {
+        const savedOrder = JSON.parse(localStorage.getItem('crm_col_order_deals'));
+        if (!savedOrder || savedOrder.length === 0) return;
+
+        const table = document.querySelector("#dealsTable");
+        const theadRow = table.querySelector("thead tr");
+        const actionsTh = theadRow.querySelector('.sticky-actions');
+
+        // Reorder headers
+        savedOrder.forEach(colIdx => {
+            const th = theadRow.querySelector(`th[data-col-index="${colIdx}"]`);
+            if (th && actionsTh) theadRow.insertBefore(th, actionsTh);
+        });
+
+        // Reorder cells in all rows
+        allRows.forEach(row => {
+            const actionsTd = row.querySelector('.sticky-actions');
+            savedOrder.forEach(colIdx => {
+                const td = row.querySelector(`td[data-col-index="${colIdx}"]`);
+                if (td && actionsTd) row.insertBefore(td, actionsTd);
+            });
+        });
+    }
+
     function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
         const idxStr = idx.toString();
         if(isVisible) hiddenCols.delete(idxStr);
@@ -2731,7 +2925,7 @@
     function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
     function handleDragEnter(e) { this.classList.add('over'); }
     function handleDragLeave(e) { this.classList.remove('over'); }
-    function handleDrop(e) {
+   function handleDrop(e) {
         e.stopPropagation();
         this.classList.remove('over');
         if (draggedItem !== this) {
@@ -2743,6 +2937,8 @@
             else this.before(draggedItem);
 
             reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
+            
+            saveColumnOrder(); // 🚀 SAVES THE NEW ORDER
         }
         return false;
     }

@@ -8,6 +8,8 @@ namespace Radar_CRM.Models
         [Key]
         public int Id { get; set; } // Record Id
 
+        public string? ZohoRecordId { get; set; }
+
         // Ownership
         public string? TaskOwnerId { get; set; }
         public string? TaskOwner { get; set; }

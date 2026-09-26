@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -11,20 +12,15 @@ namespace Radar_CRM.Models
         public string? ZohoRecordId { get; set; } // Used for migration
 
         // --- Accounts - Master Details ---
-        public string? DataSource { get; set; } // Meta ads, Google ads
-        
-       
-        public string? AccountType { get; set; } // None, Individual, Group, Institutional, Government
+        public string? DataSource { get; set; }
+        public string? AccountType { get; set; }
 
         [DataType(DataType.DateTime)]
         public DateTime DateOfEntry { get; set; } = DateTime.Now;
-        public string? CurrentStatus { get; set; } // None, User, Non User
-        public string? ContactStatus { get; set; } // Readonly in UI
-
-        public string? MetaCampaignName {get; set;}
-
+        public string? CurrentStatus { get; set; }
+        public string? ContactStatus { get; set; }
+        public string? MetaCampaignName { get; set; }
         public string? SeminarName { get; set; }
-
         public string? LeadStatus { get; set; }
 
         [Column("Group_Name")]
@@ -33,7 +29,7 @@ namespace Radar_CRM.Models
         // --- Relational Ownership ---
         public string? AccountOwnerId { get; set; }
         [ForeignKey("AccountOwnerId")]
-        [InverseProperty("OwnedAccounts")] // 🚀 ADD THIS LINE
+        [InverseProperty("OwnedAccounts")]
         public virtual User? AccountOwner { get; set; }
 
         public string? CoOwnerId { get; set; }
@@ -61,7 +57,6 @@ namespace Radar_CRM.Models
         public string? Addr1_Latitude { get; set; }
         public string? Addr1_Longitude { get; set; }
 
-        // Optional: This allows you to see all payment rows associated with this account
         [InverseProperty("Account")]
         public virtual ICollection<ProductPaymentRow> PaymentRows { get; set; } = new List<ProductPaymentRow>();
 
@@ -96,6 +91,8 @@ namespace Radar_CRM.Models
         // --- Software Details ---
         public string? CurrentlyUsingSoftware { get; set; }
         public string? CurrentSoftwareName { get; set; }
+        public string? RadarOpusLicenseNo { get; set; }
+        public string? RadarOpusVersion { get; set; }
 
         // --- Product & Purchase Details ---
         public string? ProductPurchased { get; set; }
@@ -107,20 +104,16 @@ namespace Radar_CRM.Models
         public string? PaymentStatus { get; set; }
 
         public string? CreatedBy { get; set; }
-
         public string? ModifiedBy { get; set; }
 
-        // Inside your Account or Lead class...
-        [NotMapped] // Tells Entity Framework not to create a direct SQL column for this
+        [NotMapped]
         public List<Notes> Notes { get; set; } = new List<Notes>();
 
         // --- Profile Completion Tracking ---
         public int? ProfileCompletionPercentage { get; set; }
         public string? ReferralSource { get; set; }
         public string? InvoiceNumber { get; set; }
-
         public string? Profilestatus { get; set; }
-
         public int? ProfileRate { get; set; }
 
         // --- More Contact Details ---
@@ -135,9 +128,36 @@ namespace Radar_CRM.Models
         public string? Description { get; set; }
         public bool IsDuplicated { get; set; }
 
-        // --- Navigation Properties ---
-        // Entity Framework will now map Notes, Tasks, Leads, and Contacts directly to this Account
+        // 🚀 --- NEW: AD & CAMPAIGN TRACKING --- 🚀
+        public string? SocialLeadId { get; set; }
+        public string? LeadStage { get; set; }
+        public string? OldLeadStatus { get; set; }
+        public string? Gclid { get; set; }
+        public string? Zcampaignid { get; set; }
+        public string? Adgroupid { get; set; }
+        public string? Adid { get; set; }
+        public string? Keywordid { get; set; }
+        public string? Keyword { get; set; }
+        public string? ClickType { get; set; }
+        public string? DeviceType { get; set; }
+        public string? AdNetwork { get; set; }
+        public string? SearchPartnerNetwork { get; set; }
+        public string? AdCampaignName { get; set; }
+        public string? AdGroupName { get; set; }
+        public string? Ad { get; set; }
+        public string? Gadconfigid { get; set; }
 
+        [DataType(DataType.Date)]
+        public DateTime? AdClickDate { get; set; }
+        public decimal? CostPerClick { get; set; }
+        public decimal? CostPerConversion { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime? ConversionExportedOn { get; set; }
+        public string? ConversionExportStatus { get; set; }
+        public string? ReasonForConversionFailure { get; set; }
+
+        // --- Navigation Properties ---
         public virtual ICollection<Deal> Deals { get; set; } = new List<Deal>();
         public virtual ICollection<Lead> Leads { get; set; } = new List<Lead>();
         public virtual ICollection<Notes> Note { get; set; } = new List<Notes>();

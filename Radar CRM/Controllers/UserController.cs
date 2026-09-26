@@ -29,7 +29,9 @@ namespace Radar_CRM.Controllers
         // ==========================================
         public async Task<IActionResult> Index()
         {
-            if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
+            // Redirect to HRMS Launchpad if they aren't logged in
+            if (!User.Identity.IsAuthenticated)
+                return Redirect("http://pems:8081/");
 
             string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var currentUser = await _context.Users.FindAsync(currentUserId);
@@ -44,9 +46,9 @@ namespace Radar_CRM.Controllers
                            (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
                             currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
 
-            // 🚀 THE LOGIC: 
+            // 🚀 THE LOGIC:
             // If isAdmin is true (Profile = Admin), this IF block is completely skipped.
-            // This allows Admins like Sitara and Jaspal to see each other's data AND all other users, 
+            // This allows Admins like Sitara and Jaspal to see each other's data AND all other users,
             // regardless of where they sit in the Role hierarchy.
             if (!isAdmin)
             {
@@ -273,10 +275,20 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // GET: Users/Login
         // ==========================================
+        // ==========================================
+        // GET: Users/Login (Overrides the RadarONE Login Screen)
+        // ==========================================
         [HttpGet]
         public IActionResult Login()
         {
-            return View(new User());
+            // If they are already logged in, send to Launchpad Apps menu
+            if (User.Identity.IsAuthenticated)
+            {
+                return Redirect("http://pems:8081/Applications/Index");
+            }
+
+            // If they are not logged in, send to Launchpad Login
+            return Redirect("http://pems:8081/");
         }
 
         // ==========================================
@@ -333,7 +345,9 @@ namespace Radar_CRM.Controllers
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Login", "Users");
+
+            // Redirect back to HRMS Launchpad after logging out
+            return Redirect("http://pems:8081/");
         }
 
         // ==========================================
@@ -391,6 +405,58 @@ namespace Radar_CRM.Controllers
         private bool UserExists(string id)
         {
             return _context.Users.Any(e => e.Id == id);
+        }
+
+        // ==========================================
+        // POST: Users/SsoLogin (From External Launchpad)
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> SsoLogin(string username, string ssoToken, string returnUrl)
+        {
+            // 1. Define your shared secret (this must match the Javascript exact string)
+            string expectedToken = "BJain_Radar_Sso_Secret_2026!";
+
+            // 2. Validate Token and Username
+            if (ssoToken != expectedToken || string.IsNullOrEmpty(username))
+            {
+                // Invalid token or missing email -> Kick back to Launchpad
+                return Redirect("http://pems:8081/");
+            }
+
+            // 3. Find the user BY EMAIL ONLY (We trust HRMS, so no password check needed)
+            var user = await _context.Users.FirstOrDefaultAsync(u =>
+                u.Email == username &&
+                u.UserStatus != null && u.UserStatus.ToLower() == "active");
+
+            // 4. If user exists in RadarCRM, log them in
+            if (user != null)
+            {
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id),
+                    new Claim(ClaimTypes.Name, user.fullName ?? $"{user.FirstName} {user.LastName}"),
+                    new Claim(ClaimTypes.Email, user.Email ?? ""),
+                    new Claim(ClaimTypes.Role, user.Role ?? "User"),
+                    new Claim("Profile", user.Profile ?? "Standard"),
+                    new Claim(ClaimTypes.MobilePhone, user.Phone ?? "N/A")
+                };
+
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+                // Redirect to the target dashboard or default Home
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    return Redirect(returnUrl);
+                }
+
+                return RedirectToAction("Index", "Home");
+            }
+
+            // If user exists in HRMS but NOT in RadarONE database -> Kick back
+            return Redirect("http://pems:8081/");
         }
     }
 }

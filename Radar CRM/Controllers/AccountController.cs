@@ -92,16 +92,86 @@ namespace Radar_CRM.Controllers
                         {
                             if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
 
-                            var propertyInfo = typeof(Account).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            string dbColName = f.ColumnName;
+
+                            // 🚀 1. FOREIGN KEY TRANSLATION (e.g. "AccountOwner" -> "AccountOwnerId")
+                            var propertyInfo = typeof(Account).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                            {
+                                var idProp = typeof(Account).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (idProp != null)
+                                {
+                                    dbColName = idProp.Name;
+                                    propertyInfo = idProp;
+                                }
+                            }
+
                             if (propertyInfo == null) continue;
 
                             var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
                             System.Linq.Expressions.Expression conditionExpr = null;
+                            string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
 
-                            // 1. String & Dropdown Filtering
-                            if (propertyInfo.PropertyType == typeof(string))
+                            // 🚀 2. DATES (Strict boundary checking prevents EF Core crashes on Nullable Dates)
+                            if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
                             {
-                                var valConst = System.Linq.Expressions.Expression.Constant(f.Value?.Trim());
+                                string[] dates = safeValue.Split('|');
+                                if (DateTime.TryParse(dates[0], out DateTime dVal))
+                                {
+                                    DateTime dVal2 = dates.Length > 1 && DateTime.TryParse(dates[1], out var d2) ? d2 : dVal;
+
+                                    var startOfDay = dVal.Date;
+                                    var endOfDay = dVal.Date.AddDays(1).AddTicks(-1);
+                                    var endOfDay2 = dVal2.Date.AddDays(1).AddTicks(-1);
+
+                                    var constStart = System.Linq.Expressions.Expression.Constant(startOfDay, propertyInfo.PropertyType);
+                                    var constEnd = System.Linq.Expressions.Expression.Constant(endOfDay, propertyInfo.PropertyType);
+                                    var constEnd2 = System.Linq.Expressions.Expression.Constant(endOfDay2, propertyInfo.PropertyType);
+
+                                    if (f.Condition == "on" || f.Condition == "On")
+                                    {
+                                        var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
+                                        var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd);
+                                        conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
+                                    }
+                                    else if (f.Condition == "before")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
+                                    }
+                                    else if (f.Condition == "after")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
+                                    }
+                                    else if (f.Condition == "between")
+                                    {
+                                        var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
+                                        var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd2);
+                                        conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
+                                    }
+                                }
+                            }
+                            // 🚀 3. OWNER / USER MAPPING (Translates names to IDs)
+                            else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
+                            {
+                                var searchValue = safeValue.ToLower();
+                                var matchingUserIds = _context.Users
+                                    .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
+                                                (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                    .Select(u => u.Id)
+                                    .ToList();
+
+                                var listExpr = System.Linq.Expressions.Expression.Constant(matchingUserIds);
+                                var containsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+
+                                if (f.Condition == "contains" || f.Condition == "is")
+                                    conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr);
+                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr));
+                            }
+                            // 🚀 4. REGULAR STRINGS
+                            else if (propertyInfo.PropertyType == typeof(string))
+                            {
+                                var valConst = System.Linq.Expressions.Expression.Constant(safeValue);
                                 var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
                                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
                                 var startsWithMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
@@ -109,24 +179,38 @@ namespace Radar_CRM.Controllers
 
                                 var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
                                 var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
-                                var lowerVal = System.Linq.Expressions.Expression.Constant(f.Value?.ToLower().Trim() ?? "");
+                                var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
-                                if (f.Condition == "is")
-                                    conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
-                                else if (f.Condition == "is_not")
-                                    conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
-                                else if (f.Condition == "contains")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
-                                else if (f.Condition == "does_not_contain")
-                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
-                                else if (f.Condition == "starts_with")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
-                                else if (f.Condition == "ends_with")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, endsWithMethod, lowerVal);
-                                else if (f.Condition == "is_empty")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
-                                else if (f.Condition == "is_not_empty")
-                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
+                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, endsWithMethod, lowerVal);
+                                else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                            }
+                            // 🚀 5. NUMBERS
+                            else
+                            {
+                                if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                                {
+                                    if (int.TryParse(safeValue, out int numVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(numVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
+                                }
+                                else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                                {
+                                    if (decimal.TryParse(safeValue, out decimal decVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(decVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is" || f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
+                                }
                             }
 
                             if (conditionExpr != null)
@@ -1189,32 +1273,62 @@ namespace Radar_CRM.Controllers
         // UPLOAD FILE (With Duplicate Checking)
         // ==========================================
         [HttpPost]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var accountsToInsert = new List<Account>();
-            var skippedRecords = new List<string>(); // 🚀 Track skipped duplicate rows
-            int currentRow = 1; // Start at 1 for the header
+            var accountsToUpdate = new List<Account>();
+            var skippedRecords = new List<string>();
+            int currentRow = 1;
 
+            // Load existing data for ultra-fast checking and updating
             var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
 
-            // 🚀 Pre-load existing mobiles and emails for ultra-fast duplicate checking
-            var existingMobiles = new HashSet<string>(await _context.Accounts
-                .Where(a => !string.IsNullOrEmpty(a.MobileNumber))
-                .Select(a => a.MobileNumber)
-                .ToListAsync());
+            // 🚀 NEW: Load existing accounts by Zoho ID for the Update check
+            var existingAccountsDb = await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.ZohoRecordId))
+                .AsNoTracking()
+                .GroupBy(a => a.ZohoRecordId)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
 
-            var existingEmails = new HashSet<string>(await _context.Accounts
-                .Where(a => !string.IsNullOrEmpty(a.Email))
-                .Select(a => a.Email.ToLower())
-                .ToListAsync());
+            var existingMobiles = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.MobileNumber)).Select(a => a.MobileNumber).ToListAsync());
+            var existingEmails = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.Email)).Select(a => a.Email.ToLower()).ToListAsync());
+
+            // Helper to Standardize Country to INDIA
+            string NormalizeCountry(string input)
+            {
+                if (string.IsNullOrWhiteSpace(input)) return null;
+                string upper = input.Trim().ToUpper();
+                if (upper.Contains("INDIA") || upper == "IND" || upper == "IN") return "INDIA";
+                return upper;
+            }
 
             try
             {
                 using (var reader = new StreamReader(uploadedFile.OpenReadStream()))
                 {
-                    var headerLine = await reader.ReadLineAsync(); // Skip header
+                    var headerLine = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
+
+                    // Standardize headers
+                    var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
+
+                    string GetValSafe(string[] vals, string colName)
+                    {
+                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
+
+                    decimal? GetDecimalSafe(string[] vals, string colName)
+                    {
+                        string raw = GetValSafe(vals, colName);
+                        if (string.IsNullOrWhiteSpace(raw)) return null;
+                        string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
+                        return decimal.TryParse(clean, out decimal result) ? result : null;
+                    }
 
                     while (!reader.EndOfStream)
                     {
@@ -1223,142 +1337,181 @@ namespace Radar_CRM.Controllers
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         var values = ParseCsvLine(line);
+                        string zohoRecordId = GetValSafe(values, "RecordId");
+                        string mobile = GetValSafe(values, "MobileNumber");
+                        string email = GetValSafe(values, "Email")?.ToLower();
 
-                        if (values.Length >= 4)
+                        bool isUpdate = false;
+                        Account acc;
+
+                        // 🚀 UPSERT LOGIC: Check if it exists
+                        if (!string.IsNullOrEmpty(zohoRecordId) && existingAccountsDb.TryGetValue(zohoRecordId, out var existingAccount))
                         {
-                            string mobile = GetVal(values, 7);
-                            string email = GetVal(values, 5)?.ToLower();
-
-                            // 🚀 Duplicate Check Logic
+                            acc = existingAccount; // We found it, let's update it!
+                            isUpdate = true;
+                        }
+                        else
+                        {
+                            // It doesn't exist, check if it's a duplicate by Email/Mobile before inserting
                             bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
                             bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
 
                             if (isMobileDup || isEmailDup)
                             {
-                                string dupType = isMobileDup && isEmailDup ? "Mobile & Email" : (isMobileDup ? "Mobile" : "Email");
-                                skippedRecords.Add($"Row {currentRow}: Skipped ({dupType} already exists)");
-                                continue; // Skip inserting this row
+                                skippedRecords.Add($"Row {currentRow}: Skipped (Mobile or Email exists without matching Zoho ID)");
+                                continue;
                             }
 
-                            // Add to our hashsets so we catch duplicates WITHIN the CSV file itself
+                            acc = new Account(); // Create a new one
                             if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
                             if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+                        }
 
-                            string rawOwnerId = GetVal(values, 1);
-                            string rawCoOwnerId = GetVal(values, 64);
+                        // 🚀 MAP ALL FIELDS (This applies to BOTH new and updated records)
+                        string rawOwnerId = GetValSafe(values, "AccountsOwner.id");
+                        string rawCoOwnerId = GetValSafe(values, "Co-Owner.id");
 
-                            var newAccount = new Account
-                            {
-                                // --- Existing Fields ---
-                                AccountOwnerId = validUserIds.Contains(rawOwnerId) ? rawOwnerId : null,
-                                AccountName = GetVal(values, 3),
-                                Email = GetVal(values, 5),
-                                AlternateMobile = GetVal(values, 6),
-                                MobileNumber = GetVal(values, 7),
-                                DataSource = GetVal(values, 8),
-                                Description = GetVal(values, 17),
-                                IsDuplicated = bool.TryParse(GetVal(values, 62), out bool isDup) && isDup,
-                                MetaCampaignName = GetVal(values, 63),
-                                CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null,
-                                CurrentStatus = GetVal(values, 112),
-                                AccountType = GetVal(values, 113),
-                                ContactPersonName = GetVal(values, 114),
-                                ProfilePendingReason = GetVal(values, 115),
-                                AlternateEmailID = GetVal(values, 126),
-                                QualificationStatus = GetVal(values, 129),
-                                SeminarName = GetVal(values, 88),
-                                DateOfEntry = DateTime.TryParse(GetVal(values, 95), out DateTime doe) ? doe : DateTime.Now,
-                                LeadStatus = GetVal(values, 127),
+                        acc.ZohoRecordId = zohoRecordId;
+                        acc.AccountOwnerId = validUserIds.Contains(rawOwnerId) ? rawOwnerId : null;
+                        acc.CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null;
+                        acc.AccountName = GetValSafe(values, "AccountName");
+                        acc.Email = GetValSafe(values, "Email");
+                        acc.AlternateEmailID = GetValSafe(values, "AlternateEmailID");
+                        acc.MobileNumber = mobile;
+                        acc.AlternateMobile = GetValSafe(values, "AlternateMobile");
+                        acc.DataSource = GetValSafe(values, "DataSources");
+                        acc.Description = GetValSafe(values, "Description");
+                        acc.CurrentStatus = GetValSafe(values, "CurrentStatus");
+                        acc.AccountType = GetValSafe(values, "AccountType");
+                        acc.DateOfEntry = DateTime.TryParse(GetValSafe(values, "DateofEntry"), out DateTime doe) ? doe : DateTime.Now;
+                        acc.CreatedBy = GetValSafe(values, "CreatedBy");
+                        acc.ModifiedBy = GetValSafe(values, "ModifiedBy");
+                        acc.IsDuplicated = bool.TryParse(GetValSafe(values, "IsDuplicated"), out bool isDup) ? isDup : false;
 
-                                // 🚀 NEW: Address 1 Mapping
-                                Addr1_Country = GetVal(values, 96),
-                                Addr1_FlatHouse = GetVal(values, 97),
-                                Addr1_Street = GetVal(values, 98),
-                                Addr1_City = GetVal(values, 99),
-                                Addr1_State = GetVal(values, 100),
-                                Addr1_Zip = GetVal(values, 101),
-                                Addr1_Latitude = GetVal(values, 102),
-                                Addr1_Longitude = GetVal(values, 103),
+                        // --- Address 1 ---
+                        acc.Addr1_Country = NormalizeCountry(GetValSafe(values, "Address1-Country/Region"));
+                        acc.Addr1_FlatHouse = GetValSafe(values, "Address1-Flat/HouseNo./Building/ApartmentName");
+                        acc.Addr1_Street = GetValSafe(values, "Address1-StreetAddress");
+                        acc.Addr1_City = GetValSafe(values, "Address1-City");
+                        acc.Addr1_State = GetValSafe(values, "Address1-State/Province");
+                        acc.Addr1_Zip = GetValSafe(values, "Address1-Zip/PostalCode");
+                        acc.Addr1_Latitude = GetValSafe(values, "Address1-Latitude");
+                        acc.Addr1_Longitude = GetValSafe(values, "Address1-Longitude");
 
-                                // 🚀 NEW: Address 2 Mapping
-                                Addr2_Country = GetVal(values, 67),
-                                Addr2_FlatHouse = GetVal(values, 68),
-                                Addr2_Street = GetVal(values, 69),
-                                Addr2_City = GetVal(values, 70),
-                                Addr2_State = GetVal(values, 71),
-                                Addr2_Zip = GetVal(values, 72),
-                                Addr2_Latitude = GetVal(values, 73),
-                                Addr2_Longitude = GetVal(values, 74),
+                        // --- Address 2 ---
+                        acc.Addr2_Country = NormalizeCountry(GetValSafe(values, "Address2-Country/Region"));
+                        acc.Addr2_FlatHouse = GetValSafe(values, "Address2-Flat/HouseNo./Building/ApartmentName");
+                        acc.Addr2_Street = GetValSafe(values, "Address2-StreetAddress");
+                        acc.Addr2_City = GetValSafe(values, "Address2-City");
+                        acc.Addr2_State = GetValSafe(values, "Address2-State/Province");
+                        acc.Addr2_Zip = GetValSafe(values, "Address2-Zip/PostalCode");
+                        acc.Addr2_Latitude = GetValSafe(values, "Address2-Latitude");
+                        acc.Addr2_Longitude = GetValSafe(values, "Address2-Longitude");
 
-                                // 🚀 NEW: Professional Profile (Strings)
-                                IsHomeopathicDoctor = GetVal(values, 124),
-                                ClinicType = GetVal(values, 110),
-                                Qualification = GetVal(values, 86),
-                                YearOfPassing = GetVal(values, 77),
-                                WorkType = GetVal(values, 123),
-                                HasComputer = GetVal(values, 122),
-                                CollegeName = GetVal(values, 78),
+                        // --- Contact Persons ---
+                        acc.ContactPersonName = GetValSafe(values, "ContactPersonName");
+                        acc.ContactPerson1 = GetValSafe(values, "ContactPersonName1");
+                        acc.ContactPerson2 = GetValSafe(values, "ContactPersonName2");
+                        acc.ContactPerson3 = GetValSafe(values, "ContactPersonName3");
+                        acc.Contact1Phone = GetValSafe(values, "Contact1PhoneNumber");
+                        acc.Contact2Phone = GetValSafe(values, "Contact2PhoneNumber");
+                        acc.Contact3Phone = GetValSafe(values, "Contact3PhoneNumber");
 
-                                // 🚀 NEW: Professional Profile (Numbers/Dates)
-                                YearsOfPractice = int.TryParse(GetVal(values, 75), out int yop) ? yop : null,
-                                AveragePatientFee = decimal.TryParse(GetVal(values, 79), out decimal fee) ? fee : null,
-                                DateOfBirth = DateTime.TryParse(GetVal(values, 76), out DateTime dob) ? dob : null,
-                                PatientsPerDay = int.TryParse(GetVal(values, 104), out int ppd) ? ppd : null,
-                                TotalExperience = int.TryParse(GetVal(values, 92), out int exp) ? exp : null,
-                                NumberOfClinics = int.TryParse(GetVal(values, 83), out int noc) ? noc : null,
-                                Age = int.TryParse(GetVal(values, 82), out int age) ? age : null,
+                        // --- Professional Details ---
+                        acc.GroupName = GetValSafe(values, "GroupsName");
+                        acc.SeminarName = GetValSafe(values, "SeminarName");
+                        acc.LeadStatus = GetValSafe(values, "LeadStatus");
+                        acc.ProfilePendingReason = GetValSafe(values, "ProfilePendingReason");
+                        acc.QualificationStatus = GetValSafe(values, "QualifiactionStatus");
+                        acc.IsHomeopathicDoctor = GetValSafe(values, "AreYouaHomeopathicDoctor");
+                        acc.ClinicType = GetValSafe(values, "ClinicType");
+                        acc.YearsOfPractice = int.TryParse(GetValSafe(values, "YearsofParctice"), out int yop) ? yop : null;
+                        acc.Qualification = GetValSafe(values, "Qualification");
+                        acc.YearOfPassing = GetValSafe(values, "Yearofpassing");
+                        acc.AveragePatientFee = GetDecimalSafe(values, "AveragePatientFee");
+                        acc.DateOfBirth = DateTime.TryParse(GetValSafe(values, "DateofBirth"), out DateTime dob) ? dob : null;
+                        acc.WorkType = GetValSafe(values, "WorkType");
+                        acc.HasComputer = GetValSafe(values, "HavingComputer/Laptop");
+                        acc.PatientsPerDay = int.TryParse(GetValSafe(values, "PatientsperDay"), out int ppd) ? ppd : null;
+                        acc.CollegeName = GetValSafe(values, "CollegeName");
+                        acc.TotalExperience = int.TryParse(GetValSafe(values, "Totalexperience"), out int te) ? te : null;
+                        acc.NumberOfClinics = int.TryParse(GetValSafe(values, "NumberofClinics"), out int noc) ? noc : null;
+                        acc.Age = int.TryParse(GetValSafe(values, "Age"), out int age) ? age : null;
+                        acc.ProfileCompletionPercentage = int.TryParse(GetValSafe(values, "Profilecompletion(%)"), out int pcp) ? pcp : null;
+                        acc.Profilestatus = GetValSafe(values, "ProfileStatus");
+                        acc.ProfileRate = int.TryParse(GetValSafe(values, "ProfileRate"), out int pr) ? pr : null;
+                        acc.ReferralSource = GetValSafe(values, "ReferralSource");
 
-                                // 🚀 NEW: Software & Purchases
-                                CurrentlyUsingSoftware = GetVal(values, 111),
-                                CurrentSoftwareName = GetVal(values, 85),
-                                ProductPurchased = GetVal(values, 106),
-                                PurchaseDate = DateTime.TryParse(GetVal(values, 105), out DateTime pDate) ? pDate : null,
-                                PurchaseValue = decimal.TryParse(GetVal(values, 107), out decimal pVal) ? pVal : null,
-                                PaymentType = GetVal(values, 108),
-                                PaymentStatus = GetVal(values, 109),
+                        // --- Software & Purchases ---
+                        acc.CurrentlyUsingSoftware = GetValSafe(values, "CurrentlyUsingSoftware");
+                        acc.CurrentSoftwareName = GetValSafe(values, "CurrentsoftwareName");
+                        acc.RadarOpusLicenseNo = GetValSafe(values, "RadarOpusLicenseno");
+                        acc.RadarOpusVersion = GetValSafe(values, "RadarOpusversion");
+                        acc.ProductPurchased = GetValSafe(values, "Product/PackagePurchased");
+                        acc.PurchaseDate = DateTime.TryParse(GetValSafe(values, "PurchaseDate"), out DateTime pd) ? pd : null;
+                        acc.PurchaseValue = GetDecimalSafe(values, "PurchaseValue(â‚¹)");
+                        acc.PaymentType = GetValSafe(values, "PaymentType");
+                        acc.PaymentStatus = GetValSafe(values, "PaymentStatus");
+                        acc.InvoiceNumber = GetValSafe(values, "InvoiceNumber");
 
-                                // 🚀 NEW: Additional Contact Persons
-                                ContactPerson1 = GetVal(values, 116),
-                                ContactPerson2 = GetVal(values, 117),
-                                ContactPerson3 = GetVal(values, 119),
-                                Contact1Phone = GetVal(values, 118),
-                                Contact2Phone = GetVal(values, 120),
-                                Contact3Phone = GetVal(values, 121),
+                        // 🚀 --- NEW: AD & CAMPAIGN TRACKING --- 🚀
+                        acc.MetaCampaignName = GetValSafe(values, "MetaCampaignName");
+                        acc.SocialLeadId = GetValSafe(values, "SocialLeadID");
+                        acc.LeadStage = GetValSafe(values, "LeadStage");
+                        acc.OldLeadStatus = GetValSafe(values, "OldLead_Status");
+                        acc.Gclid = GetValSafe(values, "GCLID");
+                        acc.Zcampaignid = GetValSafe(values, "ZCAMPAIGNID");
+                        acc.Adgroupid = GetValSafe(values, "ADGROUPID");
+                        acc.Adid = GetValSafe(values, "ADID");
+                        acc.Keywordid = GetValSafe(values, "KEYWORDID");
+                        acc.Keyword = GetValSafe(values, "Keyword");
+                        acc.ClickType = GetValSafe(values, "ClickType");
+                        acc.DeviceType = GetValSafe(values, "DeviceType");
+                        acc.AdNetwork = GetValSafe(values, "AdNetwork");
+                        acc.SearchPartnerNetwork = GetValSafe(values, "SearchPartnerNetwork");
+                        acc.AdCampaignName = GetValSafe(values, "AdCampaignName");
+                        acc.AdGroupName = GetValSafe(values, "AdGroupName");
+                        acc.Ad = GetValSafe(values, "Ad");
+                        acc.Gadconfigid = GetValSafe(values, "GADCONFIGID");
+                        acc.AdClickDate = DateTime.TryParse(GetValSafe(values, "AdClickDate"), out DateTime acd) ? acd : null;
+                        acc.CostPerClick = GetDecimalSafe(values, "CostperClick");
+                        acc.CostPerConversion = GetDecimalSafe(values, "CostperConversion");
+                        acc.ConversionExportedOn = DateTime.TryParse(GetValSafe(values, "ConversionExportedOn"), out DateTime ceo) ? ceo : null;
+                        acc.ConversionExportStatus = GetValSafe(values, "ConversionExportStatus");
+                        acc.ReasonForConversionFailure = GetValSafe(values, "ReasonforConversionFailure");
 
-                                // 🚀 NEW: Profile Tracking
-                                ProfileCompletionPercentage = int.TryParse(GetVal(values, 89), out int pc) ? pc : null,
-                                ReferralSource = GetVal(values, 90),
-                                InvoiceNumber = GetVal(values, 91),
-                                Profilestatus = GetVal(values, 125),
-                                ProfileRate = int.TryParse(GetVal(values, 93), out int pr) ? pr : null
-                            };
-
-                            accountsToInsert.Add(newAccount);
+                        // Route to correct list
+                        if (isUpdate)
+                        {
+                            accountsToUpdate.Add(acc);
+                        }
+                        else
+                        {
+                            accountsToInsert.Add(acc);
                         }
                     }
                 }
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
-                await _context.Accounts.AddRangeAsync(accountsToInsert);
+
+                // 🚀 Execute both Inserts and Updates
+                if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert);
+                if (accountsToUpdate.Any()) _context.Accounts.UpdateRange(accountsToUpdate);
+
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return StatusCode(500, $"Failed at Row {currentRow} -> {trueError}");
+                return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
             }
-            finally
-            {
-                _context.ChangeTracker.AutoDetectChangesEnabled = true;
-            }
+            finally { _context.ChangeTracker.AutoDetectChangesEnabled = true; }
 
-            // 🚀 NEW: Return detailed JSON with counts
             return Json(new
             {
                 success = true,
                 insertedCount = accountsToInsert.Count,
-                skippedCount = skippedRecords.Count,
-                skippedMessages = skippedRecords
+                updatedCount = accountsToUpdate.Count,
+                skippedCount = skippedRecords.Count
             });
         }
 

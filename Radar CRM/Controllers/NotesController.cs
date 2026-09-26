@@ -162,107 +162,127 @@ namespace Radar_CRM.Controllers
         // BULK UPLOAD (MAPPED SECURELY TO newnotes.csv)
         // ==========================================
         [HttpPost]
+        [DisableRequestSizeLimit] // Prevents 30MB upload limit errors
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
         public async Task<IActionResult> UploadFile(IFormFile uploadedFile)
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var notesToInsert = new List<Notes>();
             int currentRow = 1;
-            int skippedCount = 0;
+            int skippedCount = 0; // 🚀 Added to track skipped records
 
-            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
-            var usersByName = _context.Users.ToList().GroupBy(u => u.FirstName).ToDictionary(g => g.Key, g => g.First().Id);
+            // Load Maps for Polymorphic linking
+            var accountLookup = _context.Accounts.Where(a => a.ZohoRecordId != null).ToDictionary(a => a.ZohoRecordId, a => a.Id);
+            var leadLookup = _context.Leads.Where(l => l.ZohoRecordId != null).ToDictionary(l => l.ZohoRecordId, l => l.Id);
+            var dealLookup = _context.Deals.Where(d => d.ZohoRecordId != null).ToDictionary(d => d.ZohoRecordId, d => d.Id);
+            var taskLookup = _context.Tasks.Where(t => t.ZohoRecordId != null).ToDictionary(t => t.ZohoRecordId, t => t.Id);
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id));
 
-            var accountLookup = _context.Accounts.Where(a => !string.IsNullOrEmpty(a.AccountName)).ToList()
-                                        .GroupBy(a => a.AccountName).ToDictionary(g => g.Key, g => g.First().Id);
+            // 🚀 NEW: Load existing Notes ZohoRecordIds to skip duplicates ultra-fast
+            var existingNotes = new HashSet<string>(
+                await _context.Note
+                    .Where(n => !string.IsNullOrEmpty(n.ZohoRecordId))
+                    .Select(n => n.ZohoRecordId)
+                    .ToListAsync()
+            );
 
             try
             {
                 using (var stream = uploadedFile.OpenReadStream())
                 {
-                    // 🚀 USE THE NEW ROBUST PARSER THAT HANDLES MULTI-LINE NOTES
-                    var allRows = ParseCsvRobust(stream);
+                    var allRows = ParseCsvRobust(stream); // Use your robust parser to handle line breaks in notes
+                    if (allRows == null || allRows.Count == 0) return BadRequest("CSV file is empty or invalid.");
 
-                    // Skip the header row (index 0)
+                    // Standardize headers
+                    var headers = allRows[0].Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
+
+                    string GetValSafe(string[] vals, string colName)
+                    {
+                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                    }
+
+                    // Loop through data rows (skip header)
                     for (int i = 1; i < allRows.Count; i++)
                     {
                         currentRow++;
                         var values = allRows[i];
 
-                        // Extremely forgiving length check - allows processing even if trailing columns are missing
-                        if (values.Length >= 9)
+                        string zohoRecordId = GetValSafe(values, "RecordId");
+
+                        // 🚀 SKIP LOGIC: If the note already exists in the database, skip it entirely
+                        if (!string.IsNullOrEmpty(zohoRecordId) && existingNotes.Contains(zohoRecordId))
                         {
-                            string rawRecordId = GetVal(values, 0);         // Record Id
-                            string rawCreatedById = GetVal(values, 1);
-                            string rawCreatedBy = GetVal(values, 2);        // Created By
-                            string rawCreatedTime = GetVal(values, 3);      // Created Time
-                            string rawModifiedById = GetVal(values, 4);
-                            string rawModifiedBy = GetVal(values, 5);       // Modified By
-                            string rawModifiedTime = GetVal(values, 6);     // Modified Time
-                            string rawNoteContent = GetVal(values, 7);
-                            string rawNoteOwnerId= GetVal(values, 8);
-                            string rawNoteOwner = GetVal(values, 9);
-                            string rawNoteTitle = GetVal(values, 10);
-                            string rawAccountId = GetVal(values, 11);
-                            string rawAccountName = GetVal(values, 12);
-                            string rawDescription = GetVal(values, 13);      // Note Content
+                            skippedCount++;
+                            continue;
+                        }
 
-                      
+                        string parentZohoId = GetValSafe(values, "ParentID.id");
+                        string parentName = GetValSafe(values, "ParentID"); // The raw text name (e.g. DrRachana Gupta)
+                        string rawNoteContent = GetValSafe(values, "NoteContent");
 
-                            // Fallback if Description is blank (Prevents EF Core from crashing on [Required] tags)
-                            if (string.IsNullOrWhiteSpace(rawDescription))
+                        // Fallback for required fields
+                        if (string.IsNullOrWhiteSpace(rawNoteContent)) rawNoteContent = "No Content Provided";
+
+                        var newNote = new Notes
+                        {
+                            ZohoRecordId = zohoRecordId,
+
+                            // MAP THE NOTE TEXT
+                            NoteTitle = GetValSafe(values, "NoteTitle"),
+                            NoteContent = rawNoteContent,
+                            Description = rawNoteContent, // Mapped to Description since it's [Required] in your model
+
+                            // MAP THE AUDIT FIELDS
+                            CreatedBy = GetValSafe(values, "CreatedBy"),
+                            ModifiedBy = GetValSafe(values, "ModifiedBy"),
+                            CreatedDateTime = DateTime.TryParse(GetValSafe(values, "CreatedTime"), out DateTime cDt) ? cDt : DateTime.Now,
+                            ModifiedTime = DateTime.TryParse(GetValSafe(values, "ModifiedTime"), out DateTime mDt) ? mDt : null,
+
+                            // MAP THE OWNER
+                            NoteOwnerId = validUserIds.Contains(GetValSafe(values, "NoteOwner.id")) ? GetValSafe(values, "NoteOwner.id") : null,
+                        };
+
+                        // DYNAMIC POLYMORPHIC LINKING & NAME ASSIGNMENT
+                        // It assigns the correct Foreign Key ID *and* the Parent Text Name
+                        if (!string.IsNullOrEmpty(parentZohoId))
+                        {
+                            if (accountLookup.TryGetValue(parentZohoId, out int aId))
                             {
-                                rawDescription = "No Content Provided";
+                                newNote.AccountId = aId;
+                                newNote.AccountName = parentName;
                             }
-
-                            string assignedOwnerId = null;
-                            if (validUserIds.Contains(rawNoteOwnerId)) assignedOwnerId = rawNoteOwnerId;
-                            else if (usersByName.TryGetValue(rawNoteOwner, out string idByName)) assignedOwnerId = idByName;
-
-                            int? linkedAccountId = null;
-                            if (accountLookup.TryGetValue(rawAccountName, out int accId)) linkedAccountId = accId;
-
-                            DateTime createdDt = DateTime.Now;
-                            if (DateTime.TryParse(rawCreatedTime, out DateTime parsedCdt)) createdDt = parsedCdt;
-
-                            DateTime? modifiedDt = null;
-                            if (DateTime.TryParse(rawModifiedTime, out DateTime parsedMdt)) modifiedDt = parsedMdt;
-
-                            var newNote = new Notes
+                            else if (leadLookup.TryGetValue(parentZohoId, out int lId))
                             {
-                                ZohoRecordId = rawRecordId,
-                                CreatedBy = rawCreatedBy,
-                                CreatedDateTime = createdDt,
-                                ModifiedBy = rawModifiedBy,
-                                ModifiedTime = modifiedDt,
-
-                                // Set both so EF Core validates, and UI binds perfectly
-                                Description = rawDescription,
-                                NoteContent = rawDescription,
-
-                                NoteOwnerId = assignedOwnerId,
-
-                                // Strictly mapping to NoteTitle per your instructions
-                                NoteTitle = rawNoteTitle,
-
-                                AccountName = rawAccountName,
-                                AccountId = linkedAccountId
-                            };
-
-                            notesToInsert.Add(newNote);
+                                newNote.LeadId = lId;
+                                newNote.LeadName = parentName;
+                            }
+                            else if (dealLookup.TryGetValue(parentZohoId, out int dId))
+                            {
+                                newNote.DealId = dId;
+                                newNote.DealName = parentName;
+                            }
+                            else if (taskLookup.TryGetValue(parentZohoId, out int tId))
+                            {
+                                newNote.TaskId = tId;
+                                newNote.TaskName = parentName;
+                            }
                         }
-                        else
+
+                        // 🚀 Add to HashSet to prevent duplicate inserts if the CSV file itself contains duplicate rows
+                        if (!string.IsNullOrEmpty(zohoRecordId))
                         {
-                            skippedCount++; // Row was corrupt or missing mandatory columns
+                            existingNotes.Add(zohoRecordId);
                         }
+
+                        notesToInsert.Add(newNote);
                     }
                 }
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
                 await _context.Note.AddRangeAsync(notesToInsert);
                 await _context.SaveChangesAsync();
-
-                return Json(new { success = true, insertedCount = notesToInsert.Count, skippedCount = skippedCount });
             }
             catch (Exception ex)
             {
@@ -273,6 +293,9 @@ namespace Radar_CRM.Controllers
             {
                 _context.ChangeTracker.AutoDetectChangesEnabled = true;
             }
+
+            // 🚀 Added skippedCount to the response so the UI knows how many were ignored
+            return Json(new { success = true, insertedCount = notesToInsert.Count, skippedCount = skippedCount });
         }
 
         // ==========================================

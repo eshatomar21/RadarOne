@@ -225,6 +225,75 @@
         letter-spacing: -0.01em;
     }
 
+    /* Header Container */
+    .sf-header {
+        background-color: #ffffff;
+        padding: 16px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    /* Flexbox to push title left and button right */
+    .sf-header-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+        /* Title Styling */
+        .sf-header-title h1 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+    /* Modern Pill Badge for 'Account' */
+    .entity-type {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background-color: #f1f5f9; /* Light gray background */
+        color: #475569; /* Slate text */
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+
+    /* Navy Blue Back Button */
+    .sf-back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background-color: #1e3a8a; /* Deep Navy Blue */
+        color: #ffffff; /* White text */
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 6px;
+        transition: background-color 0.2s ease;
+    }
+
+        /* Darker Navy on Hover */
+        .sf-back-btn:hover {
+            background-color: #172554;
+        }
+
+        /* Arrow micro-animation on hover */
+        .sf-back-btn svg {
+            transition: transform 0.2s ease;
+        }
+
+        .sf-back-btn:hover svg {
+            transform: translateX(-4px);
+        }
+
     /* Cards - Layered effect */
     .sf-card {
         border: 1px solid var(--theme-border);
@@ -287,14 +356,22 @@
 <form asp-action="Create" method="post" id="accountForm" enctype="multipart/form-data">
     <div class="sf-container">
 
-        <!-- 1. Header -->
         <div class="sf-header">
             <div class="sf-header-title">
-                <!-- Replace your current <button> line with this -->
-                <a asp-controller="Accounts" asp-action="Index" class="sf-close-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <!-- Title & Badge (Left Side) -->
+                <h1>
+                    <span class="entity-type">Account</span>
+                    New Account
+                </h1>
+
+                <!-- Back to Dashboard Button (Right Side) -->
+                <a asp-controller="Accounts" asp-action="Index" class="sf-back-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    <span>Back to Dashboard</span>
                 </a>
-                <h1><span class="entity-type">Account</span> New Account</h1>
             </div>
         </div>
 
