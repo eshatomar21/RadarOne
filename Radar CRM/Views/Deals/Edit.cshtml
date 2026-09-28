@@ -637,11 +637,30 @@
                 </div>
 
                 <!-- NOTES UI -->
-                <div class="d-flex justify-content-between align-items-center mt-4 pb-2 mb-3" style="border-bottom: 1px solid var(--theme-border);">
-                    <h3 class="pane-section-title border-0 m-0 p-0">Notes & Attachments</h3>
-                    <button type="button" class="btn btn-sm" onclick="openNoteModal()" style="background-color: var(--theme-navy-light); color: var(--theme-navy-primary); font-weight: 600; border-radius: 6px; font-size: 0.8rem; padding: 6px 14px; border: 1px solid var(--theme-border); transition: all 0.2s;">
-                        <i class="fa-solid fa-plus me-1"></i> Add Note
-                    </button>
+               <h3 class="pane-section-title mt-4 border-bottom pb-2 mb-3">Notes & Attachments</h3>
+
+                <div class="inline-note-editor mb-4 shadow-sm" style="border: 1px solid #ccfbf1; border-radius: 8px; background-color: #f0fdfa; overflow: hidden;">
+                    <div class="p-3">
+                        <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-1" placeholder="Title" style="background: transparent; font-size: 1.05rem; font-weight: 700; color: #1e3a8a;" />
+                        <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 0.95rem; color: #334155; resize: none;"></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center p-2" style="background-color: #ffffff; border-top: 1px solid #99f6e4;">
+                        <div class="d-flex gap-3 align-items-center ps-2">
+                            <label for="inlineNoteFile" style="cursor: pointer; color: #0d9488; transition: 0.2s;" title="Attach File" onmouseover="this.style.color='#0f766e'" onmouseout="this.style.color='#0d9488'">
+                                <i class="fa-solid fa-paperclip fs-5"></i>
+                            </label>
+                            <input type="file" id="inlineNoteFile" style="display: none;" />
+                            
+                            <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="width: 140px; background: transparent; color: #0f766e; cursor: pointer;">
+                                <option value="">- System User -</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="clearInlineNote()" style="color: #0f766e; border: 1px solid #5eead4; height: 32px;">Cancel</button>
+                            <button type="button" class="btn btn-sm text-white fw-bold px-4" onclick="saveInlineNote()" style="background-color: #0d9488; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.2); transition: 0.2s; height: 32px;" onmouseover="this.style.backgroundColor='#0f766e'" onmouseout="this.style.backgroundColor='#0d9488'">Save</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="savedNotesContainer" class="mb-4">
@@ -649,22 +668,27 @@
                     {
                         foreach (var note in (IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes)
                         {
-                            <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid var(--theme-border); border-left: 4px solid var(--theme-navy-primary); border-radius: 8px; background: var(--theme-surface);">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold" style="font-size: 0.9rem; color: var(--theme-text-main);">
-                                        <i class="fa-solid fa-circle-user text-muted me-2"></i>@(note.NoteOwner?.fullName ?? "System User")
+                            <div class="saved-note-card p-3 mb-2" style="border: 1px solid #ccfbf1; border-left: 4px solid #1e3a8a; border-radius: 8px; background: #f0fdfa; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #99f6e4;">
+                                    <span class="fw-bold" style="font-size: 0.85rem; color: #1e3a8a;">
+                                        <i class="fa-solid fa-circle-user me-1" style="color: #0d9488;"></i> @(note.NoteOwner?.fullName ?? "System User")
                                     </span>
-                                    <span class="text-muted" style="font-size: 0.8rem;">
-                                        <i class="fa-regular fa-clock me-1"></i> @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
+                                    <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">
+                                        @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
                                     </span>
                                 </div>
-                                <div style="font-size: 0.9rem; color: var(--theme-text-muted); white-space: pre-wrap;">@note.Description</div>
+                                
+                                @if (!string.IsNullOrEmpty(note.NoteTitle))
+                                {
+                                    <div class="fw-bold mb-1" style="font-size: 0.95rem; color: #0f172a;">@note.NoteTitle</div>
+                                }
+                                <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap; line-height: 1.4;">@note.Description</div>
 
                                 @if (!string.IsNullOrEmpty(note.AttachmentFileName))
                                 {
                                     <div class="mt-2">
-                                        <a href="@Url.Action("DownloadNoteFile", "Deals", new { noteId = note.Id })" target="_blank" class="text-primary text-decoration-none" style="font-size: 0.85rem; background: var(--theme-navy-light); padding: 4px 12px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #bfdbfe; transition: 0.2s;">
-                                            <i class="fa-solid fa-download me-2"></i> Download: @note.AttachmentFileName
+                                        <a href="@Url.Action("DownloadNoteFile", "Deals", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #0f766e; background: #ffffff; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #5eead4; transition: 0.2s;" onmouseover="this.style.backgroundColor='#ccfbf1'" onmouseout="this.style.backgroundColor='#ffffff'">
+                                            <i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName
                                         </a>
                                     </div>
                                 }
@@ -885,13 +909,13 @@
             </div>
 
             <!-- 3. Related Tasks -->
-            <div class="mb-4">
-                <div class="sidebar-section-title">
-                    <span>Tasks</span>
-                    <button type="button" class="btn-sidebar-add" data-bs-toggle="modal" data-bs-target="#quickTaskModal" title="Add Task">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
+           <div class="sidebar-section-title">
+                            Tasks
+                            <!-- 🚀 FIX: Removed data-bs-toggle to prevent freeze -->
+                            <button type="button" class="sidebar-add-btn" onclick="openTaskModal()" title="Add Task">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
 
                 @if (ViewBag.RelatedTasks != null && ((IEnumerable<Radar_CRM.Models.Task>)ViewBag.RelatedTasks).Any())
                 {
@@ -984,6 +1008,173 @@
     </div>
 </div>
 
+<!-- ========================================================
+     PREMIUM CREAM & NAVY QUICK CREATE TASK MODAL
+     ======================================================== -->
+<div class="modal fade" id="quickTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg" style="border: 2px solid #1e3a8a; border-radius: 12px; overflow: hidden;">
+
+            <!-- Cream & Navy Header -->
+            <div class="modal-header" style="background-color: #Fdfbf7; border-bottom: 2px solid #e2e8f0; padding: 20px 24px;">
+                <h5 class="modal-title fw-bold d-flex align-items-center" id="quickTaskModalLabel" style="color: #1e3a8a; font-size: 1.2rem;">
+                    <div class="me-3" style="background-color: #eff6ff; color: #1e3a8a; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; border: 1px solid #bfdbfe;">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    Add New Task
+                </h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Body -->
+            <form asp-controller="Tasks" asp-action="Create" method="post">
+                <div class="modal-body" style="padding: 24px; background-color: #ffffff;">
+                    <!-- 🚀 Bound to DealId for Deals module -->
+                    <input type="hidden" name="DealId" value="@Model.Id" />
+
+                    <div class="row">
+                        <div class="col-md-12 form-group mb-4">
+                            <label class="sf-label w-100 mb-2 fw-bold" style="color: #1e3a8a;">Subject <span class="text-danger">*</span></label>
+                            <input name="Subject" class="sf-input w-100 bg-light" placeholder="E.g., Follow up call..." required />
+                        </div>
+
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="sf-label w-100 mb-2 fw-bold" style="color: #1e3a8a;">Due Date</label>
+                            <input name="DueDate" type="date" class="sf-input w-100 bg-light" />
+                        </div>
+
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="sf-label w-100 mb-2 fw-bold" style="color: #1e3a8a;">Priority</label>
+                            <select name="Priority" class="sf-select w-100 bg-light">
+                                <option value="Highest">Highest</option>
+                                <option value="High" selected>High</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-12 form-group mb-4">
+                            <label class="sf-label w-100 mb-2 fw-bold" style="color: #1e3a8a;">Task Owner</label>
+                            <select name="TaskOwnerId" id="taskOwnerDropdown" asp-items="ViewBag.UsersList" class="sf-select w-100 bg-light">
+                                <option value="">- Assign To -</option>
+                            </select>
+                        </div>
+
+                        <!-- 🚀 Cream & Navy Toggles for Repeat & Reminder -->
+                        <div class="col-md-12 form-group mb-4">
+                            <div class="d-flex align-items-center gap-4 p-3 rounded" style="background-color: #Fdfbf7; border: 1px solid #e2e8f0;">
+                                <div class="form-check form-switch task-switch m-0 p-0 d-flex align-items-center gap-2 ps-2">
+                                    <input class="form-check-input m-0" type="checkbox" id="modalRepeatToggle" style="cursor: pointer; background-color: #1e3a8a; border-color: #1e3a8a;">
+                                    <label class="form-check-label fw-bold" for="modalRepeatToggle" style="color: #1e3a8a; cursor: pointer;">Repeat</label>
+                                </div>
+                                <div class="form-check form-switch task-switch m-0 p-0 d-flex align-items-center gap-2 ps-4">
+                                    <input class="form-check-input m-0" type="checkbox" id="modalReminderToggle" style="cursor: pointer; background-color: #1e3a8a; border-color: #1e3a8a;">
+                                    <label class="form-check-label fw-bold" for="modalReminderToggle" style="color: #1e3a8a; cursor: pointer;">Reminder</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🚀 Slate & Navy Repeat Panel -->
+                        <div class="col-md-12 expandable-panel" id="modalRepeatPanel" style="display: none; background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a8a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                            <div class="row align-items-center mb-3">
+                                <div class="col-4 fw-bold" style="color: #1e3a8a; font-size: 0.9rem;">Repeat type</div>
+                                <div class="col-8">
+                                    <select class="sf-select w-100 bg-white mb-2" style="border-color: #cbd5e1;">
+                                        <option>Daily</option>
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                        <option>Yearly</option>
+                                    </select>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="modalExcludeWeekends">
+                                        <label class="form-check-label text-muted" for="modalExcludeWeekends" style="font-size: 0.85rem;">Except weekends and holidays.</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-4 fw-bold" style="color: #1e3a8a; font-size: 0.9rem;">Ends</div>
+                                <div class="col-8">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsNever" checked>
+                                        <label class="form-check-label fw-medium" for="modalEndsNever" style="font-size: 0.85rem; color: #334155;">Never</label>
+                                    </div>
+                                    <div class="form-check mb-2 d-flex align-items-center gap-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsAfter">
+                                        <label class="form-check-label fw-medium" for="modalEndsAfter" style="font-size: 0.85rem; color: #334155;">After</label>
+                                        <input type="number" class="form-control form-control-sm w-25" value="1" style="border-color: #cbd5e1;">
+                                        <span style="font-size: 0.85rem; color: #334155;">Times</span>
+                                    </div>
+                                    <div class="form-check d-flex align-items-center gap-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsOn">
+                                        <label class="form-check-label fw-medium" for="modalEndsOn" style="font-size: 0.85rem; color: #334155;">On</label>
+                                        <input type="date" class="form-control form-control-sm w-50" style="border-color: #cbd5e1;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🚀 Slate & Navy Reminder Panel -->
+                        <div class="col-md-12 expandable-panel" id="modalReminderPanel" style="display: none; background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a8a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                            <div class="form-check mb-3 d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindOnDate" checked>
+                                <label class="form-check-label" for="modalRemindOnDate" style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a;">On</label>
+                                <input type="date" class="form-control form-control-sm w-auto" style="border-color: #cbd5e1;">
+                                <span style="font-size: 0.85rem; color: #1e3a8a; font-weight: 600;">at</span>
+                                <input type="time" class="form-control form-control-sm w-auto" style="border-color: #cbd5e1;">
+                            </div>
+                            <div class="form-check mb-4 d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindDays">
+                                <label class="form-check-label" for="modalRemindDays" style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a;">On</label>
+                                <select class="form-select form-select-sm w-auto" style="border-color: #cbd5e1; color: #334155;">
+                                    <option>1 Day(s)</option>
+                                    <option>2 Day(s)</option>
+                                    <option>3 Day(s)</option>
+                                    <option>1 Week</option>
+                                </select>
+                                <span style="font-size: 0.85rem; color: #1e3a8a; font-weight: 600;">of due date at</span>
+                                <input type="time" class="form-control form-control-sm w-auto" style="border-color: #cbd5e1;">
+                            </div>
+                            <div class="row align-items-center mb-3">
+                                <div class="col-4 fw-bold" style="color: #1e3a8a; font-size: 0.9rem;">Repeat type</div>
+                                <div class="col-8">
+                                    <select class="sf-select w-100 bg-white" style="border-color: #cbd5e1; padding: 4px 8px; height: 32px; color: #334155;">
+                                        <option>None</option>
+                                        <option>Daily</option>
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                        <option>Yearly</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-4 fw-bold" style="color: #1e3a8a; font-size: 0.9rem;">Notify</div>
+                                <div class="col-8">
+                                    <select class="sf-select w-100 bg-white" style="border-color: #cbd5e1; padding: 4px 8px; height: 32px; color: #334155;">
+                                        <option>Email</option>
+                                        <option>Popup</option>
+                                        <option>Both</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 form-group m-0">
+                            <label class="sf-label w-100 mb-2 fw-bold" style="color: #1e3a8a;">Description</label>
+                            <textarea name="Description" class="sf-input w-100 bg-light" rows="3" placeholder="Task details..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🚀 BUTTON STRETCH FIX INCLUDED -->
+                <div class="modal-footer d-flex align-items-center justify-content-end" style="background-color: #Fdfbf7; border-top: 1px solid #e2e8f0; padding: 16px 24px;">
+                    <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; color: #475569; padding: 8px 24px;">Cancel</button>
+                    <button type="submit" class="btn text-white fw-bold" style="background-color: #1e3a8a; border-radius: 6px; box-shadow: 0 4px 6px rgba(30, 58, 138, 0.2); padding: 8px 24px; transition: 0.2s;" onmouseover="this.style.backgroundColor='#1e40af'" onmouseout="this.style.backgroundColor='#1e3a8a'">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
 @section Scripts {
     <!-- jQuery and Select2 JS -->
@@ -991,7 +1182,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        // --- NOTES POP-UP LOGIC WITH LOGGING ---
+        // --- NOTES POP-UP LOGIC WITH LOGGING ---        
         function openNoteModal() {
         console.log("[UI-LOG] Opening Note Modal...");
         const now = new Date();
@@ -1049,7 +1240,7 @@
         bootstrap.Modal.getInstance(modalEl).hide();
         }
 
-        // --- DYNAMIC TABLE LOGIC ---
+        // --- DYNAMIC TABLE LOGIC ---        
         let rowCount = @(Model.PaymentRows != null && Model.PaymentRows.Count > 0 ? Model.PaymentRows.Count : 1);
 
         function addRow() {
@@ -1118,5 +1309,125 @@
         });
         });
         });
+
+        // =================================================================
+        // 🚀 NEW: INLINE NOTES JAVASCRIPT (LIGHT TEAL & NAVY)
+        // =================================================================
+        document.addEventListener("DOMContentLoaded", function () {
+            const noteOwner = document.getElementById('inlineNoteOwner');
+            if (noteOwner) noteOwner.value = '@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value';
+        });
+
+        function clearInlineNote() {
+            const titleInput = document.getElementById('inlineNoteTitle');
+            const descInput = document.getElementById('inlineNoteDesc');
+            const fileInput = document.getElementById('inlineNoteFile');
+            
+            if(titleInput) titleInput.value = '';
+            if(descInput) descInput.value = '';
+            if(fileInput) fileInput.value = '';
+        }
+
+        function saveInlineNote() {
+            const titleEl = document.getElementById('inlineNoteTitle');
+            const descEl = document.getElementById('inlineNoteDesc');
+            const fileInput = document.getElementById('inlineNoteFile');
+
+            const title = titleEl ? titleEl.value.trim() : '';
+            const desc = descEl ? descEl.value.trim() : '';
+            const fileName = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '';
+            
+            const ownerDropdown = document.getElementById('inlineNoteOwner');
+            const ownerId = ownerDropdown ? ownerDropdown.value : '';
+            const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
+            const dateTime = new Date().toLocaleString();
+
+            if (!desc && !fileName && !title) {
+                alert('Please enter a title, content, or attach a file.');
+                return;
+            }
+
+            let finalDescription = desc;
+            if (title) {
+                finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
+            }
+
+            let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #0f172a;">${title}</div>` : '';
+            let fileHtml = fileName ? `
+            <div class="mt-2">
+                <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #0f766e; background: #ffffff; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #5eead4;">
+                    <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
+                </span>
+            </div>` : '';
+
+            const noteHtml = `
+            <div class="saved-note-card p-3 mb-2" style="border: 1px solid #ccfbf1; border-left: 4px solid #1e3a8a; border-radius: 8px; background: #f0fdfa; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #99f6e4;">
+                    <span class="fw-bold" style="font-size: 0.85rem; color: #1e3a8a;">
+                        <i class="fa-solid fa-circle-user me-1" style="color: #0d9488;"></i> ${ownerName}
+                    </span>
+                    <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">
+                        ${dateTime}
+                    </span>
+                </div>
+                ${titleHtml}
+                <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
+                ${fileHtml}
+
+                <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
+                <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
+                <input type="hidden" name="SavedNoteDesc[]" value="${finalDescription}" />
+            </div>
+            `;
+
+            const notesContainer = document.getElementById('savedNotesContainer');
+            if (notesContainer) {
+                notesContainer.insertAdjacentHTML('afterbegin', noteHtml);
+            }
+            clearInlineNote();
+        }
+
+        // =================================================================
+        // 🚀 NEW: SAFE TASK MODAL LAUNCHER (Fixes Toggles & Freezes)
+        // =================================================================
+        document.addEventListener("DOMContentLoaded", function () {
+            // Fix Repeat Toggle Logic
+            const repeatToggle = document.getElementById('modalRepeatToggle');
+            const repeatPanel = document.getElementById('modalRepeatPanel');
+            if (repeatToggle && repeatPanel) {
+                repeatToggle.addEventListener('change', function() {
+                    repeatPanel.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            // Fix Reminder Toggle Logic
+            const reminderToggle = document.getElementById('modalReminderToggle');
+            const reminderPanel = document.getElementById('modalReminderPanel');
+            if (reminderToggle && reminderPanel) {
+                reminderToggle.addEventListener('change', function() {
+                    reminderPanel.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+        });
+
+        function openTaskModal() {
+            // Force clear any glitched Bootstrap backdrops causing the freeze
+            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+
+            // Default the Task Owner to the current logged in user automatically
+            const ownerDropdown = document.getElementById('taskOwnerDropdown');
+            if(ownerDropdown) ownerDropdown.value = '@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value';
+
+            // Open safely
+            const modalEl = document.getElementById('quickTaskModal');
+            if (modalEl) {
+                document.body.appendChild(modalEl); // Fixes Z-index freeze
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        }
     </script>
 }

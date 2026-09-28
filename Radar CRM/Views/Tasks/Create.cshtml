@@ -1,4 +1,5 @@
 ﻿@model Radar_CRM.Models.Task
+@using System.Security.Claims
 
 @{
     ViewData["Title"] = "Create Task";
@@ -421,20 +422,39 @@
             </div>
 
             <!-- Notes Section -->
-            <div class="notes-section">
-                <div class="notes-header">
-                    <h5 style="color: var(--theme-navy-primary); font-weight: 600; margin: 0;">Notes & Attachments</h5>
-                    <button type="button" class="btn btn-outline-primary btn-sm rounded" data-bs-toggle="modal" data-bs-target="#addNoteModal">
-                        <i class="fa-solid fa-plus"></i> Add Note
-                    </button>
-                </div>
-                <hr style="border-color: var(--theme-border);" />
-                <div id="notesContainer" class="text-muted text-center py-3" style="font-size:0.9rem;">
-                    No notes added yet.
-                </div>
-            </div>
+           <div class="notes-section">
+                    <h3 class="pane-section-title mt-0 border-bottom pb-2 mb-3">Notes & Attachments</h3>
 
-        </div>
+                    <div class="inline-note-editor mb-4 shadow-sm" style="border: 2px solid #4f46e5; border-radius: 8px; background-color: #eef2ff; overflow: hidden;">
+                        <div class="p-3">
+                            <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-1" placeholder="Title" style="background: transparent; font-size: 1.05rem; font-weight: 700; color: #312e81;" />
+                            <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 0.95rem; color: #3730a3; resize: none;"></textarea>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center p-2" style="background-color: #ffffff; border-top: 1px solid #c7d2fe;">
+                            <div class="d-flex gap-3 align-items-center ps-2">
+                                <label for="inlineNoteFile" style="cursor: pointer; color: #4f46e5; transition: 0.2s;" title="Attach File" onmouseover="this.style.color='#312e81'" onmouseout="this.style.color='#4f46e5'">
+                                    <i class="fa-solid fa-paperclip fs-5"></i>
+                                </label>
+                                <input type="file" id="inlineNoteFile" style="display: none;" />
+                                
+                                <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="width: 140px; background: transparent; color: #4f46e5; cursor: pointer;">
+                                    <option value="">- System User -</option>
+                                </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="clearInlineNote()" style="color: #4f46e5; border: 1px solid #a5b4fc; height: 32px;">Cancel</button>
+                                <button type="button" class="btn btn-sm text-white fw-bold px-4" onclick="saveInlineNote()" style="background-color: #4f46e5; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2); transition: 0.2s; height: 32px;" onmouseover="this.style.backgroundColor='#3730a3'" onmouseout="this.style.backgroundColor='#4f46e5'">Save</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="notesContainer">
+                        <div class="text-muted text-center py-3" style="font-size:0.9rem;" id="noNotesPlaceholder">
+                            No notes added yet.
+                        </div>
+                    </div>
+                </div>
 
         <!-- Footer Buttons -->
         <div style="padding: 16px 40px; border-top: 1px solid var(--theme-border); background-color: #fafaf9; display: flex; justify-content: flex-end; gap: 16px;">
@@ -494,119 +514,173 @@
 
     <script>
         $(document).ready(function() {
-        // Apply 'Type and Search' to User Dropdown using AJAX
-        $('#TaskOwnerId').select2({
-        placeholder: "-- Select Owner --",
-        allowClear: true,
-        ajax: {
-        url: '/Tasks/SearchUsers',
-        dataType: 'json',
-        delay: 250,
-        data: function (params) { return { q: params.term }; },
-        processResults: function (data) { return { results: data.results }; },
-        cache: true
-        }
-        });
+            // Apply 'Type and Search' to User Dropdown using AJAX
+            $('#TaskOwnerId').select2({
+                placeholder: "-- Select Owner --",
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: '/Tasks/SearchUsers',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) { return { q: params.term }; },
+                    processResults: function (data) { return { results: data.results }; },
+                    cache: true
+                }
+            });
 
-        // Apply 'Type and Search' to Account Dropdown using AJAX
-        $('#AccountId').select2({
-        placeholder: "-- Search Accounts --",
-        allowClear: true,
-        ajax: {
-        url: '/Tasks/SearchAccounts',
-        dataType: 'json',
-        delay: 250,
-        data: function (params) { return { q: params.term }; },
-        processResults: function (data) { return { results: data.results }; },
-        cache: true
-        }
-        });
+            // Apply 'Type and Search' to Account Dropdown using AJAX
+            $('#AccountId').select2({
+                placeholder: "-- Search Accounts --",
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: '/Tasks/SearchAccounts',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) { return { q: params.term }; },
+                    processResults: function (data) { return { results: data.results }; },
+                    cache: true
+                }
+            });
 
-        // Apply 'Type and Search' to Lead Dropdown using AJAX
-        $('#LeadId').select2({
-        placeholder: "-- Search Leads --",
-        allowClear: true,
-        ajax: {
-        url: '/Tasks/SearchLeads',
-        dataType: 'json',
-        delay: 250,
-        data: function (params) { return { q: params.term }; },
-        processResults: function (data) { return { results: data.results }; },
-        cache: true
-        }
-        });
+            // Apply 'Type and Search' to Lead Dropdown using AJAX
+            $('#LeadId').select2({
+                placeholder: "-- Search Leads --",
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: '/Tasks/SearchLeads',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) { return { q: params.term }; },
+                    processResults: function (data) { return { results: data.results }; },
+                    cache: true
+                }
+            });
         });
 
         document.addEventListener('DOMContentLoaded', function () {
-        const dueDateInput = document.getElementById('dueDateInput');
-        const repeatToggle = document.getElementById('repeatToggle');
-        const reminderToggle = document.getElementById('reminderToggle');
-        const repeatHelpText = document.getElementById('repeatHelpText');
+            const dueDateInput = document.getElementById('dueDateInput');
+            const repeatToggle = document.getElementById('repeatToggle');
+            const reminderToggle = document.getElementById('reminderToggle');
+            const repeatHelpText = document.getElementById('repeatHelpText');
 
-        const repeatPanel = document.getElementById('repeatPanel');
-        const reminderPanel = document.getElementById('reminderPanel');
+            const repeatPanel = document.getElementById('repeatPanel');
+            const reminderPanel = document.getElementById('reminderPanel');
 
-        // Note Modal Auto-Date Logic
-        const addNoteModal = document.getElementById('addNoteModal');
-        addNoteModal.addEventListener('show.bs.modal', function () {
-        const now = new Date();
-        document.getElementById('modalDateTime').value = now.toLocaleString();
+            // Due Date Dependency Logic
+            if (dueDateInput) {
+                dueDateInput.addEventListener('change', function () {
+                    const hasDate = !!this.value;
+                    if(repeatToggle) repeatToggle.disabled = !hasDate;
+                    if(reminderToggle) reminderToggle.disabled = !hasDate;
+
+                    if (hasDate) {
+                        if(repeatHelpText) repeatHelpText.style.display = 'none';
+                    } else {
+                        if(repeatHelpText) repeatHelpText.style.display = 'inline';
+                        
+                        if(repeatToggle) repeatToggle.checked = false;
+                        if(reminderToggle) reminderToggle.checked = false;
+                        if(repeatPanel) repeatPanel.style.display = 'none';
+                        if(reminderPanel) reminderPanel.style.display = 'none';
+                    }
+                });
+            }
+
+            if (repeatToggle) {
+                repeatToggle.addEventListener('change', function () {
+                    if(repeatPanel) repeatPanel.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            if (reminderToggle) {
+                reminderToggle.addEventListener('change', function () {
+                    if(reminderPanel) reminderPanel.style.display = this.checked ? 'block' : 'none';
+                });
+            }
         });
 
-        // Due Date Dependency Logic
-        dueDateInput.addEventListener('change', function () {
-        const hasDate = !!this.value;
-        repeatToggle.disabled = !hasDate;
-        reminderToggle.disabled = !hasDate;
+        // =================================================================
+        // 🚀 NEW: INLINE NOTES JAVASCRIPT (PASTEL INDIGO)
+        // =================================================================
+        document.addEventListener("DOMContentLoaded", function () {
+            const noteOwner = document.getElementById('inlineNoteOwner');
+            if (noteOwner) noteOwner.value = '@Html.Raw(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "")';
+        });
 
-        if (hasDate) {
-        repeatHelpText.style.display = 'none';
-        } else {
-        repeatHelpText.style.display = 'inline';
-        repeatToggle.checked = false;
-        reminderToggle.checked = false;
-        repeatPanel.style.display = 'none';
-        reminderPanel.style.display = 'none';
+        function clearInlineNote() {
+            const titleInput = document.getElementById('inlineNoteTitle');
+            const descInput = document.getElementById('inlineNoteDesc');
+            const fileInput = document.getElementById('inlineNoteFile');
+            
+            if(titleInput) titleInput.value = '';
+            if(descInput) descInput.value = '';
+            if(fileInput) fileInput.value = '';
         }
-        });
 
-        repeatToggle.addEventListener('change', function () {
-        repeatPanel.style.display = this.checked ? 'block' : 'none';
-        });
+        function saveInlineNote() {
+            const titleEl = document.getElementById('inlineNoteTitle');
+            const descEl = document.getElementById('inlineNoteDesc');
+            const fileInput = document.getElementById('inlineNoteFile');
 
-        reminderToggle.addEventListener('change', function () {
-        reminderPanel.style.display = this.checked ? 'block' : 'none';
-        });
-        });
+            const title = titleEl ? titleEl.value.trim() : '';
+            const desc = descEl ? descEl.value.trim() : '';
+            const fileName = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '';
+            
+            const ownerDropdown = document.getElementById('inlineNoteOwner');
+            const ownerId = ownerDropdown ? ownerDropdown.value : '';
+            const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
+            const dateTime = new Date().toLocaleString();
 
-        let noteIndex = 0;
-        function appendNoteUI() {
-        const text = document.getElementById('modalNoteText').value;
-        const time = document.getElementById('modalDateTime').value;
-        const container = document.getElementById('notesContainer');
+            if (!desc && !fileName && !title) {
+                alert('Please enter a title, content, or attach a file.');
+                return;
+            }
 
-        if(!text.trim()) return;
+            let finalDescription = desc;
+            if (title) {
+                finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
+            }
 
-        if(noteIndex === 0) container.innerHTML = '';
+            let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #312e81;">${title}</div>` : '';
+            let fileHtml = fileName ? `
+            <div class="mt-2">
+                <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: #4f46e5; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #3730a3;">
+                    <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
+                </span>
+            </div>` : '';
 
-        const html = `
-        <div class="mb-2 p-3 bg-white border rounded shadow-sm d-flex justify-content-between">
-        <div>
-        <strong style="color: var(--theme-navy-primary); font-size: 0.9rem;">System User</strong>
-        <div style="font-size: 0.85rem; color: var(--theme-text-main); margin-top:4px;">${text}</div>
+            const noteHtml = `
+            <div class="saved-note-card p-3 mb-2" style="border: 1px solid #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 8px; background: #eef2ff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #c7d2fe;">
+                    <span class="fw-bold" style="font-size: 0.85rem; color: #3730a3;">
+                        <i class="fa-solid fa-circle-user me-1" style="color: #4f46e5;"></i> ${ownerName}
+                    </span>
+                    <span style="font-size: 0.75rem; color: #4f46e5; font-weight: 600;">
+                        ${dateTime}
+                    </span>
+                </div>
+                ${titleHtml}
+                <div style="font-size: 0.85rem; color: #3730a3; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
+                ${fileHtml}
 
-        <input type="hidden" name="SavedNoteDesc[]" value="${text}" />
-        <input type="hidden" name="SavedNoteDateTime[]" value="${time}" />
-        </div>
-        <span class="text-muted" style="font-size: 0.75rem;">${time}</span>
-        </div>
-        `;
+                <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
+                <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
+                <input type="hidden" name="SavedNoteDesc[]" value="${finalDescription}" />
+            </div>
+            `;
 
-        container.insertAdjacentHTML('beforeend', html);
-        noteIndex++;
+            const notesContainer = document.getElementById('notesContainer');
+            if (notesContainer) {
+                notesContainer.insertAdjacentHTML('afterbegin', noteHtml);
+            }
+            
+            const placeholder = document.getElementById('noNotesPlaceholder');
+            if (placeholder) placeholder.remove();
 
-        document.getElementById('modalNoteText').value = '';
-        document.getElementById('modalNoteFile').value = '';
+            clearInlineNote();
         }
     </script>
 }
