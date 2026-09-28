@@ -44,7 +44,7 @@ namespace Radar_CRM.Controllers
                            (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
                             currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
 
-            // 🚀 THE HIERARCHY LOGIC 
+            // 🚀 THE HIERARCHY LOGIC
             if (!isAdmin)
             {
                 var allRoles = await _context.Roles.ToListAsync();
@@ -182,7 +182,7 @@ namespace Radar_CRM.Controllers
                 );
             }
 
-            // Server-Side Sorting 
+            // Server-Side Sorting
             if (sortDir == "desc")
             {
                 query = sortCol switch
@@ -240,7 +240,7 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // CREATE: GET 
+        // CREATE: GET
         // ==========================================
         public IActionResult Create()
         {
@@ -251,7 +251,7 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // CREATE: POST 
+        // CREATE: POST
         // ==========================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -313,7 +313,7 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // EDIT: GET 
+        // EDIT: GET
         // ==========================================
         public async Task<IActionResult> Edit(int? id)
         {
@@ -675,79 +675,64 @@ namespace Radar_CRM.Controllers
             return result.ToArray();
         }
 
-        // ==========================================
-        // 🚀 AJAX: GET NOTES FOR DEAL SIDE PANEL
-        // ==========================================
         [HttpGet]
         public async Task<IActionResult> GetNotes(int dealId)
         {
-            try
-            {
-                // 🚀 FIXED: Query _context.Note instead of _context.DealNotes
-                var rawNotes = await _context.Note
-                    .Include(n => n.NoteOwner) // Join the user to get the name safely
-                    .Where(n => n.DealId == dealId)
-                    .OrderByDescending(n => n.CreatedDateTime)
-                    .ToListAsync();
-
-                var notes = rawNotes.Select(n => new
-                {
-                    id = n.Id,
-                    // Assuming your User table has a fullName or FirstName property 
+            var notes = await _context.Note
+                .Where(n => n.DealId == dealId)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .Select(n => new {
                     ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
-                    createdDateTime = n.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
+                    createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                    noteTitle = n.NoteTitle, // Required for UI
                     description = n.Description,
-                    attachmentFileName = ""
-                });
+                    attachmentFileName = n.AttachmentFileName
+                }).ToListAsync();
 
-                return Json(notes);
-            }
-            catch (Exception)
-            {
-                return Json(new List<object>());
-            }
+            return Json(notes);
         }
-        // ==========================================
-        // 🚀 AJAX: SAVE NEW NOTE FROM SIDE PANEL
-        // ==========================================
+
         [HttpPost]
-        [IgnoreAntiforgeryToken] // Prevents 400 Bad Request with JS Fetch
-        public async Task<IActionResult> SaveNoteAjax(int dealId, string description, string ownerId, IFormFile attachment)
+        public async Task<IActionResult> SaveNoteAjax(int dealId, string noteTitle, string description, string ownerId, IFormFile attachment)
         {
             try
             {
-                string safeOwnerId = null;
-                string ownerName = "System";
-
-                // 🚀 Lookup the actual User to get their real name instead of a GUID
-                if (!string.IsNullOrWhiteSpace(ownerId))
+                var note = new Notes
                 {
-                    var owner = await _context.Users.FindAsync(ownerId);
-                    if (owner != null)
-                    {
-                        safeOwnerId = owner.Id;
-                        ownerName = !string.IsNullOrWhiteSpace(owner.FirstName) ? owner.FirstName : owner.fullName;
-                    }
-                }
-
-                string fileName = null;
-                if (attachment != null && attachment.Length > 0)
-                {
-                    fileName = attachment.FileName;
-                    // Add physical file saving logic here later if needed
-                }
-
-                var newNote = new Notes
-                {
-                    DealId = dealId,
-                    Description = description,
-                    NoteOwnerId = safeOwnerId,
-                    CreatedDateTime = DateTime.Now,
-                    AttachmentFileName = fileName
+                    DealId = dealId, // Mapped to Deal
+                    NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
+                    NoteTitle = noteTitle ?? "",
+                    NoteContent = description ?? "",
+                    Description = description ?? "",
+                    CreatedDateTime = DateTime.Now
                 };
 
-                _context.Note.Add(newNote);
+                if (attachment != null && attachment.Length > 0)
+                {
+                    string uploadPath = @"C:\CRM_Files\Notes";
+                    if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+                    string fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(attachment.FileName);
+                    string filePath = Path.Combine(uploadPath, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await attachment.CopyToAsync(stream);
+                    }
+
+                    note.AttachmentFileName = attachment.FileName;
+                    note.AttachmentFilePath = filePath;
+                }
+
+                _context.Note.Add(note);
                 await _context.SaveChangesAsync();
+
+                string ownerName = "System User";
+                if (!string.IsNullOrEmpty(note.NoteOwnerId))
+                {
+                    var user = await _context.Users.FindAsync(note.NoteOwnerId);
+                    if (user != null) ownerName = user.fullName ?? user.FirstName;
+                }
 
                 return Json(new
                 {
@@ -755,9 +740,10 @@ namespace Radar_CRM.Controllers
                     note = new
                     {
                         ownerName = ownerName,
-                        createdDateTime = newNote.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
-                        description = newNote.Description,
-                        attachmentFileName = fileName ?? ""
+                        createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                        noteTitle = note.NoteTitle,
+                        description = note.Description,
+                        attachmentFileName = note.AttachmentFileName
                     }
                 });
             }
@@ -766,8 +752,35 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
+        [HttpGet]
+        public IActionResult DownloadNoteAttachment(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return BadRequest("Filename missing.");
+
+            string folderPath = @"C:\CRM_Files\Notes";
+            string filePath = Path.Combine(folderPath, fileName);
+
+            // Auto-search for matching GUID prefixes
+            if (!System.IO.File.Exists(filePath))
+            {
+                var matchingFiles = Directory.GetFiles(folderPath, "*_" + fileName);
+                if (matchingFiles.Length > 0)
+                {
+                    filePath = matchingFiles[0];
+                }
+                else
+                {
+                    return NotFound("File not found on server.");
+                }
+            }
+
+            byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+            return File(fileBytes, "application/octet-stream", fileName);
+        }
+
         // ==========================================
-        // EDIT: POST 
+        // EDIT: POST
         // ==========================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -850,7 +863,7 @@ namespace Radar_CRM.Controllers
                                         ProductId = dealRow.ProductId,
                                         ProductName = dealRow.ProductName,
                                         DealType = dealRow.DealType,
-                                        
+
                                         // 🚀 FIX: Explicitly cast the decimal? to int?
                                         Quantity = (int?)dealRow.Quantity,
 

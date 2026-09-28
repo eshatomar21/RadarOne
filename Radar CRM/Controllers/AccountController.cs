@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Security.Claims;
 using Task = System.Threading.Tasks.Task;
 
 namespace Radar_CRM.Controllers
@@ -435,26 +436,21 @@ namespace Radar_CRM.Controllers
         public async Task<IActionResult> GetNotes(int accountId)
         {
             var notes = await _context.Note
-                .Include(n => n.NoteOwner)
                 .Where(n => n.AccountId == accountId)
                 .OrderByDescending(n => n.CreatedDateTime)
                 .Select(n => new {
-                    id = n.Id,
-                    ownerName = n.NoteOwner != null ? (n.NoteOwner.fullName ?? n.NoteOwner.FirstName) : "System User",
+                    ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
                     createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                    noteTitle = n.NoteTitle, // 🚀 THIS MUST BE HERE
                     description = n.Description,
                     attachmentFileName = n.AttachmentFileName
-                })
-                .ToListAsync();
+                }).ToListAsync();
 
             return Json(notes);
         }
 
-        // ==========================================
-        // AJAX: SAVE NOTE FROM OFFCANVAS
-        // ==========================================
         [HttpPost]
-        public async Task<IActionResult> SaveNoteAjax(int accountId, string description, string ownerId, IFormFile attachment)
+        public async Task<IActionResult> SaveNoteAjax(int accountId, string noteTitle, string description, string ownerId, IFormFile attachment)
         {
             try
             {
@@ -462,7 +458,12 @@ namespace Radar_CRM.Controllers
                 {
                     AccountId = accountId,
                     NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
+
+                    // 🚀 FIX: Save the new Title and duplicate the text into both Content and Description
+                    NoteTitle = noteTitle ?? "",
+                    NoteContent = description ?? "",
                     Description = description ?? "",
+
                     CreatedDateTime = DateTime.Now
                 };
 
@@ -501,6 +502,7 @@ namespace Radar_CRM.Controllers
                     {
                         ownerName = ownerName,
                         createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                        noteTitle = note.NoteTitle, // 🚀 FIX: Send Title back to the UI
                         description = note.Description,
                         attachmentFileName = note.AttachmentFileName
                     }
@@ -511,6 +513,7 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
         // ==========================================
         // CREATE: GET (Opens the blank form)
         // ==========================================
@@ -518,7 +521,18 @@ namespace Radar_CRM.Controllers
         {
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
-            return View();
+
+            // 1. Get the currently logged-in user's ID
+            string loggedInUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            // 2. Create a new model and pre-fill the AccountOwnerId
+            var model = new Account
+            {
+                AccountOwnerId = loggedInUserId
+            };
+
+            // 3. Pass the model to the view
+            return View(model);
         }
 
         // ==========================================
@@ -742,6 +756,35 @@ namespace Radar_CRM.Controllers
                 }
                 await _context.SaveChangesAsync();
             }
+        }
+
+        [HttpGet]
+        public IActionResult DownloadNoteAttachment(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return BadRequest("Filename missing.");
+
+            string folderPath = @"C:\CRM_Files\Notes";
+
+            // 1. Try exact match first
+            string filePath = Path.Combine(folderPath, fileName);
+
+            // 2. If exact match fails, search for the file with the GUID prefix
+            if (!System.IO.File.Exists(filePath))
+            {
+                // Searches for any file ending with "_Screenshot (5).png"
+                var matchingFiles = Directory.GetFiles(folderPath, "*_" + fileName);
+                if (matchingFiles.Length > 0)
+                {
+                    filePath = matchingFiles[0]; // Grab the actual file with the GUID
+                }
+                else
+                {
+                    return NotFound("File not found on server.");
+                }
+            }
+
+            byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+            return File(fileBytes, "application/octet-stream", fileName);
         }
 
         // ==========================================

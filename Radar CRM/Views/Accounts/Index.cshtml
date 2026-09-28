@@ -1,5 +1,5 @@
 ﻿@model IEnumerable<Radar_CRM.Models.Account>
-
+@using System.Security.Claims
 @{
     ViewData["Title"] = "Accounts Master";
 
@@ -14,6 +14,7 @@
 
     // EXCLUSION LIST: Removed ZohoRecordId, AccountOwnerId, and CoOwnerId as requested
     var excludedFields = new[] { "ZohoRecordId" };
+    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
 
     // Using reflection to get table properties dynamically, excluding the specified fields
     var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -159,6 +160,9 @@
         flex-direction: column;
         box-shadow: var(--shadow-sm);
         height: 100%;
+        resize: horizontal;
+        overflow: hidden;
+        max-width: 600px;
     }
 
     .filter-header {
@@ -341,6 +345,9 @@
             z-index: 10;
             border-bottom: 1px solid var(--border-soft);
             padding: 14px 16px;
+            resize: horizontal;
+            overflow: auto;
+            min-width: 120px;
         }
 
     .th-content {
@@ -394,6 +401,7 @@
         z-index: 11;
         border-right: 1px solid var(--border-soft) !important;
         background-color: var(--bg-surface);
+        resize: none !important;
     }
 
     .sticky-actions {
@@ -404,6 +412,7 @@
         z-index: 11;
         border-left: 1px solid var(--border-soft) !important;
         background-color: var(--bg-surface);
+        resize: none !important;
     }
 
     .table thead th.sticky-cb, .table thead th.sticky-actions {
@@ -914,7 +923,7 @@
         </div>
 
         <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
-            
+           
             <!-- 🚀 NEW FEATURE: SAVED FILTERS SECTION -->
             <div id="savedFiltersSection" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f0fdf4; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
@@ -961,7 +970,7 @@
                             <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
                                style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
                                onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
-                            
+                           
                             <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2"
                                style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
                                onclick="saveFieldFilter(event, this, '@prop.Name')" title="Save this filter"></i>
@@ -1532,6 +1541,7 @@
 
     <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
         <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
+            <input type="text" id="newNoteTitle" class="form-control border-0 shadow-none p-3 pb-0 fw-bold" placeholder="Note Title..." style="font-size: 1rem; color: #0f172a; background: transparent;">
             <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
             <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
                 <div class="d-flex align-items-center gap-2">
@@ -1975,7 +1985,7 @@
                 field += "Id";
             }
 
-            let logicOperator = "AND"; 
+            let logicOperator = "AND";
             if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
             }
@@ -2062,7 +2072,7 @@
    function restoreSidebarFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const filtersParam = urlParams.get('advancedFilters');
-        
+       
         if (filtersParam) {
             try {
                 const activeFilters = JSON.parse(filtersParam);
@@ -2090,7 +2100,7 @@
                             const vals = f.Value.split('|');
                             const date1 = item.querySelector('.date-val-1');
                             if (date1) date1.value = vals[0];
-                            
+                           
                             if (vals.length > 1) {
                                 const date2 = item.querySelector('.date-val-2');
                                 if (date2) {
@@ -2104,8 +2114,8 @@
                         }
                     }
                 });
-            } catch(e) { 
-                console.error("Error restoring filters from URL", e); 
+            } catch(e) {
+                console.error("Error restoring filters from URL", e);
             }
         }
     }
@@ -2114,10 +2124,10 @@
     // ==========================================
     function saveFieldFilter(event, iconEl, fieldName) {
         event.stopPropagation();
-        
+       
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
-        
+       
         if(!cb.checked) {
             alert("Please check the box and set a value before saving this filter.");
             return;
@@ -2135,7 +2145,7 @@
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters') || '[]');
         savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
         localStorage.setItem('crm_saved_sidebar_filters', JSON.stringify(savedFilters));
-        
+       
         renderSavedSidebarFilters();
     }
 
@@ -2221,7 +2231,7 @@
         // Initialize features
         renderCustomViews();
         renderSavedSidebarFilters();
-        
+       
         // Call the function to re-check the boxes from the URL
         restoreSidebarFiltersFromUrl();
     });
@@ -2483,8 +2493,15 @@
     function setupColumnToggles() {
         const table = document.querySelector("#accountsTable");
         const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
-        const columnMenu = document.getElementById("columnToggleMenu");
-        columnMenu.innerHTML = '';
+    const columnMenu = document.getElementById("columnToggleMenu");
+    columnMenu.innerHTML = `
+    <li class="px-2 pb-2 mb-2 border-bottom" style="position: sticky; top: 0; background: white; z-index: 10;">
+        <div class="input-group input-group-sm border rounded">
+            <span class="input-group-text bg-transparent border-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input type="text" class="form-control border-0 shadow-none" placeholder="Search columns..." id="manageColSearch" onkeyup="filterManageColumns()">
+        </div>
+    </li>
+`;
 
         const hasSavedState = localStorage.getItem('crm_hidden_cols') !== null;
 
@@ -2533,6 +2550,15 @@
         });
     }
 
+window.filterManageColumns = function () {
+    const q = document.getElementById('manageColSearch').value.toLowerCase();
+    const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
+    items.forEach(item => {
+        const label = item.querySelector('label').innerText.toLowerCase();
+        item.style.display = label.includes(q) ? 'flex' : 'none';
+    });
+}
+
     let draggedItem = null;
     function handleDragStart(e) {
         draggedItem = this;
@@ -2555,7 +2581,7 @@
             else this.before(draggedItem);
 
             reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
-            
+           
             // 🚀 FIX: Save the new column order to LocalStorage immediately
             saveColumnOrder();
         }
@@ -2856,7 +2882,7 @@
 
    function exportTableToCSV(filename) {
         const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-        
+       
         // 🚀 FIX: Prevent export if no checkboxes are selected
         if (checkedCbs.length === 0) {
             alert("Please select at least one record using the checkboxes before exporting.");
@@ -3068,6 +3094,12 @@
             document.getElementById('newNoteText').value = '';
             document.getElementById('noteAttachment').value = '';
 
+    // ADD THIS RIGHT BELOW IT:
+    const ownerDropdown = document.getElementById('noteOwnerId');
+    if (ownerDropdown) {
+        ownerDropdown.value = '@currentUserId';
+    }
+
             const list = document.getElementById('notesTimelineList');
             list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
 
@@ -3086,7 +3118,7 @@
             bsOffcanvas.show();
 
             try {
-                const response = await fetch(`/Accounts/GetNotes?accountId=${accountId}`);
+                const response = await fetch('@Url.Action("GetNotes", "Accounts")?accountId=' + accountId);
                 if (!response.ok) throw new Error("Failed to fetch");
 
                 const responseData = await response.json();
@@ -3098,38 +3130,44 @@
                 if (notesArray && notesArray.length > 0) {
                     let allNotesHtml = '';
 
-                    // 2. Build HTML directly to avoid external function silent failures
-                    notesArray.forEach(n => {
-                        const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
-                        const time = n.createdDateTime || n.CreatedDateTime || n.createdDate || 'Unknown Date';
-                        const desc = n.description || n.Description || n.noteText || '';
-                        const file = n.attachmentFileName || n.AttachmentFileName || null;
+            // FIND THIS SECTION INSIDE openNotesPanel:
+            notesArray.forEach(n => {
+                const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
+                const time = n.createdDateTime || n.CreatedDateTime || n.createdDate || 'Unknown Date';
+                const desc = n.description || n.Description || n.noteText || '';
+                const file = n.attachmentFileName || n.AttachmentFileName || null;
 
-                        let attachmentHtml = file ? `
-                            <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155;">
-                                <i class="fa-solid fa-file-lines text-muted"></i>
-                                <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
-                            </div>` : '';
+                // 🚀 ADD THIS MISSING LINE RIGHT HERE:
+                const title = n.noteTitle || n.NoteTitle || '';
 
-                        allNotesHtml += `
-                            <div class="position-relative mb-4">
-                                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                                <i class="fa-solid fa-user"></i>
-                                            </div>
-                                            ${owner}
-                                        </div>
-                                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
-                                            <i class="fa-regular fa-clock me-1"></i>${time}
-                                        </span>
-                                    </div>
-                                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
-                                    ${attachmentHtml}
-                                </div>
-                            </div>`;
+                // 🚀 EXISTING ATTACHMENT HTML:
+                let attachmentHtml = file ? `
+        <a href="/Accounts/DownloadNoteAttachment?fileName=${encodeURIComponent(file)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
+        <i class="fa-solid fa-download text-primary"></i>
+        <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
+    </a>` : '';
+
+                // 🚀 FIX: Explicitly checks for 'title' and renders it bold above the description
+                allNotesHtml += `
+    <div class="position-relative mb-4">
+        <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+        <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                    <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    ${owner}
+                </div>
+                <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                    <i class="fa-regular fa-clock me-1"></i>${time}
+                </span>
+            </div>
+            ${title ? `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
+            <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
+            ${attachmentHtml}
+        </div>
+    </div>`;
                     });
 
                     list.innerHTML = allNotesHtml;
@@ -3147,7 +3185,8 @@
         }
 
         async function saveNoteAjax() {
-            const text = document.getElementById('newNoteText').value;
+    const title = document.getElementById('newNoteTitle').value;
+    const text = document.getElementById('newNoteText').value;
             const attachment = document.getElementById('noteAttachment').files[0];
             const ownerId = document.getElementById('noteOwnerId').value;
             const btn = document.getElementById('btnSaveNote');
@@ -3159,6 +3198,7 @@
 
             const formData = new FormData();
             formData.append('accountId', currentNoteAccountId);
+    formData.append('noteTitle', title);
             formData.append('description', text);
             formData.append('ownerId', ownerId);
             if (attachment) formData.append('attachment', attachment);
@@ -3198,34 +3238,158 @@
                 btn.disabled = false;
             }
         }
-        
-        function appendNoteToUI(ownerName, timeString, text, fileName) {
-            let attachmentHtml = fileName ? `
-                <div class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #334155;">
-                    <i class="fa-solid fa-file-lines text-muted"></i>
-                    <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
-                </div>` : '';
+       
+// 🚀 FIX: Note Title Rendering & Attachment Download Link
+function appendNoteToUI(ownerName, timeString, title, text, fileName) {
+    // Creates a clickable download button for the attachment
+    let attachmentHtml = fileName ? `
+        <a href="/Accounts/DownloadNoteAttachment?fileName=${encodeURIComponent(fileName)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.85rem; color: #0f172a; transition: 0.2s;" onmouseover="this.style.background='#eff6ff'; this.style.borderColor='#93c5fd';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';">
+            <i class="fa-solid fa-download text-primary"></i>
+            <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+        </a>` : '';
 
-            const noteHtml = `
-                <div class="position-relative mb-4">
-                    <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                    <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                                <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                    <i class="fa-solid fa-user"></i>
-                                </div>
-                                ${ownerName}
-                            </div>
-                            <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
-                                <i class="fa-regular fa-clock me-1"></i>${timeString}
-                            </span>
+    const noteHtml = `
+        <div class="position-relative mb-4">
+            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+            <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                        <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                            <i class="fa-solid fa-user"></i>
                         </div>
-                        <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
-                        ${attachmentHtml}
+                        ${ownerName}
                     </div>
-                </div>`;
+                    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                        <i class="fa-regular fa-clock me-1"></i>${timeString}
+                    </span>
+                </div>
+                ${title ? `<div class="fw-bold mb-2 pb-1 border-bottom" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
+                <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+                ${attachmentHtml}
+            </div>
+        </div>`;
 
-            document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+    document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+}
+
+// Add this inside document.addEventListener("DOMContentLoaded", ...)
+setupExcelResizing();
+
+
+function setupExcelResizing() {
+    const table = document.getElementById('accountsTable');
+    if (table) {
+        // Force table layout to respect explicit widths
+        table.style.tableLayout = "fixed";
+        table.style.width = "max-content";
+
+        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
+        cols.forEach(col => {
+            col.style.position = 'relative';
+
+            // Apply default ellipsis styling to header
+            col.style.overflow = 'hidden';
+            col.style.textOverflow = 'ellipsis';
+            col.style.whiteSpace = 'nowrap';
+
+            // Create invisible drag handle
+            const resizer = document.createElement('div');
+            resizer.style.width = '8px';
+            resizer.style.height = '100%';
+            resizer.style.position = 'absolute';
+            resizer.style.right = '0';
+            resizer.style.top = '0';
+            resizer.style.cursor = 'col-resize';
+            resizer.style.userSelect = 'none';
+            resizer.style.zIndex = '10';
+
+            resizer.addEventListener('mouseenter', () => resizer.style.backgroundColor = '#93c5fd');
+            resizer.addEventListener('mouseleave', () => resizer.style.backgroundColor = 'transparent');
+
+            col.appendChild(resizer);
+
+            let startX, startWidth;
+
+            // Get exact column index to resize corresponding TDs
+            const colIndex = Array.from(col.parentNode.children).indexOf(col);
+
+            resizer.addEventListener('mousedown', function (e) {
+                startX = e.pageX;
+                startWidth = col.offsetWidth;
+                document.body.style.cursor = 'col-resize'; // Keep cursor globally while dragging
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            });
+
+            function mouseMoveHandler(e) {
+                // 🚀 FORCE SHRINK: Allow width to drop as low as 30px
+                const newWidth = Math.max(30, startWidth + (e.pageX - startX));
+
+                col.style.width = `${newWidth}px`;
+                col.style.minWidth = `${newWidth}px`;
+                col.style.maxWidth = `${newWidth}px`;
+
+                // 🚀 Force all TDs in this column to shrink and hide overflow text
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const td = row.children[colIndex];
+                    if (td) {
+                        td.style.width = `${newWidth}px`;
+                        td.style.minWidth = `${newWidth}px`;
+                        td.style.maxWidth = `${newWidth}px`;
+                        td.style.overflow = 'hidden';
+                        td.style.textOverflow = 'ellipsis';
+                        td.style.whiteSpace = 'nowrap';
+                    }
+                });
+            }
+
+            function mouseUpHandler() {
+                document.body.style.cursor = 'default';
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+            }
+        });
+    }
+
+    // --- Sidebar Resizer remains unchanged ---
+    const sidebar = document.querySelector('.filter-sidebar');
+    if (sidebar) {
+        sidebar.style.position = 'relative';
+        const sideResizer = document.createElement('div');
+        sideResizer.style.width = '6px';
+        sideResizer.style.height = '100%';
+        sideResizer.style.position = 'absolute';
+        sideResizer.style.right = '0';
+        sideResizer.style.top = '0';
+        sideResizer.style.cursor = 'col-resize';
+        sideResizer.style.userSelect = 'none';
+
+        sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
+        sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
+
+        sidebar.appendChild(sideResizer);
+
+        let sStartX, sStartWidth;
+        sideResizer.addEventListener('mousedown', function (e) {
+            sStartX = e.pageX;
+            sStartWidth = sidebar.offsetWidth;
+            document.addEventListener('mousemove', sideMouseMove);
+            document.addEventListener('mouseup', sideMouseUp);
+        });
+
+        function sideMouseMove(e) {
+            const newWidth = sStartWidth + (e.pageX - sStartX);
+            if (newWidth > 200 && newWidth < 800) {
+                sidebar.style.minWidth = `${newWidth}px`;
+                sidebar.style.width = `${newWidth}px`;
+            }
         }
+
+        function sideMouseUp() {
+            document.removeEventListener('mousemove', sideMouseMove);
+            document.removeEventListener('mouseup', sideMouseUp);
+        }
+    }
+}
 </script>

@@ -119,6 +119,8 @@ namespace Radar_CRM.Controllers
             return View(tasks);
         }
 
+        
+
         // ==========================================
         // HELPER METHOD (Add this to the bottom of the TasksController)
         // ==========================================
@@ -140,14 +142,139 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // CREATE: GET
         // ==========================================
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
 
-            return View(new CrmTaskModel());
+            // 1. Get the currently logged-in user's ID
+            string loggedInUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var model = new CrmTaskModel
+            {
+                TaskOwnerId = loggedInUserId
+            };
+
+            // 2. 🚀 FIX FOR SELECT2: Fetch the user's name so the dropdown shows text, not just an empty ID
+            if (!string.IsNullOrEmpty(loggedInUserId))
+            {
+                var user = await _context.Users.FindAsync(loggedInUserId);
+                if (user != null)
+                {
+                    ViewBag.TaskOwnerName = user.fullName;
+                    model.TaskOwner = user.fullName;
+                }
+            }
+
+            return View(model);
         }
+
+
+        [HttpGet]
+        public async Task<IActionResult> GetNotes(int taskId)
+        {
+            var notes = await _context.Note
+                .Where(n => n.TaskId == taskId)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .Select(n => new {
+                    ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
+                    createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                    noteTitle = n.NoteTitle,
+                    description = n.Description,
+                    attachmentFileName = n.AttachmentFileName
+                }).ToListAsync();
+
+            return Json(notes);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveNoteAjax(int taskId, string noteTitle, string description, string ownerId, IFormFile attachment)
+        {
+            try
+            {
+                var note = new Notes
+                {
+                    TaskId = taskId, // Mapped specifically to Task
+                    NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
+                    NoteTitle = noteTitle ?? "",
+                    NoteContent = description ?? "",
+                    Description = description ?? "",
+                    CreatedDateTime = DateTime.Now
+                };
+
+                if (attachment != null && attachment.Length > 0)
+                {
+                    string uploadPath = @"C:\CRM_Files\Notes";
+                    if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+                    string fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(attachment.FileName);
+                    string filePath = Path.Combine(uploadPath, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await attachment.CopyToAsync(stream);
+                    }
+
+                    note.AttachmentFileName = attachment.FileName;
+                    note.AttachmentFilePath = filePath;
+                }
+
+                _context.Note.Add(note);
+                await _context.SaveChangesAsync();
+
+                string ownerName = "System User";
+                if (!string.IsNullOrEmpty(note.NoteOwnerId))
+                {
+                    var user = await _context.Users.FindAsync(note.NoteOwnerId);
+                    if (user != null) ownerName = user.fullName ?? user.FirstName;
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    note = new
+                    {
+                        ownerName = ownerName,
+                        createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                        noteTitle = note.NoteTitle,
+                        description = note.Description,
+                        attachmentFileName = note.AttachmentFileName
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public IActionResult DownloadNoteAttachment(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return BadRequest("Filename missing.");
+
+            string folderPath = @"C:\CRM_Files\Notes";
+            string filePath = Path.Combine(folderPath, fileName);
+
+            // Auto-search for matching GUID prefixes to guarantee download works
+            if (!System.IO.File.Exists(filePath))
+            {
+                var matchingFiles = Directory.GetFiles(folderPath, "*_" + fileName);
+                if (matchingFiles.Length > 0)
+                {
+                    filePath = matchingFiles[0];
+                }
+                else
+                {
+                    return NotFound("File not found on server.");
+                }
+            }
+
+            byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+            return File(fileBytes, "application/octet-stream", fileName);
+        }
+
 
         // ==========================================
         // CREATE: POST

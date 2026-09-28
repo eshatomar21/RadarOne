@@ -273,22 +273,26 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // GET: Users/Login
-        // ==========================================
-        // ==========================================
-        // GET: Users/Login (Overrides the RadarONE Login Screen)
+        // GET: Users/Login 
         // ==========================================
         [HttpGet]
         public IActionResult Login()
         {
-            // If they are already logged in, send to Launchpad Apps menu
+#if DEBUG
+            // 🚀 ON LOCALHOST: Show the local login screen so you can actually test
+            if (User.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+            return View(); // Returns the local Login.cshtml view
+#else
+            // 🚀 ON PRODUCTION: Redirect to the PEMS HRMS Launchpad
             if (User.Identity.IsAuthenticated)
             {
                 return Redirect("http://pems:8081/Applications/Index");
             }
-
-            // If they are not logged in, send to Launchpad Login
             return Redirect("http://pems:8081/");
+#endif
         }
 
         // ==========================================
@@ -346,8 +350,13 @@ namespace Radar_CRM.Controllers
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
-            // Redirect back to HRMS Launchpad after logging out
+#if DEBUG
+            // 🚀 ON LOCALHOST: Redirect to local login
+            return RedirectToAction("Login", "Users");
+#else
+            // 🚀 ON PRODUCTION: Redirect back to HRMS Launchpad
             return Redirect("http://pems:8081/");
+#endif
         }
 
         // ==========================================
@@ -406,6 +415,7 @@ namespace Radar_CRM.Controllers
         {
             return _context.Users.Any(e => e.Id == id);
         }
+
 
         // ==========================================
         // POST: Users/SsoLogin (From External Launchpad)

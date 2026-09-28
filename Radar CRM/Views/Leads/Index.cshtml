@@ -1,5 +1,5 @@
 ﻿@model IEnumerable<Radar_CRM.Models.Lead>
-
+@using System.Security.Claims
 @{
     ViewData["Title"] = "Leads Master";
 
@@ -11,7 +11,7 @@
     string currentSortCol = Context.Request.Query["sortCol"];
     string currentSortDir = Context.Request.Query["sortDir"];
     string advancedFilters = Context.Request.Query["advancedFilters"];
-
+    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
     // EXCLUSION LIST: Exclude internal IDs & collections from the main grid view
     var excludedFields = new[] {
         "ZohoRecordId", "LeadOwnerId", "CoOwnerId", "AccountOwnerId", "DemoOwnerId",
@@ -80,6 +80,21 @@
         .page-title i {
             color: var(--primary-blue);
         }
+
+        .excel-resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 15;
+    transition: background-color 0.2s;
+}
+.excel-resizer:hover, .excel-resizer.resizing {
+    background-color: var(--primary-blue);
+    width: 8px;
+}
 
     /* Action Buttons (3D SaaS Style) */
     .btn-saas {
@@ -1505,6 +1520,7 @@
 
     <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
         <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
+            <input type="text" id="newNoteTitle" class="form-control border-0 shadow-none p-3 pb-0 fw-bold" placeholder="Note Title..." style="font-size: 1rem; color: #0f172a; background: transparent;">
             <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
             <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
                 <div class="d-flex align-items-center gap-2">
@@ -1724,9 +1740,10 @@
 
         renderCustomViews();
         renderSavedSidebarFilters();
-        
+       
         // Restore Sidebar filters on load
         restoreSidebarFiltersFromUrl();
+        setupExcelResizing();
     });
     // ==========================================
     // 2. JS FILTER/SORT REFRESH
@@ -1834,10 +1851,10 @@
     // ==========================================
     function saveFieldFilter(event, iconEl, fieldName) {
         event.stopPropagation();
-        
+       
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
-        
+       
         if(!cb.checked) {
             alert("Please check the box and set a value before saving this filter.");
             return;
@@ -1855,7 +1872,7 @@
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_leads') || '[]');
         savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
         localStorage.setItem('crm_saved_sidebar_filters_leads', JSON.stringify(savedFilters));
-        
+       
         renderSavedSidebarFilters();
     }
 
@@ -1916,7 +1933,7 @@
    function restoreSidebarFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const filtersParam = urlParams.get('advancedFilters');
-        
+       
         if (filtersParam) {
             try {
                 const activeFilters = JSON.parse(filtersParam);
@@ -1931,7 +1948,7 @@
                     if (chk) {
                         chk.checked = true;
                         const item = chk.closest('.filter-field-item');
-                        item.classList.add('active'); 
+                        item.classList.add('active');
 
                         const condSelect = item.querySelector('.condition-select');
                         if (condSelect) {
@@ -1944,7 +1961,7 @@
                             const vals = f.Value.split('|');
                             const date1 = item.querySelector('.date-val-1');
                             if (date1) date1.value = vals[0];
-                            
+                           
                             if (vals.length > 1) {
                                 const date2 = item.querySelector('.date-val-2');
                                 if (date2) {
@@ -2008,7 +2025,7 @@
         if (!modalEl) return;
         document.body.appendChild(modalEl);
         modalEl.style.zIndex = "9999";
-        
+       
         try {
             const myModal = new bootstrap.Modal(modalEl);
             myModal.show();
@@ -2409,7 +2426,7 @@
         });
         refreshVisibleRows();
     }
-    
+   
     function toggleMoreFields() {
         const container = document.getElementById("moreFieldsContainer");
         const btn = document.getElementById("moreFieldsToggle");
@@ -2530,7 +2547,7 @@
 
     function exportTableToCSV(filename) {
         const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-        
+       
         if (checkedCbs.length === 0) {
             alert("Please select at least one record using the checkboxes before exporting.");
             return;
@@ -2665,7 +2682,15 @@
         const table = document.querySelector("#leadsTable");
         const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
         const columnMenu = document.getElementById("columnToggleMenu");
-        columnMenu.innerHTML = '';
+        // REPLACE columnMenu.innerHTML = ''; WITH THIS:
+        columnMenu.innerHTML = `
+        <li class="px-2 pb-2 mb-2 border-bottom" style="position: sticky; top: 0; background: white; z-index: 10;">
+            <div class="input-group input-group-sm border rounded">
+                <span class="input-group-text bg-transparent border-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" class="form-control border-0 shadow-none" placeholder="Search columns..." id="manageColSearch" onkeyup="filterManageColumns()">
+            </div>
+        </li>
+    `;
 
         const hasSavedState = localStorage.getItem('crm_hidden_cols_leads') !== null;
 
@@ -2736,7 +2761,7 @@
             else this.before(draggedItem);
 
             reorderTableColumns(draggedItem.dataset.colIndex, this.dataset.colIndex, insertAfter);
-            
+           
             // 🚀 FIX: Save the new column order to LocalStorage immediately
             saveColumnOrder();
         }
@@ -2776,5 +2801,268 @@
             }
             requestAnimationFrame(processChunk);
         }, 10);
+    }
+
+    window.filterManageColumns = function () {
+        const q = document.getElementById('manageColSearch').value.toLowerCase();
+        const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
+        items.forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            item.style.display = label.includes(q) ? 'flex' : 'none';
+        });
+    }
+
+    // --- EXCEL RESIZING FOR LEADS ---
+    function setupExcelResizing() {
+        const table = document.getElementById('leadsTable');
+        if (!table) return;
+
+        // REPLACE THEM WITH THESE THREE LINES:
+        table.style.tableLayout = "fixed";
+        table.style.width = "max-content";
+        table.style.minWidth = "100%"; // 🚀 THIS IS THE MAGIC FIX
+
+        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
+
+        cols.forEach((col, index) => {
+            col.style.position = 'relative';
+
+            const resizer = document.createElement('div');
+            resizer.className = 'excel-resizer';
+            col.appendChild(resizer);
+
+            let startX, startWidth;
+            const colIndex = index + 1;
+
+            resizer.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                startX = e.pageX;
+                startWidth = col.offsetWidth;
+
+                resizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            });
+
+            function mouseMoveHandler(e) {
+                const newWidth = Math.max(40, startWidth + (e.pageX - startX));
+
+                col.style.width = `${newWidth}px`;
+                col.style.minWidth = `${newWidth}px`;
+                col.style.maxWidth = `${newWidth}px`;
+
+                const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+                rows.forEach(row => {
+                    const td = row.children[colIndex];
+                    if (td) {
+                        td.style.width = `${newWidth}px`;
+                        td.style.minWidth = `${newWidth}px`;
+                        td.style.maxWidth = `${newWidth}px`;
+                        td.style.overflow = 'hidden';
+                        td.style.textOverflow = 'ellipsis';
+                        td.style.whiteSpace = 'nowrap';
+                    }
+                });
+            }
+
+            function mouseUpHandler() {
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = 'default';
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+            }
+        });
+
+        const sidebar = document.querySelector('.filter-sidebar');
+        if (sidebar) {
+            sidebar.style.position = 'relative';
+            const sideResizer = document.createElement('div');
+            sideResizer.style.width = '6px';
+            sideResizer.style.height = '100%';
+            sideResizer.style.position = 'absolute';
+            sideResizer.style.right = '0';
+            sideResizer.style.top = '0';
+            sideResizer.style.cursor = 'col-resize';
+            sideResizer.style.userSelect = 'none';
+
+            sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
+            sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
+
+            sidebar.appendChild(sideResizer);
+
+            let sStartX, sStartWidth;
+            sideResizer.addEventListener('mousedown', function (e) {
+                sStartX = e.pageX;
+                sStartWidth = sidebar.offsetWidth;
+                document.addEventListener('mousemove', sideMouseMove);
+                document.addEventListener('mouseup', sideMouseUp);
+            });
+
+            function sideMouseMove(e) {
+                const newWidth = sStartWidth + (e.pageX - sStartX);
+                if (newWidth > 200 && newWidth < 800) {
+                    sidebar.style.minWidth = `${newWidth}px`;
+                    sidebar.style.width = `${newWidth}px`;
+                }
+            }
+
+            function sideMouseUp() {
+                document.removeEventListener('mousemove', sideMouseMove);
+                document.removeEventListener('mouseup', sideMouseUp);
+            }
+        }
+    }
+
+    // --- LEAD NOTES SYSTEM ---
+    async function openNotesPanel(leadId, leadName) {
+        currentNoteLeadId = leadId;
+        document.getElementById('noteAccountName').innerText = leadName || 'Lead';
+
+        document.getElementById('newNoteTitle').value = '';
+        document.getElementById('newNoteText').value = '';
+        document.getElementById('noteAttachment').value = '';
+
+        const ownerDropdown = document.getElementById('noteOwnerId');
+        if (ownerDropdown) {
+            ownerDropdown.value = '@currentUserId';
+        }
+
+        const list = document.getElementById('notesTimelineList');
+        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+        const panelEl = document.getElementById('notesPanel');
+        document.body.appendChild(panelEl);
+        panelEl.style.zIndex = "1055";
+
+        let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl);
+        if (!bsOffcanvas) bsOffcanvas = new bootstrap.Offcanvas(panelEl);
+        bsOffcanvas.show();
+
+        try {
+            const response = await fetch('@Url.Action("GetNotes", "Leads")?leadId=' + leadId);
+            if (!response.ok) throw new Error("Failed to fetch");
+
+            const responseData = await response.json();
+            const notesArray = Array.isArray(responseData) ? responseData : (responseData.data || responseData.notes || []);
+
+            if (notesArray && notesArray.length > 0) {
+                let allNotesHtml = '';
+                notesArray.forEach(n => {
+                    const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
+                    const time = n.createdDateTime || n.CreatedDateTime || 'Unknown Date';
+                    const desc = n.description || n.Description || n.noteText || '';
+                    const file = n.attachmentFileName || n.AttachmentFileName || null;
+                    const title = n.noteTitle || n.NoteTitle || '';
+
+                    let attachmentHtml = file ? `
+                        <a href="/Leads/DownloadNoteAttachment?fileName=${encodeURIComponent(file)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
+                            <i class="fa-solid fa-download text-primary"></i>
+                            <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
+                        </a>` : '';
+
+                    allNotesHtml += `
+                        <div class="position-relative mb-4">
+                            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                            <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                                        <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;"><i class="fa-solid fa-user"></i></div>
+                                        ${owner}
+                                    </div>
+                                    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;"><i class="fa-regular fa-clock me-1"></i>${time}</span>
+                                </div>
+                                ${title ? `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
+                                <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
+                                ${attachmentHtml}
+                            </div>
+                        </div>`;
+                });
+                list.innerHTML = allNotesHtml;
+            } else {
+                list.innerHTML = `<div class="position-relative mb-4"><div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div><p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p></div>`;
+            }
+        } catch (e) {
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes.</p>';
+        }
+    }
+
+    async function saveNoteAjax() {
+        const title = document.getElementById('newNoteTitle').value;
+        const text = document.getElementById('newNoteText').value;
+        const attachment = document.getElementById('noteAttachment').files[0];
+        const ownerId = document.getElementById('noteOwnerId').value;
+        const btn = document.getElementById('btnSaveNote');
+
+        if (!text.trim() && !attachment && !title.trim()) return;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('leadId', currentNoteLeadId);
+        formData.append('noteTitle', title);
+        formData.append('description', text);
+        formData.append('ownerId', ownerId);
+        if (attachment) formData.append('attachment', attachment);
+
+        try {
+            const response = await fetch('@Url.Action("SaveNoteAjax", "Leads")', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.note) {
+                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+                if (fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
+
+                const owner = data.note.ownerName || 'System';
+                const time = data.note.createdDateTime || 'Just now';
+                const desc = data.note.description || text;
+                const savedTitle = data.note.noteTitle || title;
+                const file = data.note.attachmentFileName || null;
+
+                appendNoteToUI(owner, time, savedTitle, desc, file);
+
+                document.getElementById('newNoteTitle').value = '';
+                document.getElementById('newNoteText').value = '';
+                document.getElementById('noteAttachment').value = '';
+            } else {
+                alert("Failed to save note: " + (data.message || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Network error while saving note.");
+        } finally {
+            btn.innerHTML = 'Save Note';
+            btn.disabled = false;
+        }
+    }
+
+    function appendNoteToUI(ownerName, timeString, title, text, fileName) {
+        let attachmentHtml = fileName ? `
+            <a href="/Leads/DownloadNoteAttachment?fileName=${encodeURIComponent(fileName)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
+                <i class="fa-solid fa-download text-primary"></i>
+                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+            </a>` : '';
+
+        const noteHtml = `
+            <div class="position-relative mb-4">
+                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;"><i class="fa-solid fa-user"></i></div>
+                            ${ownerName}
+                        </div>
+                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;"><i class="fa-regular fa-clock me-1"></i>${timeString}</span>
+                    </div>
+                    ${title ? `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
+                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+                    ${attachmentHtml}
+                </div>
+            </div>`;
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
 </script>

@@ -460,7 +460,7 @@ namespace Radar_CRM.Controllers
                 // Detach the list so Entity Framework doesn't save them automatically (we will do it manually to prevent duplicates)
                 lead.PaymentRow = null;
 
-                // 1. Save new lead to DB 
+                // 1. Save new lead to DB
                 _context.Add(lead);
                 await _context.SaveChangesAsync(); // Generates the new Lead.Id
 
@@ -489,87 +489,75 @@ namespace Radar_CRM.Controllers
             return View(lead);
         }
 
-        // ==========================================
-        // AJAX: GET NOTES FOR SIDE PANEL
-        // ==========================================
         [HttpGet]
         public async Task<IActionResult> GetNotes(int leadId)
         {
-            try
-            {
-                // 1. Fetch the raw data from the database first
-                var rawNotes = await _context.Note
-                    .Include(n => n.NoteOwner)
-                    .Where(n => n.LeadId == leadId)
-                    .OrderByDescending(n => n.CreatedDateTime)
-                    .ToListAsync(); // <-- Call this BEFORE .Select()
-
-                // 2. Format the dates in memory to avoid EF Core SQL translation errors
-                var notes = rawNotes.Select(n => new
-                {
-                    id = n.Id,
-                    ownerName = n.NoteOwner != null ? n.NoteOwner.FirstName : "System",
-                    // Since it's a non-nullable DateTime, we can just call .ToString() directly
-                    createdDateTime = n.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
+            var notes = await _context.Note
+                .Where(n => n.LeadId == leadId)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .Select(n => new {
+                    ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
+                    createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                    noteTitle = n.NoteTitle,
                     description = n.Description,
                     attachmentFileName = n.AttachmentFileName
-                });
+                }).ToListAsync();
 
-                return Json(notes);
-            }
-            catch (Exception ex)
-            {
-                // Return an empty array instead of crashing if something goes wrong
-                return Json(new List<object>());
-            }
+            return Json(notes);
         }
 
-        // ==========================================
-        // AJAX: SAVE NEW NOTE FROM SIDE PANEL
-        // ==========================================
         [HttpPost]
-        public async Task<IActionResult> SaveNoteAjax(int leadId, string description, string ownerId, IFormFile attachment)
+        public async Task<IActionResult> SaveNoteAjax(int leadId, string noteTitle, string description, string ownerId, IFormFile attachment)
         {
             try
             {
-                string fileName = null;
-
-                // Handle basic file attachment info if provided
-                if (attachment != null && attachment.Length > 0)
-                {
-                    fileName = attachment.FileName;
-                    // Note: Add your actual file system saving logic here if you want to store the physical file.
-                    // Example: var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", fileName);
-                    // using (var stream = new FileStream(filePath, FileMode.Create)) { await attachment.CopyToAsync(stream); }
-                }
-
-                // Create the new Note object (Make sure your model is actually called 'Notes' or 'Note' as defined in your DB Context)
-                var newNote = new Notes
+                var note = new Notes
                 {
                     LeadId = leadId,
-                    Description = description,
                     NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
-                    CreatedDateTime = DateTime.Now,
-                    AttachmentFileName = fileName
+                    NoteTitle = noteTitle ?? "",
+                    NoteContent = description ?? "",
+                    Description = description ?? "",
+                    CreatedDateTime = DateTime.Now
                 };
 
-                _context.Note.Add(newNote);
+                if (attachment != null && attachment.Length > 0)
+                {
+                    string uploadPath = @"C:\CRM_Files\Notes";
+                    if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+                    string fileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(attachment.FileName);
+                    string filePath = Path.Combine(uploadPath, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await attachment.CopyToAsync(stream);
+                    }
+
+                    note.AttachmentFileName = attachment.FileName;
+                    note.AttachmentFilePath = filePath;
+                }
+
+                _context.Note.Add(note);
                 await _context.SaveChangesAsync();
 
-                // Fetch the owner's name so we can return it to the UI instantly
-                var owner = await _context.Users.FindAsync(ownerId);
-                string ownerName = owner != null ? owner.FirstName : "System";
+                string ownerName = "System User";
+                if (!string.IsNullOrEmpty(note.NoteOwnerId))
+                {
+                    var user = await _context.Users.FindAsync(note.NoteOwnerId);
+                    if (user != null) ownerName = user.fullName ?? user.FirstName;
+                }
 
-                // Return exactly what the JavaScript is expecting
                 return Json(new
                 {
                     success = true,
                     note = new
                     {
                         ownerName = ownerName,
-                        createdDateTime = newNote.CreatedDateTime.ToString("dd-MM-yyyy HH:mm"),
-                        description = newNote.Description,
-                        attachmentFileName = newNote.AttachmentFileName
+                        createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
+                        noteTitle = note.NoteTitle,
+                        description = note.Description,
+                        attachmentFileName = note.AttachmentFileName
                     }
                 });
             }
@@ -577,6 +565,31 @@ namespace Radar_CRM.Controllers
             {
                 return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        [HttpGet]
+        public IActionResult DownloadNoteAttachment(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return BadRequest("Filename missing.");
+
+            string folderPath = @"C:\CRM_Files\Notes";
+            string filePath = Path.Combine(folderPath, fileName);
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                var matchingFiles = Directory.GetFiles(folderPath, "*_" + fileName);
+                if (matchingFiles.Length > 0)
+                {
+                    filePath = matchingFiles[0];
+                }
+                else
+                {
+                    return NotFound("File not found on server.");
+                }
+            }
+
+            byte[] fileBytes = System.IO.File.ReadAllBytes(filePath);
+            return File(fileBytes, "application/octet-stream", fileName);
         }
 
         // ==========================================
@@ -832,7 +845,7 @@ namespace Radar_CRM.Controllers
                             // --- Ownership Mapping ---
                             linkedAccount.AccountOwnerId = lead.AccountOwnerId;
                             linkedAccount.CoOwnerId = lead.CoOwnerId;
-                            
+
 
                             // --- Source Mapping ---
                             linkedAccount.DataSource = lead.DataSources;
@@ -929,7 +942,7 @@ namespace Radar_CRM.Controllers
                                 AccountOwner = lead.AccountOwnerId,
                                 DemoOwner = lead.DemoOwnerId,
                                 AccountType = lead.AccountType,
-                                CreatedBy=lead.CreatedBy,
+                                CreatedBy = lead.CreatedBy,
 
                                 // 🚀 FIX: Assign proper DateTime object, not a string
                                 DateOfEntry = DateTime.Now,
