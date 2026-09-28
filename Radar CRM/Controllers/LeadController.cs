@@ -299,6 +299,15 @@ namespace Radar_CRM.Controllers
             // 🚀 ADD THIS LINE TO FIX THE CRASH:
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
 
+            // 🚀 NEW: Safely get note counts only for the loaded leads
+            var leadIds = leads.Select(l => l.Id).ToList();
+            var noteCounts = await _context.Note
+                .Where(n => n.LeadId != null && leadIds.Contains(n.LeadId.Value))
+                .GroupBy(n => n.LeadId.Value)
+                .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+            ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
+
             return View(leads);
         }
 

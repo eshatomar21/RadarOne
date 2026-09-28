@@ -1195,13 +1195,27 @@
                                         tdIndex++;
                                     }
                                 }
-                                <td class="sticky-actions text-center">
-                                    <div class="d-flex align-items-center justify-content-center gap-2">
-                                        <button class="btn btn-sm" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
-                                            <i class="fa-regular fa-comment-dots"></i> Notes
-                                        </button>
-                                    </div>
-                                </td>
+                               <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+    <div class="d-flex align-items-center justify-content-center gap-2">
+        @{
+            // Safely grab the count from the Dictionary we passed in the ViewBag
+            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
+            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
+            
+            // Dynamic badge color: Blue if > 0, Gray if 0
+            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
+        }
+        
+        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+            <i class="fa-regular fa-comment-dots"></i> Notes
+            
+            <!-- Always show the badge, conditionally change color -->
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">
+                @noteCount
+            </span>
+        </button>
+    </div>
+</td>
                             </tr>
                         }
                     }

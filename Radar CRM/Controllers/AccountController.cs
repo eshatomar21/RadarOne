@@ -293,11 +293,21 @@ namespace Radar_CRM.Controllers
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
-
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+
+            // 🚀 NEW: Safely get note counts only for the loaded accounts (No Include needed!)
+            var accountIds = accounts.Select(a => a.Id).ToList();
+            var noteCounts = await _context.Note
+                .Where(n => n.AccountId != null && accountIds.Contains(n.AccountId.Value))
+                .GroupBy(n => n.AccountId.Value)
+                .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+            ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
 
             return View(accounts);
         }
+
+
         // Replace the existing class in AccountsController.cs with this:
         public class FilterCriteria
         {

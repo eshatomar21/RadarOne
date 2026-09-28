@@ -108,7 +108,6 @@ namespace Radar_CRM.Controllers
                     _ => query.OrderBy(t => t.Id)
                 };
             }
-
             var totalRecords = await query.CountAsync();
             var tasks = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
@@ -116,10 +115,19 @@ namespace Radar_CRM.Controllers
             ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
             ViewBag.TotalRecords = totalRecords;
 
+            // 🚀 NEW: Safely get note counts only for the loaded tasks
+            var taskIds = tasks.Select(t => t.Id).ToList();
+            var noteCounts = await _context.Note
+                .Where(n => n.TaskId != null && taskIds.Contains(n.TaskId.Value))
+                .GroupBy(n => n.TaskId.Value)
+                .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+            ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
+
             return View(tasks);
         }
 
-        
+
 
         // ==========================================
         // HELPER METHOD (Add this to the bottom of the TasksController)

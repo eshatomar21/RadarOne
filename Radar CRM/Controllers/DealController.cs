@@ -218,6 +218,15 @@ namespace Radar_CRM.Controllers
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
 
+            // 🚀 NEW: Safely get note counts only for the loaded deals
+            var dealIds = deals.Select(d => d.Id).ToList();
+            var noteCounts = await _context.Note
+                .Where(n => n.DealId != null && dealIds.Contains(n.DealId.Value))
+                .GroupBy(n => n.DealId.Value)
+                .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+            ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
+
             return View(deals);
         }
         // ==========================================
