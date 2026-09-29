@@ -3507,6 +3507,31 @@
         }
     }
 
+    // ==========================================
+    // DATA TABLE SORTING LOGIC
+    // ==========================================
+    window.sortTableByCol = function(colIndex, sortDir) {
+        // 1. Get the exact column name from the table header attribute
+        const th = document.querySelector(`th[data-col-index="${colIndex}"]`);
+        if (!th) return;
+
+        const colName = th.getAttribute("data-col-name");
+        if (!colName) return;
+
+        // 2. Keep existing parameters (filters, active views, etc.)
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 3. Set the new sorting parameters
+        urlParams.set('sortCol', colName);
+        urlParams.set('sortDir', sortDir);
+        urlParams.set('page', 1); // Reset to page 1 when sorting changes
+        urlParams.set('_t', Date.now()); // Prevent browser caching
+
+        // 4. Redirect to backend to fetch sorted data
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    };
+
     async function saveNoteAjax() {
         const title = document.getElementById('newNoteTitle').value;
         const text = document.getElementById('newNoteText').value;

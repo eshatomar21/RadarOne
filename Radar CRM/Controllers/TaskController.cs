@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Text.Json;
 // 2. Force your database model to use the alias 'CrmTaskModel'
 using CrmTaskModel = Radar_CRM.Models.Task;
 // 1. Force the word 'Task' to always mean the System's async Task
@@ -27,53 +28,112 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // INDEX
         // ==========================================
+        // Inside TasksController class, update the Index method:
         public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc")
         {
             if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
 
             string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var currentUser = await _context.Users.FindAsync(currentUserId);
-
             if (currentUser == null) return RedirectToAction("Login", "Users");
+
+            // 1. FIX: Supply UsersList for the TaskOwner dropdowns
+            ViewBag.UsersList = new SelectList(await _context.Users.ToListAsync(), "Id", "fullName");
 
             int pageSize = 100;
             var query = _context.Tasks.AsQueryable();
 
-            // 🚀 ADMIN CHECK BASED ON 'PROFILE'
             bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
                            (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
                             currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
 
-            // 🚀 THE HIERARCHY LOGIC 
-            // Applies ONLY to non-admins. Filters Tasks based on TaskOwner.
             if (!isAdmin)
             {
                 var allRoles = await _context.Roles.ToListAsync();
                 var visibleRoleIds = new List<int>();
-
-                // Get subordinates
                 var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
                 visibleRoleIds.AddRange(subordinateIds);
 
-                // Share with peers if enabled
                 var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
                 if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
                 {
                     visibleRoleIds.Add(currentUser.RoleId.Value);
                 }
 
-                // Get the User IDs belonging to those visible roles
                 var visibleUserIds = await _context.Users
                     .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
                     .Select(u => u.Id)
                     .ToListAsync();
-
-                // Always include the current user's own ID
                 visibleUserIds.Add(currentUserId);
 
-                // Filter the tasks by TaskOwner
-                // Note: Ensure 'TaskOwner' is the field storing the User ID. If it's named 'TaskOwnerId', change it below.
                 query = query.Where(t => visibleUserIds.Contains(t.TaskOwner));
+            }
+
+            // 2. FIX: Parse and Apply Advanced Filters dynamically
+            string advancedFilters = Request.Query["advancedFilters"];
+
+            if (!string.IsNullOrEmpty(advancedFilters))
+            {
+                try
+                {
+                    var filters = JsonSerializer.Deserialize<List<AdvancedFilter>>(advancedFilters);
+                    if (filters != null && filters.Any())
+                    {
+                        foreach (var filter in filters)
+                        {
+                            if (string.IsNullOrEmpty(filter.ColumnName) || string.IsNullOrEmpty(filter.Value)) continue;
+
+                            string col = filter.ColumnName;
+                            // Auto-map UI friendly names to actual DB foreign key names
+                            if (col == "TaskOwner" || col == "Owner") col = "TaskOwnerId";
+                            if (col == "CreatedBy") col = "CreatedById";
+                            if (col == "ModifiedBy") col = "ModifiedById";
+
+                            string val = filter.Value.Trim();
+                            string lowerVal = val.ToLower();
+
+                            if (filter.IsDate)
+                            {
+                                DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
+                                if (val.Contains("|"))
+                                {
+                                    var dates = val.Split('|');
+                                    DateTime.TryParse(dates[0], out d1);
+                                    DateTime.TryParse(dates[1], out d2);
+                                }
+                                else
+                                {
+                                    DateTime.TryParse(val, out d1);
+                                }
+
+                                // Apply Date Filters
+                                if (col == "DueDate")
+                                {
+                                    if (filter.Condition.Contains("between")) query = query.Where(t => t.DueDate >= d1 && t.DueDate <= d2);
+                                    else query = query.Where(t => t.DueDate != null && t.DueDate.Value.Date == d1.Date);
+                                }
+                                else if (col == "CreatedTime")
+                                {
+                                    if (filter.Condition.Contains("between")) query = query.Where(t => t.CreatedTime >= d1 && t.CreatedTime <= d2);
+                                    else query = query.Where(t => t.CreatedTime.Date == d1.Date);
+                                }
+                            }
+                            else
+                            {
+                                // Apply String / ID Filters
+                                if (col == "Subject") query = query.Where(t => t.Subject != null && t.Subject.ToLower().Contains(lowerVal));
+                                else if (col == "Status") query = query.Where(t => t.Status == val);
+                                else if (col == "Priority") query = query.Where(t => t.Priority == val);
+                                else if (col == "TaskOwnerId") query = query.Where(t => t.TaskOwnerId == val);
+                                else if (col == "CreatedById") query = query.Where(t => t.CreatedById == val);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Filter Parse Error: " + ex.Message);
+                }
             }
 
             if (!string.IsNullOrEmpty(search))
@@ -108,6 +168,7 @@ namespace Radar_CRM.Controllers
                     _ => query.OrderBy(t => t.Id)
                 };
             }
+
             var totalRecords = await query.CountAsync();
             var tasks = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
@@ -115,18 +176,14 @@ namespace Radar_CRM.Controllers
             ViewBag.TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
             ViewBag.TotalRecords = totalRecords;
 
-            // 🚀 NEW: Safely get note counts only for the loaded tasks
             var taskIds = tasks.Select(t => t.Id).ToList();
-            var noteCounts = await _context.Note
+            ViewBag.NoteCounts = await _context.Note
                 .Where(n => n.TaskId != null && taskIds.Contains(n.TaskId.Value))
                 .GroupBy(n => n.TaskId.Value)
                 .ToDictionaryAsync(g => g.Key, g => g.Count());
 
-            ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
-
             return View(tasks);
         }
-
 
 
         // ==========================================
@@ -683,5 +740,14 @@ namespace Radar_CRM.Controllers
         {
             return _context.Tasks.Any(e => e.Id == id);
         }
+    }
+    // Add this class anywhere inside your namespace (e.g., at the bottom of the file)
+    public class AdvancedFilter
+    {
+        public string LogicalOperator { get; set; }
+        public string ColumnName { get; set; }
+        public string Condition { get; set; }
+        public string Value { get; set; }
+        public bool IsDate { get; set; }
     }
 }

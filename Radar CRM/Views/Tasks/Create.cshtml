@@ -270,6 +270,13 @@
                 </select>
             </div>
 
+             <div class="form-group">
+                <label class="sf-label">Leads</label>
+                <select asp-for="DealId" class="sf-select" id="DealId" asp-items="ViewBag.DealsList">
+                    <option value="">-- Select Lead --</option>
+                </select>
+            </div>
+
             <div class="form-group">
                 <label class="sf-label">Mobile</label>
                 <input asp-for="Mobile" class="sf-input" />

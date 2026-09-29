@@ -2002,59 +2002,76 @@
     const leadForm = document.getElementById('leadForm');
 
     if (leadForm) {
-    leadForm.addEventListener('submit', function (e) {
-    const stageSelect = document.getElementById('actualStageSelect');
-    if (stageSelect) {
-    const stageValue = stageSelect.value;
-    if (stageValue === 'Direct Deal' && !isDirectDealConfirmed) {
-    e.preventDefault();
-    const confirmModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealConfirmModal'));
-    confirmModal.show();
-    }
-    }
-    });
+        leadForm.addEventListener('submit', function (e) {
+            const stageSelect = document.getElementById('actualStageSelect');
+            if (stageSelect) {
+                const stageValue = stageSelect.value;
+                if (stageValue === 'Direct Deal' && !isDirectDealConfirmed) {
+                    e.preventDefault();
+                   
+                    // 🚀 FIX: Move Confirm modal to body to prevent grey/blurred screen
+                    const confirmModalEl = document.getElementById('directDealConfirmModal');
+                    if (confirmModalEl) {
+                        document.body.appendChild(confirmModalEl);
+                        const confirmModal = bootstrap.Modal.getOrCreateInstance(confirmModalEl);
+                        confirmModal.show();
+                    }
+                }
+            }
+        });
     }
 
-    const btnCancelDirectDeal = document.getElementById('btnCancelDirectDeal');
+     const btnCancelDirectDeal = document.getElementById('btnCancelDirectDeal');
     if (btnCancelDirectDeal) {
-    btnCancelDirectDeal.addEventListener('click', function () {
-    const stageSelect = document.getElementById('actualStageSelect');
-    if (stageSelect) {
-    stageSelect.value = '';
-    stageSelect.dispatchEvent(new Event('change'));
-    }
-    });
+        btnCancelDirectDeal.addEventListener('click', function () {
+            const stageSelect = document.getElementById('actualStageSelect');
+            if (stageSelect) {
+                stageSelect.value = '';
+                stageSelect.dispatchEvent(new Event('change'));
+            }
+        });
     }
 
     const btnConfirmDirectDeal = document.getElementById('btnConfirmDirectDeal');
     if (btnConfirmDirectDeal) {
-    btnConfirmDirectDeal.addEventListener('click', function () {
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealConfirmModal')).hide();
-    const paymentRows = document.querySelectorAll('#paymentTbody .payment-row');
-    let hasValidPayment = false;
+        btnConfirmDirectDeal.addEventListener('click', function () {
+            const confirmModalEl = document.getElementById('directDealConfirmModal');
+            if (confirmModalEl) {
+                bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
+            }
 
-    paymentRows.forEach(row => {
-    const productNameInput = row.querySelector('input[name*="ProductName"]');
-    const totalInput = row.querySelector('.total');
+            const paymentRows = document.querySelectorAll('#paymentTbody .payment-row');
+            let hasValidPayment = false;
 
-    const productName = productNameInput ? productNameInput.value.trim() : '';
-    const total = totalInput ? parseFloat(totalInput.value) : 0;
+            paymentRows.forEach(row => {
+                const productNameInput = row.querySelector('input[name*="ProductName"]');
+                const totalInput = row.querySelector('.total');
 
-    if (productName !== '' && total > 0) hasValidPayment = true;
-    });
+                const productName = productNameInput ? productNameInput.value.trim() : '';
+                const total = totalInput ? parseFloat(totalInput.value) : 0;
 
-    if (!hasValidPayment) {
-    const stageSelect = document.getElementById('actualStageSelect');
-    if (stageSelect) {
-    stageSelect.value = '';
-    stageSelect.dispatchEvent(new Event('change'));
-    }
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('directDealErrorModal')).show();
-    } else {
-    isDirectDealConfirmed = true;
-    if (leadForm) leadForm.submit();
-    }
-    });
+                if (productName !== '' && total > 0) hasValidPayment = true;
+            });
+
+
+     if (!hasValidPayment) {
+                const stageSelect = document.getElementById('actualStageSelect');
+                if (stageSelect) {
+                    stageSelect.value = '';
+                    stageSelect.dispatchEvent(new Event('change'));
+                }
+               
+                // 🚀 FIX: Move Error modal to body to prevent grey/blurred screen
+                const errorModalEl = document.getElementById('directDealErrorModal');
+                if (errorModalEl) {
+                    document.body.appendChild(errorModalEl);
+                    bootstrap.Modal.getOrCreateInstance(errorModalEl).show();
+                }
+            } else {
+                isDirectDealConfirmed = true;
+                if (leadForm) leadForm.submit();
+            }
+        });
     }
 
     let productPrices = {};

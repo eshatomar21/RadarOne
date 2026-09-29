@@ -15,6 +15,7 @@
     // EXCLUSION LIST: Hide raw foreign keys and background properties from the table
     var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId" };
     string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    
     // Dynamically get all properties of the Task model, excluding the specified fields and Lists
     var tableProps = typeof(Radar_CRM.Models.Task).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
         .Where(p => !excludedFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)))
@@ -710,8 +711,8 @@
         <i class="fa-solid fa-file-export"></i> Export
     </button>
     <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'csv')"><i class="fa-solid fa-file-csv me-2 text-primary"></i>Export as CSV</a></li>
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'xlsx')"><i class="fa-solid fa-file-excel me-2 text-success"></i>Export as Excel</a></li>
+        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Tasks', 'csv')"><i class="fa-solid fa-file-csv me-2 text-primary"></i>Export as CSV</a></li>
+        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Tasks', 'xlsx')"><i class="fa-solid fa-file-excel me-2 text-success"></i>Export as Excel</a></li>
     </ul>
 </div>
         <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
@@ -803,7 +804,7 @@
                         <div class="filter-expanded-area">
                             @if (isDate)
                             {
-                                <!-- Full Date Conditions Matching Images -->
+                                <!-- Full Date Conditions -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
                                     <option value="age in">age in</option>
                                     <option value="due in">due in</option>
@@ -838,7 +839,7 @@
                             {
                                 <!-- Predefined Options -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is</option>
+                                    <option value="is" selected>is exactly</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
@@ -853,23 +854,24 @@
                             }
                             else if (isUserField)
                             {
-                                <!-- User Field with User Options -->
+                                <!-- FIX: User Field explicitly mapping to Database User IDs via a standard select dropdown -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is</option>
+                                    <option value="is" selected>is exactly</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
-                                <datalist id="dl_users_@prop.Name">
+                                
+                                <select class="form-select form-select-sm condition-val text-val">
+                                    <option value="" disabled selected>- Select User -</option>
                                     @if (ViewBag.UsersList != null)
                                     {
                                         foreach (var user in (SelectList)ViewBag.UsersList)
                                         {
-                                            <option value="@user.Text">@user.Text</option>
+                                            <option value="@user.Value">@user.Text</option>
                                         }
                                     }
-                                </datalist>
+                                </select>
                             }
                             else
                             {
@@ -931,7 +933,7 @@
                     <i class="fa-solid fa-plus me-1"></i> Create View
                 </button>
             </div>
-           
+            
             <div class="d-flex gap-2 ms-3">
                 <div class="dropdown">
                     <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -1153,11 +1155,9 @@
                     </select>
                 </div>
 
-                <!-- 🚀 FIX: Removed display:none so the modal doesn't look cut off -->
                 <div class="mb-2" id="massUpdateValueContainer">
                     <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">2. Enter New Value</label>
                     <div id="dynamicInputArea">
-                        <!-- Default disabled state -->
                         <input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />
                     </div>
                 </div>
@@ -1171,6 +1171,7 @@
         </div>
     </div>
 </div>
+
 <!-- ==========================================
      PREMIUM SAAS NOTES OFFCANVAS PANEL
      ========================================== -->
@@ -1189,7 +1190,6 @@
 
         <!-- Cohesive Compose Box -->
         <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
-            <!-- ADD THIS LINE: -->
             <input type="text" id="newNoteTitle" class="form-control border-0 shadow-none p-3 pb-0 fw-bold" placeholder="Note Title..." style="font-size: 1rem; color: #0f172a; background: transparent;">
             <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
 
@@ -1347,7 +1347,7 @@
     const ownerOptionsList = [
         @if (ViewBag.UsersList != null) {
             foreach (var user in (SelectList)ViewBag.UsersList) {
-                <text>"@Html.Raw(user.Text)",</text>
+                <text>{ id: "@user.Value", text: "@Html.Raw(user.Text)" },</text>
             }
         }
     ];
@@ -1385,7 +1385,7 @@
         setupFileUpload();
         setupExcelResizing();
         restorePinnedFilters();
-       
+        
         // Advanced Premium Features
         renderCustomViews();
         renderSavedSidebarFilters();
@@ -1425,15 +1425,33 @@
         document.querySelectorAll('.filter-field-item.active').forEach(item => {
             const cb = item.querySelector('.field-checkbox');
             if (cb && cb.checked) {
-                const colName = cb.value;
+                let colName = cb.value;
                 const conditionNode = item.querySelector('.condition-select');
                 const condition = conditionNode ? conditionNode.value : 'contains';
                 const isDate = item.dataset.fieldType === "date";
 
-                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+                // 1. Extract Value safely
+                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value || '').trim();
+
+                // 2. FIX: Prevent empty filters from crashing the query
+                if (!val1 && condition !== 'is_empty' && condition !== 'is_not_empty') {
+                    return; // Skip this incomplete filter
+                }
+
+                // 3. FIX: Map UI names to actual Database Foreign Keys
+                if (colName === "TaskOwner" || colName === "Owner") {
+                    colName = "TaskOwnerId";
+                }
+
+                // 4. FIX: Capture the second date if the condition is 'between'
+                if (isDate && (condition === 'between' || condition === 'not between')) {
+                    const val2 = item.querySelector('.date-val-2')?.value || '';
+                    if (!val2) return; // Ensure both dates exist
+                    val1 = val1 + "|" + val2; // Pass to backend as "StartDate|EndDate"
+                }
 
                 activeFilters.push({
-                    LogicalOperator: "AND", // Sidebar logic defaults to AND
+                    LogicalOperator: "AND",
                     ColumnName: colName,
                     Condition: condition,
                     Value: val1,
@@ -1529,10 +1547,10 @@
         const wrapper = selectElement.closest('.filter-expanded-area');
         const val1 = wrapper.querySelector('.date-val-1');
         const val2 = wrapper.querySelector('.date-val-2');
-       
+        
         if (val1 && val2) {
             const condition = selectElement.value;
-           
+            
             // Show two inputs for between / not between
             if (condition === 'between' || condition === 'not between') {
                 val1.style.display = 'block';
@@ -1581,10 +1599,10 @@
     // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
     function saveFieldFilter(event, iconEl, fieldName) {
         event.stopPropagation();
-       
+        
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
-       
+        
         if(!cb.checked) {
             alert("Please check the box and set a value before saving this filter.");
             return;
@@ -1602,7 +1620,7 @@
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_tasks') || '[]');
         savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
         localStorage.setItem('crm_saved_sidebar_filters_tasks', JSON.stringify(savedFilters));
-       
+        
         renderSavedSidebarFilters();
     }
 
@@ -1663,23 +1681,43 @@
     function restoreSidebarFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const filtersParam = urlParams.get('advancedFilters');
-       
+        
         if (filtersParam) {
             try {
                 const activeFilters = JSON.parse(filtersParam);
                 activeFilters.forEach(f => {
-                    const chk = document.getElementById('chk_' + f.ColumnName);
+                    // Revert Foreign Key mapping to find the UI Checkbox ID
+                    let searchColName = f.ColumnName;
+                    if (searchColName.endsWith("Id") && !document.getElementById('chk_' + searchColName)) {
+                        searchColName = searchColName.replace("Id", "");
+                    }
+
+                    const chk = document.getElementById('chk_' + searchColName);
                     if (chk) {
                         chk.checked = true;
                         const item = chk.closest('.filter-field-item');
                         item.classList.add('active');
 
                         const condSelect = item.querySelector('.condition-select');
-                        if (condSelect) condSelect.value = f.Condition;
+                        if (condSelect) {
+                            Array.from(condSelect.options).forEach(opt => {
+                                if (opt.value.toLowerCase() === f.Condition.toLowerCase()) condSelect.value = opt.value;
+                            });
+                        }
 
+                        // Split 'between' dates to restore them
                         if (f.IsDate) {
+                            const vals = f.Value.split('|');
                             const date1 = item.querySelector('.date-val-1');
-                            if (date1) date1.value = f.Value;
+                            if (date1) date1.value = vals[0];
+                            
+                            if (vals.length > 1) {
+                                const date2 = item.querySelector('.date-val-2');
+                                if (date2) {
+                                    date2.value = vals[1];
+                                    date2.style.display = 'block';
+                                }
+                            }
                         } else {
                             const textVal = item.querySelector('.condition-val');
                             if (textVal) textVal.value = f.Value;
@@ -1690,16 +1728,41 @@
         }
     }
 
+    // ==========================================
+    // DATA TABLE SORTING LOGIC
+    // ==========================================
+    window.sortTableByCol = function(colIndex, sortDir) {
+        // 1. Get the exact column name from the table header attribute
+        const th = document.querySelector(`th[data-col-index="${colIndex}"]`);
+        if (!th) return;
+
+        const colName = th.getAttribute("data-col-name");
+        if (!colName) return;
+
+        // 2. Keep existing parameters (filters, active views, etc.)
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 3. Set the new sorting parameters
+        urlParams.set('sortCol', colName);
+        urlParams.set('sortDir', sortDir);
+        urlParams.set('page', 1); // Reset to page 1 when sorting changes
+        urlParams.set('_t', Date.now()); // Prevent browser caching
+
+        // 4. Redirect to backend to fetch sorted data
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    };
+
 
     // ==========================================
-    // 🚀 DYNAMIC CUSTOM VIEWS & CRITERIA BUILDER
+    // 🚀 FIX: CUSTOM VIEWS CRITERIA BUILDER
     // ==========================================
     function openCustomViewModal() {
         const modalEl = document.getElementById('createCustomViewModal');
         if (!modalEl) return;
         document.body.appendChild(modalEl);
         modalEl.style.zIndex = "9999";
-       
+        
         try {
             const myModal = new bootstrap.Modal(modalEl);
             myModal.show();
@@ -1776,16 +1839,16 @@
             });
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
-        // 2. User/Owner Fields Dropdown
+        // 2. User/Owner Fields Dropdown (FIXED: NOW USES <select> INSTEAD OF <datalist>)
         else if (fieldName.toLowerCase().includes('owner') || fieldName.toLowerCase().includes('user') || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
             conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
-            let datalistId = "dl_cv_owner_" + Date.now();
-            let opts = `<datalist id="${datalistId}">`;
-            ownerOptionsList.forEach(name => {
-                opts += `<option value="${name}">${name}</option>`;
+            
+            let opts = '<option value="" disabled selected>- Select User -</option>';
+            ownerOptionsList.forEach(user => {
+                opts += `<option value="${user.id}">${user.text}</option>`; // mapped id properly
             });
-            opts += `</datalist>`;
-            valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select or type user..." style="width:100%;">${opts}`;
+            
+            valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
         // 3. Date Fields
         else if (fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('time')) {
@@ -1819,8 +1882,7 @@
                     <input type="date" class="form-control criteria-builder-input cv-value date-val-1" style="width:100%;">
                     <input type="date" class="form-control criteria-builder-input cv-value date-val-2" style="display:none; width:100%;">
                 </div>`;
-           
-            // Attach unique listener to toggle second input dynamically in the builder
+            
             conditionSelect.onchange = function() {
                 const v2 = valueContainer.querySelector('.date-val-2');
                 const v1 = valueContainer.querySelector('.date-val-1');
@@ -1836,7 +1898,7 @@
                 }
             };
         }
-        // 4. Default to Text Input for everything else
+        // 4. Default to Text Input
         else {
             conditionOptions = '<option value="is">is exactly</option><option value="is_not">isn\'t</option><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">`;
@@ -1927,7 +1989,7 @@
         updateCriteriaPattern();
     }
 
-    function saveAndApplyCustomView() {
+  function saveAndApplyCustomView() {
         const viewName = document.getElementById('customViewName').value.trim();
         if (!viewName) {
             alert("Please enter a Custom View Name.");
@@ -1939,21 +2001,30 @@
         document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').forEach((row, index) => {
             const field = row.querySelector('.cv-field').value;
             const condition = row.querySelector('.cv-condition').value;
-            const val = row.querySelector('.cv-value').value;
-
+            
             let logicOperator = "AND";
             if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
             }
 
             if (field && condition) {
+                // 🚀 FIX: Determine value based on Date vs Text
+                let val = "";
+                if (field.toLowerCase().includes('date') || field.toLowerCase().includes('time')) {
+                    let v1 = row.querySelector('.date-val-1') ? row.querySelector('.date-val-1').value : "";
+                    let v2 = row.querySelector('.date-val-2') ? row.querySelector('.date-val-2').value : "";
+                    val = (condition === 'between' || condition === 'not between') ? (v1 + "|" + v2) : v1;
+                } else {
+                    val = row.querySelector('.cv-value') ? row.querySelector('.cv-value').value : "";
+                }
+
                 if (!val && !condition.includes('empty')) return; // Skip incomplete
 
                 activeFilters.push({
                     LogicalOperator: index === 0 ? "" : logicOperator,
                     ColumnName: field,
                     Condition: condition,
-                    Value: val || "",
+                    Value: val,
                     IsDate: field.toLowerCase().includes('date') || field.toLowerCase().includes('time')
                 });
             }
@@ -1964,6 +2035,7 @@
             return;
         }
 
+        // ... rest of the function remains the same ...
         let savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
         savedViews = savedViews.filter(v => v.name !== viewName);
         savedViews.push({ name: viewName, isPinned: true, filters: activeFilters });
@@ -2021,37 +2093,6 @@
                 renderCustomViews();
             }
         }
-    }
-
-    // ==========================================
-    // 5. SORTING
-    // ==========================================
-    function sortTableByCol(colIndex, direction) {
-        document.body.style.cursor = 'wait';
-        setTimeout(() => {
-            const tbody = document.getElementById("tableBody");
-
-            allRows.sort((a, b) => {
-                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
-
-                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
-                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
-
-                if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-                    return direction === 'asc' ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-                }
-
-                if (aText < bText) return direction === 'asc' ? -1 : 1;
-                if (aText > bText) return direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            allRows.forEach(row => tbody.appendChild(row));
-
-            refreshVisibleRows();
-            document.body.style.cursor = 'default';
-        }, 10);
     }
 
     // ==========================================
@@ -2324,7 +2365,7 @@
 
     function exportTableToCSV(filename) {
         const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-       
+        
         if (checkedCbs.length === 0) {
             alert("Please select at least one record using the checkboxes before exporting.");
             return;
@@ -2442,7 +2483,6 @@
         });
     }
 
-   
    window.filterManageColumns = function () {
         const searchInput = document.getElementById('manageColSearch');
         if (!searchInput) return;

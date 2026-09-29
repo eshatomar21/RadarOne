@@ -103,25 +103,64 @@ namespace Radar_CRM.Controllers
                             else continue;
                         }
 
-                        // 🚀 FIX: Translate '+' back into ' ' to fix URL encoding breaks (e.g. "Jaspal+Rawat" -> "Jaspal Rawat")
+                        // 🚀 Translates '+' back to space (e.g. "John+Doe" -> "John Doe")
                         string safeValue = f.Value?.Replace("+", " ") ?? "";
 
+                        // 1. DATE FILTERS (Fixed 'Between' parsing)
                         if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
                         {
-                            if (DateTime.TryParse(safeValue, out DateTime dVal))
+                            DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
+                            bool isValidDate = false;
+
+                            if (safeValue.Contains("|")) // Split 'between' dates
                             {
-                                if (f.Condition == "on") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == dVal.Date);
-                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < dVal.Date);
-                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > dVal.Date);
+                                var dates = safeValue.Split('|');
+                                if (DateTime.TryParse(dates[0], out d1) && DateTime.TryParse(dates[1], out d2)) isValidDate = true;
+                            }
+                            else if (DateTime.TryParse(safeValue, out d1))
+                            {
+                                isValidDate = true;
+                            }
+
+                            if (isValidDate)
+                            {
+                                if (f.Condition == "between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= d1 && EF.Property<DateTime?>(a, dbColName) <= d2);
+                                else if (f.Condition == "not between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) < d1 || EF.Property<DateTime?>(a, dbColName) > d2);
+                                else if (f.Condition == "on" || f.Condition == "is") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == d1.Date);
+                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < d1.Date);
+                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > d1.Date);
                             }
                         }
-                        // 🚀 CRITICAL FIX: Only run User ID mappings on actual ID columns!
+                        // 2. ACCOUNT FILTERS (Auto-translates Text Names to IDs)
+                        else if (dbColName.Equals("AccountId", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (int.TryParse(safeValue, out int accId))
+                            {
+                                if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => a.AccountId == accId);
+                                else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => a.AccountId != accId);
+                            }
+                            else
+                            {
+                                var searchValue = safeValue.ToLower().Trim();
+                                var matchingAccIds = _context.Accounts
+                                    .Where(acc => acc.AccountName != null && acc.AccountName.ToLower().Contains(searchValue))
+                                    .Select(acc => acc.Id)
+                                    .ToList();
+
+                                if (f.Condition == "contains" || f.Condition == "is")
+                                    query = query.Where(a => a.AccountId.HasValue && matchingAccIds.Contains(a.AccountId.Value));
+                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                    query = query.Where(a => !a.AccountId.HasValue || !matchingAccIds.Contains(a.AccountId.Value));
+                            }
+                        }
+                        // 3. OWNER / USER FILTERS (Auto-translates User Names to IDs)
                         else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
                         {
                             var searchValue = safeValue.ToLower().Trim();
                             var matchingUserIds = _context.Users
                                 .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
-                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
+                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)) ||
+                                            (u.Id == searchValue)) // Directly match ID if they passed an ID
                                 .Select(u => u.Id)
                                 .ToList();
 
@@ -134,6 +173,7 @@ namespace Radar_CRM.Controllers
                             else if (f.Condition == "is_not_empty")
                                 query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
+                        // 4. STANDARD STRING FILTERS
                         else if (propertyInfo.PropertyType == typeof(string))
                         {
                             var searchValue = safeValue.ToLower().Trim();
@@ -146,6 +186,7 @@ namespace Radar_CRM.Controllers
                             else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                             else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
+                        // 5. NUMERIC FILTERS
                         else
                         {
                             if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
@@ -934,6 +975,7 @@ namespace Radar_CRM.Controllers
 
     public class FilterCriteria
     {
+        public string LogicalOperator { get; set; } // Add this property!
         public string ColumnName { get; set; }
         public string Condition { get; set; }
         public string Value { get; set; }

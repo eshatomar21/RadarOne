@@ -21,6 +21,8 @@ namespace Radar_CRM.Models
 
         // Relations (Updated)
         public int? AccountId { get; set; }
+
+        public int? DealId { get; set; }
         public int? LeadId { get; set; }
         public string? RelatedToId { get; set; }
         public string? RelatedTo { get; set; }
