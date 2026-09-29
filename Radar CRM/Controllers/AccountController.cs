@@ -304,6 +304,37 @@ namespace Radar_CRM.Controllers
 
             ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
 
+            // 1. Get the IDs of the accounts currently being displayed on the page
+            var currentAccountIds = accounts.Select(a => a.Id).ToList();
+
+            // 2. Fetch the most urgent/upcoming task for each of these accounts
+            // 🚀 FIX: Added t.AccountId.HasValue and .Value to safely handle the int? conversion
+            var upcomingTasks = _context.Tasks
+                .Where(t => t.AccountId.HasValue && currentAccountIds.Contains(t.AccountId.Value) && t.Status != "Completed")
+                .ToList()
+                .GroupBy(t => t.AccountId.Value) // Group by the strict int value
+                .Select(g => g.OrderBy(t => t.DueDate).FirstOrDefault())
+                .ToList();
+
+            // 3. Map it to the Dictionary format that the Razor View expects
+            var accountTasksDict = new Dictionary<int, dynamic>();
+
+            foreach (var task in upcomingTasks)
+            {
+                if (task != null && task.AccountId.HasValue)
+                {
+                    // 🚀 FIX: Use .Value to convert int? to int for the Dictionary key
+                    accountTasksDict[task.AccountId.Value] = new
+                    {
+                        Subject = task.Subject,
+                        DueDate = task.DueDate
+                    };
+                }
+            }
+
+            // 4. Pass it to the ViewBag
+            ViewBag.AccountTasks = accountTasksDict;
+
             return View(accounts);
         }
 

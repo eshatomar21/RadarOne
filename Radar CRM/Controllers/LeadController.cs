@@ -308,6 +308,34 @@ namespace Radar_CRM.Controllers
 
             ViewBag.NoteCounts = noteCounts; // Send dictionary to the view
 
+            // 1. Get the IDs of the Leads currently being displayed
+            var currentLeadIds = leads.Select(l => l.Id).ToList();
+
+            // 2. Fetch upcoming tasks strictly for Leads
+            var upcomingTasks = _context.Tasks
+                .Where(t => t.LeadId.HasValue && currentLeadIds.Contains(t.LeadId.Value) && t.Status != "Completed")
+                .ToList()
+                .GroupBy(t => t.LeadId.Value)
+                .Select(g => g.OrderBy(t => t.DueDate).FirstOrDefault())
+                .ToList();
+
+            // 3. Map to Dictionary
+            var leadTasksDict = new Dictionary<int, dynamic>();
+            foreach (var task in upcomingTasks)
+            {
+                if (task != null && task.LeadId.HasValue)
+                {
+                    leadTasksDict[task.LeadId.Value] = new
+                    {
+                        Subject = task.Subject,
+                        DueDate = task.DueDate
+                    };
+                }
+            }
+
+            // 4. Send to View
+            ViewBag.LeadTasks = leadTasksDict;
+
             return View(leads);
         }
 

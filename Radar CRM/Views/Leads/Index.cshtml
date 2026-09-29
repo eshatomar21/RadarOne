@@ -157,6 +157,35 @@
             box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
         }
 
+        /* Sticky Columns (Checkboxes & Actions) */
+    .sticky-cb {
+        position: sticky;
+        left: 0;
+        width: 110px; /* 🚀 FIX: Increased from 40px to fit the flag and text */
+        min-width: 110px;
+        text-align: left;
+        z-index: 11;
+        border-right: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+        resize: none !important;
+    }
+
+    /* 🚀 NEW: Custom Tooltip Theme for the white popover box */
+    .custom-tooltip .tooltip-inner {
+        background-color: #ffffff;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        text-align: left;
+        padding: 12px 16px;
+        max-width: 250px;
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .custom-tooltip.bs-tooltip-end .tooltip-arrow::before { border-right-color: #cbd5e1; }
+    .custom-tooltip.bs-tooltip-start .tooltip-arrow::before { border-left-color: #cbd5e1; }
+
     /* Layout Grid */
     .crm-container {
         display: flex;
@@ -834,10 +863,10 @@
             <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
                 <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
             </button>
-            <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
+            <button class="btn-saas" type="button" onclick="openMassUpdateModal()">
                 <i class="fa-solid fa-layer-group"></i> Mass Update
             </button>
-            <button class="btn-saas" type="button" onclick="openTaskModal()">
+           <button class="btn-saas" type="button" onclick="openTaskModal()">
                 <i class="fa-solid fa-list-check"></i> Create Task
             </button>
             <div class="vr mx-2 d-none d-md-block"></div>
@@ -1094,8 +1123,11 @@
             <table class="table" id="leadsTable">
                 <thead>
                     <tr>
-                        <th class="sticky-cb">
-                            <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        <th class="sticky-cb" style="width: 110px; min-width: 110px;">
+                            <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
+                                <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                                <i class="fa-solid fa-bookmark text-muted fs-5" style="opacity:0.4;" title="Task Status"></i>
+                            </div>
                         </th>
 
                         @if (tableProps.Length > 0)
@@ -1144,8 +1176,63 @@
                         foreach (var item in Model)
                         {
                             <tr class="lead-row" data-id="@item.Id">
-                                <td class="sticky-cb">
-                                    <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                               <td class="sticky-cb" style="width: 110px; min-width: 110px;">
+                                    <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
+                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                        
+                                        <!-- 🚀 NEW: Large Bookmark Flag Logic for Leads -->
+                                        @{
+                                            string flagColor = "#cbd5e1"; // Default gray (no task)
+                                            string tooltipText = "No pending tasks";
+                                            bool isToday = false;
+                                            var tasksDict = ViewBag.LeadTasks as System.Collections.Generic.Dictionary<int, dynamic>;
+
+                                            if (tasksDict != null && tasksDict.ContainsKey(item.Id))
+                                            {
+                                                var task = tasksDict[item.Id];
+                                                DateTime? dueDate = task.DueDate;
+                                                string subject = task.Subject;
+
+                                                if (dueDate.HasValue)
+                                                {
+                                                    if (dueDate.Value.Date == DateTime.Today)
+                                                    {
+                                                        flagColor = "#f97316"; // 🚀 Orange for Today
+                                                        isToday = true;
+                                                    }
+                                                    else if (dueDate.Value.Date < DateTime.Today)
+                                                    {
+                                                        flagColor = "#ef4444"; // Red for Overdue
+                                                    }
+                                                    else
+                                                    {
+                                                        flagColor = "#22c55e"; // Green for Future
+                                                    }
+                                                    
+                                                    tooltipText = $"<div class='text-start'><div class='fw-bold mb-1'>{subject}</div><span class='text-muted'>{dueDate.Value.ToString("dd/MM/yyyy")}</span></div>";
+                                                }
+                                            }
+                                        }
+
+                                        <!-- Group the flag and text together so the tooltip applies to both -->
+                                        <div class="d-flex align-items-center gap-1" 
+                                             style="cursor: pointer; transition: transform 0.2s;" 
+                                             data-bs-toggle="tooltip" 
+                                             data-bs-html="true" 
+                                             data-bs-placement="right" 
+                                             data-bs-custom-class="custom-tooltip"
+                                             title="@tooltipText"
+                                             onmouseover="this.style.transform='scale(1.1)'" 
+                                             onmouseout="this.style.transform='scale(1)'">
+                                             
+                                            <i class="fa-solid fa-bookmark fs-5" style="color: @flagColor;"></i>
+                                            
+                                            @if(isToday)
+                                            {
+                                                <span class="fw-bold" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">Today</span>
+                                            }
+                                        </div>
+                                    </div>
                                 </td>
                                 @{
                                     int tdIndex = 0;
@@ -1264,22 +1351,23 @@
     </div>
 </div>
 
+
 <!-- Mass Update Modal -->
 <div class="modal fade" id="massUpdateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
             <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                 <h5 class="modal-title fw-bold" style="color: var(--primary-blue);">
-                    <i class="fa-solid fa-layer-group me-2"></i> Mass Update Leads
+                    <i class="fa-solid fa-layer-group me-2"></i> Mass Update Records
                 </h5>
                 <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body py-4">
                 <div class="alert alert-info py-2 px-3 mb-4" style="background-color: #eff6ff; border-color: #bfdbfe; font-size: 0.9rem;">
-                    <i class="fa-solid fa-circle-info me-2"></i> You are about to update <strong id="massUpdateCountDisplay" class="text-primary fs-6">0</strong> selected records.
+                    <i class="fa-solid fa-circle-info me-2 text-primary"></i> You are about to update <strong id="massUpdateCountDisplay" class="text-primary fs-6">0</strong> selected record(s).
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-4">
                     <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Select Field to Update</label>
                     <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" onchange="renderMassUpdateInput()">
                         <option value="" disabled selected>- Choose a field -</option>
@@ -1290,9 +1378,13 @@
                     </select>
                 </div>
 
-                <div class="mb-2" id="massUpdateValueContainer" style="display: none;">
+                <!-- 🚀 FIX: Removed display:none so the modal doesn't look cut off -->
+                <div class="mb-2" id="massUpdateValueContainer">
                     <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">2. Enter New Value</label>
-                    <div id="dynamicInputArea"></div>
+                    <div id="dynamicInputArea">
+                        <!-- Default disabled state -->
+                        <input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />
+                    </div>
                 </div>
             </div>
             <div class="modal-footer bg-light border-top-0 rounded-bottom">
@@ -1523,6 +1615,225 @@
     </div>
 </div>
 
+<!-- ========================================================
+     MODERN SAAS QUICK CREATE TASK MODAL (Navy & Slate Theme)
+     ======================================================== -->
+<div class="modal fade" id="quickTaskModal" tabindex="-1" aria-labelledby="quickTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content task-modal-content">
+
+            <div class="modal-header task-modal-header">
+                <h5 class="modal-title task-modal-title" id="quickTaskModalLabel">
+                    <div style="background: var(--theme-navy-light, #eff6ff); color: var(--theme-navy-primary, #1e3a8a); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px;">
+                        <i class="fa-solid fa-check-square"></i>
+                    </div>
+                    Add New Task
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form asp-controller="Tasks" asp-action="Create" method="post">
+                <div class="modal-body task-modal-body">
+                    <div class="row">
+                        <div class="col-md-12 form-group mb-4">
+                            <label class="task-label">Subject <span class="text-danger">*</span></label>
+                            <input name="Subject" class="task-input" placeholder="E.g., Follow up call..." required />
+                        </div>
+
+                        <!-- Dropdown to select Account from the Index List -->
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Related Account</label>
+                            <select name="AccountId" id="taskModalAccountId" class="task-input">
+                                <option value="">- Select Account -</option>
+                                @if (Model != null)
+                                {
+                                    foreach (var acc in Model)
+                                    {
+                                        <option value="@acc.Id">@acc.AccountName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Due Date</label>
+                            <input name="DueDate" type="date" id="modalDueDate" class="task-input" />
+                        </div>
+
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Priority</label>
+                            <select name="Priority" class="task-input">
+                                <option value="Highest">Highest</option>
+                                <option value="High" selected>High</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Low">Low</option>
+                                <option value="Lowest">Lowest</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 form-group mb-4">
+                            <label class="task-label">Task Owner</label>
+                            <select name="TaskOwnerId" asp-items="ViewBag.UsersList" class="task-input">
+                                <option value="">- Assign To -</option>
+                            </select>
+                        </div>
+
+                        <!-- Modern UI Toggles -->
+                        <div class="col-md-12 form-group mb-2 d-flex align-items-center gap-4 pt-3">
+                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
+                                <input class="form-check-input" type="checkbox" id="modalRepeatToggle" disabled>
+                                <label class="form-check-label ms-2" for="modalRepeatToggle">Repeat</label>
+                            </div>
+                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
+                                <input class="form-check-input" type="checkbox" id="modalReminderToggle" disabled>
+                                <label class="form-check-label ms-2" for="modalReminderToggle">Reminder</label>
+                            </div>
+                            <span class="text-muted ms-2" style="font-size:0.8rem;" id="modalRepeatHelpText">(Select Due Date first)</span>
+                        </div>
+
+                        <!-- Expandable Repeat Panel -->
+                        <div class="col-md-12 expandable-panel" id="modalRepeatPanel">
+                            <div class="row align-items-center mb-3">
+                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
+                                <div class="col-9">
+                                    <select class="task-input w-50 mb-2" style="padding: 4px 8px;">
+                                        <option>Daily</option>
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                        <option>Yearly</option>
+                                    </select>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="modalExcludeWeekends">
+                                        <label class="form-check-label text-muted" for="modalExcludeWeekends" style="font-size:0.85rem;">Except weekends and holidays.</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Ends</div>
+                                <div class="col-9">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsNever" checked>
+                                        <label class="form-check-label" for="modalEndsNever" style="font-size:0.85rem;">Never</label>
+                                    </div>
+                                    <div class="form-check mb-2 d-flex align-items-center gap-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsAfter">
+                                        <label class="form-check-label" for="modalEndsAfter" style="font-size:0.85rem;">After</label>
+                                        <input type="number" class="form-control form-control-sm w-25 d-inline" value="1">
+                                        <span style="font-size:0.85rem;">Times</span>
+                                    </div>
+                                    <div class="form-check d-flex align-items-center gap-2">
+                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsOn">
+                                        <label class="form-check-label" for="modalEndsOn" style="font-size:0.85rem;">On</label>
+                                        <input type="date" class="form-control form-control-sm w-50 d-inline">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expandable Reminder Panel -->
+                        <div class="col-md-12 expandable-panel" id="modalReminderPanel">
+                            <div class="form-check mb-3 d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindOnDate" checked>
+                                <label class="form-check-label" for="modalRemindOnDate" style="font-size:0.85rem;">On</label>
+                                <input type="date" class="form-control form-control-sm w-25 d-inline">
+                                <span style="font-size:0.85rem;">at</span>
+                                <input type="time" class="form-control form-control-sm w-25 d-inline">
+                            </div>
+                            <div class="form-check mb-4 d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindDays">
+                                <label class="form-check-label" for="modalRemindDays" style="font-size:0.85rem;">On</label>
+                                <select class="form-select form-select-sm w-25 d-inline">
+                                    <option>1 Day(s)</option>
+                                    <option>2 Day(s)</option>
+                                </select>
+                                <span style="font-size:0.85rem;">of due date at</span>
+                                <input type="time" class="form-control form-control-sm w-25 d-inline">
+                            </div>
+
+                            <div class="row align-items-center mb-3">
+                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
+                                <div class="col-9">
+                                    <select class="task-input w-50" style="padding: 4px 8px;">
+                                        <option>None</option>
+                                        <option>Daily</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Notify</div>
+                                <div class="col-9">
+                                    <select class="task-input w-50" style="padding: 4px 8px;">
+                                        <option>Email</option>
+                                        <option>Popup</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expandable "More Fields" Button -->
+                        <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="toggleMoreFields()">
+                            <span>More Fields</span>
+                            <i class="fa-solid fa-chevron-right" id="moreFieldsIcon" style="transition: transform 0.2s;"></i>
+                        </div>
+
+                        <!-- Hidden Extended Fields -->
+                        <div id="moreFieldsContainer" style="display: none; padding-top: 24px; border-top: 1px dashed #e2e8f0; margin-top: 20px;">
+                            <div class="row">
+                                <div class="col-md-6 form-group mb-4">
+                                    <label class="task-label">Lead Name</label>
+                                    <select name="LeadId" class="task-input">
+                                        <option value="">- Select Lead -</option>
+                                        @if (ViewBag.RelatedLeads != null)
+                                        {
+                                            foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
+                                            {
+                                                <option value="@lead.Id">@lead.LeadName</option>
+                                            }
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 form-group mb-4">
+                                    <label class="task-label">Mobile</label>
+                                    <input name="Mobile" class="task-input" placeholder="+1..." />
+                                </div>
+
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="task-label">Lead Status</label>
+                                    <select name="LeadStatus" class="task-input">
+                                        <option value="">-None-</option>
+                                        <option value="Important contact">Important contact</option>
+                                        <option value="Not a Doctor">Not a Doctor</option>
+                                        <option value="Warm">Warm</option>
+                                        <option value="Hot">Hot</option>
+                                        <option value="Not Interested">Not Interested</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 form-group mb-0">
+                                    <label class="task-label">Status</label>
+                                    <select name="Status" class="task-input">
+                                        <option value="Not Started" selected>Not Started</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Deferred">Deferred</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer task-modal-footer">
+                        <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn-task-save">Save Task</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
 <!-- Notes Offcanvas Panel -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
     <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
@@ -1730,6 +2041,16 @@
         "CurrentlyUsingSoftware": ["Yes", "No"]
     };
 
+    // 🚀 NEW: Initialize Tooltips
+    window.initializeTooltips = function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            const existing = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
+            if (existing) existing.dispose();
+            return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false });
+        });
+    };
+
    document.addEventListener("DOMContentLoaded", function () {
         allRows = Array.from(document.querySelectorAll('tbody tr.lead-row'));
 
@@ -1758,6 +2079,7 @@
         // Restore Sidebar filters on load
         restoreSidebarFiltersFromUrl();
         setupExcelResizing();
+        initializeTooltips();
     });
     // ==========================================
     // 2. JS FILTER/SORT REFRESH
@@ -2559,6 +2881,8 @@
         }
     }
 
+
+
     function exportTableToCSV(filename) {
         const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
        
@@ -2817,14 +3141,24 @@
         }, 10);
     }
 
-    window.filterManageColumns = function () {
-        const q = document.getElementById('manageColSearch').value.toLowerCase();
+   window.filterManageColumns = function () {
+        const searchInput = document.getElementById('manageColSearch');
+        if (!searchInput) return;
+        
+        const q = searchInput.value.toLowerCase();
         const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
+        
         items.forEach(item => {
             const label = item.querySelector('label').innerText.toLowerCase();
-            item.style.display = label.includes(q) ? 'flex' : 'none';
+            if (label.includes(q)) {
+                item.classList.remove('d-none');
+                item.classList.add('d-flex');
+            } else {
+                item.classList.remove('d-flex');
+                item.classList.add('d-none');
+            }
         });
-    }
+    };
 
     // --- EXCEL RESIZING FOR LEADS ---
     function setupExcelResizing() {
@@ -2928,6 +3262,148 @@
             }
         }
     }
+
+    // ==========================================
+    // 🚀 FIX: MISSING MODAL & MASS UPDATE LOGIC
+    // ==========================================
+
+    window.openMassUpdateModal = function() {
+        // Destroy any stuck tooltips to prevent freezing
+        document.querySelectorAll('.tooltip').forEach(t => t.remove());
+
+        const modalEl = document.getElementById('massUpdateModal');
+        if (modalEl) {
+            document.body.appendChild(modalEl); // Prevents the dark backdrop screen freeze
+            modalEl.style.zIndex = "1055";
+            try {
+                const myModal = new bootstrap.Modal(modalEl);
+                myModal.show();
+            } catch (error) {
+                if (typeof $!== 'undefined')$(modalEl).modal('show');
+            }
+        }
+    };
+
+    window.openTaskModal = function() {
+        // Destroy any stuck tooltips to prevent freezing
+        document.querySelectorAll('.tooltip').forEach(t => t.remove());
+
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        const leadDropdown = document.getElementById('taskModalLeadId');
+
+        if (selectedCbs.length > 0 && leadDropdown) {
+            leadDropdown.value = selectedCbs[0].value;
+        } else if (leadDropdown) {
+            leadDropdown.value = "";
+        }
+
+        const modalEl = document.getElementById('quickTaskModal');
+        if (modalEl) {
+            document.body.appendChild(modalEl); // Prevents the dark backdrop screen freeze
+            modalEl.style.zIndex = "1055";
+            try {
+                const taskModal = new bootstrap.Modal(modalEl);
+                taskModal.show();
+            } catch (error) {
+                if (typeof $!== 'undefined')$(modalEl).modal('show');
+            }
+        }
+    };
+
+    window.renderMassUpdateInput = function() {
+        const fieldSelect = document.getElementById('massUpdateField');
+        const inputArea = document.getElementById('dynamicInputArea');
+        const container = document.getElementById('massUpdateValueContainer');
+        
+        if (!fieldSelect || !inputArea) return; 
+        
+        const selectedField = fieldSelect.value;
+        const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
+        const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+
+        // Force container visibility so the modal doesn't collapse
+        if (container) container.style.display = 'block';
+
+        if (!selectedField) {
+            inputArea.innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
+            return;
+        }
+
+        // Generate inputs dynamically
+        if (criteriaFilterOptionsMap[selectedField]) {
+            let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>';
+            selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>';
+            criteriaFilterOptionsMap[selectedField].forEach(opt => {
+                selectHTML += `<option value="${opt}">${opt}</option>`;
+            });
+            selectHTML += '</select>';
+            inputArea.innerHTML = selectHTML;
+        } else if (fieldType && fieldType.includes('DateTime')) {
+            inputArea.innerHTML = '<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />';
+        } else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
+            inputArea.innerHTML = '<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />';
+        } else {
+            inputArea.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />';
+        }
+    };
+
+    window.executeMassUpdateAjax = function() {
+         const field = document.getElementById('massUpdateField').value;
+         const valInput = document.getElementById('massUpdateValue');
+         let val = valInput ? valInput.value : '';
+
+         if (val === "CLEAR_VALUE_COMMAND") val = "";
+
+         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+         const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+         if (!field || selectedIds.length === 0) {
+             alert("Please select a field and ensure records are checked.");
+             return;
+         }
+
+         if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
+             return;
+         }
+
+         const btn = document.getElementById('btnExecuteMassUpdate');
+         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+         btn.disabled = true;
+
+         // Targets the LEADS controller
+         fetch('@Url.Action("BulkUpdate", "Leads")', {
+             method: 'POST',
+             headers: {
+                 'Content-Type': 'application/json',
+                 'Accept': 'application/json'
+             },
+             body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
+         })
+         .then(async response => {
+             if (!response.ok) {
+                 const errorText = await response.text();
+                 throw new Error(errorText || `HTTP Error ${response.status}`);
+             }
+             return response.json();
+         })
+         .then(data => {
+             if (data.success) {
+                 bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
+                 alert(`Successfully updated ${selectedIds.length} records!`);
+                 window.location.reload();
+             } else {
+                 alert("Update failed: " + data.message);
+                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+                 btn.disabled = false;
+             }
+         })
+         .catch((err) => {
+             console.error("Mass Update Error:", err);
+             alert("Connection error! Please check the browser console (F12) for exact details.");
+             btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+             btn.disabled = false;
+         });
+    };
 
     // --- LEAD NOTES SYSTEM ---
     async function openNotesPanel(leadId, leadName) {

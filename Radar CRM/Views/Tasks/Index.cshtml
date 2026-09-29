@@ -699,7 +699,7 @@
             <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
                 <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
             </button>
-            <button class="btn-saas" data-bs-toggle="modal" data-bs-target="#massUpdateModal">
+           <button class="btn-saas" type="button" onclick="openMassUpdateModal()">
                 <i class="fa-solid fa-layer-group"></i> Mass Update
             </button>
             <div class="vr mx-2 d-none d-md-block"></div>
@@ -1126,35 +1126,51 @@
     </div>
 </div>
 
+
 <!-- Mass Update Modal -->
 <div class="modal fade" id="massUpdateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: var(--radius-lg);">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> Mass Update Tasks</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <h5 class="modal-title fw-bold" style="color: var(--primary-blue);">
+                    <i class="fa-solid fa-layer-group me-2"></i> Mass Update Records
+                </h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body py-4">
-                <p class="text-muted mb-3" style="font-size: 0.9rem;">Select a field to update for all checked records.</p>
-                <div class="d-flex gap-3 align-items-center">
-                    <select id="massUpdateField" class="form-select fw-semibold" style="width: 200px;">
-                        <option value="" disabled selected>Select a field...</option>
+                <div class="alert alert-info py-2 px-3 mb-4" style="background-color: #eff6ff; border-color: #bfdbfe; font-size: 0.9rem;">
+                    <i class="fa-solid fa-circle-info me-2 text-primary"></i> You are about to update <strong id="massUpdateCountDisplay" class="text-primary fs-6">0</strong> selected record(s).
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Select Field to Update</label>
+                    <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" onchange="renderMassUpdateInput()">
+                        <option value="" disabled selected>- Choose a field -</option>
                         @foreach (var prop in tableProps)
                         {
-                            <option value="@prop.Name">@prop.Name</option>
+                            <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
                         }
                     </select>
-                    <input type="text" id="massUpdateValue" class="form-control" placeholder="Enter new value..." />
+                </div>
+
+                <!-- 🚀 FIX: Removed display:none so the modal doesn't look cut off -->
+                <div class="mb-2" id="massUpdateValueContainer">
+                    <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">2. Enter New Value</label>
+                    <div id="dynamicInputArea">
+                        <!-- Default disabled state -->
+                        <input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />
+                    </div>
                 </div>
             </div>
             <div class="modal-footer bg-light border-top-0 rounded-bottom">
-                <button type="button" class="btn-saas" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn-saas-primary" id="btnExecuteMassUpdate" onclick="executeMassUpdateAjax()">Update Records</button>
+                <button type="button" class="btn-saas" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1;">Cancel</button>
+                <button type="button" class="btn-saas-primary" id="btnExecuteMassUpdate" onclick="executeMassUpdateAjax()">
+                    <i class="fa-solid fa-check"></i> Apply Update
+                </button>
             </div>
         </div>
     </div>
 </div>
-
 <!-- ==========================================
      PREMIUM SAAS NOTES OFFCANVAS PANEL
      ========================================== -->
@@ -2427,14 +2443,88 @@
     }
 
    
-    window.filterManageColumns = function() {
-    const q = document.getElementById('manageColSearch').value.toLowerCase();
-    const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
-    items.forEach(item => {
-        const label = item.querySelector('label').innerText.toLowerCase();
-        item.style.display = label.includes(q) ? 'flex' : 'none';
-    });
-}
+   window.filterManageColumns = function () {
+        const searchInput = document.getElementById('manageColSearch');
+        if (!searchInput) return;
+        
+        const q = searchInput.value.toLowerCase();
+        const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
+        
+        items.forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            if (label.includes(q)) {
+                item.classList.remove('d-none');
+                item.classList.add('d-flex');
+            } else {
+                item.classList.remove('d-flex');
+                item.classList.add('d-none');
+            }
+        });
+    };
+
+    // ==========================================
+    // 🚀 FIX: MISSING MODAL & MASS UPDATE LOGIC FOR TASKS
+    // ==========================================
+
+    const massUpdateOptionsMap = {
+        "Status": ["Not Started", "In Progress", "Deferred", "Completed", "Waiting on input"],
+        "Priority": ["Highest", "High", "Normal", "Low", "Lowest"],
+        "TaskOwnerId": ownerOptionsList
+    };
+
+    window.openMassUpdateModal = function() {
+        // Destroy any stuck tooltips to prevent freezing
+        document.querySelectorAll('.tooltip').forEach(t => t.remove());
+
+        const modalEl = document.getElementById('massUpdateModal');
+        if (modalEl) {
+            document.body.appendChild(modalEl); // Prevents the dark backdrop screen freeze
+            modalEl.style.zIndex = "1055";
+            try {
+                const myModal = new bootstrap.Modal(modalEl);
+                myModal.show();
+            } catch (error) {
+                if (typeof $!== 'undefined')$(modalEl).modal('show');
+            }
+        }
+    };
+
+    window.renderMassUpdateInput = function() {
+        const fieldSelect = document.getElementById('massUpdateField');
+        const inputArea = document.getElementById('dynamicInputArea');
+        const container = document.getElementById('massUpdateValueContainer');
+        
+        if (!fieldSelect || !inputArea) return; 
+        
+        const selectedField = fieldSelect.value;
+        const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
+        const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+
+        // Force container visibility so the modal doesn't collapse
+        if (container) container.style.display = 'block';
+
+        if (!selectedField) {
+            inputArea.innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
+            return;
+        }
+
+        // Generate inputs dynamically using the Tasks map
+        if (massUpdateOptionsMap[selectedField]) {
+            let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>';
+            selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>';
+            massUpdateOptionsMap[selectedField].forEach(opt => {
+                selectHTML += `<option value="${opt}">${opt}</option>`;
+            });
+            selectHTML += '</select>';
+            inputArea.innerHTML = selectHTML;
+        } else if (fieldType && fieldType.includes('DateTime')) {
+            inputArea.innerHTML = '<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />';
+        } else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
+            inputArea.innerHTML = '<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />';
+        } else {
+            inputArea.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />';
+        }
+    };
 
 // --- EXCEL RESIZING WITH WHITE SPACE FIX ---
 function setupExcelResizing() {
