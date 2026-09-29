@@ -3106,35 +3106,54 @@ document.addEventListener("DOMContentLoaded", function () {
 
         table.style.tableLayout = "fixed";
         table.style.width = "max-content";
-        table.style.minWidth = "100%"; // 🚀 PREVENTS THE WHITE SPACE BUG
+        table.style.minWidth = "100%"; 
 
+        let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_deals')) || {};
         const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
 
         cols.forEach((col, index) => {
             col.style.position = 'relative';
+            const colIndex = index + 1; 
+
+            // Apply saved width
+            if (savedWidths[colIndex]) {
+                const w = savedWidths[colIndex];
+                col.style.width = w;
+                col.style.minWidth = w;
+                col.style.maxWidth = w;
+
+                const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+                rows.forEach(row => {
+                    const td = row.children[colIndex];
+                    if (td) {
+                        td.style.width = w;
+                        td.style.minWidth = w;
+                        td.style.maxWidth = w;
+                        td.style.overflow = 'hidden';
+                        td.style.textOverflow = 'ellipsis';
+                        td.style.whiteSpace = 'nowrap';
+                    }
+                });
+            }
 
             const resizer = document.createElement('div');
             resizer.className = 'excel-resizer';
             col.appendChild(resizer);
 
             let startX, startWidth;
-            const colIndex = index + 1;
 
             resizer.addEventListener('mousedown', function (e) {
                 e.preventDefault();
                 startX = e.pageX;
                 startWidth = col.offsetWidth;
-
                 resizer.classList.add('resizing');
                 document.body.style.cursor = 'col-resize';
-
                 document.addEventListener('mousemove', mouseMoveHandler);
                 document.addEventListener('mouseup', mouseUpHandler);
             });
 
             function mouseMoveHandler(e) {
                 const newWidth = Math.max(40, startWidth + (e.pageX - startX));
-
                 col.style.width = `${newWidth}px`;
                 col.style.minWidth = `${newWidth}px`;
                 col.style.maxWidth = `${newWidth}px`;
@@ -3158,10 +3177,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 document.body.style.cursor = 'default';
                 document.removeEventListener('mousemove', mouseMoveHandler);
                 document.removeEventListener('mouseup', mouseUpHandler);
+
+                // Save width to memory
+                savedWidths[colIndex] = col.style.width;
+                localStorage.setItem('crm_col_widths_deals', JSON.stringify(savedWidths));
             }
         });
 
-        const sidebar = document.querySelector('.filter-sidebar');
+       const sidebar = document.querySelector('.filter-sidebar');
         if (sidebar) {
             sidebar.style.position = 'relative';
             const sideResizer = document.createElement('div');
@@ -3194,7 +3217,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
 
-            function sideMouseUp() {
+           function sideMouseUp() {
                 document.removeEventListener('mousemove', sideMouseMove);
                 document.removeEventListener('mouseup', sideMouseUp);
             }

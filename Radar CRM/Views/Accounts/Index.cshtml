@@ -1197,9 +1197,9 @@
             <table class="table" id="accountsTable">
                 <thead>
                     <tr>
-                        <th class="sticky-cb" style="width: 80px; min-width: 80px;">
-                            <div class="d-flex align-items-center justify-content-start gap-3 w-100 ps-3">
-                                <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        <th class="sticky-cb" style="width: 120px; min-width: 120px;">
+                            <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
+                                <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
                                 <i class="fa-solid fa-bookmark text-muted fs-5" style="opacity:0.4;" title="Task Status"></i>
                             </div>
                         </th>
@@ -1253,14 +1253,14 @@
                         foreach (var item in Model)
                         {
                             <tr class="account-row" data-id="@item.Id">
-                                <td class="sticky-cb" style="width: 110px; min-width: 110px;">
+                               <td class="sticky-cb" style="width: 120px; min-width: 120px;">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
                                         <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
-
+                                        
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
                                             string tooltipText = "No pending tasks";
-                                            bool isToday = false;
+                                            string displayDateText = ""; // 🚀 NEW: Holds the text to show next to the flag
                                             var tasksDict = ViewBag.AccountTasks as System.Collections.Generic.Dictionary<int, dynamic>;
 
                                             if (tasksDict != null && tasksDict.ContainsKey(item.Id))
@@ -1273,39 +1273,42 @@
                                                 {
                                                     if (dueDate.Value.Date == DateTime.Today)
                                                     {
-                                                        flagColor = "#f97316"; // 🚀 Orange for Today
-                                                        isToday = true;
+                                                        flagColor = "#f97316"; // Orange for Today
+                                                        displayDateText = "Today";
                                                     }
                                                     else if (dueDate.Value.Date < DateTime.Today)
                                                     {
                                                         flagColor = "#ef4444"; // Red for Overdue
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Sep 30
                                                     }
                                                     else
                                                     {
                                                         flagColor = "#22c55e"; // Green for Future
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Oct 1
                                                     }
-
+                                                    
                                                     tooltipText = $"<div class='text-start'><div class='fw-bold mb-1'>{subject}</div><span class='text-muted'>{dueDate.Value.ToString("dd/MM/yyyy")}</span></div>";
                                                 }
                                             }
                                         }
 
                                         <!-- Group the flag and text together so the tooltip applies to both -->
-                                        <div class="d-flex align-items-center gap-1"
-                                             style="cursor: pointer; transition: transform 0.2s;"
-                                             data-bs-toggle="tooltip"
-                                             data-bs-html="true"
-                                             data-bs-placement="right"
+                                        <div class="d-flex align-items-center gap-1" 
+                                             style="cursor: pointer; transition: transform 0.2s;" 
+                                             data-bs-toggle="tooltip" 
+                                             data-bs-html="true" 
+                                             data-bs-placement="right" 
                                              data-bs-custom-class="custom-tooltip"
                                              title="@tooltipText"
-                                             onmouseover="this.style.transform='scale(1.1)'"
+                                             onmouseover="this.style.transform='scale(1.1)'" 
                                              onmouseout="this.style.transform='scale(1)'">
-
-                                            <i class="fa-solid fa-bookmark fs-5" style="color: @flagColor;"></i>
-
-                                            @if (isToday)
+                                             
+                                            <i class="fa-solid fa-bookmark fs-5 flex-shrink-0" style="color: @flagColor;"></i>
+                                            
+                                            <!-- 🚀 NEW: Shows the date text for ALL active flags -->
+                                            @if(!string.IsNullOrEmpty(displayDateText))
                                             {
-                                                <span class="fw-bold" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">Today</span>
+                                                <span class="fw-bold text-nowrap" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">@displayDateText</span>
                                             }
                                         </div>
                                     </div>
@@ -3489,67 +3492,97 @@ setupExcelResizing();
 
 function setupExcelResizing() {
     const table = document.getElementById('accountsTable');
-    if (table) {
-        table.style.tableLayout = "fixed";
-        table.style.width = "max-content";
+    if (!table) return;
 
-        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
-        cols.forEach(col => {
-            col.style.position = 'relative';
+    table.style.tableLayout = "fixed";
+    table.style.width = "max-content";
 
-            const resizer = document.createElement('div');
-            resizer.style.width = '8px';
-            resizer.style.height = '100%';
-            resizer.style.position = 'absolute';
-            resizer.style.right = '0';
-            resizer.style.top = '0';
-            resizer.style.cursor = 'col-resize';
-            resizer.style.userSelect = 'none';
-            resizer.style.zIndex = '10';
+    // 🚀 NEW: Load saved widths from LocalStorage
+    let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_accounts')) || {};
 
-            resizer.addEventListener('mouseenter', () => resizer.style.backgroundColor = '#93c5fd');
-            resizer.addEventListener('mouseleave', () => resizer.style.backgroundColor = 'transparent');
+    const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
+    cols.forEach(col => {
+        col.style.position = 'relative';
 
-            col.appendChild(resizer);
+        const colIndex = Array.from(col.parentNode.children).indexOf(col);
+        
+        // 🚀 NEW: Apply saved width immediately if it exists
+        if (savedWidths[colIndex]) {
+            const w = savedWidths[colIndex];
+            col.style.width = w;
+            col.style.minWidth = w;
+            col.style.maxWidth = w;
 
-            let startX, startWidth;
-            const colIndex = Array.from(col.parentNode.children).indexOf(col);
-
-            resizer.addEventListener('mousedown', function (e) {
-                startX = e.pageX;
-                startWidth = col.offsetWidth;
-                document.body.style.cursor = 'col-resize';
-                document.addEventListener('mousemove', mouseMoveHandler);
-                document.addEventListener('mouseup', mouseUpHandler);
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const td = row.children[colIndex];
+                if (td) {
+                    td.style.width = w;
+                    td.style.minWidth = w;
+                    td.style.maxWidth = w;
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
+                }
             });
-           function mouseMoveHandler(e) {
-                const newWidth = Math.max(90, startWidth + (e.pageX - startX));
+        }
 
-                col.style.width = `${newWidth}px`;
-                col.style.minWidth = `${newWidth}px`;
-                col.style.maxWidth = `${newWidth}px`;
+        const resizer = document.createElement('div');
+        resizer.style.width = '8px';
+        resizer.style.height = '100%';
+        resizer.style.position = 'absolute';
+        resizer.style.right = '0';
+        resizer.style.top = '0';
+        resizer.style.cursor = 'col-resize';
+        resizer.style.userSelect = 'none';
+        resizer.style.zIndex = '10';
 
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    const td = row.children[colIndex];
-                    if (td) {
-                        td.style.width = `${newWidth}px`;
-                        td.style.minWidth = `${newWidth}px`;
-                        td.style.maxWidth = `${newWidth}px`;
-                        td.style.overflow = 'hidden';
-                        td.style.textOverflow = 'ellipsis';
-                        td.style.whiteSpace = 'nowrap';
-                    }
-                });
-            }
-           function mouseUpHandler() {
-                document.body.style.cursor = 'default';
-                document.removeEventListener('mousemove', mouseMoveHandler);
-                document.removeEventListener('mouseup', mouseUpHandler);
-            }
+        resizer.addEventListener('mouseenter', () => resizer.style.backgroundColor = '#93c5fd');
+        resizer.addEventListener('mouseleave', () => resizer.style.backgroundColor = 'transparent');
+
+        col.appendChild(resizer);
+
+        let startX, startWidth;
+
+        resizer.addEventListener('mousedown', function (e) {
+            startX = e.pageX;
+            startWidth = col.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
         });
-    }
 
+           function mouseMoveHandler(e) {
+            const newWidth = Math.max(90, startWidth + (e.pageX - startX));
+
+            col.style.width = `${newWidth}px`;
+            col.style.minWidth = `${newWidth}px`;
+            col.style.maxWidth = `${newWidth}px`;
+
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const td = row.children[colIndex];
+                if (td) {
+                    td.style.width = `${newWidth}px`;
+                    td.style.minWidth = `${newWidth}px`;
+                    td.style.maxWidth = `${newWidth}px`;
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
+                }
+            });
+        }
+           function mouseUpHandler() {
+            document.body.style.cursor = 'default';
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+
+            // 🚀 NEW: Save the new width to LocalStorage so it survives reloads/clicks
+            savedWidths[colIndex] = col.style.width;
+            localStorage.setItem('crm_col_widths_accounts', JSON.stringify(savedWidths));
+        }
+    });
+}
     // --- Sidebar Resizer remains unchanged ---
     const sidebar = document.querySelector('.filter-sidebar');
     if (sidebar) {

@@ -1123,7 +1123,7 @@
             <table class="table" id="leadsTable">
                 <thead>
                     <tr>
-                        <th class="sticky-cb" style="width: 110px; min-width: 110px;">
+                       <th class="sticky-cb" style="width: 120px; min-width: 120px;">
                             <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
                                 <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
                                 <i class="fa-solid fa-bookmark text-muted fs-5" style="opacity:0.4;" title="Task Status"></i>
@@ -1176,15 +1176,14 @@
                         foreach (var item in Model)
                         {
                             <tr class="lead-row" data-id="@item.Id">
-                               <td class="sticky-cb" style="width: 110px; min-width: 110px;">
+                              <td class="sticky-cb" style="width: 120px; min-width: 120px;">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
                                         <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
                                         
-                                        <!-- 🚀 NEW: Large Bookmark Flag Logic for Leads -->
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
                                             string tooltipText = "No pending tasks";
-                                            bool isToday = false;
+                                            string displayDateText = ""; // 🚀 NEW: Holds the text to show next to the flag
                                             var tasksDict = ViewBag.LeadTasks as System.Collections.Generic.Dictionary<int, dynamic>;
 
                                             if (tasksDict != null && tasksDict.ContainsKey(item.Id))
@@ -1197,16 +1196,18 @@
                                                 {
                                                     if (dueDate.Value.Date == DateTime.Today)
                                                     {
-                                                        flagColor = "#f97316"; // 🚀 Orange for Today
-                                                        isToday = true;
+                                                        flagColor = "#f97316"; // Orange for Today
+                                                        displayDateText = "Today";
                                                     }
                                                     else if (dueDate.Value.Date < DateTime.Today)
                                                     {
                                                         flagColor = "#ef4444"; // Red for Overdue
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Sep 30
                                                     }
                                                     else
                                                     {
                                                         flagColor = "#22c55e"; // Green for Future
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Oct 1
                                                     }
                                                     
                                                     tooltipText = $"<div class='text-start'><div class='fw-bold mb-1'>{subject}</div><span class='text-muted'>{dueDate.Value.ToString("dd/MM/yyyy")}</span></div>";
@@ -1225,11 +1226,12 @@
                                              onmouseover="this.style.transform='scale(1.1)'" 
                                              onmouseout="this.style.transform='scale(1)'">
                                              
-                                            <i class="fa-solid fa-bookmark fs-5" style="color: @flagColor;"></i>
+                                            <i class="fa-solid fa-bookmark fs-5 flex-shrink-0" style="color: @flagColor;"></i>
                                             
-                                            @if(isToday)
+                                            <!-- 🚀 NEW: Shows the date text for ALL active flags -->
+                                            @if(!string.IsNullOrEmpty(displayDateText))
                                             {
-                                                <span class="fw-bold" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">Today</span>
+                                                <span class="fw-bold text-nowrap" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">@displayDateText</span>
                                             }
                                         </div>
                                     </div>
@@ -3162,106 +3164,133 @@
 
     // --- EXCEL RESIZING FOR LEADS ---
     function setupExcelResizing() {
-        const table = document.getElementById('leadsTable');
-        if (!table) return;
+    const table = document.getElementById('leadsTable');
+    if (!table) return;
 
-        // REPLACE THEM WITH THESE THREE LINES:
-        table.style.tableLayout = "fixed";
-        table.style.width = "max-content";
-        table.style.minWidth = "100%"; // 🚀 THIS IS THE MAGIC FIX
+    table.style.tableLayout = "fixed";
+    table.style.width = "max-content";
+    table.style.minWidth = "100%"; 
 
-        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
+    // 🚀 NEW: Load saved widths from LocalStorage
+    let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_leads')) || {};
 
-        cols.forEach((col, index) => {
-            col.style.position = 'relative';
+    const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
 
-            const resizer = document.createElement('div');
-            resizer.className = 'excel-resizer';
-            col.appendChild(resizer);
+    cols.forEach((col, index) => {
+        col.style.position = 'relative';
+        const colIndex = index + 1; // Since checkbox is column 0
 
-            let startX, startWidth;
-            const colIndex = index + 1;
+        // 🚀 NEW: Apply saved width immediately if it exists
+        if (savedWidths[colIndex]) {
+            const w = savedWidths[colIndex];
+            col.style.width = w;
+            col.style.minWidth = w;
+            col.style.maxWidth = w;
 
-            resizer.addEventListener('mousedown', function (e) {
-                e.preventDefault();
-                startX = e.pageX;
-                startWidth = col.offsetWidth;
-
-                resizer.classList.add('resizing');
-                document.body.style.cursor = 'col-resize';
-
-                document.addEventListener('mousemove', mouseMoveHandler);
-                document.addEventListener('mouseup', mouseUpHandler);
+            const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+            rows.forEach(row => {
+                const td = row.children[colIndex];
+                if (td) {
+                    td.style.width = w;
+                    td.style.minWidth = w;
+                    td.style.maxWidth = w;
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
+                }
             });
+        }
 
-            function mouseMoveHandler(e) {
-                const newWidth = Math.max(40, startWidth + (e.pageX - startX));
+        const resizer = document.createElement('div');
+        resizer.className = 'excel-resizer';
+        col.appendChild(resizer);
 
-                col.style.width = `${newWidth}px`;
-                col.style.minWidth = `${newWidth}px`;
-                col.style.maxWidth = `${newWidth}px`;
+        let startX, startWidth;
 
-                const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-                rows.forEach(row => {
-                    const td = row.children[colIndex];
-                    if (td) {
-                        td.style.width = `${newWidth}px`;
-                        td.style.minWidth = `${newWidth}px`;
-                        td.style.maxWidth = `${newWidth}px`;
-                        td.style.overflow = 'hidden';
-                        td.style.textOverflow = 'ellipsis';
-                        td.style.whiteSpace = 'nowrap';
-                    }
-                });
-            }
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            startX = e.pageX;
+            startWidth = col.offsetWidth;
 
-            function mouseUpHandler() {
-                resizer.classList.remove('resizing');
-                document.body.style.cursor = 'default';
-                document.removeEventListener('mousemove', mouseMoveHandler);
-                document.removeEventListener('mouseup', mouseUpHandler);
-            }
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
         });
 
-        const sidebar = document.querySelector('.filter-sidebar');
-        if (sidebar) {
-            sidebar.style.position = 'relative';
-            const sideResizer = document.createElement('div');
-            sideResizer.style.width = '6px';
-            sideResizer.style.height = '100%';
-            sideResizer.style.position = 'absolute';
-            sideResizer.style.right = '0';
-            sideResizer.style.top = '0';
-            sideResizer.style.cursor = 'col-resize';
-            sideResizer.style.userSelect = 'none';
+          function mouseMoveHandler(e) {
+            const newWidth = Math.max(40, startWidth + (e.pageX - startX));
 
-            sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
-            sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
+            col.style.width = `${newWidth}px`;
+            col.style.minWidth = `${newWidth}px`;
+            col.style.maxWidth = `${newWidth}px`;
 
-            sidebar.appendChild(sideResizer);
-
-            let sStartX, sStartWidth;
-            sideResizer.addEventListener('mousedown', function (e) {
-                sStartX = e.pageX;
-                sStartWidth = sidebar.offsetWidth;
-                document.addEventListener('mousemove', sideMouseMove);
-                document.addEventListener('mouseup', sideMouseUp);
-            });
-
-            function sideMouseMove(e) {
-                const newWidth = sStartWidth + (e.pageX - sStartX);
-                if (newWidth > 200 && newWidth < 800) {
-                    sidebar.style.minWidth = `${newWidth}px`;
-                    sidebar.style.width = `${newWidth}px`;
+            const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+            rows.forEach(row => {
+                const td = row.children[colIndex];
+                if (td) {
+                    td.style.width = `${newWidth}px`;
+                    td.style.minWidth = `${newWidth}px`;
+                    td.style.maxWidth = `${newWidth}px`;
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
                 }
-            }
+            });
+        }
 
-            function sideMouseUp() {
-                document.removeEventListener('mousemove', sideMouseMove);
-                document.removeEventListener('mouseup', sideMouseUp);
+            function mouseUpHandler() {
+            resizer.classList.remove('resizing');
+            document.body.style.cursor = 'default';
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+
+            // 🚀 NEW: Save the new width to LocalStorage so it survives reloads/clicks
+            savedWidths[colIndex] = col.style.width;
+            localStorage.setItem('crm_col_widths_leads', JSON.stringify(savedWidths));
+        }
+    });
+
+      const sidebar = document.querySelector('.filter-sidebar');
+    if (sidebar) {
+        sidebar.style.position = 'relative';
+        const sideResizer = document.createElement('div');
+        sideResizer.style.width = '6px';
+        sideResizer.style.height = '100%';
+        sideResizer.style.position = 'absolute';
+        sideResizer.style.right = '0';
+        sideResizer.style.top = '0';
+        sideResizer.style.cursor = 'col-resize';
+        sideResizer.style.userSelect = 'none';
+
+        sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
+        sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
+
+        sidebar.appendChild(sideResizer);
+
+        let sStartX, sStartWidth;
+        sideResizer.addEventListener('mousedown', function (e) {
+            sStartX = e.pageX;
+            sStartWidth = sidebar.offsetWidth;
+            document.addEventListener('mousemove', sideMouseMove);
+            document.addEventListener('mouseup', sideMouseUp);
+        });
+
+           function sideMouseMove(e) {
+            const newWidth = sStartWidth + (e.pageX - sStartX);
+            if (newWidth > 200 && newWidth < 800) {
+                sidebar.style.minWidth = `${newWidth}px`;
+                sidebar.style.width = `${newWidth}px`;
             }
         }
+
+           function sideMouseUp() {
+            document.removeEventListener('mousemove', sideMouseMove);
+            document.removeEventListener('mouseup', sideMouseUp);
+        }
     }
+}
 
     // ==========================================
     // 🚀 FIX: MISSING MODAL & MASS UPDATE LOGIC
