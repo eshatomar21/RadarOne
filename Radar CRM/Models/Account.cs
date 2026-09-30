@@ -23,6 +23,8 @@ namespace Radar_CRM.Models
         public string? SeminarName { get; set; }
         public string? LeadStatus { get; set; }
 
+        public string? Phone { get; set; }
+
         [Column("Group_Name")]
         public string? GroupName { get; set; }
 

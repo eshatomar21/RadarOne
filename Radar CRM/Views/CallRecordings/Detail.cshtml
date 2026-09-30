@@ -1,0 +1,198 @@
+﻿@model Radar_CRM.Models.CallRecord
+
+@{
+    ViewData["Title"] = "Call Detail";
+}
+
+<style>
+    /* Custom CSS to match the referenced dashboard UI */
+    body {
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Inter, Roboto, sans-serif;
+    }
+    .dashboard-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2b3445;
+        border-left: 3px solid #3b82f6; /* Blue accent line */
+        padding-left: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+    }
+    .breadcrumb-text {
+        color: #8392a5;
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+    }
+    .breadcrumb-text span {
+        color: #3b82f6;
+        font-weight: 500;
+    }
+    .data-label {
+        color: #8392a5;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    .data-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #2b3445;
+    }
+    .badge-soft-success {
+        background-color: #d1fae5;
+        color: #065f46;
+        border-radius: 50rem;
+        padding: 5px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .badge-soft-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+        border-radius: 50rem;
+        padding: 5px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .ai-text-box {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        color: #475569;
+        line-height: 1.6;
+        white-space: pre-wrap; /* Keeps line breaks from AI */
+    }
+    audio {
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 8px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb-text">
+        Call Logs > <span>Call Details</span>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Call Info & Audio -->
+        <div class="col-lg-7">
+            <!-- Call Overview Card -->
+            <div class="dashboard-card">
+                <div class="section-title">CALL OVERVIEW</div>
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="data-label">Customer Phone</div>
+                        <div class="data-value">@Model.CustomerPhone</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="data-label">Salesperson Phone</div>
+                        <div class="data-value">@Model.SalespersonPhone</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="data-label">Duration</div>
+                        <div class="data-value">@Model.DurationSeconds seconds</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="data-label">Date & Time</div>
+                        <div class="data-value">@Model.CallDate.ToString("dd MMM yyyy, hh:mm tt")</div>
+                    </div>
+                </div>
+
+                <hr class="my-4 text-muted" />
+
+                <!-- Audio Player -->
+                <div class="section-title border-0 ps-0 text-primary">
+                    <i class="bi bi-play-circle-fill me-2"></i> Play Recording
+                </div>
+                @if (!string.IsNullOrEmpty(Model.RecordingUrl))
+                {
+                    <audio controls>
+                        <source src="@Model.RecordingUrl" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                }
+                else
+                {
+                    <div class="alert alert-secondary">Recording URL is not available for this call.</div>
+                }
+            </div>
+
+            <!-- AI Summary Card -->
+            <div class="dashboard-card">
+                <div class="section-title">AI SUMMARY</div>
+                <div class="ai-text-box">
+                    @(string.IsNullOrEmpty(Model.AiSummary) ? "Summary is generating or not available." : Model.AiSummary)
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Linked Entities & Full Text -->
+        <div class="col-lg-5">
+            <!-- CRM Links Card -->
+            <div class="dashboard-card">
+                <div class="section-title">ATTACHED CRM RECORDS</div>
+
+                <div class="mb-4">
+                    <div class="data-label mb-2">Linked Account</div>
+                    @if (Model.Account != null)
+                    {
+                        <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                            <!-- Replace 'Name' with your actual Account name property -->
+                            <span class="data-value">@Model.Account.Id - Account Exists</span>
+                            <span class="badge-soft-success">Linked</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-between align-items-center p-3 border rounded bg-light">
+                            <span class="text-muted">No Account Found</span>
+                            <span class="badge-soft-warning">Unlinked</span>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <div class="data-label mb-2">Linked Lead</div>
+                    @if (Model.Lead != null)
+                    {
+                        <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                            <!-- Replace 'Name' with your actual Lead name property -->
+                            <span class="data-value">@Model.Lead.Id - Lead Exists</span>
+                            <span class="badge-soft-success">Linked</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-between align-items-center p-3 border rounded bg-light">
+                            <span class="text-muted">No Lead Found</span>
+                            <span class="badge-soft-warning">Unlinked</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Full Transcription Card -->
+            <div class="dashboard-card">
+                <div class="section-title">FULL TRANSCRIPTION</div>
+                <div class="ai-text-box" style="max-height: 400px; overflow-y: auto;">
+                    @(string.IsNullOrEmpty(Model.TranscriptionText) ? "Transcription is generating or not available." : Model.TranscriptionText)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

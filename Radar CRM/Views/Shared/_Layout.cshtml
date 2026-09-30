@@ -12,39 +12,50 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
-    <!-- Commented out to prevent the 404 error if CSS isolation is not active or project name is different -->
-    <!-- <link rel="stylesheet" href="~/Radar_CRM.styles.css" /> -->
-
     <style>
-            /* --- Premium Enterprise SaaS Palette (Cream & Navy Theme) --- */
+            /* --- Premium Enterprise SaaS Palette (Zoho Flat Theme) --- */
             @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
             :root {
-                /* Main Workspace Colors */
-                --bg-light: #f8fafc;
+                --bg-light: #f3f4f6; /* Lighter Zoho gray background */
+                --bg-surface: #ffffff;
                 --navbar-bg: #ffffff;
-                --navbar-border: #e2e8f0;
-                --text-main: #0f172a;
-                --text-muted: #64748b;
-                /* Clean Cream & Navy Sidebar Theme */
-                --sidebar-bg: #Fdfbf7; /* Cream Background */
-                --sidebar-border: #e2e8f0;
-                --sidebar-text: #475569;
-                --sidebar-hover-bg: #1e3a8a; /* Dark Navy Blue */
-                --sidebar-hover-text: #ffffff; /* White text on hover */
-                --sidebar-active-bg: #1e3a8a; /* Dark Navy Blue active state */
-                --sidebar-active-text: #ffffff; /* White text on active state */
-                --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                --navbar-border: #e5e7eb;
+                --primary-blue: #2563eb;
+                --primary-hover: #1d4ed8;
+                --text-dark: #111827;
+                --text-main: #374151;
+                --text-muted: #6b7280;
+                /* Flat Sidebar Theme */
+                --sidebar-bg: #ffffff;
+                --sidebar-border: #e5e7eb;
+                --sidebar-text: #4b5563;
+                --sidebar-hover-bg: #f9fafb;
+                --sidebar-hover-text: #111827;
+                --sidebar-active-bg: #eff6ff;
+                --sidebar-active-text: #2563eb;
+                --border-soft: #e5e7eb;
+                --border-dark: #94a3b8;
+                --radius-md: 4px; /* Strict, small corners */
+                --radius-lg: 0px;
+                --shadow-sm: none; /* Flattening the UI */
+                --shadow-soft: none;
+                --btn-depth: 0px;
             }
 
-            /* --- Layout & Structure --- */
+            /* Override layout whitespace */
+            body .content-area {
+                padding: 0 !important;
+                background-color: var(--bg-body);
+            }
+
             body {
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
                 background-color: var(--bg-light);
                 font-family: 'Inter', sans-serif;
-                font-size: 0.875rem;
+                font-size: 0.85rem;
                 color: var(--text-main);
             }
 
@@ -54,7 +65,7 @@
                 width: 100vw;
             }
 
-            /* --- Premium Sidebar Styling --- */
+            /* --- Flat Sidebar Styling --- */
             .sidebar {
                 width: 240px;
                 background-color: var(--sidebar-bg);
@@ -63,54 +74,42 @@
                 flex-direction: column;
                 flex-shrink: 0;
                 z-index: 1040;
-                transition: transform 0.3s ease-in-out;
-                box-shadow: 4px 0 15px rgba(0,0,0,0.02);
+                transition: width 0.3s ease; /* Smooth collapse */
+                overflow-x: hidden;
+                white-space: nowrap;
             }
 
             .sidebar-brand {
-                padding: 0 1.5rem;
+                padding: 0 1.25rem;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                height: 85px;
-                background-color: var(--sidebar-bg);
+                height: 60px; /* Slimmer Zoho header height */
                 border-bottom: 1px solid var(--sidebar-border);
             }
 
-            /* PREMIUM 3D BRAND LOGO STYLING */
             .brand-logo-container {
                 display: flex;
                 align-items: center;
-                gap: 14px;
+                gap: 10px;
             }
 
                 .brand-logo-container img {
-                    width: 46px;
-                    height: 46px;
-                    border-radius: 10px;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 6px;
                     object-fit: cover;
-                    border: 2px solid #ffffff;
-                    box-shadow: 0 6px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1);
-                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 }
 
-                    .brand-logo-container img:hover {
-                        transform: translateY(-2px) scale(1.05);
-                    }
-
                 .brand-logo-container h5 {
-                    font-weight: 800;
+                    font-weight: 700;
                     margin: 0;
-                    letter-spacing: -0.5px;
-                    font-size: 1.5rem;
-                    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    text-shadow: 2px 2px 4px rgba(30, 58, 138, 0.15);
+                    font-size: 1.1rem;
+                    color: #0f172a;
                 }
 
             .sidebar-nav {
-                padding: 1.5rem 1rem;
+                padding: 1rem;
                 overflow-y: auto;
                 flex-grow: 1;
             }
@@ -130,22 +129,20 @@
                 font-weight: 800;
                 color: #94a3b8;
                 letter-spacing: 0.1em;
-                margin: 1.5rem 0 0.5rem 0.5rem;
+                margin: 1rem 0 0.5rem 0.5rem;
             }
 
             .nav-item-link {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 0.75rem 1rem;
+                padding: 0.6rem 1rem;
                 color: var(--sidebar-text);
                 text-decoration: none;
-                border-radius: 8px;
-                margin-bottom: 6px;
-                font-weight: 600;
-                font-size: 0.95rem;
-                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-                position: relative;
+                border-radius: 6px;
+                margin-bottom: 4px;
+                font-weight: 500;
+                font-size: 0.9rem;
             }
 
             .nav-item-link-content {
@@ -153,49 +150,38 @@
                 align-items: center;
             }
 
-            .icon-3d {
-                margin-right: 0.85rem;
-                font-size: 1.25rem;
-                filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.15));
-                transition: all 0.25s ease;
-            }
-
             .nav-item-link:hover:not(.active) {
                 background-color: var(--sidebar-hover-bg);
                 color: var(--sidebar-hover-text);
-                /* Removed translateX to fix the hover disappearing glitch */
-                box-shadow: 0 4px 10px rgba(30, 58, 138, 0.15);
             }
-
-                .nav-item-link:hover:not(.active) .icon-3d,
-                .nav-item-link:hover:not(.active) .toggle-arrow {
-                    color: var(--sidebar-hover-text) !important;
-                    filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
-                }
 
             .nav-item-link.active {
                 background-color: var(--sidebar-active-bg);
                 color: var(--sidebar-active-text);
-                font-weight: 700;
-                box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2);
+                font-weight: 600;
             }
 
-                .nav-item-link.active .icon-3d,
-                .nav-item-link.active .toggle-arrow {
-                    color: var(--sidebar-active-text) !important;
-                    filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.3));
-                }
+            .icon-3d {
+                margin-right: 0.75rem;
+                font-size: 1.1rem;
+                transition: 0.2s;
+                filter: none;
+            }
+
+            .nav-item-link.active .icon-3d {
+                color: var(--sidebar-active-text) !important;
+            }
 
             .toggle-arrow {
                 transition: transform 0.3s ease;
                 font-size: 0.85rem;
-                color: #64748b;
+                color: #6b7280;
                 font-weight: bold;
             }
 
             .nav-item-link[aria-expanded="true"] {
-                background-color: #e2e8f0;
-                color: #0f172a;
+                background-color: #e5e7eb;
+                color: #111827;
             }
 
                 .nav-item-link[aria-expanded="true"] .toggle-arrow {
@@ -205,22 +191,79 @@
             .collapse.sub-menu {
                 margin-left: 1.5rem;
                 padding-left: 0.5rem;
-                border-left: 2px solid #cbd5e1;
+                border-left: 2px solid #e5e7eb;
                 margin-top: 4px;
                 margin-bottom: 12px;
-                border-radius: 0 8px 8px 0;
                 transition: all 0.3s ease-in-out;
             }
 
             .sub-menu .nav-item-link {
                 font-size: 0.85rem;
-                padding: 0.6rem 1rem;
-                color: #475569;
+                padding: 0.5rem 1rem;
                 margin-bottom: 2px;
-                font-weight: 600;
             }
 
-            /* --- Main Content Area --- */
+            /* --- Collapsed Sidebar Logic --- */
+            body.full-view-mode .sidebar {
+                width: 64px !important;
+            }
+
+            body.full-view-mode .sidebar-brand {
+                justify-content: center;
+                padding: 0;
+            }
+
+            body.full-view-mode .brand-logo-container h5,
+            body.full-view-mode .nav-section-title,
+            body.full-view-mode .toggle-arrow,
+            body.full-view-mode .nav-item-link-text {
+                display: none !important;
+            }
+
+            body.full-view-mode .nav-item-link {
+                padding: 0.75rem 0;
+                justify-content: center;
+            }
+
+            body.full-view-mode .nav-item-link-content {
+                justify-content: center;
+                width: 100%;
+            }
+
+            body.full-view-mode .icon-3d {
+                margin-right: 0 !important;
+                font-size: 1.25rem;
+            }
+
+            body.full-view-mode .sub-menu {
+                display: none !important;
+            }
+
+            /* Toggle Button States */
+            #showLayoutBtnIcon {
+                display: none;
+            }
+
+            body.full-view-mode #hideLayoutBtnText {
+                display: none;
+            }
+
+            body.full-view-mode #showLayoutBtnIcon {
+                display: block;
+                font-size: 1.1rem;
+                color: #6b7280;
+                padding: 18px 0;
+            }
+
+            body.full-view-mode .brand-logo-container {
+                display: none;
+            }
+
+            #showLayoutBtn {
+                display: none !important;
+            }
+
+            /* --- Top Navbar Styling (Slim & Flat) --- */
             .main-wrapper {
                 flex-grow: 1;
                 display: flex;
@@ -229,31 +272,32 @@
             }
 
             .top-navbar {
-                height: 70px;
+                height: 60px;
                 background-color: var(--navbar-bg);
                 border-bottom: 1px solid var(--navbar-border);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 0 2rem;
+                padding: 0 1.5rem;
                 flex-shrink: 0;
                 z-index: 10;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
             }
 
             .content-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 2rem;
-    background-color: var(--bg-light);
-    /* 🚀 FIX 2: Trap the table's checkboxes and sticky headers in a low-level layer */
-    position: relative;
-    z-index: 1; 
-}
-            /* --- Global Search Bar --- */
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 0;
+                background-color: var(--bg-light);
+                position: relative;
+                z-index: 1;
+            }
+
+            /* Global Search */
             .search-wrapper {
                 position: relative;
-                width: 480px;
+                max-width: 480px;
+                width: 100%;
+                margin: 0 20px;
             }
 
                 .search-wrapper .bi-search {
@@ -261,60 +305,56 @@
                     left: 16px;
                     top: 50%;
                     transform: translateY(-50%);
-                    color: #64748b;
+                    color: #6b7280;
                     font-size: 1rem;
                     z-index: 2;
-                    transition: color 0.3s;
                     font-weight: bold;
                 }
 
                 .search-wrapper input {
                     width: 100%;
                     padding-left: 46px;
-                    border-radius: 8px;
-                    background-color: #f1f5f9;
-                    border: 2px solid transparent;
-                    font-size: 0.95rem;
-                    padding-top: 10px;
-                    padding-bottom: 10px;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    color: #0f172a;
-                    font-weight: 600;
+                    border-radius: 6px;
+                    background-color: #f3f4f6;
+                    border: 1px solid transparent;
+                    font-size: 0.9rem;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    color: #111827;
+                    font-weight: 500;
                 }
 
                     .search-wrapper input:focus {
                         background-color: #ffffff;
-                        border-color: #1e3a8a;
-                        box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.15);
+                        border-color: var(--primary-blue);
+                        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
                         outline: none;
                     }
 
                         .search-wrapper input:focus + .bi-search {
-                            color: #1e3a8a;
+                            color: var(--primary-blue);
                         }
 
-            /* --- Global Search Bar Updates --- */
-        .search-results-dropdown {
-    display: none;
-    position: absolute;
-    top: 110%;
-    left: 0;
-    width: 100%;
-    background: white;
-    border: 1px solid var(--navbar-border);
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25); 
-    /* 🚀 FIX 4: Nuclear option with !important to absolutely guarantee it sits in front */
-    z-index: 999999 !important; 
-    max-height: 450px;
-    overflow-y: auto;
-}
+            /* Search Dropdown */
+            .search-results-dropdown {
+                display: none;
+                position: absolute;
+                top: 110%;
+                left: 0;
+                width: 100%;
+                background: white;
+                border: 1px solid var(--navbar-border);
+                border-radius: 6px;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                z-index: 999999 !important;
+                max-height: 400px;
+                overflow-y: auto;
+            }
 
             .search-result-item {
                 padding: 10px 16px;
-                border-bottom: 1px solid #f1f5f9;
+                border-bottom: 1px solid #f3f4f6;
                 cursor: pointer;
-                transition: background 0.1s;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -322,13 +362,13 @@
                 color: inherit;
             }
 
-            .search-result-item:last-child {
-                border-bottom: none;
-            }
+                .search-result-item:last-child {
+                    border-bottom: none;
+                }
 
-            .search-result-item:hover {
-                background: #f8fafc;
-            }
+                .search-result-item:hover {
+                    background: #f9fafb;
+                }
 
             .search-result-left {
                 display: flex;
@@ -337,69 +377,44 @@
             }
 
             .search-result-icon i {
-                color: #64748b;
+                color: #6b7280;
                 font-size: 1.1rem;
             }
 
             .search-result-details h6 {
                 margin: 0;
-                font-size: 0.9rem;
+                font-size: 0.85rem;
                 font-weight: 600;
-                color: #1e293b;
+                color: #111827;
             }
 
             .search-result-details p {
                 margin: 2px 0 0 0;
-                font-size: 0.75rem;
-                color: #64748b;
+                font-size: 0.7rem;
+                color: #6b7280;
             }
 
-            /* Mimics Zoho's right-aligned module name */
             .search-result-module {
-                font-size: 0.75rem;
-                color: #94a3b8;
+                font-size: 0.7rem;
+                color: #9ca3af;
                 font-weight: 500;
             }
 
-            .search-badge {
-                font-size: 0.65rem;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-weight: 700;
-                text-transform: uppercase;
-            }
-
-            .badge-account {
-                background: #e0e7ff;
-                color: #1e40af;
-            }
-
-            .badge-lead {
-                background: #dcfce3;
-                color: #166534;
-            }
-
-            .badge-deal {
-                background: #fef3c7;
-                color: #92400e;
-            }
-
-            /* --- Header Controls --- */
+            /* Action Buttons (Flat Zoho Style) */
             .header-actions {
                 display: flex;
                 align-items: center;
-                gap: 1.25rem;
+                gap: 1rem;
             }
 
             .btn-signout {
-                color: #64748b;
-                font-size: 0.9rem;
-                font-weight: 700;
+                color: #6b7280;
+                font-size: 0.85rem;
+                font-weight: 600;
                 text-decoration: none;
-                padding: 8px 16px;
-                border-radius: 8px;
-                border: 2px solid var(--navbar-border);
-                transition: 0.2s;
+                padding: 6px 14px;
+                border-radius: 6px;
+                border: 1px solid var(--navbar-border);
                 background: white;
             }
 
@@ -407,6 +422,55 @@
                     background-color: #fef2f2;
                     color: #dc2626;
                     border-color: #fca5a5;
+                }
+
+            .btn-saas {
+                background-color: #f9fafb;
+                color: var(--text-dark);
+                border: 1px solid #d1d5db;
+                font-weight: 500;
+                border-radius: var(--radius-md);
+                padding: 5px 14px;
+                font-size: 0.8rem;
+                transition: all 0.1s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                box-shadow: none;
+            }
+
+                .btn-saas:hover {
+                    background-color: #f3f4f6;
+                }
+
+            .btn-saas-primary {
+                background-color: var(--primary-blue) !important;
+                color: #ffffff !important;
+                font-weight: 500;
+                border: 1px solid var(--primary-hover) !important;
+                border-radius: var(--radius-md);
+                padding: 5px 18px;
+                font-size: 0.8rem;
+                box-shadow: none;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+                .btn-saas-primary:hover {
+                    background-color: var(--primary-hover) !important;
+                }
+
+            .btn-saas-danger {
+                background-color: #fef2f2;
+                color: #b91c1c;
+                border: 1px solid #fca5a5;
+            }
+
+                .btn-saas-danger:hover {
+                    background-color: #fee2e2;
                 }
 
             .user-dropdown-btn {
@@ -417,27 +481,511 @@
             }
 
             .avatar-circle {
-                width: 42px;
-                height: 42px;
+                width: 36px;
+                height: 36px;
                 background: linear-gradient(135deg, #1e3a8a, #0ea5e9);
                 color: #ffffff;
                 border-radius: 50%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-weight: 700;
-                font-size: 1.1rem;
-                box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
+                font-weight: 600;
+                font-size: 1rem;
                 border: 2px solid #ffffff;
-                transition: all 0.2s ease;
             }
 
-            .user-dropdown-btn:hover .avatar-circle {
-                transform: scale(1.05);
-                box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
+            /* --- Unified Layout Grid (Zero Gaps like Zoho) --- */
+            .crm-container {
+                display: flex;
+                height: calc(100vh - 60px);
+                gap: 0;
+                width: 100%;
+                max-width: 100%;
+                border-top: 1px solid var(--border-soft);
+                background: var(--bg-surface);
             }
 
-            /* --- Mobile Responsive --- */
+            /* Flat Sidebar inside CRM Container */
+            .filter-sidebar {
+                width: 260px;
+                min-width: 260px;
+                background: var(--bg-surface);
+                border-right: 1px solid var(--border-soft);
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                transition: width 0.3s ease, min-width 0.3s ease;
+            }
+
+                .filter-sidebar.hidden-sidebar {
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    border-right: none !important;
+                    opacity: 0;
+                    overflow: hidden;
+                }
+
+            .filter-header {
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-soft);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+                .filter-header h6 {
+                    margin: 0;
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    color: var(--text-dark);
+                }
+
+            .filter-search-box {
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-soft);
+                background-color: #f8fafc;
+            }
+
+            .filter-body {
+                overflow-y: auto;
+                flex-grow: 1;
+                padding: 0;
+            }
+
+            .filter-field-item {
+                padding: 10px 16px;
+                border-bottom: 1px solid #f1f5f9;
+                transition: background-color 0.2s;
+            }
+
+                .filter-field-item:hover {
+                    background-color: #f8fafc;
+                }
+
+            .filter-expanded-area {
+                display: none;
+                margin-top: 10px;
+                padding-left: 24px;
+            }
+
+            .filter-field-item.active .filter-expanded-area {
+                display: block;
+                animation: fadeIn 0.3s ease;
+            }
+
+            /* Table Area (Flat) */
+            .table-container {
+                flex: 1;
+                min-width: 0;
+                background: var(--bg-surface);
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+                border-radius: 0;
+                box-shadow: none;
+                border: none;
+            }
+
+            .table-toolbar {
+                padding: 8px 16px;
+                border-bottom: 1px solid var(--border-soft);
+                display: flex;
+                align-items: center;
+                background-color: var(--bg-surface);
+                gap: 10px;
+            }
+
+            /* The Table */
+            .table-responsive {
+                overflow: auto;
+                flex-grow: 1;
+                width: 100%;
+            }
+
+            .table {
+                margin-bottom: 0;
+                white-space: nowrap;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+            #accountsTable {
+                width: 100% !important;
+                min-width: max-content !important;
+            }
+
+            .table thead th, .table tbody td {
+                border-right: 1px solid var(--border-dark) !important;
+            }
+
+                .table thead th:last-child, .table tbody td:last-child {
+                    border-right: none !important;
+                }
+
+            /* Header Icons */
+            .header-action-icon {
+                cursor: pointer;
+                opacity: 0.4;
+                transition: 0.2s;
+                padding: 4px;
+                font-size: 0.9rem;
+            }
+
+                .header-action-icon:hover {
+                    opacity: 1;
+                    color: var(--primary-blue) !important;
+                    background: #e2e8f0;
+                    border-radius: 4px;
+                }
+
+            /* Tighter Zoho Table Density */
+            .table thead th {
+                background-color: var(--bg-surface);
+                color: #111827;
+                font-weight: 600;
+                font-size: 0.75rem;
+                text-transform: none;
+                padding: 8px 12px;
+                border-bottom: 2px solid var(--border-soft);
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            .th-content {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                gap: 12px;
+            }
+
+            .table tbody td {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+                border-bottom: 1px solid #f3f4f6;
+                vertical-align: middle;
+                color: var(--text-dark);
+                font-weight: 500;
+                background-color: var(--bg-surface);
+            }
+
+            .table tbody tr:hover td {
+                background-color: #f8fafc;
+            }
+
+            /* Sticky Columns */
+            .sticky-cb {
+                position: sticky;
+                left: 0;
+                width: 40px;
+                min-width: 40px;
+                text-align: center;
+                z-index: 11;
+                background-color: var(--bg-surface);
+            }
+
+            .sticky-actions {
+                position: sticky;
+                right: 0;
+                width: 100px;
+                text-align: center;
+                z-index: 11;
+                background-color: var(--bg-surface);
+            }
+
+            .table thead th.sticky-cb, .table thead th.sticky-actions {
+                z-index: 12;
+                background-color: var(--bg-surface);
+            }
+
+            /* Dummy Filler Column */
+            .dummy-filler-col {
+                width: auto !important;
+                max-width: none !important;
+                min-width: 10px !important;
+                padding: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                pointer-events: none;
+            }
+
+            /* Task Ribbon */
+            .task-ribbon {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 16px 4px 8px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+                cursor: pointer;
+                white-space: nowrap;
+                transition: 0.2s;
+            }
+
+                .task-ribbon:hover {
+                    opacity: 0.8;
+                }
+
+            .task-ribbon-blue {
+                background-color: #eff6ff;
+                color: #3b82f6;
+            }
+
+            .task-ribbon-red {
+                background-color: #fef2f2;
+                color: #ef4444;
+            }
+
+            .task-ribbon-green {
+                background-color: #f0fdf4;
+                color: #22c55e;
+            }
+
+            /* Custom Views Tabs */
+            .custom-views-nav {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                overflow-x: auto;
+                white-space: nowrap;
+                scrollbar-width: none;
+            }
+
+                .custom-views-nav::-webkit-scrollbar {
+                    display: none;
+                }
+
+            .view-tab {
+                padding: 6px 12px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                color: var(--text-muted);
+                text-decoration: none;
+                border-radius: 4px;
+                transition: 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+                .view-tab:hover {
+                    background-color: #f3f4f6;
+                    color: var(--text-dark);
+                }
+
+                .view-tab.active {
+                    background-color: #eff6ff;
+                    color: var(--primary-blue);
+                    font-weight: 600;
+                }
+
+            /* Modals & Criteria Builder */
+            .criteria-card {
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                padding: 20px;
+                background-color: #ffffff;
+                margin-bottom: 0;
+            }
+
+            .criteria-header {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+
+                .criteria-header h6 {
+                    margin: 0;
+                    font-weight: 600;
+                    color: #111827;
+                    font-size: 0.95rem;
+                }
+
+            .criteria-row-builder {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 8px;
+            }
+
+            .criteria-num {
+                width: 26px;
+                height: 26px;
+                border: 1px solid #d1d5db;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.8rem;
+                color: #6b7280;
+                font-weight: 600;
+                flex-shrink: 0;
+            }
+
+            .criteria-builder-select, .criteria-builder-input {
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                padding: 6px 10px;
+                font-size: 0.85rem;
+                color: #374151;
+                background-color: #ffffff;
+                outline: none;
+            }
+
+                .criteria-builder-input:focus, .criteria-builder-select:focus {
+                    border-color: var(--primary-blue);
+                }
+
+            .criteria-action-btn {
+                background: transparent;
+                border: none;
+                padding: 4px;
+                cursor: pointer;
+                transition: 0.2s;
+            }
+
+            .criteria-connector-vertical {
+                margin-left: 12px;
+                border-left: 1px solid #d1d5db;
+                padding: 6px 0 6px 10px;
+                color: #16a34a;
+                font-size: 0.7rem;
+                font-weight: 600;
+            }
+
+            /* Custom Tooltip Theme */
+            .custom-tooltip .tooltip-inner {
+                background-color: #ffffff;
+                color: #111827;
+                border: 1px solid #e5e7eb;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                text-align: left;
+                padding: 10px 14px;
+                max-width: 250px;
+                border-radius: 6px;
+                font-family: 'Inter', sans-serif;
+                font-size: 0.8rem;
+            }
+
+            .custom-tooltip.bs-tooltip-end .tooltip-arrow::before {
+                border-right-color: #d1d5db;
+            }
+
+            .custom-tooltip.bs-tooltip-start .tooltip-arrow::before {
+                border-left-color: #d1d5db;
+            }
+
+            .badge-soft-success {
+                background: #dcfce3;
+                color: #166534;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-weight: 600;
+                font-size: 0.7rem;
+            }
+
+            .badge-soft-warning {
+                background: #fef3c7;
+                color: #92400e;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-weight: 600;
+                font-size: 0.7rem;
+            }
+
+            /* Drag & Drop Columns */
+            .columns-container {
+                display: flex;
+                gap: 20px;
+                align-items: stretch;
+            }
+
+            .columns-box-wrapper {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .columns-box {
+                border: 1px solid var(--border-soft);
+                border-radius: 4px;
+                height: 250px;
+                overflow-y: auto;
+                background: #f9fafb;
+                padding: 8px;
+            }
+
+            .column-item {
+                padding: 6px 10px;
+                background: #ffffff;
+                border: 1px solid var(--border-soft);
+                border-radius: 4px;
+                margin-bottom: 4px;
+                font-size: 0.8rem;
+                font-weight: 500;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: 0.2s;
+            }
+
+                .column-item:hover {
+                    border-color: #d1d5db;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+
+            .draggable-col-item.dragging {
+                opacity: 0.4;
+                background-color: #f3f4f6;
+            }
+
+            .draggable-col-item.over {
+                border-top: 2px solid var(--primary-blue);
+            }
+
+            /* Simulate 80% Zoom on Laptops Only */
+            @@media (min-width: 769px) and (max-width: 1600px) {
+                body {
+                    zoom: 0.8;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                }
+
+                .app-container {
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 125vw !important;
+                    height: 125vh !important;
+                    max-width: none !important;
+                    max-height: none !important;
+                }
+
+                .sidebar-overlay {
+                    width: 125vw !important;
+                    height: 125vh !important;
+                }
+
+                .offcanvas {
+                    height: 125vh !important;
+                }
+
+                .crm-container {
+                    height: calc(125vh - 75px) !important;
+                }
+
+                body.full-view-mode .crm-container {
+                    height: 125vh !important;
+                }
+            }
+
+            /* Mobile Responsive Overlays */
             .sidebar-overlay {
                 display: none;
                 position: fixed;
@@ -445,10 +993,20 @@
                 left: 0;
                 width: 100vw;
                 height: 100vh;
-                background-color: rgba(15, 23, 42, 0.5);
+                background-color: rgba(17, 24, 39, 0.5);
                 z-index: 1030;
                 opacity: 0;
                 transition: opacity 0.3s ease;
+            }
+
+            @@media (max-width: 1200px) {
+                .sidebar {
+                    width: 220px;
+                }
+
+                .search-wrapper {
+                    max-width: 300px;
+                }
             }
 
             @@media (max-width: 768px) {
@@ -469,32 +1027,21 @@
                     opacity: 1;
                 }
 
-            .top-navbar {
-    height: 70px;
-    background-color: var(--navbar-bg);
-    border-bottom: 1px solid var(--navbar-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 2rem;
-    flex-shrink: 0;
-    /* 🚀 FIX 1: Set position and a massive z-index */
-    position: relative; 
-    z-index: 99999; 
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-}
+                .top-navbar {
+                    height: 60px;
+                    padding: 0 1rem;
+                    position: relative;
+                    z-index: 99999;
+                }
 
                 .search-wrapper {
-    position: relative;
-    width: 480px;
-    /* 🚀 FIX 3: Ensure the wrapper itself stays on top */
-    z-index: 99999; 
-}
+                    width: 100%;
+                    z-index: 99999;
+                }
 
                 .search-results-dropdown {
                     width: calc(100vw - 2rem);
-                    position: fixed;
-                    top: 70px;
+                    top: 60px;
                     left: 1rem;
                 }
             }
@@ -503,7 +1050,6 @@
 <body>
 
     <div class="app-container">
-
         <!-- Mobile Overlay -->
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -514,58 +1060,55 @@
                     <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/Radaropusd_funal.jpg?v=1788239642" alt="Radar One Logo">
                     <h5>Radar One</h5>
                 </div>
+                <!-- 🚀 Collapsible Sidebar Toggle -->
+                <button type="button" id="hideLayoutBtn" class="btn btn-sm text-muted border-0 shadow-none p-1" title="Toggle Sidebar">
+                    <span id="hideLayoutBtnText" style="font-size: 0.75rem; font-weight: 600;">Hide</span>
+                    <i id="showLayoutBtnIcon" class="fa-solid fa-angles-right"></i>
+                </button>
             </div>
 
             <div class="sidebar-nav">
                 <div class="nav-section-title">Work</div>
                 <a asp-controller="Home" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-house icon-3d" style="color: #3b82f6;"></i> Home</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-house icon-3d" style="color: #3b82f6;"></i> <span class="nav-item-link-text">Home</span></div>
                 </a>
                 <a href="#" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-file-invoice icon-3d" style="color: #8b5cf6;"></i> Reports</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-file-invoice icon-3d" style="color: #8b5cf6;"></i> <span class="nav-item-link-text">Reports</span></div>
                 </a>
 
                 <div class="nav-section-title">Sales</div>
                 <a asp-controller="Accounts" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-building icon-3d" style="color: #0ea5e9;"></i> Accounts</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-building icon-3d" style="color: #0ea5e9;"></i> <span class="nav-item-link-text">Accounts</span></div>
                 </a>
                 <a asp-controller="Leads" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-user-tie icon-3d" style="color: #10b981;"></i> Leads</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-user-tie icon-3d" style="color: #10b981;"></i> <span class="nav-item-link-text">Leads</span></div>
                 </a>
                 <a asp-controller="Deals" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-briefcase icon-3d" style="color: #f59e0b;"></i> Deals</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-briefcase icon-3d" style="color: #f59e0b;"></i> <span class="nav-item-link-text">Deals</span></div>
                 </a>
                 <a asp-controller="Tasks" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-list-check icon-3d" style="color: #ef4444;"></i> Tasks</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-list-check icon-3d" style="color: #ef4444;"></i> <span class="nav-item-link-text">Tasks</span></div>
                 </a>
 
-                <!-- Notes moved above Other Modules -->
-               @*  <a asp-controller="Notes" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content" Hidden>
-                        <i class="fa-solid fa-note-sticky icon-3d" style="color: #eab308;"></i> Notes
-                    </div>
-                </a> *@
-
                 <a href="#otherModulesMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="otherModulesMenu">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-layer-group icon-3d" style="color: #06b6d4;"></i> Other Modules</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-layer-group icon-3d" style="color: #06b6d4;"></i> <span class="nav-item-link-text">Other Modules</span></div>
                     <i class="fa-solid fa-chevron-down toggle-arrow"></i>
                 </a>
                 <div class="collapse sub-menu" id="otherModulesMenu">
-                    <a asp-controller="Products" asp-action="Index" class="nav-item-link">Products</a>
-                    <a asp-controller="Vendors" asp-action="Index" class="nav-item-link">Vendors</a>
-                    <!-- Postcodes moved inside Other Modules submenu -->
-                    <a asp-controller="Postcode" asp-action="Index" class="nav-item-link" hidden>Postcodes</a>
+                    <a asp-controller="Products" asp-action="Index" class="nav-item-link"><span class="nav-item-link-text">Products</span></a>
+                    <a asp-controller="Vendors" asp-action="Index" class="nav-item-link"><span class="nav-item-link-text">Vendors</span></a>
+                    <a asp-controller="Postcode" asp-action="Index" class="nav-item-link" hidden><span class="nav-item-link-text">Postcodes</span></a>
                 </div>
 
                 <div class="nav-section-title">Administration</div>
                 <a href="#adminMenu" data-bs-toggle="collapse" class="nav-item-link" aria-expanded="false" role="button" aria-controls="adminMenu">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-gear icon-3d" style="color: #64748b;"></i> Settings</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-gear icon-3d" style="color: #64748b;"></i> <span class="nav-item-link-text">Settings</span></div>
                     <i class="fa-solid fa-chevron-down toggle-arrow"></i>
                 </a>
                 <div class="collapse sub-menu" id="adminMenu">
-                    <a asp-controller="Users" asp-action="Index" class="nav-item-link">Users</a>
-                    <a asp-controller="Roles" asp-action="Index" class="nav-item-link">Roles</a>
-                    <a href="#" class="nav-item-link">Profiles</a>
+                    <a asp-controller="Users" asp-action="Index" class="nav-item-link"><span class="nav-item-link-text">Users</span></a>
+                    <a asp-controller="Roles" asp-action="Index" class="nav-item-link"><span class="nav-item-link-text">Roles</span></a>
+                    <a href="#" class="nav-item-link"><span class="nav-item-link-text">Profiles</span></a>
                 </div>
 
                 <div aria-live="polite" aria-atomic="true" class="position-relative">
@@ -575,7 +1118,7 @@
                 </div>
 
                 <a asp-controller="AssignmentRules" asp-action="Create" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-route icon-3d" style="color: #ec4899;"></i> Assignment Rules</div>
+                    <div class="nav-item-link-content"><i class="fa-solid fa-route icon-3d" style="color: #ec4899;"></i> <span class="nav-item-link-text">Assignment Rules</span></div>
                 </a>
             </div>
         </nav>
@@ -612,7 +1155,7 @@
         </div>
     </div>
 
-    
+   
 
     <!-- USER PROFILE OFFCANVAS SIDEBAR (Placed outside the flex containers) -->
     <div class="offcanvas offcanvas-end shadow-lg" tabindex="-1" id="userProfileSidebar" aria-labelledby="userProfileSidebarLabel" style="width: 380px; border-left: none;">
@@ -957,7 +1500,33 @@
                     XLSX.writeFile(workbook, filename + ".xlsx");
                 }
             }
+    </script>
 
+    <script>
+            // 1. Immediately check storage on page load
+            if (localStorage.getItem('radar_sidebar_collapsed') === 'true') {
+                document.body.classList.add('full-view-mode');
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const toggleBtn = document.getElementById('hideLayoutBtn');
+
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function () {
+                        const isCollapsed = document.body.classList.contains('full-view-mode');
+
+                        if (isCollapsed) {
+                            // Expand Sidebar
+                            document.body.classList.remove('full-view-mode');
+                            localStorage.setItem('radar_sidebar_collapsed', 'false');
+                        } else {
+                            // Collapse Sidebar
+                            document.body.classList.add('full-view-mode');
+                            localStorage.setItem('radar_sidebar_collapsed', 'true');
+                        }
+                    });
+                }
+            });
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

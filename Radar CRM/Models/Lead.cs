@@ -19,6 +19,8 @@ namespace Radar_CRM.Models
         public string? CampaignSource { get; set; }
         public string? CurrentStatus { get; set; }
 
+        public string? Phone { get; set; }
+
         [DataType(DataType.DateTime)]
         public DateTime? CreatedDateAndTime { get; set; }
         [DataType(DataType.DateTime)]

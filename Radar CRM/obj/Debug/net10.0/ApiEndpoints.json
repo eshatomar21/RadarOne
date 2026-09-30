@@ -37,6 +37,22 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "Radar_CRM.Controllers.WebhookcallyzerController",
+    "Method": "ReceiveCallyzerData",
+    "RelativePath": "api/webhook/callyzer",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "payload",
+        "Type": "Radar_CRM.DTOs.CallyzerWebhookPayload",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "Radar_CRM.Controllers.WebhookController",
     "Method": "ReceiveWordpressContact",
     "RelativePath": "api/Webhook/WordpressContact",

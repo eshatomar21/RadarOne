@@ -20,6 +20,9 @@
     var tableProps = typeof(Radar_CRM.Models.Task).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
         .Where(p => !excludedFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)))
         .ToArray();
+
+    // 🚀 SPEED FIX: Cache Reflection to prevent thousands of slow lookups
+    var propCache = new System.Collections.Generic.Dictionary<Type, System.Reflection.PropertyInfo>();
 }
 
 <meta charset="utf-8" />
@@ -27,24 +30,28 @@
 <title>@ViewData["Title"] - Radar CRM</title>
 
 <style>
-    /* Premium Enterprise SaaS Theme */
+    /* Premium Enterprise SaaS Theme (Matching Accounts Master) */
     @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
-        --bg-body: #f8fafc;
+        --bg-body: #f3f4f6; /* Lighter background */
         --bg-surface: #ffffff;
-        --primary-blue: #2563eb;
-        --primary-hover: #1d4ed8;
-        --text-dark: #0f172a;
-        --text-main: #334155;
-        --text-muted: #64748b;
-        --border-soft: #e2e8f0;
-        --radius-md: 8px;
-        --radius-lg: 12px;
-        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-        --btn-depth: 2px;
+        --primary-blue: #0f172a;
+        --primary-hover: #1e293b;
+        --zoho-green: #22c55e;
+        --zoho-green-hover: #16a34a;
+        --text-dark: #111827;
+        --text-main: #374151;
+        --text-muted: #6b7280;
+        --border-soft: #e5e7eb;
+        --border-dark: #d1d5db;
+        --radius-md: 4px; /* Strict, small corners */
+        --radius-lg: 0px; /* Removing massive rounding */
+        --shadow-sm: none; /* Flattening the UI */
+        --btn-depth: 0px; /* Removing 3D effects */
     }
+
+    body .content-area { padding: 0 !important; background-color: var(--bg-body); }
 
     body {
         background-color: var(--bg-body);
@@ -53,100 +60,41 @@
         -webkit-font-smoothing: antialiased;
     }
 
-    /* Top Page Header */
+    /* Top Page Header (Hidden to merge with toolbar) */
     .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-        background: var(--bg-surface);
-        padding: 20px 28px;
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border-soft);
-        flex-wrap: wrap;
-        gap: 16px;
+        display: none;
     }
 
-    .page-title {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 0;
-        font-weight: 700;
-        font-size: 1.4rem;
-        color: var(--text-dark);
-        letter-spacing: -0.02em;
-    }
-
-        .page-title i {
-            color: var(--primary-blue);
-        }
-
-    /* Action Buttons (3D SaaS Style) */
     .btn-saas {
-        background-color: var(--bg-surface);
+        background-color: #f9fafb;
         color: var(--text-dark);
-        border: 1px solid #cbd5e1;
+        border: 1px solid #d1d5db;
         font-weight: 500;
         border-radius: var(--radius-md);
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        transition: all 0.15s ease;
+        padding: 5px 14px;
+        font-size: 0.8rem;
+        transition: all 0.1s ease;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         cursor: pointer;
-        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
-        transform: translateY(0);
+        box-shadow: none;
     }
-
-    .excel-resizer {
-        position: absolute;
-        right: 0;
-        top: 0;
-        width: 6px;
-        height: 100%;
-        cursor: col-resize;
-        z-index: 15;
-        transition: background-color 0.2s;
-    }
-
-        .excel-resizer:hover, .excel-resizer.resizing {
-            background-color: var(--primary-blue);
-            width: 8px;
-        }
-
-        .btn-saas:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
-        }
-
+    .btn-saas:hover { background-color: #f3f4f6; }
+   
     .btn-saas-primary {
-        background-color: var(--primary-blue);
-        color: white;
-        font-weight: 600;
-        border: 1px solid var(--primary-hover);
-        border-radius: var(--radius-md);
-        padding: 8px 20px;
-        font-size: 0.85rem;
-        transition: all 0.15s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+        background-color: #2563eb !important; /* Radar Blue */
+        border-color: #1d4ed8 !important;
+        color: #ffffff !important;
+    }
+    .btn-saas-primary:hover {
+        background-color: #1d4ed8 !important;
     }
 
-        .btn-saas-primary:hover {
-            color: white;
-            background-color: var(--primary-hover);
-        }
-
-        .btn-saas-primary:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
-        }
+    .btn-saas-primary:active {
+        transform: translateY(var(--btn-depth));
+        box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
+    }
 
     .btn-saas-danger {
         background-color: #fef2f2;
@@ -155,46 +103,44 @@
         box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
     }
 
-        .btn-saas-danger:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
-        }
+    .btn-saas-danger:active {
+        transform: translateY(var(--btn-depth));
+        box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
+    }
 
-    /* Layout Grid */
     .crm-container {
         display: flex;
-        height: calc(100vh - 160px);
-        gap: 24px;
+        height: calc(100vh - 70px);
+        gap: 0; /* Flat style */
         width: 100%;
         max-width: 100%;
+        border-top: 1px solid var(--border-soft);
     }
 
-    /* Fixed Sidebar Filter */
+    body.full-view-mode .crm-container {
+        height: 100vh !important;
+    }
+
+    @@media (min-width: 769px) and (max-width: 1600px) {
+        .crm-container { height: calc(125vh - 85px) !important; }
+        body.full-view-mode .crm-container { height: 125vh !important; }
+    }
+
+    /* Flat Sidebar */
     .filter-sidebar {
-        width: 320px;
-        min-width: 320px;
+        width: 260px;
+        min-width: 260px;
         background: var(--bg-surface);
-        border: 1px solid var(--border-soft);
-        border-radius: var(--radius-lg);
+        border-right: 1px solid var(--border-soft);
         display: flex;
         flex-direction: column;
-        box-shadow: var(--shadow-sm);
         height: 100%;
+        transition: width 0.3s ease, min-width 0.3s ease;
     }
+    .filter-sidebar.hidden-sidebar { width: 0 !important; min-width: 0 !important; border-right: none !important; opacity: 0; }
 
-    .filter-header {
-        padding: 18px 20px;
-        border-bottom: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-        .filter-header h6 {
-            margin: 0;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
+    .filter-header { padding: 12px 16px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; }
+    .filter-header h6 { margin: 0; font-weight: 600; font-size: 0.85rem; color: var(--text-dark); }
 
     .filter-search-box {
         padding: 12px 20px;
@@ -213,10 +159,9 @@
         border-bottom: 1px solid #f1f5f9;
         transition: background-color 0.2s;
     }
-
-        .filter-field-item:hover {
-            background-color: #f8fafc;
-        }
+    .filter-field-item:hover {
+        background-color: #f8fafc;
+    }
 
     .filter-expanded-area {
         display: none;
@@ -230,315 +175,11 @@
     }
 
     @@keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-5px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
-    .form-select, .form-control {
-        border: 1px solid var(--border-soft);
-        border-radius: var(--radius-md);
-        font-size: 0.85rem;
-        padding: 8px 12px;
-    }
-
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-            outline: none;
-        }
-
-    /* Main Table Container */
-    .table-container {
-        flex: 1;
-        min-width: 0;
-        background: var(--bg-surface);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border-soft);
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        overflow: hidden;
-    }
-
-    /* Table Toolbar */
-    .table-toolbar {
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        background-color: var(--bg-surface);
-    }
-
-    /* The Table */
-    .table-responsive {
-        overflow: auto;
-        flex-grow: 1;
-        width: 100%;
-    }
-
-    .table {
-        margin-bottom: 0;
-        white-space: nowrap;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-        .table thead th {
-            background-color: #f8fafc;
-            color: var(--text-muted);
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: 1px solid var(--border-soft);
-            padding: 14px 16px;
-        }
-
-    /* Flex Layout for Header Content */
-    .th-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        gap: 12px;
-    }
-
-    /* Funnel Icon Button */
-    .header-menu-btn {
-        color: var(--text-muted);
-        background: transparent;
-        border: 1px solid transparent;
-        cursor: pointer;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    }
-
-        .header-menu-btn:hover, .header-menu-btn[aria-expanded="true"] {
-            background: #e2e8f0;
-            color: var(--text-dark);
-            border-color: #cbd5e1;
-        }
-
-    .table tbody td {
-        padding: 16px;
-        vertical-align: middle;
-        color: var(--text-dark);
-        font-size: 0.85rem;
-        font-weight: 500;
-        border-bottom: 1px solid #f1f5f9;
-        background-color: var(--bg-surface);
-    }
-
-    .table tbody tr {
-        cursor: pointer;
-    }
-
-        .table tbody tr:hover td {
-            background-color: #f8fafc;
-        }
-
-    /* Sticky Columns (Checkboxes & Actions) */
-    .sticky-cb {
-        position: sticky;
-        left: 0;
-        width: 40px;
-        text-align: center;
-        z-index: 11;
-        border-right: 1px solid var(--border-soft) !important;
-        background-color: var(--bg-surface);
-    }
-
-    .sticky-actions {
-        position: sticky;
-        right: 0;
-        width: 100px;
-        text-align: center;
-        z-index: 11;
-        border-left: 1px solid var(--border-soft) !important;
-        background-color: var(--bg-surface);
-    }
-
-    .table thead th.sticky-cb, .table thead th.sticky-actions {
-        z-index: 12;
-        background-color: #f8fafc;
-    }
-
-    /* Drag and Drop Manage Columns Styles */
-    .draggable-col-item {
-        transition: background-color 0.2s;
-    }
-
-        .draggable-col-item.dragging {
-            opacity: 0.4;
-            background-color: #f1f5f9;
-        }
-
-        .draggable-col-item.over {
-            border-top: 2px solid var(--primary-blue);
-        }
-
-    .drag-handle {
-        cursor: grab;
-        padding: 4px;
-        color: #94a3b8;
-    }
-
-        .drag-handle:active {
-            cursor: grabbing;
-        }
-
-    /* Custom Views Navigation */
-    .custom-views-nav {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        white-space: nowrap;
-        scrollbar-width: none;
-    }
-
-        .custom-views-nav::-webkit-scrollbar {
-            display: none;
-        }
-
-    .view-tab {
-        padding: 8px 16px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        color: var(--text-muted);
-        text-decoration: none;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-        .view-tab:hover {
-            background-color: #f1f5f9;
-            color: var(--text-dark);
-        }
-
-        .view-tab.active {
-            background-color: #eff6ff;
-            color: var(--primary-blue);
-            font-weight: 600;
-        }
-
-    /* Custom View & Criteria Builder Styles */
-    .criteria-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 24px;
-        background-color: #ffffff;
-        margin-bottom: 0;
-    }
-
-    .criteria-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
-
-        .criteria-header h6 {
-            margin: 0;
-            font-weight: 700;
-            color: #1e293b;
-            font-size: 1rem;
-        }
-
-    .criteria-row-builder {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 8px;
-    }
-
-    .criteria-num {
-        width: 30px;
-        height: 30px;
-        border: 1px solid #cbd5e1;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        color: #64748b;
-        font-weight: 600;
-        flex-shrink: 0;
-    }
-
-    .criteria-builder-select {
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 0.9rem;
-        color: #334155;
-        background-color: #ffffff;
-        min-width: 160px;
-        outline: none;
-    }
-
-    .criteria-builder-input {
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 0.9rem;
-        color: #334155;
-        background-color: #f8fafc;
-        flex-grow: 1;
-        outline: none;
-    }
-
-        .criteria-builder-input:focus, .criteria-builder-select:focus {
-            border-color: var(--primary-blue);
-            background-color: #ffffff;
-        }
-
-    .criteria-action-btn {
-        background: transparent;
-        border: none;
-        padding: 4px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: 0.2s;
-    }
-
-        .criteria-action-btn.add {
-            color: #22c55e;
-            font-size: 1.2rem;
-        }
-
-        .criteria-action-btn.remove {
-            color: #ef4444;
-            font-size: 1.2rem;
-        }
-
-        .criteria-action-btn:hover {
-            opacity: 0.8;
-            transform: scale(1.1);
-        }
-
+    /* Custom View Builder - Vertical AND & Pattern */
     .criteria-connector-vertical {
         margin-left: 14px;
         border-left: 1px solid #cbd5e1;
@@ -557,184 +198,203 @@
         align-items: center;
     }
 
-    .related-modules-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 20px 24px;
-        background-color: #ffffff;
-        margin-top: 16px;
-    }
-
     /* Columns Selection Boxes */
-    .columns-container {
-        display: flex;
-        gap: 20px;
-        align-items: stretch;
-        margin-top: 10px;
+    .columns-container { display: flex; gap: 20px; align-items: stretch; margin-top: 10px; }
+    .columns-box-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .columns-box { border: 1px solid var(--border-soft); border-radius: 8px; height: 300px; overflow-y: auto; background: #ffffff; padding: 8px; }
+    .column-item { padding: 8px 12px; background: #ffffff; border-radius: 6px; margin-bottom: 2px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; color: #1e293b; }
+    .column-item:hover { background-color: #f1f5f9; }
+    .column-item i { opacity: 0; transition: 0.2s; }
+    .column-item:hover i { opacity: 1; color: var(--primary-blue); }
+
+    /* Table Area (Flat) */
+    .table-container { flex: 1; min-width: 0; background: var(--bg-surface); display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 0; box-shadow: none; border: none; }
+    .table-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; background-color: var(--bg-surface); gap: 10px; }
+
+    /* The Table */
+    .table-responsive {
+        overflow: auto;
+        flex-grow: 1;
+        width: 100%;
     }
 
-    .columns-box-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
+    .table {
+        margin-bottom: 0;
+        white-space: nowrap;
+        border-collapse: separate;
+        border-spacing: 0;
     }
 
-    .columns-box {
-        border: 1px solid var(--border-soft);
-        border-radius: 8px;
-        height: 300px;
-        overflow-y: auto;
-        background: #ffffff;
-        padding: 8px;
-    }
-
-    .column-item {
+    .table thead th {
+        background-color: var(--bg-surface);
+        color: #111827;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: none;
         padding: 8px 12px;
-        background: #ffffff;
-        border-radius: 6px;
-        margin-bottom: 2px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        cursor: pointer;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 2px solid var(--border-soft);
+        border-right: 1px solid var(--border-soft) !important;
+        min-width: 120px;
+    }
+
+    .th-content {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: 0.2s;
-        color: #1e293b;
+        width: 100%;
+        gap: 12px;
     }
 
-        .column-item:hover {
-            background-color: #f1f5f9;
-        }
-
-        .column-item i {
-            opacity: 0;
-            transition: 0.2s;
-        }
-
-        .column-item:hover i {
-            opacity: 1;
-            color: var(--primary-blue);
-        }
-
-    /* Badges for Task Status & Priority */
-    .badge-soft-success {
-        background: #dcfce3;
-        color: #166534;
-        padding: 4px 10px;
+    .header-menu-btn {
+        color: var(--text-muted);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        width: 28px;
+        height: 28px;
         border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+    .header-menu-btn:hover, .header-menu-btn[aria-expanded="true"] { background: #e2e8f0; color: var(--text-dark); border-color: #cbd5e1; }
+
+    .table tbody td {
+        padding: 6px 12px; font-size: 0.8rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; color: var(--text-dark); font-weight: 500; background-color: var(--bg-surface);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .table thead th:last-child, .table tbody td:last-child { border-right: none !important; }
+    .table tbody tr:hover td { background-color: #f8fafc; }
+
+    /* Sticky Columns (Checkboxes & Actions) */
+    .sticky-cb {
+        position: sticky;
+        left: 0;
+        width: 50px; 
+        min-width: 50px;
+        text-align: center;
+        z-index: 11;
+        border-right: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+        resize: none !important;
     }
 
-    .badge-soft-danger {
-        background: #fee2e2;
-        color: #b91c1c;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
+    .sticky-actions {
+        position: sticky;
+        right: 0;
+        width: 100px;
+        text-align: center;
+        z-index: 11;
+        border-left: 1px solid var(--border-soft) !important;
+        background-color: var(--bg-surface);
+        resize: none !important;
     }
 
-    .badge-soft-warning {
-        background: #fef3c7;
-        color: #92400e;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
+    /* Custom Views Tabs */
+    .custom-views-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        white-space: nowrap;
+        scrollbar-width: none;
     }
+    .custom-views-nav::-webkit-scrollbar { display: none; }
 
-    .badge-soft-secondary {
-        background: #f1f5f9;
-        color: #475569;
-        padding: 4px 10px;
+    .view-tab {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-decoration: none;
         border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
+    .view-tab:hover { background-color: #f1f5f9; color: var(--text-dark); }
+    .view-tab.active { background-color: #eff6ff; color: var(--primary-blue); font-weight: 600; }
+
+    /* Custom View & Criteria Builder Styles */
+    .criteria-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; background-color: #ffffff; margin-bottom: 0; }
+    .criteria-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .criteria-header h6 { margin: 0; font-weight: 700; color: #1e293b; font-size: 1rem; }
+    .criteria-row-builder { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .criteria-num { width: 30px; height: 30px; border: 1px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #64748b; font-weight: 600; flex-shrink: 0; }
+    .criteria-builder-select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 0.9rem; color: #334155; background-color: #ffffff; min-width: 160px; outline: none; }
+    .criteria-builder-input { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 0.9rem; color: #334155; background-color: #f8fafc; flex-grow: 1; outline: none; }
+    .criteria-builder-input:focus, .criteria-builder-select:focus { border-color: var(--primary-blue); background-color: #ffffff; }
+    .criteria-action-btn { background: transparent; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .criteria-action-btn.add { color: #22c55e; font-size: 1.2rem; }
+    .criteria-action-btn.remove { color: #ef4444; font-size: 1.2rem; }
+    .criteria-action-btn:hover { opacity: 0.8; transform: scale(1.1); }
+    .related-modules-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 24px; background-color: #ffffff; margin-top: 16px; }
+
+    /* Custom Tooltip Theme */
+    .custom-tooltip .tooltip-inner {
+        background-color: #ffffff;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        text-align: left;
+        padding: 12px 16px;
+        max-width: 250px;
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif;
+    }
+    .custom-tooltip.bs-tooltip-end .tooltip-arrow::before { border-right-color: #cbd5e1; }
+    .custom-tooltip.bs-tooltip-start .tooltip-arrow::before { border-left-color: #cbd5e1; }
+
+    /* Badges */
+    .badge-soft-success { background: #dcfce3; color: #166534; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; }
+    .badge-soft-warning { background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; }
+    .badge-soft-danger { background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; }
+    .badge-soft-secondary { background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; }
 
     /* Pagination */
-    .pagination-container {
-        padding: 14px 24px;
-        border-top: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: var(--bg-surface);
-    }
+    .pagination-container { padding: 14px 24px; border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-surface); }
 
-    /* Mobile Friendly Adjustments */
+    /* Drag and Drop */
+    .draggable-col-item { transition: background-color 0.2s; }
+    .draggable-col-item.dragging { opacity: 0.4; background-color: #f1f5f9; }
+    .draggable-col-item.over { border-top: 2px solid var(--primary-blue); }
+    .drag-handle { cursor: grab; padding: 4px; color: #94a3b8; }
+    .drag-handle:active { cursor: grabbing; }
+
     @@media (max-width: 992px) {
-        .crm-container {
-            flex-direction: column;
-            height: auto;
-        }
-
-        .filter-sidebar {
-            width: 100%;
-            height: 400px;
-        }
-
-        .table-container {
-            height: 600px;
-        }
-
-        .page-header {
-            flex-direction: column;
-            align-items: flex-start;
-        }
+        .crm-container { flex-direction: column; height: auto; }
+        .filter-sidebar { width: 100%; height: 400px; }
+        .table-container { height: 600px; }
     }
+
+    /* Dummy Filler Column */
+    #tasksTable { width: 100% !important; min-width: max-content !important; }
+    .dummy-filler-col { width: auto !important; max-width: none !important; min-width: 10px !important; padding: 0 !important; border: none !important; background: transparent !important; pointer-events: none; }
 </style>
 
-<!-- Hidden Inputs -->
+<!-- Hidden Input for Files -->
 <input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
 
-<!-- Top Action Header -->
-<div class="page-header">
-    <h1 class="page-title"><i class="fa-solid fa-list-check"></i> Tasks Master</h1>
-
-    <div class="d-flex gap-2 align-items-center flex-wrap">
-        <!-- Bulk Action Container -->
-        <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
-            <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
-                <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
-            </button>
-           <button class="btn-saas" type="button" onclick="openMassUpdateModal()">
-                <i class="fa-solid fa-layer-group"></i> Mass Update
-            </button>
-            <div class="vr mx-2 d-none d-md-block"></div>
-        </div>
-
-       <div class="dropdown">
-    <button class="btn-saas dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="fa-solid fa-file-export"></i> Export
-    </button>
-    <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Tasks', 'csv')"><i class="fa-solid fa-file-csv me-2 text-primary"></i>Export as CSV</a></li>
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Tasks', 'xlsx')"><i class="fa-solid fa-file-excel me-2 text-success"></i>Export as Excel</a></li>
-    </ul>
-</div>
-        <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
-            <i class="fa-solid fa-cloud-arrow-up"></i> Upload
-        </button>
-        <a href="@Url.Action("Create", "Tasks")" class="btn-saas-primary">
-            <i class="fa-solid fa-plus"></i> Create Task
-        </a>
-    </div>
-</div>
-
-<!-- Main Table Container -->
+<!-- Main Layout -->
 <div class="crm-container">
 
     <!-- Fixed Sidebar Filter -->
-    <div class="filter-sidebar" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+    <div class="filter-sidebar" id="filterSidebarWrapper" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <div class="filter-header">
-            <h6>
-                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
-                Filters
+            <h6 class="d-flex align-items-center m-0">
+                <i class="fa-solid fa-filter text-primary me-2"></i> Filters
             </h6>
-            <button class="btn btn-sm btn-link text-decoration-none" onclick="clearFilters()">Clear</button>
+            <div class="d-flex align-items-center gap-2">
+                <a href="@Url.Action("Index", "Tasks")" class="btn btn-sm btn-link text-decoration-none p-0">Clear</a>
+                <button class="btn btn-sm text-muted border-0 bg-transparent p-1 ms-1" onclick="toggleFilterSidebar()" title="Hide Filters">
+                    <i class="fa-solid fa-chevron-left fs-6"></i>
+                </button>
+            </div>
         </div>
         <div class="filter-search-box">
             <div class="input-group input-group-sm">
@@ -743,10 +403,9 @@
             </div>
         </div>
 
-        <!-- ONE UNIFIED SCROLLING BODY -->
         <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
-
-            <!-- 🚀 NEW FEATURE: SAVED FILTERS SECTION -->
+            
+            <!-- SAVED FILTERS SECTION -->
             <div id="savedFiltersSection" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f0fdf4; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
                     <i class="fa-solid fa-bookmark me-2"></i> SAVED FILTERS
@@ -757,12 +416,9 @@
             <!-- FREQUENTLY USED SECTION -->
             <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
                 <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                    <i class="fa-solid fa-star me-2" style="color: #eab308;"></i>
-                    FREQUENTLY USED
+                    <i class="fa-solid fa-star text-warning" style="margin-right: 6px;"></i> FREQUENTLY USED
                 </div>
-                <div id="pinnedItemsContainer">
-                    <!-- Pinned filters will be dynamically moved here -->
-                </div>
+                <div id="pinnedItemsContainer"></div>
             </div>
 
             <!-- UNPINNED LIST -->
@@ -782,53 +438,27 @@
                     bool isPredefined = predefinedLists.ContainsKey(prop.Name);
 
                     <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
-
                         <div class="d-flex align-items-center m-0 w-100">
-                            <!-- Star Icon for Pinning -->
-                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
-                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
-                               onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
-
-                            <!-- 🚀 Save Filter Icon -->
-                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2"
-                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
-                               onclick="saveFieldFilter(event, this, '@prop.Name')" title="Save this filter setting"></i>
-
-                            <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
-
-                            <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
+                            <input class="form-check-input field-checkbox me-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="width: 14px; height: 14px; border-radius: 3px; cursor: pointer;">
+                            <label class="form-check-label flex-grow-1 text-dark text-truncate" for="chk_@prop.Name" style="font-size: 0.8rem; cursor: pointer;">
                                 @prop.Name
                             </label>
+                            
+                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0 ms-auto" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="togglePinFilter(event, this)"></i>
+                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="saveFieldFilter(event, this, '@prop.Name')"></i>
                         </div>
 
                         <div class="filter-expanded-area">
                             @if (isDate)
                             {
-                                <!-- Full Date Conditions -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
-                                    <option value="age in">age in</option>
-                                    <option value="due in">due in</option>
-                                    <option value="Previous">Previous</option>
-                                    <option value="Next">Next</option>
-                                    <option value="On" selected>On</option>
+                                    <option value="on" selected>On</option>
                                     <option value="before">before</option>
-                                    <option value="not between">not between</option>
                                     <option value="after">after</option>
                                     <option value="between">between</option>
+                                    <option value="not between">not between</option>
                                     <option value="Today">Today</option>
-                                    <option value="Tomorrow">Tomorrow</option>
-                                    <option value="Till Yesterday">Till Yesterday</option>
-                                    <option value="Starting tomorrow">Starting tomorrow</option>
-                                    <option value="Yesterday">Yesterday</option>
-                                    <option value="This Week">This Week</option>
                                     <option value="This Month">This Month</option>
-                                    <option value="This Year">This Year</option>
-                                    <option value="Previous Week">Previous Week</option>
-                                    <option value="Previous Month">Previous Month</option>
-                                    <option value="Previous Year">Previous Year</option>
-                                    <option value="Current FY">Current FY</option>
-                                    <option value="Previous FY">Previous FY</option>
-                                    <option value="Current FQ">Current FQ</option>
                                 </select>
                                 <div class="d-flex flex-column gap-2">
                                     <input type="date" class="form-control form-control-sm condition-val date-val-1" />
@@ -837,12 +467,10 @@
                             }
                             else if (isPredefined)
                             {
-                                <!-- Predefined Options -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is exactly</option>
+                                    <option value="is" selected>is</option>
                                     <option value="is_not">is not</option>
                                     <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
                                 </select>
                                 <select class="form-select form-select-sm condition-val">
                                     <option value="" disabled selected>- Select @prop.Name -</option>
@@ -854,14 +482,10 @@
                             }
                             else if (isUserField)
                             {
-                                <!-- FIX: User Field explicitly mapping to Database User IDs via a standard select dropdown -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="is" selected>is exactly</option>
                                     <option value="is_not">is not</option>
-                                    <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
                                 </select>
-                                
                                 <select class="form-select form-select-sm condition-val text-val">
                                     <option value="" disabled selected>- Select User -</option>
                                     @if (ViewBag.UsersList != null)
@@ -875,122 +499,83 @@
                             }
                             else
                             {
-                                <!-- Text Field for Large Data -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="contains" selected>contains</option>
-                                    <option value="does_not_contain">does not contain</option>
-                                    <option value="starts_with">starts with</option>
-                                    <option value="ends_with">ends with</option>
-                                    <option value="is">is exactly</option>
-                                    <option value="is_not">isn't</option>
                                     <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Type or select..." />
-                                <datalist id="dl_@prop.Name"></datalist>
+                                <input type="text" class="form-control form-control-sm condition-val text-val" placeholder="Search @prop.Name..." />
                             }
                         </div>
                     </div>
                 }
             </div>
         </div>
-        <div class="filter-footer p-3 border-top d-flex gap-2 bg-white mt-auto" style="flex-shrink: 0; z-index: 10;">
+
+        <div class="filter-footer p-3 border-top bg-white mt-auto" style="flex-shrink: 0; z-index: 10;">
             <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
         </div>
     </div>
 
     <!-- Table Area -->
-    <div class="table-container" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-        <!-- Top Toolbar -->
+    <div class="table-container">
+        
+        <!-- Unified Table Toolbar -->
         <div class="table-toolbar">
-            <div class="me-auto d-flex align-items-center gap-3 w-100">
-                <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
-                    <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
-                </span>
+            <button class="btn-saas" onclick="toggleFilterSidebar()" title="Hide/Show Filters" style="border: none; box-shadow: none;">
+                <i class="fa-solid fa-filter text-muted"></i>
+            </button>
 
-                <!-- DYNAMIC Custom Views Navigation -->
-                <div class="custom-views-nav m-0 d-flex gap-2 align-items-center flex-grow-1 ms-4" style="max-width: 70%;" id="customViewsTabsContainer">
-                    <!-- JS will populate these tabs dynamically -->
-                </div>
+            <div class="custom-views-nav flex-grow-1 mx-2" id="customViewsTabsContainer"></div>
 
-                <div class="dropdown ms-1">
-                    <button class="btn btn-sm btn-light border-0 shadow-none px-2 text-muted" type="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-ellipsis fs-5"></i>
-                    </button>
-                    <ul class="dropdown-menu shadow-sm border-0 py-2" id="unpinnedViewsMenu" style="min-width: 220px;">
-                        <li><h6 class="dropdown-header text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Unpinned Views</h6></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item fw-bold" style="color: var(--primary-blue);" href="#" onclick="openCustomViewModal(); return false;">
-                                <i class="fa-solid fa-plus me-2"></i> Create View
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Create View Button -->
-                <button type="button" class="btn-saas-primary ms-auto" onclick="openCustomViewModal()">
-                    <i class="fa-solid fa-plus me-1"></i> Create View
-                </button>
+            <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+                <button class="btn-saas btn-saas-danger" onclick="deleteSelected()"><i class="fa-regular fa-trash-can"></i> (<span id="selCount">0</span>)</button>
+                <button class="btn-saas" onclick="openMassUpdateModal()">Mass Update</button>
+                <div class="vr mx-1 d-none d-md-block" style="background-color: #d1d5db;"></div>
             </div>
+
+            <button class="btn-saas" onclick="exportTableData('Tasks', 'csv')"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
             
-            <div class="d-flex gap-2 ms-3">
-                <div class="dropdown">
-                    <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                        <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
-                        <!-- Populated via JS for Drag & Drop -->
-                    </ul>
-                </div>
+            <div class="dropdown">
+                <button class="btn-saas" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                    <i class="fa-solid fa-table-columns"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end p-2 shadow-sm border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;"></ul>
             </div>
+            <button type="button" class="btn-saas" onclick="openCustomViewModal()">View</button>
+            
+            <a href="@Url.Action("Create", "Tasks")" class="btn btn-primary d-inline-flex align-items-center fw-semibold border-0 shadow-sm" style="background-color: #2563eb; font-size: 0.85rem; padding: 7px 18px; border-radius: 4px; gap: 8px;">
+                <i class="fa-solid fa-plus"></i> Create Task
+            </a>
         </div>
 
-        <!-- The Data Table -->
-        <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow-y: auto;">
+        <div class="table-responsive" id="tableWrapper">
             <table class="table" id="tasksTable">
                 <thead>
                     <tr>
-                        <th class="sticky-cb">
-                            <input class="form-check-input m-0 border-secondary" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        <th class="sticky-cb" style="width: 50px; min-width: 50px;">
+                            <div class="d-flex align-items-center justify-content-center w-100">
+                                <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                            </div>
                         </th>
-
                         @if (tableProps.Length > 0)
                         {
                             int colIndex = 0;
                             foreach (var prop in tableProps)
                             {
                                 <th data-col-index="@colIndex" data-col-name="@prop.Name">
-                                    <div class="th-content">
-                                        <span>@prop.Name</span>
-
-                                        <div class="dropdown">
-                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort" style="background: transparent; border: none; padding: 0;">
-                                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                                            </button>
-                                            <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
-                                                <li>
-                                                    <input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)">
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'asc')">
-                                                        <i class="fa-solid fa-arrow-down-a-z text-muted me-2"></i> Sort A to Z
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'desc')">
-                                                        <i class="fa-solid fa-arrow-up-z-a text-muted me-2"></i> Sort Z to A
-                                                    </a>
-                                                </li>
-                                            </ul>
+                                    <div class="th-content d-flex justify-content-between align-items-center w-100">
+                                        <span class="text-truncate flex-grow-1" style="max-width: calc(100% - 30px);" title="@prop.Name">@prop.Name</span>
+                                        <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                            <i class="fa-solid fa-sort text-muted header-action-icon" onclick="toggleSort(event, @colIndex)" title="Sort"></i>
+                                            <i class="fa-solid fa-filter text-muted header-action-icon" onclick="triggerSidebarFilter(event, '@prop.Name')" title="Filter"></i>
                                         </div>
                                     </div>
                                 </th>
                                 colIndex++;
                             }
                         }
-
+                        <th class="dummy-filler-col"></th>
                         <th class="sticky-actions text-center">
                             <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
                         </th>
@@ -1002,14 +587,34 @@
                         foreach (var item in Model)
                         {
                             <tr class="task-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Tasks", new { id = item.Id })'">
-                                <td class="sticky-cb" onclick="event.stopPropagation()">
-                                    <input class="form-check-input m-0 row-cb border-secondary" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                <td class="sticky-cb" style="width: 50px; min-width: 50px;" onclick="event.stopPropagation()">
+                                    <div class="d-flex align-items-center justify-content-center w-100">
+                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                    </div>
                                 </td>
                                 @{
                                     int tdIndex = 0;
                                     foreach (var prop in tableProps)
                                     {
-                                        string value = prop.GetValue(item, null)?.ToString() ?? "";
+                                        string value = "";
+                                        var rawValue = prop.GetValue(item, null);
+
+                                        if (rawValue != null)
+                                        {
+                                            var type = rawValue.GetType();
+                                            if (type.Name.Contains("User") || type.Name.Contains("Account"))
+                                            {
+                                                if (!propCache.ContainsKey(type)) {
+                                                    propCache[type] = type.GetProperty("fullName") ?? type.GetProperty("FirstName") ?? type.GetProperty("AccountName");
+                                                }
+                                                var nameProp = propCache[type];
+                                                value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown";
+                                            }
+                                            else
+                                            {
+                                                value = rawValue.ToString();
+                                            }
+                                        }
 
                                         <td data-col-index="@tdIndex">
                                             @if (prop.Name == "Subject")
@@ -1019,66 +624,43 @@
                                             else if (prop.Name == "Status")
                                             {
                                                 @if (value.ToLower() == "completed")
-                                                {
-                                                    <span class="badge-soft-success">@value</span>
-                                                }
+                                                { <span class="badge-soft-success">@value</span> }
                                                 else if (value.ToLower() == "in progress" || value.ToLower() == "waiting on input")
-                                                {
-                                                    <span class="badge-soft-warning">@value</span>
-                                                }
+                                                { <span class="badge-soft-warning">@value</span> }
                                                 else if (value.ToLower() == "deferred")
-                                                {
-                                                    <span class="badge-soft-secondary">@value</span>
-                                                }
+                                                { <span class="badge-soft-secondary">@value</span> }
                                                 else if (!string.IsNullOrEmpty(value))
-                                                {
-                                                    <span class="badge-soft-danger">@value</span>
-                                                }
+                                                { <span class="badge-soft-danger">@value</span> }
                                             }
                                             else if (prop.Name == "Priority")
                                             {
                                                 @if (value.ToLower() == "high" || value.ToLower() == "highest")
-                                                {
-                                                    <span class="badge-soft-danger"><i class="fa-solid fa-arrow-up"></i> @value</span>
-                                                }
+                                                { <span class="badge-soft-danger"><i class="fa-solid fa-arrow-up"></i> @value</span> }
                                                 else if (value.ToLower() == "normal")
-                                                {
-                                                    <span class="badge-soft-success">@value</span>
-                                                }
+                                                { <span class="badge-soft-success">@value</span> }
                                                 else if (!string.IsNullOrEmpty(value))
-                                                {
-                                                    <span class="badge-soft-secondary"><i class="fa-solid fa-arrow-down"></i> @value</span>
-                                                }
+                                                { <span class="badge-soft-secondary"><i class="fa-solid fa-arrow-down"></i> @value</span> }
                                             }
                                             else
-                                            {
-                                                @value
-                                            }
+                                            { @value }
                                         </td>
                                         tdIndex++;
                                     }
                                 }
-                               <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-    <div class="d-flex align-items-center justify-content-center gap-2">
-        @{
-            // Safely grab the count from the Dictionary we passed in the ViewBag
-            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
-            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
-            
-            // Dynamic badge color: Blue if > 0, Gray if 0
-            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
-        }
-        
-        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("Subject")?.GetValue(item, null)?.ToString() ?? "Task")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
-            <i class="fa-regular fa-comment-dots"></i> Notes
-            
-            <!-- Always show the badge, conditionally change color -->
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">
-                @noteCount
-            </span>
-        </button>
-    </div>
-</td>
+                                <td class="dummy-filler-col"></td>
+                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                        @{
+                                            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
+                                            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
+                                            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
+                                        }
+                                        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("Subject")?.GetValue(item, null)?.ToString() ?? "Task")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+                                            <i class="fa-regular fa-comment-dots"></i> Notes
+                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         }
                     }
@@ -1096,38 +678,32 @@
             </table>
         </div>
 
-        <!-- Pagination (Server-Side Integration) -->
-        <div class="pagination-container" style="flex-shrink: 0;">
-            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
-                Showing page @currentPage of @totalPages (@totalRecords total records)
-            </span>
-            <div class="d-flex gap-2">
-                @if (currentPage > 1)
-                {
-                    <button class="btn-saas" onclick="goToPage(@(currentPage - 1))">
-                        <i class="fa-solid fa-chevron-left"></i> Prev
-                    </button>
+        <div class="pagination-container">
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-dark fw-semibold" style="font-size: 0.8rem;">
+                    Total Records <span id="bottomTotalCount">@totalRecords</span>
+                </span>
+                <span id="pageInfo" class="text-muted" style="font-size: 0.75rem; border-left: 1px solid #d1d5db; padding-left: 12px;">
+                    Showing page @currentPage of @totalPages
+                </span>
+            </div>
+            
+            <div class="d-flex gap-1 align-items-center">
+                @if (currentPage > 1) {
+                    <a href="@Url.Action("Index", new { page = currentPage - 1 })" class="btn-saas text-decoration-none" style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-left text-muted"></i></a>
+                } else {
+                    <button class="btn-saas" disabled style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-left text-muted" style="opacity: 0.5;"></i></button>
                 }
-                else
-                {
-                    <button class="btn-saas" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                }
-
-                @if (currentPage < totalPages)
-                {
-                    <button class="btn-saas" onclick="goToPage(@(currentPage + 1))">
-                        Next <i class="fa-solid fa-chevron-right"></i>
-                    </button>
-                }
-                else
-                {
-                    <button class="btn-saas" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                
+                @if (currentPage < totalPages) {
+                    <a href="@Url.Action("Index", new { page = currentPage + 1 })" class="btn-saas text-decoration-none" style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-right text-muted"></i></a>
+                } else {
+                    <button class="btn-saas" disabled style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-right text-muted" style="opacity: 0.5;"></i></button>
                 }
             </div>
         </div>
     </div>
 </div>
-
 
 <!-- Mass Update Modal -->
 <div class="modal fade" id="massUpdateModal" tabindex="-1">
@@ -1172,58 +748,7 @@
     </div>
 </div>
 
-<!-- ==========================================
-     PREMIUM SAAS NOTES OFFCANVAS PANEL
-     ========================================== -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
-
-    <!-- Header -->
-    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
-        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a; letter-spacing: -0.01em;">
-            <i class="fa-regular fa-message me-2 text-muted"></i> <span id="noteAccountName">Task Subject</span>
-        </h5>
-        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-
-    <!-- Body -->
-    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
-
-        <!-- Cohesive Compose Box -->
-        <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
-            <input type="text" id="newNoteTitle" class="form-control border-0 shadow-none p-3 pb-0 fw-bold" placeholder="Note Title..." style="font-size: 1rem; color: #0f172a; background: transparent;">
-            <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
-
-            <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="position-relative overflow-hidden btn btn-sm bg-white border shadow-sm" style="color: #475569; font-weight: 500;">
-                        <i class="fa-solid fa-paperclip"></i>
-                        <input type="file" id="noteAttachment" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" style="cursor: pointer;" title="Attach file" />
-                    </div>
-                    <select id="noteOwnerId" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="background-color: transparent; color: #475569; cursor: pointer; max-width: 130px;">
-                        <option value="">System</option>
-                    </select>
-                </div>
-
-                <button id="btnSaveNote" class="btn btn-sm shadow-sm" onclick="saveNoteAjax()" style="background-color: #0f172a; color: #ffffff; font-weight: 600; border-radius: 6px; padding: 6px 16px; transition: all 0.2s;">
-                    Save Note
-                </button>
-            </div>
-        </div>
-
-        <div class="d-flex align-items-center mb-3">
-            <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em; text-transform: uppercase;">
-                Timeline Log
-            </span>
-            <div class="ms-3 flex-grow-1" style="height: 1px; background-color: #e2e8f0;"></div>
-        </div>
-
-        <div class="position-relative ms-2 ps-4" id="notesTimelineList" style="border-left: 2px solid #e2e8f0;">
-            <!-- Notes dynamically appended here via JS -->
-        </div>
-    </div>
-</div>
-
-<!-- 🚀 Create Custom View Modal (Mounted at page root) -->
+<!-- Create Custom View Modal (Mounted at page root) -->
 <div class="modal fade" id="createCustomViewModal" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content shadow-lg border-0" style="border-radius: 12px; background-color: #f8fafc;">
@@ -1256,7 +781,6 @@
                                 <option value="Tasks" selected>Tasks</option>
                             </select>
 
-                            <!-- Field Selection -->
                             <select class="form-select criteria-builder-select cv-field" style="max-width: 200px;" onchange="handleCriteriaFieldChange(this)">
                                 <option value="" disabled selected>None</option>
                                 @foreach (var prop in tableProps)
@@ -1284,23 +808,11 @@
                     </div>
                 </div>
 
-                <!-- Related Modules Criteria Card -->
-                <div class="related-modules-card shadow-sm mb-4">
-                    <div class="d-flex align-items-center gap-3 mb-2">
-                        <h6 class="m-0 fw-bold" style="color: #1e293b; font-size: 0.95rem;">Related Modules Criteria</h6>
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" style="width: 36px; height: 20px;">
-                        </div>
-                    </div>
-                    <p class="text-muted m-0" style="font-size: 0.85rem;">It helps to filter record based on related module values.</p>
-                </div>
-
                 <!-- Choose Column for Default List View -->
                 <div class="bg-white p-4 rounded-3 border shadow-sm mt-4" style="border-color: var(--border-soft) !important;">
                     <h6 class="fw-bold m-0 text-dark d-flex align-items-center gap-2">Choose Column for Default List View <i class="fa-solid fa-circle-info text-muted fs-6"></i></h6>
 
                     <div class="columns-container d-flex gap-4 mt-3">
-                        <!-- Available Columns -->
                         <div class="columns-box-wrapper w-50">
                             <label class="text-muted fw-semibold mb-2" style="font-size: 0.85rem;">Available</label>
                             <div class="columns-box border rounded p-2" id="availableColumnsBox" style="height: 250px; overflow-y: auto; background: #f8fafc;">
@@ -1319,11 +831,9 @@
                             </div>
                         </div>
 
-                        <!-- Selected Columns -->
                         <div class="columns-box-wrapper w-50">
                             <label class="text-muted fw-semibold mb-2" style="font-size: 0.85rem;">Selected</label>
                             <div class="columns-box border rounded p-2" id="selectedColumnsBox" style="height: 250px; overflow-y: auto; background: #ffffff;">
-                                <!-- Default starting items -->
                                 <div class="column-item p-2 mb-1 border rounded d-flex justify-content-between align-items-center" style="background: #f1f5f9; cursor: pointer; font-size: 0.85rem;" onclick="moveColumn(this, 'availableColumnsBox')">
                                     <i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">Subject</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>
                                 </div>
@@ -1352,6 +862,9 @@
         }
     ];
 
+    const userLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.UsersList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
+    const accountLookup = @Html.Raw(Json.Serialize(((SelectList)ViewBag.AccountsList)?.ToDictionary(x => x.Value, x => x.Text) ?? new Dictionary<string, string>()));
+
     // ==========================================
     // 1. GLOBAL VARIABLES & INITIALIZATION
     // ==========================================
@@ -1359,58 +872,147 @@
     let currentNoteTaskId = null;
 
     let allRows = [];
+    let currentVisibleRows = [];
     let hiddenCols = new Set();
+    let sortStates = {};
 
-    // Map of fields to selectable dropdown arrays for Tasks
     const criteriaFilterOptionsMap = {
         "Status": ["Not Started", "In Progress", "Deferred", "Completed", "Waiting on input"],
         "Priority": ["Highest", "High", "Normal", "Low", "Lowest"]
     };
 
+    function formatUserAndAccountIDs() {
+        const masterMap = { ...userLookup, ...accountLookup };
+
+        if (Object.keys(masterMap).length > 0) {
+            allRows.forEach(row => {
+                row.querySelectorAll('td').forEach(td => {
+                    if(td.querySelector('a')) return;
+                    
+                    const text = td.innerText.trim();
+                    if (masterMap[text]) {
+                        td.innerHTML = `<span class="fw-medium text-dark text-truncate d-inline-block" style="max-width: 100%; vertical-align: bottom;" onclick="event.stopPropagation()">${masterMap[text]}</span>`;
+                    } else if (text.startsWith("zcrm_")) {
+                        td.innerHTML = `<span class="text-muted text-truncate d-inline-block" style="font-size: 0.8rem; max-width: 100%; vertical-align: bottom;" onclick="event.stopPropagation()">Unknown (${text.substring(0, 10)}...)</span>`;
+                    }
+                });
+            });
+        }
+    }
+
+    function initializeTooltips() {
+        setTimeout(() => {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                const existing = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
+                if (existing) existing.dispose();
+                return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false });
+            });
+        }, 500);
+    }
+
+    function toggleFilterSidebar() {
+        const sidebar = document.getElementById('filterSidebarWrapper');
+        if (sidebar.classList.contains('hidden-sidebar')) {
+            sidebar.classList.remove('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden_tasks', 'false');
+        } else {
+            sidebar.classList.add('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden_tasks', 'true');
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
-        allRows = Array.from(document.querySelectorAll('tbody tr.task-row'));
+        allRows = Array.from(document.querySelectorAll('#tableBody tr.task-row'));
+        currentVisibleRows = [...allRows];
 
         const style = document.createElement('style');
         style.id = 'dynamic-col-styles';
         document.head.appendChild(style);
 
+        formatUserAndAccountIDs();
         allRows.forEach(r => r.style.display = 'none');
+
+        restoreColumnOrder();
 
         const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols_tasks') || '[]');
         hiddenCols = new Set(savedHidden);
 
         setupColumnToggles();
         setupFilterInteractions();
-        setupLazyDatalists();
         setupFileUpload();
         setupExcelResizing();
         restorePinnedFilters();
         
-        // Advanced Premium Features
         renderCustomViews();
         renderSavedSidebarFilters();
         restoreSidebarFiltersFromUrl();
 
         refreshVisibleRows();
+        initializeTooltips();
+
+        if (localStorage.getItem('crm_filter_hidden_tasks') === 'true') {
+            document.getElementById('filterSidebarWrapper').classList.add('hidden-sidebar');
+        }
+        
+        document.querySelectorAll('.header-menu-btn').forEach(btn => {
+            btn.setAttribute('data-bs-boundary', 'window');
+            btn.setAttribute('data-bs-reference', 'parent');
+        });
     });
 
-    // ==========================================
-    // 2. UI REFRESH (Local display toggles)
-    // ==========================================
+    window.toggleSort = function(event, colIndex) {
+        if(event) { event.stopPropagation(); event.preventDefault(); }
+        let dir = sortStates[colIndex] === 'asc' ? 'desc' : 'asc';
+        sortStates[colIndex] = dir;
+        
+        document.querySelectorAll('th .fa-arrow-up-a-z, th .fa-arrow-down-z-a').forEach(icon => {
+            icon.className = 'fa-solid fa-sort text-muted header-action-icon';
+            icon.style.color = '';
+        });
+
+        const currentIcon = event.currentTarget;
+        currentIcon.className = dir === 'asc' ? 'fa-solid fa-arrow-up-a-z header-action-icon' : 'fa-solid fa-arrow-down-z-a header-action-icon';
+        currentIcon.style.color = 'var(--primary-blue)';
+
+        document.body.style.cursor = 'wait';
+        setTimeout(() => {
+            const tbody = document.getElementById("tableBody");
+            let rowsToSort = Array.from(tbody.querySelectorAll('tr.task-row'));
+
+            rowsToSort.sort((a, b) => {
+                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
+                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+
+                if (!isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '') {
+                    return dir === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+                if (aText < bText) return dir === 'asc' ? -1 : 1;
+                if (aText > bText) return dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+            rowsToSort.forEach(row => tbody.appendChild(row));
+            allRows = rowsToSort;
+            document.body.style.cursor = 'default';
+        }, 50);
+    };
+
     function refreshVisibleRows() {
         const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
+        currentVisibleRows.forEach(r => r.style.display = 'none');
+        currentVisibleRows = [...filteredRows];
+        currentVisibleRows.forEach(r => r.style.display = '');
 
-        allRows.forEach(r => r.style.display = 'none');
-        filteredRows.forEach(r => r.style.display = '');
-
-        const totalCountBadge = document.getElementById('topTotalCount');
-        if (totalCountBadge) {
-            if (filteredRows.length === allRows.length) {
-                totalCountBadge.innerText = '@totalRecords';
-            } else {
-                totalCountBadge.innerText = filteredRows.length + ' (Filtered)';
-            }
-        }
+        const topCountBadge = document.getElementById('topTotalCount');
+        const bottomCountBadge = document.getElementById('bottomTotalCount');
+        const displayCount = (currentVisibleRows.length === allRows.length) ? '@totalRecords' : currentVisibleRows.length + ' (Filtered)';
+        
+        if (topCountBadge) topCountBadge.innerText = displayCount;
+        if (bottomCountBadge) bottomCountBadge.innerText = displayCount;
 
         const selectAllCb = document.getElementById('selectAllCb');
         if (selectAllCb) selectAllCb.checked = false;
@@ -1418,94 +1020,120 @@
     }
 
     // ==========================================
-    // 3. SERVER-SIDE FILTERING & PAGINATION
+    // 3. FILTERING & SEARCHING
     // ==========================================
-       function applyFilters() {
-            const activeFilters = [];
+    window.applyFilters = function() {
+        const activeFilters = [];
+        const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'];
 
-            // 🚀 FIX: Allow predefined dates to pass validation without a typed value
-            const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'];
+        document.querySelectorAll('.filter-field-item.active').forEach(item => {
+            const cb = item.querySelector('.field-checkbox');
+            if (cb && cb.checked) {
+                let colName = cb.value;
+                const conditionNode = item.querySelector('.condition-select');
+                const condition = conditionNode ? conditionNode.value : 'contains';
+                const isDate = item.dataset.fieldType === "date";
 
-            document.querySelectorAll('.filter-field-item.active').forEach(item => {
-                const cb = item.querySelector('.field-checkbox');
-                if (cb && cb.checked) {
-                    let colName = cb.value;
-                    const conditionNode = item.querySelector('.condition-select');
-                    const condition = conditionNode ? conditionNode.value : 'contains';
-                    const isDate = item.dataset.fieldType === "date";
+                let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value || '').trim();
 
-                    let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value || '').trim();
-
-                    // 🚀 FIX: Bypass the skip if the condition is a predefined date
-                    if (!val1 && !noValueNeeded.includes(condition)) {
-                        return; // Skip this incomplete filter
-                    }
-
-                    // Map UI names to actual Database Foreign Keys
-                    if (colName === "TaskOwner" || colName === "Owner") {
-                        colName = "TaskOwnerId";
-                    }
-
-                    if (isDate && (condition === 'between' || condition === 'not between')) {
-                        const val2 = item.querySelector('.date-val-2')?.value || '';
-                        if (!val2) return;
-                        val1 = val1 + "|" + val2;
-                    }
-
-                    activeFilters.push({
-                        LogicalOperator: "AND",
-                        ColumnName: colName,
-                        Condition: condition,
-                        Value: val1,
-                        IsDate: isDate
-                    });
+                if (!val1 && !noValueNeeded.includes(condition)) {
+                    return; 
                 }
-            });
 
-            if (activeFilters.length === 0) {
-                clearFilters();
-                return;
+                if (colName === "TaskOwner" || colName === "Owner") {
+                    colName = "TaskOwnerId";
+                }
+
+                if (isDate && (condition === 'between' || condition === 'not between')) {
+                    const val2 = item.querySelector('.date-val-2')?.value || '';
+                    if (!val2) return;
+                    val1 = val1 + "|" + val2;
+                }
+
+                activeFilters.push({
+                    LogicalOperator: "AND",
+                    ColumnName: colName,
+                    Condition: condition,
+                    Value: val1,
+                    IsDate: isDate
+                });
             }
+        });
 
-            const filterStr = JSON.stringify(activeFilters);
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('advancedFilters', filterStr);
-            urlParams.set('page', 1);
-            urlParams.set('_t', Date.now());
-
-            document.body.style.cursor = 'wait';
-            window.location.href = window.location.pathname + '?' + urlParams.toString();
+        if (activeFilters.length === 0) {
+            window.location.href = window.location.pathname;
+            return;
         }
-    function clearFilters() {
-        document.body.style.cursor = 'wait';
-        window.location.href = window.location.pathname;
-    }
 
-    function goToPage(pageNumber) {
+        const filterStr = JSON.stringify(activeFilters);
         const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('page', pageNumber);
+        urlParams.set('advancedFilters', filterStr);
+        urlParams.set('page', 1);
         urlParams.set('_t', Date.now());
 
         document.body.style.cursor = 'wait';
         window.location.href = window.location.pathname + '?' + urlParams.toString();
-    }
+    };
 
-    function filterSingleColumn(inputEl, colIndex) {
+    window.clearFilters = function() {
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname;
+    };
+
+    window.goToPage = function(pageNumber) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', pageNumber);
+        urlParams.set('_t', Date.now());
+        document.body.style.cursor = 'wait';
+        window.location.href = window.location.pathname + '?' + urlParams.toString();
+    };
+
+    window.filterSingleColumn = function(inputEl, colIndex) {
         const filterValue = inputEl.value.toLowerCase().trim();
         allRows.forEach(row => {
             const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
             if (td) {
                 const text = td.textContent.trim().toLowerCase();
-                row.classList.toggle('filtered-out', !text.includes(filterValue));
+                if (!text.includes(filterValue)) {
+                    row.dataset[`colFilter_${colIndex}`] = "hidden";
+                } else {
+                    delete row.dataset[`colFilter_${colIndex}`];
+                }
             }
+            row.classList.toggle('filtered-out', Object.keys(row.dataset).some(k => k.startsWith('colFilter_') && row.dataset[k] === "hidden"));
         });
         refreshVisibleRows();
-    }
+    };
+
+    window.triggerSidebarFilter = function(event, fieldName) {
+        if(event) { event.stopPropagation(); event.preventDefault(); }
+        
+        const sidebar = document.getElementById('filterSidebarWrapper');
+        if (sidebar) {
+            sidebar.classList.remove('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden_tasks', 'false');
+        }
+
+        const chk = document.getElementById('chk_' + fieldName);
+        if(chk) {
+            const item = chk.closest('.filter-field-item');
+            chk.checked = true;
+            item.classList.add('active');
+            chk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            item.style.backgroundColor = '#eff6ff';
+            setTimeout(() => item.style.backgroundColor = '', 2000);
+            
+            setTimeout(() => {
+                const inputToFocus = item.querySelector('input[type="text"].condition-val, input[type="date"], select.condition-val');
+                if (inputToFocus) inputToFocus.focus();
+            }, 150);
+        }
+    };
 
     // ==========================================
-    // 4. SIDEBAR UI INTERACTIONS (Pins, Saves, Dates)
+    // 4. SIDEBAR UI INTERACTIONS
     // ==========================================
-    function togglePinFilter(event, iconElement, isRestoring = false) {
+    window.togglePinFilter = function(event, iconElement, isRestoring = false) {
         if(event) event.stopPropagation();
 
         const item = iconElement.closest('.filter-field-item');
@@ -1531,7 +1159,7 @@
             const pinnedIds = Array.from(pinnedContainer.children).map(el => el.querySelector('.field-checkbox').id);
             localStorage.setItem('crm_pinned_filters_tasks', JSON.stringify(pinnedIds));
         }
-    }
+    };
 
     function restorePinnedFilters() {
         const pinnedIds = JSON.parse(localStorage.getItem('crm_pinned_filters_tasks') || '[]');
@@ -1544,31 +1172,27 @@
         });
     }
 
-    function toggleDateInputs(selectElement) {
+    window.toggleDateInputs = function(selectElement) {
         const wrapper = selectElement.closest('.filter-expanded-area');
         const val1 = wrapper.querySelector('.date-val-1');
         const val2 = wrapper.querySelector('.date-val-2');
         
         if (val1 && val2) {
             const condition = selectElement.value;
-            
-            // Show two inputs for between / not between
             if (condition === 'between' || condition === 'not between') {
                 val1.style.display = 'block';
                 val2.style.display = 'block';
             }
-            // Hide both inputs for predefined date ranges
             else if (['Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'].includes(condition)) {
                 val1.style.display = 'none';
                 val2.style.display = 'none';
             }
-            // Show only one input for exact dates (On, before, after)
             else {
                 val1.style.display = 'block';
                 val2.style.display = 'none';
             }
         }
-    }
+    };
 
     function setupFilterInteractions() {
         document.querySelectorAll('.field-checkbox').forEach(cb => {
@@ -1589,18 +1213,16 @@
         });
     }
 
-    function filterSidebarItems() {
+    window.filterSidebarItems = function() {
         const q = document.getElementById('sidebarSearch').value.toLowerCase();
         document.querySelectorAll('#sidebarList .filter-field-item').forEach(item => {
             const label = item.querySelector('label').innerText.toLowerCase();
             item.style.display = label.includes(q) ? '' : 'none';
         });
-    }
+    };
 
-    // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
-    function saveFieldFilter(event, iconEl, fieldName) {
+    window.saveFieldFilter = function(event, iconEl, fieldName) {
         event.stopPropagation();
-        
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
         
@@ -1613,7 +1235,9 @@
         const isDate = item.dataset.fieldType === "date";
         let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
 
-        if(!val && condition !== 'is_empty' && condition !== 'is_not_empty') {
+        const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year'];
+        
+        if(!val && !noValueNeeded.includes(condition)) {
             alert("Please enter a value before saving.");
             return;
         }
@@ -1623,7 +1247,7 @@
         localStorage.setItem('crm_saved_sidebar_filters_tasks', JSON.stringify(savedFilters));
         
         renderSavedSidebarFilters();
-    }
+    };
 
     function renderSavedSidebarFilters() {
         const section = document.getElementById('savedFiltersSection');
@@ -1650,7 +1274,7 @@
         });
     }
 
-    function applySavedSidebarFilter(id) {
+    window.applySavedSidebarFilter = function(id) {
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_tasks') || '[]');
         let f = savedFilters.find(x => x.id === id);
         if(!f) return;
@@ -1669,15 +1293,15 @@
         urlParams.set('page', 1);
         urlParams.set('_t', Date.now());
         window.location.href = window.location.pathname + '?' + urlParams.toString();
-    }
+    };
 
-    function deleteSavedSidebarFilter(id, event) {
+    window.deleteSavedSidebarFilter = function(id, event) {
         event.stopPropagation();
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_tasks') || '[]');
         savedFilters = savedFilters.filter(x => x.id !== id);
         localStorage.setItem('crm_saved_sidebar_filters_tasks', JSON.stringify(savedFilters));
         renderSavedSidebarFilters();
-    }
+    };
 
     function restoreSidebarFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1687,11 +1311,11 @@
             try {
                 const activeFilters = JSON.parse(filtersParam);
                 activeFilters.forEach(f => {
-                    // Revert Foreign Key mapping to find the UI Checkbox ID
                     let searchColName = f.ColumnName;
                     if (searchColName.endsWith("Id") && !document.getElementById('chk_' + searchColName)) {
                         searchColName = searchColName.replace("Id", "");
                     }
+                    if (searchColName === "Owner") searchColName = "TaskOwner";
 
                     const chk = document.getElementById('chk_' + searchColName);
                     if (chk) {
@@ -1706,7 +1330,6 @@
                             });
                         }
 
-                        // Split 'between' dates to restore them
                         if (f.IsDate) {
                             const vals = f.Value.split('|');
                             const date1 = item.querySelector('.date-val-1');
@@ -1730,49 +1353,20 @@
     }
 
     // ==========================================
-    // DATA TABLE SORTING LOGIC
+    // 🚀 DYNAMIC CUSTOM VIEWS & CRITERIA BUILDER
     // ==========================================
-    window.sortTableByCol = function(colIndex, sortDir) {
-        // 1. Get the exact column name from the table header attribute
-        const th = document.querySelector(`th[data-col-index="${colIndex}"]`);
-        if (!th) return;
-
-        const colName = th.getAttribute("data-col-name");
-        if (!colName) return;
-
-        // 2. Keep existing parameters (filters, active views, etc.)
-        const urlParams = new URLSearchParams(window.location.search);
-        
-        // 3. Set the new sorting parameters
-        urlParams.set('sortCol', colName);
-        urlParams.set('sortDir', sortDir);
-        urlParams.set('page', 1); // Reset to page 1 when sorting changes
-        urlParams.set('_t', Date.now()); // Prevent browser caching
-
-        // 4. Redirect to backend to fetch sorted data
-        document.body.style.cursor = 'wait';
-        window.location.href = window.location.pathname + '?' + urlParams.toString();
-    };
-
-
-    // ==========================================
-    // 🚀 FIX: CUSTOM VIEWS CRITERIA BUILDER
-    // ==========================================
-    function openCustomViewModal() {
+    window.openCustomViewModal = function() {
         const modalEl = document.getElementById('createCustomViewModal');
         if (!modalEl) return;
         document.body.appendChild(modalEl);
         modalEl.style.zIndex = "9999";
-        
         try {
             const myModal = new bootstrap.Modal(modalEl);
             myModal.show();
         } catch (error) {
-            if (typeof $ !== 'undefined') {
-                $(modalEl).modal('show');
-            }
+            if (typeof $ !== 'undefined') { $(modalEl).modal('show'); }
         }
-    }
+    };
 
     function renderCustomViews() {
         const container = document.getElementById('customViewsTabsContainer');
@@ -1818,7 +1412,7 @@
         });
     }
 
-    function handleCriteriaFieldChange(selectEl) {
+    window.handleCriteriaFieldChange = function(selectEl) {
         const row = selectEl.closest('.criteria-row-builder');
         const fieldName = selectEl.value;
         const valueContainer = row.querySelector('.cv-value-container');
@@ -1831,7 +1425,6 @@
             return;
         }
 
-        // 1. Static Dropdowns (Status, Priority)
         if (criteriaFilterOptionsMap[fieldName]) {
             conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             let opts = '<option value="" disabled selected>- Select Value -</option>';
@@ -1840,18 +1433,14 @@
             });
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
-        // 2. User/Owner Fields Dropdown (FIXED: NOW USES <select> INSTEAD OF <datalist>)
         else if (fieldName.toLowerCase().includes('owner') || fieldName.toLowerCase().includes('user') || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
             conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
-            
             let opts = '<option value="" disabled selected>- Select User -</option>';
             ownerOptionsList.forEach(user => {
-                opts += `<option value="${user.id}">${user.text}</option>`; // mapped id properly
+                opts += `<option value="${user.id}">${user.text}</option>`; 
             });
-            
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
-        // 3. Date Fields
         else if (fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('time')) {
             conditionOptions = `
                 <option value="age in">age in</option>
@@ -1899,16 +1488,15 @@
                 }
             };
         }
-        // 4. Default to Text Input
         else {
             conditionOptions = '<option value="is">is exactly</option><option value="is_not">isn\'t</option><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             valueContainer.innerHTML = `<input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;">`;
         }
 
         conditionSelect.innerHTML = conditionOptions;
-    }
+    };
 
-    function updateCriteriaPattern() {
+    window.updateCriteriaPattern = function() {
         const totalRows = document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').length;
         let patternText = "( 1 )";
 
@@ -1923,12 +1511,11 @@
 
         const patternEl = document.getElementById('criteriaPatternText');
         if(patternEl) patternEl.innerText = patternText;
-    }
+    };
 
-    function addCriteriaRow() {
+    window.addCriteriaRow = function() {
         const container = document.getElementById('criteriaRowsContainer');
         const rowCount = container.querySelectorAll('.criteria-row-builder').length + 1;
-
         const firstRowFields = container.querySelector('.cv-field').innerHTML;
 
         const andLine = document.createElement('div');
@@ -1948,34 +1535,22 @@
         row.className = 'criteria-row-builder d-flex align-items-center gap-2 mb-2';
         row.innerHTML = `
             <div class="criteria-num" style="width: 30px; height: 30px; border: 1px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #64748b; font-weight: 600; flex-shrink: 0;">${rowCount}</div>
-
-            <select class="form-select criteria-builder-select cv-module" disabled style="max-width: 150px;">
-                <option value="Tasks" selected>Tasks</option>
-            </select>
-
+            <select class="form-select criteria-builder-select cv-module" disabled style="max-width: 150px;"><option value="Tasks" selected>Tasks</option></select>
             <select class="form-select criteria-builder-select cv-field" style="max-width: 200px;" onchange="handleCriteriaFieldChange(this)">
                 ${firstRowFields}
             </select>
-
-            <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;">
-                <option value="" disabled selected>Select Field First</option>
-            </select>
-
-            <div class="cv-value-container d-flex" style="flex-grow:1;">
-                <input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled>
-            </div>
-
+            <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;"><option value="" disabled selected>Select Field First</option></select>
+            <div class="cv-value-container d-flex" style="flex-grow:1;"><input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled></div>
             <button type="button" class="btn btn-link text-success p-1 add" onclick="addCriteriaRow()"><i class="fa-solid fa-circle-plus fs-5"></i></button>
             <button type="button" class="btn btn-link text-danger p-1 remove" onclick="removeCriteriaRow(this)"><i class="fa-solid fa-circle-minus fs-5"></i></button>
         `;
 
         container.appendChild(andLine);
         container.appendChild(row);
-
         updateCriteriaPattern();
-    }
+    };
 
-    function removeCriteriaRow(btn) {
+    window.removeCriteriaRow = function(btn) {
         const row = btn.closest('.criteria-row-builder');
         if (row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
             row.previousElementSibling.remove();
@@ -1986,81 +1561,74 @@
         document.querySelectorAll('#criteriaRowsContainer .criteria-num').forEach(el => {
             el.innerText = index++;
         });
-
         updateCriteriaPattern();
-    }
+    };
 
-     function saveAndApplyCustomView() {
-            const viewName = document.getElementById('customViewName').value.trim();
-            if (!viewName) {
-                alert("Please enter a Custom View Name.");
-                return;
-            }
-
-            const activeFilters = [];
-
-            // 🚀 FIX 1: Define conditions that are perfectly valid WITHOUT an input value
-            const noValueNeededConditions = [
-                'is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday',
-                'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month',
-                'This Year', 'Previous Week', 'Previous Month', 'Previous Year',
-                'Current FY', 'Previous FY', 'Current FQ'
-            ];
-
-            document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').forEach((row, index) => {
-                const field = row.querySelector('.cv-field').value;
-                const condition = row.querySelector('.cv-condition').value;
-
-                if (field && condition) {
-                    let val = "";
-                    let isDate = field.toLowerCase().includes('date') || field.toLowerCase().includes('time');
-
-                    // 🚀 FIX 2: Correctly extract values depending on if it is a Date or Text field
-                    if (isDate) {
-                        let v1 = row.querySelector('.date-val-1') ? row.querySelector('.date-val-1').value : "";
-                        let v2 = row.querySelector('.date-val-2') ? row.querySelector('.date-val-2').value : "";
-                        val = (condition === 'between' || condition === 'not between') ? (v1 + "|" + v2) : v1;
-                    } else {
-                        val = row.querySelector('.cv-value') ? row.querySelector('.cv-value').value : "";
-                    }
-
-                    // Determine Logic Operator (AND/OR)
-                    let logicOperator = "AND";
-                    if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
-                        logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
-                    }
-
-                    // 🚀 FIX 3: Skip row ONLY if value is empty AND the condition actually requires a value
-                    if (!val && !noValueNeededConditions.includes(condition)) {
-                        return; // Skip this incomplete criteria
-                    }
-
-                    activeFilters.push({
-                        LogicalOperator: index === 0 ? "" : logicOperator,
-                        ColumnName: field,
-                        Condition: condition,
-                        Value: val || "",
-                        IsDate: isDate
-                    });
-                }
-            });
-
-            // 🚀 If it skipped everything because of invalid inputs, alert the user
-            if (activeFilters.length === 0) {
-                alert("Please specify at least one valid complete criteria.");
-                return;
-            }
-
-            let savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
-            savedViews = savedViews.filter(v => v.name !== viewName);
-            savedViews.push({ name: viewName, isPinned: true, filters: activeFilters });
-            localStorage.setItem('crm_user_views_tasks', JSON.stringify(savedViews));
-
-            bootstrap.Modal.getInstance(document.getElementById('createCustomViewModal')).hide();
-            applyCustomView(viewName, activeFilters);
+    window.saveAndApplyCustomView = function() {
+        const viewName = document.getElementById('customViewName').value.trim();
+        if (!viewName) {
+            alert("Please enter a Custom View Name.");
+            return;
         }
 
-    function applyCustomView(viewName, filterObj) {
+        const activeFilters = [];
+        const noValueNeededConditions = [
+            'is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday',
+            'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month',
+            'This Year', 'Previous Week', 'Previous Month', 'Previous Year',
+            'Current FY', 'Previous FY', 'Current FQ'
+        ];
+
+        document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').forEach((row, index) => {
+            const field = row.querySelector('.cv-field').value;
+            const condition = row.querySelector('.cv-condition').value;
+
+            if (field && condition) {
+                let val = "";
+                let isDate = field.toLowerCase().includes('date') || field.toLowerCase().includes('time');
+
+                if (isDate) {
+                    let v1 = row.querySelector('.date-val-1') ? row.querySelector('.date-val-1').value : "";
+                    let v2 = row.querySelector('.date-val-2') ? row.querySelector('.date-val-2').value : "";
+                    val = (condition === 'between' || condition === 'not between') ? (v1 + "|" + v2) : v1;
+                } else {
+                    val = row.querySelector('.cv-value') ? row.querySelector('.cv-value').value : "";
+                }
+
+                let logicOperator = "AND";
+                if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
+                    logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
+                }
+
+                if (!val && !noValueNeededConditions.includes(condition)) {
+                    return; 
+                }
+
+                activeFilters.push({
+                    LogicalOperator: index === 0 ? "" : logicOperator,
+                    ColumnName: field,
+                    Condition: condition,
+                    Value: val || "",
+                    IsDate: isDate
+                });
+            }
+        });
+
+        if (activeFilters.length === 0) {
+            alert("Please specify at least one valid complete criteria.");
+            return;
+        }
+
+        let savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
+        savedViews = savedViews.filter(v => v.name !== viewName);
+        savedViews.push({ name: viewName, isPinned: true, filters: activeFilters });
+        localStorage.setItem('crm_user_views_tasks', JSON.stringify(savedViews));
+
+        bootstrap.Modal.getInstance(document.getElementById('createCustomViewModal')).hide();
+        applyCustomView(viewName, activeFilters);
+    };
+
+    window.applyCustomView = function(viewName, filterObj) {
         document.body.style.cursor = 'wait';
         const urlParams = new URLSearchParams(window.location.search);
 
@@ -2075,9 +1643,9 @@
         urlParams.set('_t', Date.now());
 
         window.location.href = window.location.pathname + '?' + urlParams.toString();
-    }
+    };
 
-    function toggleViewPinStatus(viewName, event) {
+    window.toggleViewPinStatus = function(viewName, event) {
         if(event) {
             event.stopPropagation();
             event.preventDefault();
@@ -2089,9 +1657,9 @@
             localStorage.setItem('crm_user_views_tasks', JSON.stringify(savedViews));
             renderCustomViews();
         }
-    }
+    };
 
-    function deleteCustomView(viewName, event) {
+    window.deleteCustomView = function(viewName, event) {
         if(event) {
             event.stopPropagation();
             event.preventDefault();
@@ -2108,12 +1676,12 @@
                 renderCustomViews();
             }
         }
-    }
+    };
 
     // ==========================================
     // 6. COLUMN MANAGEMENT & DRAG-DROP
     // ==========================================
-    function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
+    window.toggleColumnVisibility = function(idx, isVisible, isRestoring = false) {
         const idxStr = idx.toString();
         if(isVisible) hiddenCols.delete(idxStr);
         else hiddenCols.add(idxStr);
@@ -2127,7 +1695,7 @@
         if (!isRestoring) {
             localStorage.setItem('crm_hidden_cols_tasks', JSON.stringify(Array.from(hiddenCols)));
         }
-    }
+    };
 
     function setupColumnToggles() {
         const table = document.getElementById("tasksTable");
@@ -2147,15 +1715,11 @@
     `;
 
         const hasSavedState = localStorage.getItem('crm_hidden_cols_tasks') !== null;
-
         let savedHidden = [];
         try {
             const stored = localStorage.getItem('crm_hidden_cols_tasks');
             if (stored) savedHidden = JSON.parse(stored);
-        } catch(e) {
-            savedHidden = [];
-        }
-
+        } catch(e) { }
         hiddenCols = new Set(savedHidden);
 
         theadRows.forEach((th) => {
@@ -2229,49 +1793,129 @@
         return false;
     }
     function handleDragEnd(e) {
-          this.classList.remove('dragging');
-          document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
-      }
+        this.classList.remove('dragging');
+        document.querySelectorAll('.draggable-col-item').forEach(item => item.classList.remove('over'));
+    }
 
     function reorderTableColumns(draggedIdx, targetIdx, insertAfter) {
-         document.body.style.cursor = 'wait';
-         setTimeout(() => {
-             const table = document.querySelector("#tasksTable");
-             if(!table) { document.body.style.cursor = 'default'; return; }
+        document.body.style.cursor = 'wait';
+        setTimeout(() => {
+            const table = document.querySelector("#tasksTable");
+            if(!table) { document.body.style.cursor = 'default'; return; }
 
-             const theadRow = table.querySelector("thead tr");
-             const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedIdx}"]`);
-             const targetTh = theadRow.querySelector(`th[data-col-index="${targetIdx}"]`);
+            const theadRow = table.querySelector("thead tr");
+            const draggedTh = theadRow.querySelector(`th[data-col-index="${draggedIdx}"]`);
+            const targetTh = theadRow.querySelector(`th[data-col-index="${targetIdx}"]`);
 
-             if(!draggedTh || !targetTh) { document.body.style.cursor = 'default'; return; }
+            if(!draggedTh || !targetTh) { document.body.style.cursor = 'default'; return; }
 
-             if (insertAfter) targetTh.after(draggedTh);
-             else targetTh.before(draggedTh);
+            if (insertAfter) targetTh.after(draggedTh);
+            else targetTh.before(draggedTh);
 
-             const chunkSize = 150;
-             let i = 0;
-             function processChunk() {
-                 const end = Math.min(i + chunkSize, allRows.length);
-                 for(; i < end; i++) {
-                     const row = allRows[i];
-                     const draggedTd = row.querySelector(`td[data-col-index="${draggedIdx}"]`);
-                     const targetTd = row.querySelector(`td[data-col-index="${targetIdx}"]`);
-                     if(draggedTd && targetTd) {
-                         if (insertAfter) targetTd.after(draggedTd);
-                         else targetTd.before(draggedTd);
-                     }
-                 }
-                 if (i < allRows.length) requestAnimationFrame(processChunk);
-                 else document.body.style.cursor = 'default';
-             }
-             requestAnimationFrame(processChunk);
-         }, 10);
-     }
+            const chunkSize = 150;
+            let i = 0;
+            function processChunk() {
+                const end = Math.min(i + chunkSize, allRows.length);
+                for(; i < end; i++) {
+                    const row = allRows[i];
+                    const draggedTd = row.querySelector(`td[data-col-index="${draggedIdx}"]`);
+                    const targetTd = row.querySelector(`td[data-col-index="${targetIdx}"]`);
+                    if(draggedTd && targetTd) {
+                        if (insertAfter) targetTd.after(draggedTd);
+                        else targetTd.before(draggedTd);
+                    }
+                }
+                if (i < allRows.length) requestAnimationFrame(processChunk);
+                else { 
+                    document.body.style.cursor = 'default';
+                    saveColumnOrder(); // 🚀 SAVES THE NEW ORDER
+                }
+            }
+            requestAnimationFrame(processChunk);
+        }, 10);
+    }
+
+    window.saveColumnOrder = function() {
+        const menu = document.getElementById("columnToggleMenu");
+        const items = menu.querySelectorAll("li.draggable-col-item");
+        const order = Array.from(items).map(li => li.dataset.colIndex);
+        localStorage.setItem('crm_col_order_tasks', JSON.stringify(order));
+    };
+
+    function restoreColumnOrder() {
+        const savedOrder = JSON.parse(localStorage.getItem('crm_col_order_tasks'));
+        if (!savedOrder || savedOrder.length === 0) return;
+
+        const table = document.querySelector("#tasksTable");
+        const theadRow = table.querySelector("thead tr");
+        
+        // 🚀 FIX: Insert before the dummy-filler-col to keep the spacer on the right
+        const dummyTh = theadRow.querySelector('.dummy-filler-col');
+
+        // Reorder headers
+        savedOrder.forEach(colIdx => {
+            const th = theadRow.querySelector(`th[data-col-index="${colIdx}"]`);
+            if (th && dummyTh) theadRow.insertBefore(th, dummyTh);
+        });
+
+        // Reorder cells in all rows
+        allRows.forEach(row => {
+            const dummyTd = row.querySelector('.dummy-filler-col');
+            savedOrder.forEach(colIdx => {
+                const td = row.querySelector(`td[data-col-index="${colIdx}"]`);
+                if (td && dummyTd) row.insertBefore(td, dummyTd);
+            });
+        });
+    }
+
+    window.filterManageColumns = function () {
+        const searchInput = document.getElementById('manageColSearch');
+        if (!searchInput) return;
+        
+        const q = searchInput.value.toLowerCase();
+        const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
+        
+        items.forEach(item => {
+            const label = item.querySelector('label').innerText.toLowerCase();
+            if (label.includes(q)) {
+                item.classList.remove('d-none');
+                item.classList.add('d-flex');
+            } else {
+                item.classList.remove('d-flex');
+                item.classList.add('d-none');
+            }
+        });
+    };
+
+    window.moveColumn = function(item, targetBoxId) {
+        const targetBox = document.getElementById(targetBoxId);
+        const fieldName = item.innerText.trim();
+
+        if (targetBoxId === 'selectedColumnsBox') {
+            item.innerHTML = `<i class="fa-solid fa-grip-vertical text-muted me-2"></i> <span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-xmark text-danger ms-2"></i>`;
+            item.style.background = "#f1f5f9";
+            item.onclick = function() { moveColumn(this, 'availableColumnsBox'); };
+        } else {
+            item.innerHTML = `<span class="flex-grow-1">${fieldName}</span> <i class="fa-solid fa-arrow-right text-primary"></i>`;
+            item.style.background = "#ffffff";
+            item.onclick = function() { moveColumn(this, 'selectedColumnsBox'); };
+        }
+        targetBox.appendChild(item);
+    };
+
+    window.filterColumns = function(boxId, inputId) {
+        const q = document.getElementById(inputId).value.toLowerCase();
+        const items = document.querySelectorAll(`#${boxId} .column-item`);
+        items.forEach(item => {
+            const text = item.innerText.toLowerCase();
+            item.style.display = text.includes(q) ? 'flex' : 'none';
+        });
+    };
 
     // ==========================================
     // 7. BULK ACTIONS, EXPORT & DELETE
     // ==========================================
-    function toggleAllRowCheckboxes(sourceCb) {
+    window.toggleAllRowCheckboxes = function(sourceCb) {
         allRows.forEach(row => {
             if (!row.classList.contains('filtered-out')) {
                 const cb = row.querySelector('.row-cb');
@@ -2279,9 +1923,9 @@
             }
         });
         updateSelectedCount();
-    }
+    };
 
-    function updateSelectedCount() {
+    window.updateSelectedCount = function() {
         const selected = document.querySelectorAll('tbody .row-cb:checked').length;
         document.getElementById('selCount').innerText = selected;
         document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
@@ -2290,9 +1934,9 @@
         const totalVisible = activeRows.length;
         const selectAllCb = document.getElementById('selectAllCb');
         if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
-    }
+    };
 
-    function deleteSelected() {
+    window.deleteSelected = function() {
         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
         if(selectedCbs.length === 0) return;
 
@@ -2318,67 +1962,9 @@
                 } else alert("Database Error: " + data.message);
             }).catch(() => alert("Network error occurred."));
         }
-    }
+    };
 
-    // 🚀 NEW: Robust AJAX Mass Update identical to Deals/Leads
-    function executeMassUpdateAjax() {
-        const field = document.getElementById('massUpdateField').value;
-        const valInput = document.getElementById('massUpdateValue');
-        let val = valInput ? valInput.value : '';
-
-        if (val === "CLEAR_VALUE_COMMAND") val = "";
-
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-        if (!field || selectedIds.length === 0) {
-            alert("Please select a field and ensure records are checked.");
-            return;
-        }
-
-        if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
-            return;
-        }
-
-        const btn = document.getElementById('btnExecuteMassUpdate');
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-        btn.disabled = true;
-
-        fetch('@Url.Action("BulkUpdate", "Tasks")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
-        })
-        .then(async response => {
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `HTTP Error ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
-                alert(`Successfully updated ${selectedIds.length} records!`);
-                window.location.reload();
-            } else {
-                alert("Update failed: " + data.message);
-                btn.innerHTML = 'Update Records';
-                btn.disabled = false;
-            }
-        })
-        .catch((err) => {
-            console.error("Mass Update Error:", err);
-            alert("Connection error! Please check the browser console (F12) for exact details.");
-            btn.innerHTML = 'Update Records';
-            btn.disabled = false;
-        });
-    }
-
-    function exportTableToCSV(filename) {
+    window.exportTableData = function(moduleName, format) {
         const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
         
         if (checkedCbs.length === 0) {
@@ -2411,13 +1997,13 @@
 
         let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
         let downloadLink = document.createElement("a");
-        downloadLink.download = filename;
+        downloadLink.download = `${moduleName}_Export.${format}`;
         downloadLink.href = window.URL.createObjectURL(csvFile);
         downloadLink.style.display = "none";
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
-    }
+    };
 
     // ==========================================
     // 8. FILE UPLOAD & LAZY DATALISTS
@@ -2481,7 +2067,7 @@
                             const td = row.querySelector(`td[data-col-index="${colIndex}"]`);
                             if(td) {
                                 const text = td.innerText.trim();
-                                if(text) uniqueValues.add(text);
+                                if(text && !text.startsWith("zcrm_")) uniqueValues.add(text);
                             }
                         });
 
@@ -2498,342 +2084,136 @@
         });
     }
 
-   window.filterManageColumns = function () {
-        const searchInput = document.getElementById('manageColSearch');
-        if (!searchInput) return;
+    // --- EXCEL RESIZING WITH WHITE SPACE FIX ---
+    function setupExcelResizing() {
+        const table = document.getElementById('tasksTable');
+        if (!table) return;
+
+        table.style.tableLayout = "fixed";
+        table.style.width = "max-content";
+        table.style.minWidth = "100%"; // Prevents white space bug
+
+        let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_tasks')) || {};
+        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions):not(.dummy-filler-col)');
         
-        const q = searchInput.value.toLowerCase();
-        const items = document.querySelectorAll('#columnToggleMenu .draggable-col-item');
-        
-        items.forEach(item => {
-            const label = item.querySelector('label').innerText.toLowerCase();
-            if (label.includes(q)) {
-                item.classList.remove('d-none');
-                item.classList.add('d-flex');
-            } else {
-                item.classList.remove('d-flex');
-                item.classList.add('d-none');
+        cols.forEach((col, index) => {
+            col.style.position = 'relative';
+            const colIndex = Array.from(col.parentNode.children).indexOf(col);
+
+            // Apply saved width
+            if (savedWidths[colIndex]) {
+                const w = savedWidths[colIndex];
+                col.style.width = w;
+                col.style.minWidth = w;
+                col.style.maxWidth = w;
+
+                const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+                rows.forEach(row => {
+                    const td = row.children[colIndex];
+                    if (td) {
+                        td.style.width = w;
+                        td.style.minWidth = w;
+                        td.style.maxWidth = w;
+                        td.style.overflow = 'hidden';
+                        td.style.textOverflow = 'ellipsis';
+                        td.style.whiteSpace = 'nowrap';
+                    }
+                });
             }
-        });
-    };
 
-    // ==========================================
-    // 🚀 FIX: MISSING MODAL & MASS UPDATE LOGIC FOR TASKS
-    // ==========================================
+            const resizer = document.createElement('div');
+            resizer.className = 'excel-resizer';
+            col.appendChild(resizer);
 
-    const massUpdateOptionsMap = {
-        "Status": ["Not Started", "In Progress", "Deferred", "Completed", "Waiting on input"],
-        "Priority": ["Highest", "High", "Normal", "Low", "Lowest"],
-        "TaskOwnerId": ownerOptionsList
-    };
+            let startX, startWidth;
 
-    window.openMassUpdateModal = function() {
-        // Destroy any stuck tooltips to prevent freezing
-        document.querySelectorAll('.tooltip').forEach(t => t.remove());
+            resizer.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                startX = e.pageX;
+                startWidth = col.offsetWidth;
+                
+                resizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                
+                let animationFrameId;
 
-        const modalEl = document.getElementById('massUpdateModal');
-        if (modalEl) {
-            document.body.appendChild(modalEl); // Prevents the dark backdrop screen freeze
-            modalEl.style.zIndex = "1055";
-            try {
-                const myModal = new bootstrap.Modal(modalEl);
-                myModal.show();
-            } catch (error) {
-                if (typeof $!== 'undefined')$(modalEl).modal('show');
-            }
-        }
-    };
+                function mouseMoveHandler(e) {
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    
+                    animationFrameId = requestAnimationFrame(() => {
+                        const newWidth = Math.max(40, startWidth + (e.pageX - startX));
+                        col.style.width = `${newWidth}px`;
+                        col.style.minWidth = `${newWidth}px`;
+                        col.style.maxWidth = `${newWidth}px`;
 
-    window.renderMassUpdateInput = function() {
-        const fieldSelect = document.getElementById('massUpdateField');
-        const inputArea = document.getElementById('dynamicInputArea');
-        const container = document.getElementById('massUpdateValueContainer');
-        
-        if (!fieldSelect || !inputArea) return; 
-        
-        const selectedField = fieldSelect.value;
-        const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
-        const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
-
-        // Force container visibility so the modal doesn't collapse
-        if (container) container.style.display = 'block';
-
-        if (!selectedField) {
-            inputArea.innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
-            return;
-        }
-
-        // Generate inputs dynamically using the Tasks map
-        if (massUpdateOptionsMap[selectedField]) {
-            let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>';
-            selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>';
-            massUpdateOptionsMap[selectedField].forEach(opt => {
-                selectHTML += `<option value="${opt}">${opt}</option>`;
-            });
-            selectHTML += '</select>';
-            inputArea.innerHTML = selectHTML;
-        } else if (fieldType && fieldType.includes('DateTime')) {
-            inputArea.innerHTML = '<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />';
-        } else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
-            inputArea.innerHTML = '<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />';
-        } else {
-            inputArea.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />';
-        }
-    };
-
-// --- EXCEL RESIZING WITH WHITE SPACE FIX ---
-function setupExcelResizing() {
-    const table = document.getElementById('tasksTable');
-    if (!table) return;
-
-    table.style.tableLayout = "fixed";
-    table.style.width = "max-content";
-    table.style.minWidth = "100%"; // Prevents white space bug
-
-    const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
-   
-    cols.forEach((col, index) => {
-        col.style.position = 'relative';
-
-        const resizer = document.createElement('div');
-        resizer.className = 'excel-resizer';
-        col.appendChild(resizer);
-
-        let startX, startWidth;
-        const colIndex = index + 1;
-
-        resizer.addEventListener('mousedown', function(e) {
-            e.preventDefault();
-            startX = e.pageX;
-            startWidth = col.offsetWidth;
-           
-            resizer.classList.add('resizing');
-            document.body.style.cursor = 'col-resize';
-           
-            document.addEventListener('mousemove', mouseMoveHandler);
-            document.addEventListener('mouseup', mouseUpHandler);
-        });
-
-        function mouseMoveHandler(e) {
-            const newWidth = Math.max(40, startWidth + (e.pageX - startX));
-           
-            col.style.width = `${newWidth}px`;
-            col.style.minWidth = `${newWidth}px`;
-            col.style.maxWidth = `${newWidth}px`;
-
-            const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-            rows.forEach(row => {
-                const td = row.children[colIndex];
-                if (td) {
-                    td.style.width = `${newWidth}px`;
-                    td.style.minWidth = `${newWidth}px`;
-                    td.style.maxWidth = `${newWidth}px`;
-                    td.style.overflow = 'hidden';
-                    td.style.textOverflow = 'ellipsis';
-                    td.style.whiteSpace = 'nowrap';
+                        const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
+                        rows.forEach(row => {
+                            const td = row.children[colIndex];
+                            if (td) {
+                                td.style.width = `${newWidth}px`;
+                                td.style.minWidth = `${newWidth}px`;
+                                td.style.maxWidth = `${newWidth}px`;
+                                td.style.overflow = 'hidden';
+                                td.style.textOverflow = 'ellipsis';
+                                td.style.whiteSpace = 'nowrap';
+                            }
+                        });
+                    });
                 }
+
+                function mouseUpHandler() {
+                    resizer.classList.remove('resizing');
+                    document.body.style.cursor = 'default';
+                    document.removeEventListener('mousemove', mouseMoveHandler);
+                    document.removeEventListener('mouseup', mouseUpHandler);
+
+                    // Save width to memory
+                    savedWidths[colIndex] = col.style.width;
+                    localStorage.setItem('crm_col_widths_tasks', JSON.stringify(savedWidths));
+                }
+                
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
             });
-        }
-
-        function mouseUpHandler() {
-            resizer.classList.remove('resizing');
-            document.body.style.cursor = 'default';
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-        }
-    });
-
-    const sidebar = document.querySelector('.filter-sidebar');
-    if (sidebar) {
-        sidebar.style.position = 'relative';
-        const sideResizer = document.createElement('div');
-        sideResizer.style.width = '6px';
-        sideResizer.style.height = '100%';
-        sideResizer.style.position = 'absolute';
-        sideResizer.style.right = '0';
-        sideResizer.style.top = '0';
-        sideResizer.style.cursor = 'col-resize';
-        sideResizer.style.userSelect = 'none';
-       
-        sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
-        sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
-
-        sidebar.appendChild(sideResizer);
-
-        let sStartX, sStartWidth;
-        sideResizer.addEventListener('mousedown', function(e) {
-            sStartX = e.pageX;
-            sStartWidth = sidebar.offsetWidth;
-            document.addEventListener('mousemove', sideMouseMove);
-            document.addEventListener('mouseup', sideMouseUp);
         });
 
-        function sideMouseMove(e) {
-            const newWidth = sStartWidth + (e.pageX - sStartX);
-            if (newWidth > 200 && newWidth < 800) {
-                sidebar.style.minWidth = `${newWidth}px`;
-                sidebar.style.width = `${newWidth}px`;
+        const sidebar = document.querySelector('.filter-sidebar');
+        if (sidebar) {
+            sidebar.style.position = 'relative';
+            const sideResizer = document.createElement('div');
+            sideResizer.style.width = '6px';
+            sideResizer.style.height = '100%';
+            sideResizer.style.position = 'absolute';
+            sideResizer.style.right = '0';
+            sideResizer.style.top = '0';
+            sideResizer.style.cursor = 'col-resize';
+            sideResizer.style.userSelect = 'none';
+            
+            sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
+            sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
+
+            sidebar.appendChild(sideResizer);
+
+            let sStartX, sStartWidth;
+            sideResizer.addEventListener('mousedown', function(e) {
+                sStartX = e.pageX;
+                sStartWidth = sidebar.offsetWidth;
+                document.addEventListener('mousemove', sideMouseMove);
+                document.addEventListener('mouseup', sideMouseUp);
+            });
+
+            function sideMouseMove(e) {
+                const newWidth = sStartWidth + (e.pageX - sStartX);
+                if (newWidth > 200 && newWidth < 800) {
+                    sidebar.style.minWidth = `${newWidth}px`;
+                    sidebar.style.width = `${newWidth}px`;
+                }
+            }
+
+            function sideMouseUp() {
+                document.removeEventListener('mousemove', sideMouseMove);
+                document.removeEventListener('mouseup', sideMouseUp);
             }
         }
-
-        function sideMouseUp() {
-            document.removeEventListener('mousemove', sideMouseMove);
-            document.removeEventListener('mouseup', sideMouseUp);
-        }
     }
-}
-
-// --- FULLY FIXED TASKS NOTES LOGIC ---
-async function openNotesPanel(taskId, taskSubject) {
-    currentNoteTaskId = taskId;
-    document.getElementById('noteAccountName').innerText = taskSubject || 'Task';
-   
-    document.getElementById('newNoteTitle').value = '';
-    document.getElementById('newNoteText').value = '';
-    document.getElementById('noteAttachment').value = '';
-
-    const ownerDropdown = document.getElementById('noteOwnerId');
-    if (ownerDropdown) {
-        ownerDropdown.value = '@currentUserId';
-    }
-
-    const list = document.getElementById('notesTimelineList');
-    list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
-
-    const panelEl = document.getElementById('notesPanel');
-    document.body.appendChild(panelEl);
-    panelEl.style.zIndex = "1055";
-
-    let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl);
-    if (!bsOffcanvas) bsOffcanvas = new bootstrap.Offcanvas(panelEl);
-    bsOffcanvas.show();
-
-    try {
-        const response = await fetch('@Url.Action("GetNotes", "Tasks")?taskId=' + taskId);
-        if (!response.ok) throw new Error("Failed to fetch");
-
-        const responseData = await response.json();
-        const notesArray = Array.isArray(responseData) ? responseData : (responseData.data || responseData.notes || []);
-
-        if (notesArray && notesArray.length > 0) {
-            let allNotesHtml = '';
-            notesArray.forEach(n => {
-                const owner = n.ownerName || n.OwnerName || n.addedBy || 'System';
-                const time = n.createdDateTime || n.CreatedDateTime || 'Unknown Date';
-                const desc = n.description || n.Description || n.noteText || '';
-                const file = n.attachmentFileName || n.AttachmentFileName || null;
-                const title = n.noteTitle || n.NoteTitle || '';
-
-                let attachmentHtml = file ? `
-                    <a href="/Tasks/DownloadNoteAttachment?fileName=${encodeURIComponent(file)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
-                        <i class="fa-solid fa-download text-primary"></i>
-                        <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
-                    </a>` : '';
-
-                allNotesHtml += `
-                    <div class="position-relative mb-4">
-                        <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-                        <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                                    <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;"><i class="fa-solid fa-user"></i></div>
-                                    ${owner}
-                                </div>
-                                <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;"><i class="fa-regular fa-clock me-1"></i>${time}</span>
-                            </div>
-                            ${title ? `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
-                            <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
-                            ${attachmentHtml}
-                        </div>
-                    </div>`;
-            });
-            list.innerHTML = allNotesHtml;
-        } else {
-            list.innerHTML = `<div class="position-relative mb-4"><div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div><p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p></div>`;
-        }
-    } catch(e) {
-        list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes.</p>';
-    }
-}
-
-async function saveNoteAjax() {
-    const title = document.getElementById('newNoteTitle').value;
-    const text = document.getElementById('newNoteText').value;
-    const attachment = document.getElementById('noteAttachment').files[0];
-    const ownerId = document.getElementById('noteOwnerId').value;
-    const btn = document.getElementById('btnSaveNote');
-
-    if (!text.trim() && !attachment && !title.trim()) return;
-
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    btn.disabled = true;
-
-    const formData = new FormData();
-    formData.append('taskId', currentNoteTaskId);
-    formData.append('noteTitle', title);
-    formData.append('description', text);
-    formData.append('ownerId', ownerId);
-    if (attachment) formData.append('attachment', attachment);
-
-    try {
-        const response = await fetch('@Url.Action("SaveNoteAjax", "Tasks")', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await response.json();
-
-        if (data.success && data.note) {
-            const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
-            if(fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) fallbackMsg.closest('.position-relative').remove();
-
-            const owner = data.note.ownerName || 'System';
-            const time = data.note.createdDateTime || 'Just now';
-            const desc = data.note.description || text;
-            const savedTitle = data.note.noteTitle || title;
-            const file = data.note.attachmentFileName || null;
-
-            appendNoteToUI(owner, time, savedTitle, desc, file);
-
-            document.getElementById('newNoteTitle').value = '';
-            document.getElementById('newNoteText').value = '';
-            document.getElementById('noteAttachment').value = '';
-        } else {
-            alert("Failed to save note: " + (data.message || "Unknown error"));
-        }
-    } catch(e) {
-        alert("Network error while saving note.");
-    } finally {
-        btn.innerHTML = 'Save Note';
-        btn.disabled = false;
-    }
-}
-
-function appendNoteToUI(ownerName, timeString, title, text, fileName) {
-    let attachmentHtml = fileName ? `
-        <a href="/Tasks/DownloadNoteAttachment?fileName=${encodeURIComponent(fileName)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
-            <i class="fa-solid fa-download text-primary"></i>
-            <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
-        </a>` : '';
-
-    const noteHtml = `
-        <div class="position-relative mb-4">
-            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
-            <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
-                        <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;"><i class="fa-solid fa-user"></i></div>
-                        ${ownerName}
-                    </div>
-                    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;"><i class="fa-regular fa-clock me-1"></i>${timeString}</span>
-                </div>
-                ${title ? `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
-                <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
-                ${attachmentHtml}
-            </div>
-        </div>`;
-    document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
-}
-   
-
-   
 </script>

@@ -18,601 +18,157 @@
         "Tasks", "Notes", "Deals", "PaymentRow", "Note"
     };
 
-    // 🚀 Robust property extraction directly from the Type definition
+// 🚀 Robust property extraction directly from the Type definition
     var tableProps = typeof(Radar_CRM.Models.Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
         .Where(p => !excludedFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)))
         .ToArray();
+        
+    // 🚀 SPEED FIX: Cache Reflection for User objects to prevent thousands of slow lookups
+    var userPropCache = new System.Collections.Generic.Dictionary<Type, System.Reflection.PropertyInfo>();
 }
 
 <style>
-    /* Premium Enterprise SaaS Theme */
-    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    /* --- Premium Enterprise SaaS Palette (Zoho Flat Theme) --- */
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
     :root {
-        --bg-body: #f8fafc;
+        --bg-light: #f3f4f6; 
         --bg-surface: #ffffff;
-        --primary-blue: #2563eb;
+        --navbar-bg: #ffffff;
+        --navbar-border: #e5e7eb;
+        --primary-blue: #2563eb; 
         --primary-hover: #1d4ed8;
-        --text-dark: #0f172a;
-        --text-main: #334155;
-        --text-muted: #64748b;
-        --border-soft: #e2e8f0;
-        --radius-md: 8px;
-        --radius-lg: 12px;
-        --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-        --btn-depth: 2px;
+        --text-dark: #111827;
+        --text-main: #374151;
+        --text-muted: #6b7280;
+        
+        --sidebar-bg: #ffffff; 
+        --sidebar-border: #e5e7eb;
+        --sidebar-text: #4b5563;
+        --sidebar-hover-bg: #f9fafb; 
+        --sidebar-hover-text: #111827; 
+        --sidebar-active-bg: #eff6ff; 
+        --sidebar-active-text: #2563eb; 
+        
+        --border-soft: #e5e7eb;
+        --border-dark: #94a3b8; 
+        --radius-md: 4px; 
+        --radius-lg: 0px; 
+        --shadow-sm: none; 
+        --shadow-soft: none;
+        --btn-depth: 0px; 
     }
+
+    body .content-area { padding: 0 !important; background-color: var(--bg-body); }
 
     body {
-        background-color: var(--bg-body);
+        margin: 0; padding: 0; overflow: hidden;
+        background-color: var(--bg-light);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.85rem;
         color: var(--text-main);
-        font-family: 'Inter', -apple-system, sans-serif;
-        -webkit-font-smoothing: antialiased;
     }
 
-    /* Top Page Header */
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-        background: var(--bg-surface);
-        padding: 20px 28px;
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border-soft);
-        flex-wrap: wrap;
-        gap: 16px;
+    /* Action Buttons (Flat Style) */
+    .btn-saas { background-color: #f9fafb; color: var(--text-dark); border: 1px solid #d1d5db; font-weight: 500; border-radius: var(--radius-md); padding: 5px 14px; font-size: 0.8rem; transition: all 0.1s ease; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: none; }
+    .btn-saas:hover { background-color: #f3f4f6; }
+    .btn-saas-primary { background-color: #2563eb !important; color: #ffffff !important; border-color: #1d4ed8 !important; font-weight: 500; border-radius: var(--radius-md); padding: 5px 18px; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-saas-primary:hover { background-color: #1d4ed8 !important; }
+    .btn-saas-danger { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+    /* --- Unified Layout Grid (Zero Gaps like Zoho) --- */
+    .crm-container {
+        display: flex; height: calc(100vh - 60px); gap: 0; width: 100%; max-width: 100%;
+        border-top: 1px solid var(--border-soft); background: var(--bg-surface);
     }
-
-    .page-title {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 0;
-        font-weight: 700;
-        font-size: 1.4rem;
-        color: var(--text-dark);
-        letter-spacing: -0.02em;
+    
+    /* Flat Sidebar inside CRM Container */
+    .filter-sidebar {
+        width: 260px; min-width: 260px; background: var(--bg-surface); border-right: 1px solid var(--border-soft);
+        display: flex; flex-direction: column; height: 100%; transition: width 0.3s ease, min-width 0.3s ease;
     }
+    .filter-sidebar.hidden-sidebar { width: 0 !important; min-width: 0 !important; border-right: none !important; opacity: 0; overflow: hidden; }
 
-        .page-title i {
-            color: var(--primary-blue);
-        }
+    .filter-header { padding: 12px 16px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; }
+    .filter-header h6 { margin: 0; font-weight: 600; font-size: 0.85rem; color: var(--text-dark); }
+    .filter-search-box { padding: 12px 16px; border-bottom: 1px solid var(--border-soft); background-color: #f8fafc; }
+    .filter-body { overflow-y: auto; flex-grow: 1; padding: 0; }
+    .filter-field-item { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; transition: background-color 0.2s; }
+    .filter-field-item:hover { background-color: #f8fafc; }
+    .filter-expanded-area { display: none; margin-top: 10px; padding-left: 24px; }
+    .filter-field-item.active .filter-expanded-area { display: block; animation: fadeIn 0.3s ease; }
 
-        .excel-resizer {
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 6px;
-    height: 100%;
-    cursor: col-resize;
-    z-index: 15;
-    transition: background-color 0.2s;
-}
-.excel-resizer:hover, .excel-resizer.resizing {
-    background-color: var(--primary-blue);
-    width: 8px;
-}
+    /* Table Area (Flat) */
+    .table-container { flex: 1; min-width: 0; background: var(--bg-surface); display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 0; box-shadow: none; border: none; }
+    .table-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; background-color: var(--bg-surface); gap: 10px; }
 
-    /* Action Buttons (3D SaaS Style) */
-    .btn-saas {
-        background-color: var(--bg-surface);
-        color: var(--text-dark);
-        border: 1px solid #cbd5e1;
-        font-weight: 500;
-        border-radius: var(--radius-md);
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        transition: all 0.15s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        box-shadow: 0 var(--btn-depth) 0 #e2e8f0, 0 2px 4px rgba(0,0,0,0.02);
-        transform: translateY(0);
+    /* The Table */
+    .table-responsive { overflow: auto; flex-grow: 1; width: 100%; }
+    .table { margin-bottom: 0; white-space: nowrap; border-collapse: separate; border-spacing: 0; }
+    #leadsTable { width: 100% !important; min-width: max-content !important; }
+
+    .table thead th, .table tbody td { border-right: 1px solid var(--border-dark) !important; }
+    .table thead th:last-child, .table tbody td:last-child { border-right: none !important; }
+
+    /* Header Icons */
+    .header-action-icon { cursor: pointer; opacity: 0.4; transition: 0.2s; padding: 4px; font-size: 0.9rem; }
+    .header-action-icon:hover { opacity: 1; color: var(--primary-blue) !important; background: #e2e8f0; border-radius: 4px; }
+
+    /* Tighter Zoho Table Density */
+    .table thead th { 
+        background-color: var(--bg-surface); color: #111827; font-weight: 600; font-size: 0.75rem; 
+        text-transform: none; padding: 8px 12px; border-bottom: 2px solid var(--border-soft); position: sticky; top: 0; z-index: 10;
     }
-
-        .btn-saas:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 #e2e8f0, 0 1px 2px rgba(0,0,0,0.05);
-        }
-
-    .btn-saas-primary {
-        background-color: var(--primary-blue);
-        color: white;
-        font-weight: 600;
-        border: 1px solid var(--primary-hover);
-        border-radius: var(--radius-md);
-        padding: 8px 20px;
-        font-size: 0.85rem;
-        transition: all 0.15s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-        box-shadow: 0 var(--btn-depth) 0 var(--primary-hover), 0 4px 6px rgba(37,99,235,0.2);
+    .th-content { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 12px; }
+    
+    .table tbody td { 
+        padding: 6px 12px; font-size: 0.8rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; color: var(--text-dark); font-weight: 500; background-color: var(--bg-surface);
+        /* 🚀 SPEED FIX: Let CSS handle text truncation instantly */
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .table tbody tr:hover td { background-color: #f8fafc; }
 
-        .btn-saas-primary:hover {
-            color: white;
-            background-color: var(--primary-hover);
-        }
-
-        .btn-saas-primary:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 var(--primary-hover), 0 1px 2px rgba(37,99,235,0.2);
-        }
-
-    .btn-saas-danger {
-        background-color: #fef2f2;
-        color: #b91c1c;
-        border: 1px solid #fca5a5;
-        box-shadow: 0 var(--btn-depth) 0 #f87171, 0 2px 4px rgba(220,38,38,0.05);
-    }
-
-        .btn-saas-danger:active {
-            transform: translateY(var(--btn-depth));
-            box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
-        }
-
-        /* Sticky Columns (Checkboxes & Actions) */
+    /* Sticky Columns */
+ 
     .sticky-cb {
         position: sticky;
         left: 0;
-        width: 110px; /* 🚀 FIX: Increased from 40px to fit the flag and text */
-        min-width: 110px;
+        width: 120px !important;
+        min-width: 120px !important;
         text-align: left;
         z-index: 11;
         border-right: 1px solid var(--border-soft) !important;
         background-color: var(--bg-surface);
         resize: none !important;
     }
-
-    /* 🚀 NEW: Custom Tooltip Theme for the white popover box */
-    .custom-tooltip .tooltip-inner {
-        background-color: #ffffff;
-        color: #0f172a;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        text-align: left;
-        padding: 12px 16px;
-        max-width: 250px;
-        border-radius: 8px;
-        font-family: 'Inter', sans-serif;
-    }
+    .sticky-actions { position: sticky; right: 0; width: 100px; text-align: center; z-index: 11; background-color: var(--bg-surface); }
+    .table thead th.sticky-cb, .table thead th.sticky-actions { z-index: 12; background-color: var(--bg-surface); }
     
-    .custom-tooltip.bs-tooltip-end .tooltip-arrow::before { border-right-color: #cbd5e1; }
-    .custom-tooltip.bs-tooltip-start .tooltip-arrow::before { border-left-color: #cbd5e1; }
+    /* Dummy Filler Column */
+    .dummy-filler-col { width: auto !important; max-width: none !important; min-width: 10px !important; padding: 0 !important; border: none !important; background: transparent !important; pointer-events: none; }
 
-    /* Layout Grid */
-    .crm-container {
-        display: flex;
-        height: calc(100vh - 160px);
-        gap: 24px;
-        width: 100%;
-        max-width: 100%;
-    }
+    /* Custom Views Tabs */
+    .custom-views-nav { display: flex; align-items: center; gap: 8px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+    .custom-views-nav::-webkit-scrollbar { display: none; }
+    .view-tab { padding: 6px 12px; font-size: 0.85rem; font-weight: 500; color: var(--text-muted); text-decoration: none; border-radius: 4px; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .view-tab:hover { background-color: #f3f4f6; color: var(--text-dark); }
+    .view-tab.active { background-color: #eff6ff; color: var(--primary-blue); font-weight: 600; }
 
-    /* Fixed Sidebar Filter */
-    .filter-sidebar {
-        width: 320px;
-        min-width: 320px;
-        background: var(--bg-surface);
-        border: 1px solid var(--border-soft);
-        border-radius: var(--radius-lg);
-        display: flex;
-        flex-direction: column;
-        box-shadow: var(--shadow-sm);
-        height: 100%;
-    }
-
-    .filter-header {
-        padding: 18px 20px;
-        border-bottom: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-        .filter-header h6 {
-            margin: 0;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-
-    .filter-search-box {
-        padding: 12px 20px;
-        border-bottom: 1px solid var(--border-soft);
-        background-color: #f8fafc;
-    }
-
-    .filter-body {
-        overflow-y: auto;
-        flex-grow: 1;
-        padding: 0;
-    }
-
-    .filter-field-item {
-        padding: 14px 20px;
-        border-bottom: 1px solid #f1f5f9;
-        transition: background-color 0.2s;
-    }
-
-        .filter-field-item:hover {
-            background-color: #f8fafc;
-        }
-
-    .filter-expanded-area {
-        display: none;
-        margin-top: 12px;
-        padding-left: 28px;
-    }
-
-    .filter-field-item.active .filter-expanded-area {
-        display: block;
-        animation: fadeIn 0.3s ease;
-    }
-
-    @@keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-5px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    /* Main Table Container */
-    .table-container {
-        flex: 1;
-        min-width: 0;
-        background: var(--bg-surface);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border-soft);
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        overflow: hidden;
-    }
-
-    /* Table Toolbar */
-    .table-toolbar {
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        background-color: var(--bg-surface);
-    }
-
-    /* The Table */
-    .table-responsive {
-        overflow: auto;
-        flex-grow: 1;
-        width: 100%;
-    }
-
-    .table {
-        margin-bottom: 0;
-        white-space: nowrap;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-        .table thead th {
-            background-color: #f8fafc;
-            color: var(--text-muted);
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: 1px solid var(--border-soft);
-            padding: 14px 16px;
-        }
-
-    .th-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        gap: 12px;
-    }
-
-    .header-menu-btn {
-        color: var(--text-muted);
-        background: transparent;
-        border: 1px solid transparent;
-        cursor: pointer;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    }
-
-        .header-menu-btn:hover, .header-menu-btn[aria-expanded="true"] {
-            background: #e2e8f0;
-            color: var(--text-dark);
-            border-color: #cbd5e1;
-        }
-
-    .table tbody td {
-        padding: 16px;
-        vertical-align: middle;
-        color: var(--text-dark);
-        font-size: 0.85rem;
-        font-weight: 500;
-        border-bottom: 1px solid #f1f5f9;
-        background-color: var(--bg-surface);
-    }
-
-    .table tbody tr:hover td {
-        background-color: #f8fafc;
-    }
-
-    /* Sticky Columns (Checkboxes & Actions) */
-    .sticky-cb {
-        position: sticky;
-        left: 0;
-        width: 40px;
-        text-align: center;
-        z-index: 11;
-        border-right: 1px solid var(--border-soft) !important;
-        background-color: var(--bg-surface);
-    }
-
-    .sticky-actions {
-        position: sticky;
-        right: 0;
-        width: 100px;
-        text-align: center;
-        z-index: 11;
-        border-left: 1px solid var(--border-soft) !important;
-        background-color: var(--bg-surface);
-    }
-
-    .table thead th.sticky-cb, .table thead th.sticky-actions {
-        z-index: 12;
-        background-color: #f8fafc;
-    }
-
-    /* Custom Views Navigation */
-    .custom-views-nav {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        white-space: nowrap;
-        scrollbar-width: none;
-    }
-
-        .custom-views-nav::-webkit-scrollbar {
-            display: none;
-        }
-
-    .view-tab {
-        padding: 8px 16px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        color: var(--text-muted);
-        text-decoration: none;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-        .view-tab:hover {
-            background-color: #f1f5f9;
-            color: var(--text-dark);
-        }
-
-        .view-tab.active {
-            background-color: #eff6ff;
-            color: var(--primary-blue);
-            font-weight: 600;
-        }
-
-    /* Custom View & Criteria Builder Styles */
-    .criteria-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 24px;
-        background-color: #ffffff;
-        margin-bottom: 0;
-    }
-
-    .criteria-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
-
-        .criteria-header h6 {
-            margin: 0;
-            font-weight: 700;
-            color: #1e293b;
-            font-size: 1rem;
-        }
-
-    .criteria-row-builder {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 8px;
-    }
-
-    .criteria-num {
-        width: 30px;
-        height: 30px;
-        border: 1px solid #cbd5e1;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-        color: #64748b;
-        font-weight: 600;
-        flex-shrink: 0;
-    }
-
-    .criteria-builder-select {
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 0.9rem;
-        color: #334155;
-        background-color: #ffffff;
-        min-width: 160px;
-        outline: none;
-    }
-
-    .criteria-builder-input {
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 0.9rem;
-        color: #334155;
-        background-color: #f8fafc;
-        flex-grow: 1;
-        outline: none;
-    }
-
-        .criteria-builder-input:focus, .criteria-builder-select:focus {
-            border-color: var(--primary-blue);
-            background-color: #ffffff;
-        }
-
-    .criteria-action-btn {
-        background: transparent;
-        border: none;
-        padding: 4px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: 0.2s;
-    }
-
-        .criteria-action-btn.add {
-            color: #22c55e;
-            font-size: 1.2rem;
-        }
-
-        .criteria-action-btn.remove {
-            color: #ef4444;
-            font-size: 1.2rem;
-        }
-
-        .criteria-action-btn:hover {
-            opacity: 0.8;
-            transform: scale(1.1);
-        }
-
-    .criteria-connector-vertical {
-        margin-left: 14px;
-        border-left: 1px solid #cbd5e1;
-        padding: 8px 0 8px 12px;
-        color: #16a34a;
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-    }
-
-    .criteria-pattern-box {
-        background: #ffffff;
-        padding: 12px 20px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-    }
-
-    .related-modules-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 20px 24px;
-        background-color: #ffffff;
-        margin-top: 16px;
-    }
-
-    /* Columns Selection Boxes */
-    .columns-container {
-        display: flex;
-        gap: 20px;
-        align-items: stretch;
-        margin-top: 10px;
-    }
-
-    .columns-box-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .columns-box {
-        border: 1px solid var(--border-soft);
-        border-radius: 8px;
-        height: 300px;
-        overflow-y: auto;
-        background: #ffffff;
-        padding: 8px;
-    }
-
-    .column-item {
-        padding: 8px 12px;
-        background: #ffffff;
-        border-radius: 6px;
-        margin-bottom: 2px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: 0.2s;
-        color: #1e293b;
-    }
-
-        .column-item:hover {
-            background-color: #f1f5f9;
-        }
-
-        .column-item i {
-            opacity: 0;
-            transition: 0.2s;
-        }
-
-        .column-item:hover i {
-            opacity: 1;
-            color: var(--primary-blue);
-        }
-
-    /* MODERN SAAS TASK MODAL */
+    /* ========================================================
+       MODERN SAAS QUICK CREATE TASK MODAL FIX
+       ======================================================== */
     .task-modal-content {
-        border-radius: 16px;
+        border-radius: 12px;
         border: none;
         box-shadow: 0 25px 50px -12px rgba(30, 58, 138, 0.25);
         background-color: #ffffff;
     }
 
     .task-modal-header {
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e5e7eb;
         padding: 20px 24px;
-        background-color: #ffffff;
-        border-radius: 16px 16px 0 0;
+        background-color: #f9fafb;
+        border-radius: 12px 12px 0 0;
         display: flex;
         align-items: center;
     }
@@ -620,7 +176,7 @@
     .task-modal-title {
         font-size: 1.15rem;
         font-weight: 700;
-        color: var(--text-main);
+        color: #111827;
         display: flex;
         align-items: center;
         gap: 10px;
@@ -634,51 +190,41 @@
     .task-label {
         font-size: 0.8rem;
         font-weight: 600;
-        color: var(--text-muted);
+        color: #6b7280;
         margin-bottom: 6px;
         display: block;
         letter-spacing: 0.02em;
     }
 
-        .task-label .text-danger {
-            color: #ef4444;
-            margin-left: 2px;
-        }
+    .task-label .text-danger {
+        color: #ef4444;
+        margin-left: 2px;
+    }
 
+    /* Input Fields */
     .task-input {
         width: 100%;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
         padding: 10px 14px;
         font-size: 0.9rem;
-        color: var(--text-dark);
+        color: #111827;
         background-color: #ffffff;
         transition: all 0.2s ease;
     }
 
-        .task-input:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px #eff6ff;
-        }
+    .task-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
 
+    /* Switch Toggles */
     .task-switch {
         display: flex;
         align-items: center;
         gap: 8px;
         cursor: pointer;
-    }
-
-    .expandable-panel {
-        display: none;
-        background-color: #fafaf9;
-        border: 1px solid var(--border-soft, #e2e8f0);
-        border-radius: 8px;
-        padding: 20px;
-        margin-top: 10px;
-        margin-bottom: 24px;
-        width: 100%;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
     }
 
     .task-switch .form-check-input {
@@ -687,19 +233,32 @@
         cursor: pointer;
     }
 
-        .task-switch .form-check-input:checked {
-            background-color: var(--primary-blue);
-            border-color: var(--primary-blue);
-        }
+    .task-switch .form-check-input:checked {
+        background-color: #2563eb;
+        border-color: #2563eb;
+    }
 
     .task-switch .form-check-label {
         font-size: 0.85rem;
         font-weight: 600;
-        color: var(--primary-blue);
+        color: #111827;
         cursor: pointer;
         padding-top: 2px;
     }
 
+    /* Expandable Panels (Hidden by default) */
+    .expandable-panel {
+        display: none; /* This fixes the panels showing up initially */
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 20px;
+        margin-top: 10px;
+        margin-bottom: 24px;
+        width: 100%;
+    }
+
+    /* More Fields Button */
     .task-more-fields-btn {
         display: flex;
         justify-content: space-between;
@@ -707,30 +266,31 @@
         width: 100%;
         padding: 14px 16px;
         background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
         font-weight: 600;
         font-size: 0.9rem;
-        color: var(--primary-blue);
+        color: #2563eb;
         cursor: pointer;
         transition: all 0.2s ease;
         margin-top: 10px;
     }
 
-        .task-more-fields-btn:hover {
-            background-color: #eff6ff;
-            border-color: #bfdbfe;
-        }
+    .task-more-fields-btn:hover {
+        background-color: #eff6ff;
+        border-color: #bfdbfe;
+    }
 
-        .task-more-fields-btn.expanded i {
-            transform: rotate(90deg);
-        }
+    .task-more-fields-btn.expanded i {
+        transform: rotate(90deg);
+    }
 
+    /* Footer & Buttons */
     .task-modal-footer {
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid #e5e7eb;
         padding: 16px 24px;
-        background-color: #f8fafc;
-        border-radius: 0 0 16px 16px;
+        background-color: #f9fafb;
+        border-radius: 0 0 12px 12px;
         display: flex;
         justify-content: flex-end;
         gap: 12px;
@@ -738,21 +298,21 @@
 
     .btn-task-cancel {
         background-color: #ffffff;
-        border: 1px solid #cbd5e1;
-        color: #475569;
+        border: 1px solid #d1d5db;
+        color: #4b5563;
         font-weight: 500;
         padding: 8px 20px;
         border-radius: 6px;
         transition: 0.2s;
     }
 
-        .btn-task-cancel:hover {
-            background-color: #f1f5f9;
-            color: #1e293b;
-        }
+    .btn-task-cancel:hover {
+        background-color: #f3f4f6;
+        color: #111827;
+    }
 
     .btn-task-save {
-        background-color: var(--primary-blue);
+        background-color: #2563eb;
         color: #ffffff;
         border: none;
         font-weight: 500;
@@ -761,146 +321,69 @@
         transition: 0.2s;
     }
 
-        .btn-task-save:hover {
-            background-color: var(--primary-hover);
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-        }
-
-    /* Badges */
-    .badge-soft-success {
-        background: #dcfce3;
-        color: #166534;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
+    .btn-task-save:hover {
+        background-color: #1d4ed8;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
     }
 
-    .badge-soft-warning {
-        background: #fef3c7;
-        color: #92400e;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
-    }
+    /* Modals & Criteria Builder */
+    .criteria-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; background-color: #ffffff; margin-bottom: 0; }
+    .criteria-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .criteria-header h6 { margin: 0; font-weight: 600; color: #111827; font-size: 0.95rem; }
+    .criteria-row-builder { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .criteria-num { width: 26px; height: 26px; border: 1px solid #d1d5db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #6b7280; font-weight: 600; flex-shrink: 0; }
+    .criteria-builder-select, .criteria-builder-input { border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 10px; font-size: 0.85rem; color: #374151; background-color: #ffffff; outline: none; }
+    .criteria-builder-input:focus, .criteria-builder-select:focus { border-color: var(--primary-blue); }
+    .criteria-action-btn { background: transparent; border: none; padding: 4px; cursor: pointer; transition: 0.2s; }
+    .criteria-connector-vertical { margin-left: 12px; border-left: 1px solid #d1d5db; padding: 6px 0 6px 10px; color: #16a34a; font-size: 0.7rem; font-weight: 600; }
 
-    .badge-soft-danger {
-        background: #fee2e2;
-        color: #b91c1c;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.75rem;
-    }
+    /* Custom Tooltip Theme */
+    .custom-tooltip .tooltip-inner { background-color: #ffffff; color: #111827; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); text-align: left; padding: 10px 14px; max-width: 250px; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.8rem; }
+    .custom-tooltip.bs-tooltip-end .tooltip-arrow::before { border-right-color: #d1d5db; }
+    .custom-tooltip.bs-tooltip-start .tooltip-arrow::before { border-left-color: #d1d5db; }
 
-    /* Pagination */
-    .pagination-container {
-        padding: 14px 24px;
-        border-top: 1px solid var(--border-soft);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: var(--bg-surface);
-    }
+    .badge-soft-success { background: #dcfce3; color: #166534; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
+    .badge-soft-warning { background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
+    .badge-soft-danger { background: #fee2e2; color: #b91c1c; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
 
-    /* Drag and Drop Manage Columns Styles */
-    .draggable-col-item {
-        transition: background-color 0.2s;
-    }
+    /* Drag & Drop Columns */
+    .columns-container { display: flex; gap: 20px; align-items: stretch; }
+    .columns-box-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .columns-box { border: 1px solid var(--border-soft); border-radius: 4px; height: 250px; overflow-y: auto; background: #f9fafb; padding: 8px; }
+    .column-item { padding: 6px 10px; background: #ffffff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 4px; font-size: 0.8rem; font-weight: 500; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+    .column-item:hover { border-color: #d1d5db; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .draggable-col-item.dragging { opacity: 0.4; background-color: #f3f4f6; }
+    .draggable-col-item.over { border-top: 2px solid var(--primary-blue); }
 
-        .draggable-col-item.dragging {
-            opacity: 0.4;
-            background-color: #f1f5f9;
-        }
-
-        .draggable-col-item.over {
-            border-top: 2px solid var(--primary-blue);
-        }
-
-    .drag-handle {
-        cursor: grab;
-        padding: 4px;
-        color: #94a3b8;
-    }
-
-        .drag-handle:active {
-            cursor: grabbing;
-        }
-
-    @@media (max-width: 992px) {
-        .crm-container {
-            flex-direction: column;
-            height: auto;
-        }
-
-        .filter-sidebar {
-            width: 100%;
-            height: 400px;
-        }
-
-        .table-container {
-            height: 600px;
-        }
-
-        .page-header {
-            flex-direction: column;
-            align-items: flex-start;
-        }
+    /* Simulate 80% Zoom on Laptops Only */
+    @@media (min-width: 769px) and (max-width: 1600px) {
+        body { zoom: 0.8; margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
+        .app-container { position: absolute !important; top: 0 !important; left: 0 !important; width: 125vw !important; height: 125vh !important; max-width: none !important; max-height: none !important; }
+        .offcanvas { height: 125vh !important; }
+        .crm-container { height: calc(125vh - 75px) !important; }
+        body.full-view-mode .crm-container { height: 125vh !important; }
     }
 </style>
 
 <!-- Hidden Inputs -->
 <input type="file" id="fileUploadInput" accept=".zip,.zpj,.xlsx,.csv" style="display: none;" />
 
-<!-- Top Action Header -->
-<div class="page-header">
-    <h1 class="page-title"><i class="fa-solid fa-users-viewfinder"></i> Leads Master</h1>
-
-    <div class="d-flex gap-2 align-items-center flex-wrap">
-        <!-- Bulk Action Container -->
-        <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
-            <button class="btn-saas btn-saas-danger" onclick="deleteSelected()">
-                <i class="fa-regular fa-trash-can"></i> Delete (<span id="selCount">0</span>)
-            </button>
-            <button class="btn-saas" type="button" onclick="openMassUpdateModal()">
-                <i class="fa-solid fa-layer-group"></i> Mass Update
-            </button>
-           <button class="btn-saas" type="button" onclick="openTaskModal()">
-                <i class="fa-solid fa-list-check"></i> Create Task
-            </button>
-            <div class="vr mx-2 d-none d-md-block"></div>
-        </div>
-
-       <div class="dropdown">
-    <button class="btn-saas dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="fa-solid fa-file-export"></i> Export
-    </button>
-    <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'csv')"><i class="fa-solid fa-file-csv me-2 text-primary"></i>Export as CSV</a></li>
-        <li><a class="dropdown-item py-2 fw-medium" href="#" onclick="exportTableData('Accounts', 'xlsx')"><i class="fa-solid fa-file-excel me-2 text-success"></i>Export as Excel</a></li>
-    </ul>
-</div>
-        <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
-            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Data
-        </button>
-        <a href="@Url.Action("Create", "Leads")" class="btn-saas-primary" Hidden>
-            <i class="fa-solid fa-plus"></i> Create Lead
-        </a>
-    </div>
-</div>
 
 <!-- Main Table Container -->
 <div class="crm-container">
 
     <!-- Fixed Sidebar Filter -->
-    <div class="filter-sidebar" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+    <div class="filter-sidebar" id="filterSidebarWrapper">
         <div class="filter-header">
-            <h6>
-                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; margin-right: 6px; vertical-align: middle;">
-                Filters
+            <h6 class="d-flex align-items-center m-0">
+                <i class="fa-solid fa-filter text-primary me-2"></i> Filters
             </h6>
-            <a href="@Url.Action("Index", "Leads")" class="btn btn-sm btn-link text-decoration-none">Clear</a>
+            <div class="d-flex align-items-center gap-2">
+                <a href="@Url.Action("Index", "Leads")" class="btn btn-sm btn-link text-decoration-none p-0">Clear</a>
+                <button class="btn btn-sm text-muted border-0 bg-transparent p-1 ms-1" onclick="toggleFilterSidebar()" title="Hide Filters">
+                    <i class="fa-solid fa-chevron-left fs-6"></i>
+                </button>
+            </div>
         </div>
         <div class="filter-search-box">
             <div class="input-group input-group-sm">
@@ -909,25 +392,17 @@
             </div>
         </div>
 
-        <div class="filter-body" style="flex-grow: 1; overflow-y: auto; padding-bottom: 20px;">
-            <!-- 🚀 NEW FEATURE: SAVED FILTERS SECTION -->
+        <div class="filter-body" style="padding-bottom: 20px;">
             <div id="savedFiltersSection" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f0fdf4; padding-bottom: 8px;">
-                <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                    <i class="fa-solid fa-bookmark me-2"></i> SAVED FILTERS
-                </div>
+                <div class="px-3 py-2 text-success fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;"><i class="fa-solid fa-bookmark me-2"></i> SAVED FILTERS</div>
                 <div id="savedFiltersContainer" class="px-3 pb-2 d-flex flex-wrap gap-2"></div>
             </div>
 
-            <!-- FREQUENTLY USED SECTION -->
             <div id="pinnedFilters" style="display: none; border-bottom: 2px solid #e2e8f0; background-color: #f8fafc; padding-bottom: 8px;">
-                <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-                    <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/star_1.png?v=1789022857" style="width: 12px; height: 12px; margin-right: 6px;" alt="Star">
-                    FREQUENTLY USED
-                </div>
+                <div class="px-3 py-2 text-muted fw-bold d-flex align-items-center" style="font-size: 0.75rem; letter-spacing: 0.05em;"><i class="fa-solid fa-star text-warning me-2"></i> FREQUENTLY USED</div>
                 <div id="pinnedItemsContainer"></div>
             </div>
 
-            <!-- UNPINNED LIST -->
             <div id="sidebarList">
                 @{
                     var predefinedLists = new Dictionary<string, string[]>
@@ -955,171 +430,81 @@
                     bool isUserField = prop.Name.Contains("Owner") || prop.Name == "CreatedBy" || prop.Name == "ModifiedBy";
                     bool isPredefined = predefinedLists.ContainsKey(prop.Name);
 
-                    <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
+                    <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")" style="padding: 10px 16px;">
                         <div class="d-flex align-items-center m-0 w-100">
-                            <!-- Star Pin Icon -->
-                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0"
-                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
-                               onclick="togglePinFilter(event, this)" title="Pin this filter"></i>
-
-                            <!-- 🚀 NEW: Save Filter Icon -->
-                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2"
-                               style="font-size: 15px; cursor: pointer; color: #cbd5e1; transition: all 0.2s;"
-                               onclick="saveFieldFilter(event, this, '@prop.Name')" title="Save this filter setting"></i>
-
-                            <input class="form-check-input field-checkbox mx-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="cursor: pointer;">
-
-                            <label class="form-check-label flex-grow-1 fw-semibold text-dark text-truncate" for="chk_@prop.Name" style="cursor: pointer; padding-left: 2px;">
-                                @prop.Name
-                            </label>
+                            <input class="form-check-input field-checkbox me-2 mt-0 flex-shrink-0" type="checkbox" value="@prop.Name" id="chk_@prop.Name" style="width: 14px; height: 14px; border-radius: 3px; cursor: pointer;">
+                            <label class="form-check-label flex-grow-1 text-dark text-truncate" for="chk_@prop.Name" style="font-size: 0.8rem; cursor: pointer;">@prop.Name</label>
+                            
+                            <i class="fa-regular fa-star pin-filter-btn flex-shrink-0 ms-auto" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="togglePinFilter(event, this)"></i>
+                            <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="saveFieldFilter(event, this, '@prop.Name')"></i>
                         </div>
 
                         <div class="filter-expanded-area">
-                            @if (isDate)
-                            {
-                                <!-- Full Date Conditions Matching Accounts Update -->
+                            @if (isDate) {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold" onchange="toggleDateInputs(this)">
-                                    <option value="On" selected>On</option>
-                                    <option value="before">before</option>
-                                    <option value="after">after</option>
-                                    <option value="between">between</option>
-                                    <option value="not between">not between</option>
-                                    <option value="Previous">Previous</option>
-                                    <option value="Next">Next</option>
-                                    <option value="Today">Today</option>
-                                    <option value="Tomorrow">Tomorrow</option>
-                                    <option value="Yesterday">Yesterday</option>
-                                    <option value="Till Yesterday">Till Yesterday</option>
-                                    <option value="Starting tomorrow">Starting tomorrow</option>
-                                    <option value="This Week">This Week</option>
-                                    <option value="This Month">This Month</option>
-                                    <option value="This Year">This Year</option>
-                                    <option value="Previous Week">Previous Week</option>
-                                    <option value="Previous Month">Previous Month</option>
-                                    <option value="Previous Year">Previous Year</option>
-                                    <option value="Current FY">Current FY</option>
-                                    <option value="Previous FY">Previous FY</option>
-                                    <option value="Current FQ">Current FQ</option>
-                                    <option value="age in">age in</option>
-                                    <option value="due in">due in</option>
+                                    <option value="On" selected>On</option><option value="before">before</option><option value="after">after</option><option value="between">between</option><option value="not between">not between</option><option value="Previous">Previous</option><option value="Next">Next</option><option value="Today">Today</option><option value="Tomorrow">Tomorrow</option><option value="Yesterday">Yesterday</option><option value="Till Yesterday">Till Yesterday</option><option value="Starting tomorrow">Starting tomorrow</option><option value="This Week">This Week</option><option value="This Month">This Month</option><option value="This Year">This Year</option><option value="Previous Week">Previous Week</option><option value="Previous Month">Previous Month</option><option value="Previous Year">Previous Year</option><option value="Current FY">Current FY</option><option value="Previous FY">Previous FY</option><option value="Current FQ">Current FQ</option><option value="age in">age in</option><option value="due in">due in</option>
                                 </select>
                                 <div class="d-flex flex-column gap-2">
                                     <input type="date" class="form-control form-control-sm condition-val date-val-1" />
                                     <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
                                 </div>
-                            }
-                            else if (isPredefined)
-                            {
-                                <!-- Predefined Options -->
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is</option>
-                                    <option value="is_not">is not</option>
-                                    <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
-                                </select>
+                            } else if (isPredefined) {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="is" selected>is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
                                 <select class="form-select form-select-sm condition-val">
                                     <option value="" disabled selected>- Select @prop.Name -</option>
-                                    @foreach (var opt in predefinedLists[prop.Name])
-                                    {
-                                        <option value="@opt">@opt</option>
-                                    }
+                                    @foreach (var opt in predefinedLists[prop.Name]) { <option value="@opt">@opt</option> }
                                 </select>
-                            }
-                            else if (isUserField)
-                            {
-                                <!-- User Field with User Options -->
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is</option>
-                                    <option value="is_not">is not</option>
-                                    <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
-                                </select>
+                            } else if (isUserField) {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="is" selected>is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
                                 <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
                                 <datalist id="dl_users_@prop.Name">
-                                    @if (ViewBag.UsersList != null)
-                                    {
-                                        foreach (var user in (SelectList)ViewBag.UsersList)
-                                        {
-                                            <option value="@user.Text">@user.Text</option>
-                                        }
-                                    }
+                                    @if (ViewBag.UsersList != null) { foreach (var user in (SelectList)ViewBag.UsersList) { <option value="@user.Text">@user.Text</option> } }
                                 </datalist>
-                            }
-                            else
-                            {
-                                <!-- Text Field for Large Data -->
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="contains" selected>contains</option>
-                                    <option value="does_not_contain">does not contain</option>
-                                    <option value="starts_with">starts with</option>
-                                    <option value="ends_with">ends with</option>
-                                    <option value="is">is exactly</option>
-                                    <option value="is_not">isn't</option>
-                                    <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
-                                </select>
-                                <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Type or select..." />
-                                <datalist id="dl_@prop.Name"></datalist>
+                            } else {
+                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is">is exactly</option><option value="is_not">isn't</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
+                                <input type="text" class="form-control form-control-sm condition-val text-val" placeholder="Search @prop.Name..." />
                             }
                         </div>
                     </div>
                 }
             </div>
         </div>
-
         <div class="filter-footer p-3 border-top bg-white mt-auto" style="flex-shrink: 0; z-index: 10;">
             <button class="btn-saas-primary w-100 justify-content-center" onclick="applyFilters()">Apply Filters</button>
         </div>
     </div>
 
-    <!-- Table Area -->
-    <div class="table-container" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-        <!-- Top Toolbar -->
+    <div class="table-container">
+        
+        <!-- Unified Top Toolbar (Zoho Style) -->
         <div class="table-toolbar">
-            <div class="me-auto d-flex align-items-center gap-3 w-100">
-                <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm" style="border-radius: var(--radius-md);">
-                    <i class="fa-solid fa-database me-2"></i> Total Records: <span id="topTotalCount">@totalRecords</span>
-                </span>
+            <button class="btn-saas" onclick="toggleFilterSidebar()" title="Hide/Show Filters" style="border: none; box-shadow: none;">
+                <i class="fa-solid fa-filter text-muted"></i>
+            </button>
 
-                <!-- DYNAMIC Custom Views Navigation -->
-                <div class="custom-views-nav m-0 d-flex gap-2 align-items-center flex-grow-1 ms-4" style="max-width: 70%;" id="customViewsTabsContainer">
-                    <!-- JS will populate these tabs dynamically -->
-                </div>
+            <div class="custom-views-nav flex-grow-1 mx-2" id="customViewsTabsContainer"></div>
 
-                <div class="dropdown ms-1">
-                    <button class="btn btn-sm btn-light border-0 shadow-none px-2 text-muted" type="button" data-bs-toggle="dropdown">
-                        <i class="fa-solid fa-ellipsis fs-5"></i>
-                    </button>
-                    <ul class="dropdown-menu shadow-sm border-0 py-2" id="unpinnedViewsMenu" style="min-width: 220px;">
-                        <li><h6 class="dropdown-header text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Unpinned Views</h6></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item fw-bold" style="color: var(--primary-blue);" href="#" onclick="openCustomViewModal(); return false;">
-                                <i class="fa-solid fa-plus me-2"></i> Create View
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Create View Button -->
-                <button type="button" class="btn-saas-primary ms-auto" onclick="openCustomViewModal()">
-                    <i class="fa-solid fa-plus me-1"></i> Create View
-                </button>
+            <div id="bulkActionsContainer" style="display: none;" class="gap-2 align-items-center">
+                <button class="btn-saas btn-saas-danger" onclick="deleteSelected()"><i class="fa-regular fa-trash-can"></i> (<span id="selCount">0</span>)</button>
+                <button class="btn-saas" onclick="openMassUpdateModal()">Mass Update</button>
+                <button class="btn-saas" onclick="openTaskModal()">Create Task</button>
+                <div class="vr mx-1 d-none d-md-block" style="background-color: #d1d5db;"></div>
             </div>
 
-            <!-- Manage Columns Dropdown -->
-            <div class="dropdown ms-3 flex-shrink-0">
-                <button class="btn-saas shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                    <i class="fa-solid fa-table-columns text-primary"></i> Manage Columns
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end p-2 shadow-lg border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;">
-                    <!-- Populated via JS for Drag & Drop -->
-                </ul>
+            <button class="btn-saas" onclick="exportTableData('Leads', 'csv')"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
+            
+            <div class="dropdown">
+                <button class="btn-saas" data-bs-toggle="dropdown" data-bs-auto-close="outside"><i class="fa-solid fa-table-columns"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end p-2 shadow-sm border-0" id="columnToggleMenu" style="max-height: 400px; overflow-y: auto; width: 250px;"></ul>
             </div>
+
+            <button type="button" class="btn-saas" onclick="openCustomViewModal()">View</button>
+            <a href="@Url.Action("Create", "Leads")" class="btn btn-primary d-inline-flex align-items-center fw-semibold border-0 shadow-sm" style="background-color: #2563eb; font-size: 0.85rem; padding: 7px 18px; border-radius: 4px; gap: 8px; transition: background-color 0.2s;"><i class="fa-solid fa-plus"></i> Create Lead</a>
         </div>
 
         <!-- The Data Table -->
-        <div class="table-responsive" id="tableWrapper" style="flex: 1; overflow-y: auto;">
+        <div class="table-responsive" id="tableWrapper">
             <table class="table" id="leadsTable">
                 <thead>
                     <tr>
@@ -1129,45 +514,25 @@
                                 <i class="fa-solid fa-bookmark text-muted fs-5" style="opacity:0.4;" title="Task Status"></i>
                             </div>
                         </th>
-
                         @if (tableProps.Length > 0)
                         {
                             int colIndex = 0;
                             foreach (var prop in tableProps)
                             {
                                 <th data-col-index="@colIndex" data-col-name="@prop.Name">
-                                    <div class="th-content">
-                                        <span>@prop.Name</span>
-                                        <div class="dropdown">
-                                            <button class="header-menu-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filter & Sort">
-                                                <img src="https://cdn.shopify.com/s/files/1/0578/8198/5133/files/filter.png?v=1789023005" alt="Filter" style="width: 14px; height: 14px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                                            </button>
-                                            <ul class="dropdown-menu shadow-sm border-0 p-2" style="width: 200px;">
-                                                <li>
-                                                    <input type="text" class="form-control form-control-sm mb-2 col-search-input" data-col-index="@colIndex" placeholder="Search @prop.Name..." onkeyup="filterSingleColumn(this, @colIndex)">
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'asc')">
-                                                        <i class="fa-solid fa-arrow-down-a-z text-muted me-2"></i> Sort A to Z
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item d-flex align-items-center rounded" href="#" onclick="sortTableByCol(@colIndex, 'desc')">
-                                                        <i class="fa-solid fa-arrow-up-z-a text-muted me-2"></i> Sort Z to A
-                                                    </a>
-                                                </li>
-                                            </ul>
+                                    <div class="th-content d-flex justify-content-between align-items-center w-100">
+                                        <span class="text-truncate flex-grow-1" style="max-width: calc(100% - 30px);" title="@prop.Name">@prop.Name</span>
+                                        <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                            <i class="fa-solid fa-sort text-muted header-action-icon" onclick="toggleSort(event, @colIndex)" title="Sort"></i>
+                                            <i class="fa-solid fa-filter text-muted header-action-icon" onclick="triggerSidebarFilter(event, '@prop.Name')" title="Filter"></i>
                                         </div>
                                     </div>
                                 </th>
                                 colIndex++;
                             }
                         }
-
-                        <th class="sticky-actions text-center">
-                            <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
-                        </th>
+                        <th class="dummy-filler-col"></th>
+                        <th class="sticky-actions text-center"><i class="fa-solid fa-bolt text-muted me-1"></i> Actions</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -1183,7 +548,8 @@
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
                                             string tooltipText = "No pending tasks";
-                                            string displayDateText = ""; // 🚀 NEW: Holds the text to show next to the flag
+                                            string displayDateText = ""; 
+                                            // IMPORTANT: Make sure your Leads controller is passing ViewBag.LeadTasks
                                             var tasksDict = ViewBag.LeadTasks as System.Collections.Generic.Dictionary<int, dynamic>;
 
                                             if (tasksDict != null && tasksDict.ContainsKey(item.Id))
@@ -1202,12 +568,12 @@
                                                     else if (dueDate.Value.Date < DateTime.Today)
                                                     {
                                                         flagColor = "#ef4444"; // Red for Overdue
-                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Sep 30
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); 
                                                     }
                                                     else
                                                     {
                                                         flagColor = "#22c55e"; // Green for Future
-                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Oct 1
+                                                        displayDateText = dueDate.Value.ToString("MMM d"); 
                                                     }
                                                     
                                                     tooltipText = $"<div class='text-start'><div class='fw-bold mb-1'>{subject}</div><span class='text-muted'>{dueDate.Value.ToString("dd/MM/yyyy")}</span></div>";
@@ -1228,7 +594,6 @@
                                              
                                             <i class="fa-solid fa-bookmark fs-5 flex-shrink-0" style="color: @flagColor;"></i>
                                             
-                                            <!-- 🚀 NEW: Shows the date text for ALL active flags -->
                                             @if(!string.IsNullOrEmpty(displayDateText))
                                             {
                                                 <span class="fw-bold text-nowrap" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">@displayDateText</span>
@@ -1245,66 +610,45 @@
 
                                         if (rawValue != null)
                                         {
-                                            if (rawValue.GetType().Name.Contains("User"))
+                                            var type = rawValue.GetType();
+                                            if (type.Name.Contains("User"))
                                             {
-                                                var nameProp = rawValue.GetType().GetProperty("fullName") ?? rawValue.GetType().GetProperty("FirstName");
+                                                if (!userPropCache.ContainsKey(type)) {
+                                                    userPropCache[type] = type.GetProperty("fullName") ?? type.GetProperty("FirstName");
+                                                }
+                                                var nameProp = userPropCache[type];
                                                 value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown User";
                                             }
-                                            else
-                                            {
-                                                value = rawValue.ToString();
-                                            }
+                                            else { value = rawValue.ToString(); }
                                         }
 
                                         <td data-col-index="@tdIndex">
-                                            @if (prop.Name == "LeadName")
-                                            {
-                                                <a href="@Url.Action("Edit", "Leads", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a>
-                                            }
+                                            @if (prop.Name == "LeadName") { <a href="@Url.Action("Edit", "Leads", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a> }
                                             else if (prop.Name == "LeadStatus" || prop.Name == "Stage" || prop.Name == "CurrentStatus")
                                             {
-                                                @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active" || value.ToLower() == "won")
-                                                {
-                                                    <span class="badge-soft-success">@value</span>
-                                                }
-                                                else if (value.ToLower() == "lost" || value.ToLower() == "not interested" || value.ToLower() == "non-user")
-                                                {
-                                                    <span class="badge-soft-danger">@value</span>
-                                                }
-                                                else if (!string.IsNullOrEmpty(value))
-                                                {
-                                                    <span class="badge-soft-warning">@value</span>
-                                                }
+                                                @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active" || value.ToLower() == "won") { <span class="badge-soft-success">@value</span> }
+                                                else if (value.ToLower() == "lost" || value.ToLower() == "not interested" || value.ToLower() == "non-user") { <span class="badge-soft-danger">@value</span> }
+                                                else if (!string.IsNullOrEmpty(value)) { <span class="badge-soft-warning">@value</span> }
                                             }
-                                            else
-                                            {
-                                                @value
-                                            }
+                                            else { @value }
                                         </td>
                                         tdIndex++;
                                     }
                                 }
-                               <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-    <div class="d-flex align-items-center justify-content-center gap-2">
-        @{
-            // Safely grab the count from the Dictionary we passed in the ViewBag
-            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
-            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
-            
-            // Dynamic badge color: Blue if > 0, Gray if 0
-            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
-        }
-        
-        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
-            <i class="fa-regular fa-comment-dots"></i> Notes
-            
-            <!-- Always show the badge, conditionally change color -->
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">
-                @noteCount
-            </span>
-        </button>
-    </div>
-</td>
+                                <td class="dummy-filler-col"></td>
+                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                         @{
+                                             var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
+                                             int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
+                                             string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
+                                         }
+                                         <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("LeadName")?.GetValue(item, null)?.ToString() ?? "Lead")')">
+                                             <i class="fa-regular fa-comment-dots"></i> Notes
+                                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
+                                         </button>
+                                    </div> 
+                                </td>
                             </tr>
                         }
                     }
@@ -1314,7 +658,6 @@
                             <td colspan="50" class="text-center py-5 text-muted">
                                 <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
                                 <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
-                                <p class="mt-1">Try adjusting your filters or upload new data.</p>
                             </td>
                         </tr>
                     }
@@ -1322,32 +665,17 @@
             </table>
         </div>
 
-        <div class="pagination-container" style="flex-shrink: 0;">
-            <span id="pageInfo" class="text-muted fw-semibold" style="font-size: 0.85rem;">
-                Showing page @currentPage of @totalPages (@totalRecords total records)
-            </span>
-            <div class="d-flex gap-2">
-                @if (currentPage > 1)
-                {
-                    <a href="@Url.Action("Index", new { page = currentPage - 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir, advancedFilters = advancedFilters })" class="btn-saas text-decoration-none">
-                        <i class="fa-solid fa-chevron-left"></i> Prev
-                    </a>
-                }
-                else
-                {
-                    <button class="btn-saas" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                }
-
-                @if (currentPage < totalPages)
-                {
-                    <a href="@Url.Action("Index", new { page = currentPage + 1, search = currentSearch, sortCol = currentSortCol, sortDir = currentSortDir, advancedFilters = advancedFilters })" class="btn-saas text-decoration-none">
-                        Next <i class="fa-solid fa-chevron-right"></i>
-                    </a>
-                }
-                else
-                {
-                    <button class="btn-saas" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
-                }
+        <div class="pagination-container" style="padding: 10px 16px; border-top: 1px solid var(--border-soft); background-color: var(--bg-surface);">
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-dark fw-semibold" style="font-size: 0.8rem;">Total Records <span id="bottomTotalCount">@totalRecords</span></span>
+                <span id="pageInfo" class="text-muted" style="font-size: 0.75rem; border-left: 1px solid #d1d5db; padding-left: 12px;">Showing page @currentPage of @totalPages</span>
+            </div>
+            <div class="d-flex gap-1 align-items-center">
+                @if (currentPage > 1) { <a href="@Url.Action("Index", new { page = currentPage - 1 })" class="btn-saas text-decoration-none" style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-left text-muted"></i></a> } 
+                else { <button class="btn-saas" disabled style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-left text-muted" style="opacity: 0.5;"></i></button> }
+                
+                @if (currentPage < totalPages) { <a href="@Url.Action("Index", new { page = currentPage + 1 })" class="btn-saas text-decoration-none" style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-right text-muted"></i></a> } 
+                else { <button class="btn-saas" disabled style="padding: 4px 8px; border: none; background: transparent;"><i class="fa-solid fa-chevron-right text-muted" style="opacity: 0.5;"></i></button> }
             </div>
         </div>
     </div>
@@ -1400,7 +728,7 @@
 </div>
 
 <!-- ========================================================
-     MODERN SAAS QUICK CREATE TASK MODAL
+     MODERN SAAS QUICK CREATE TASK MODAL (Navy & Slate Theme)
      ======================================================== -->
 <div class="modal fade" id="quickTaskModal" tabindex="-1" aria-labelledby="quickTaskModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1424,7 +752,7 @@
                             <input name="Subject" class="task-input" placeholder="E.g., Follow up call..." required />
                         </div>
 
-                        <!-- Dropdown to select Account from the Index List -->
+                        <!-- Dropdown to select Lead from the Index List -->
                         <div class="col-md-6 form-group mb-4">
                             <label class="task-label">Related Lead</label>
                             <select name="LeadId" id="taskModalLeadId" class="task-input">
@@ -1554,54 +882,29 @@
                             </div>
                         </div>
 
-                        <!-- Expandable "More Fields" Button -->
+                        <!-- 🚀 CORRECTED: Expandable "More Fields" Button -->
                         <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="toggleMoreFields()">
                             <span>More Fields</span>
                             <i class="fa-solid fa-chevron-right" id="moreFieldsIcon" style="transition: transform 0.2s;"></i>
                         </div>
 
-                        <!-- Hidden Extended Fields -->
+                        <!-- 🚀 CORRECTED: Hidden Extended Task Fields (Status & Description) -->
                         <div id="moreFieldsContainer" style="display: none; padding-top: 24px; border-top: 1px dashed #e2e8f0; margin-top: 20px;">
                             <div class="row">
                                 <div class="col-md-6 form-group mb-4">
-                                    <label class="task-label">Lead Name</label>
-                                    <select name="LeadId" class="task-input">
-                                        <option value="">- Select Lead -</option>
-                                        @if (ViewBag.RelatedLeads != null)
-                                        {
-                                            foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
-                                            {
-                                                <option value="@lead.Id">@lead.LeadName</option>
-                                            }
-                                        }
-                                    </select>
-                                </div>
-
-                                <div class="col-md-6 form-group mb-4">
-                                    <label class="task-label">Mobile</label>
-                                    <input name="Mobile" class="task-input" placeholder="+1..." />
-                                </div>
-
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="task-label">Lead Status</label>
-                                    <select name="LeadStatus" class="task-input">
-                                        <option value="">-None-</option>
-                                        <option value="Important contact">Important contact</option>
-                                        <option value="Not a Doctor">Not a Doctor</option>
-                                        <option value="Warm">Warm</option>
-                                        <option value="Hot">Hot</option>
-                                        <option value="Not Interested">Not Interested</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-6 form-group mb-0">
                                     <label class="task-label">Status</label>
                                     <select name="Status" class="task-input">
                                         <option value="Not Started" selected>Not Started</option>
                                         <option value="In Progress">In Progress</option>
+                                        <option value="Waiting on someone else">Waiting on someone else</option>
                                         <option value="Deferred">Deferred</option>
                                         <option value="Completed">Completed</option>
                                     </select>
+                                </div>
+                                
+                                <div class="col-md-12 form-group mb-0">
+                                    <label class="task-label">Description</label>
+                                    <textarea name="Description" class="task-input" rows="3" placeholder="Add task details or description..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -1994,35 +1297,20 @@
 </div>
 
 <script>
-    // ==========================================
     // 🚀 INJECT C# DATA ARRAYS DIRECTLY INTO JS
-    // ==========================================
     const ownerOptionsList = [
-        @if (ViewBag.UsersList != null) {
-            foreach (var user in (SelectList)ViewBag.UsersList) {
-                <text>"@Html.Raw(user.Text)",</text>
-            }
-        }
+        @if (ViewBag.UsersList != null) { foreach (var user in (SelectList)ViewBag.UsersList) { <text>"@Html.Raw(user.Text)",</text> } }
     ];
-
-    // 🚀 ADD THIS MISSING ARRAY TO FIX THE CRASH:
     const vendorOptionsList = [
-        @if (ViewBag.VendorsList != null) {
-            foreach (var vendor in (SelectList)ViewBag.VendorsList) {
-                <text>"@Html.Raw(vendor.Text)",</text>
-            }
-        }
+        @if (ViewBag.VendorsList != null) { foreach (var vendor in (SelectList)ViewBag.VendorsList) { <text>"@Html.Raw(vendor.Text)",</text> } }
     ];
 
-    // ==========================================
-    // 1. GLOBAL VARIABLES & INITIALIZATION
-    // ==========================================
     const defaultVisibleColumns = ["LeadName", "MobileNumber", "LeadStatus", "Stage", "CreatedDateAndTime"];
     let currentNoteLeadId = null;
-
     let allRows = [];
     let currentVisibleRows = [];
     let hiddenCols = new Set();
+    let sortStates = {}; 
 
     // Map of fields to selectable dropdown arrays
     const criteriaFilterOptionsMap = {
@@ -2043,26 +1331,27 @@
         "CurrentlyUsingSoftware": ["Yes", "No"]
     };
 
-    // 🚀 NEW: Initialize Tooltips
+    const criteriaFieldOptions = `@foreach (var prop in tableProps) { <option value="@prop.Name">@prop.Name</option> }`;
+
     window.initializeTooltips = function() {
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            const existing = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
-            if (existing) existing.dispose();
-            return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false });
-        });
+        setTimeout(() => {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                const existing = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
+                if (existing) existing.dispose();
+                return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false });
+            });
+        }, 500);
     };
 
-   document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
         allRows = Array.from(document.querySelectorAll('tbody tr.lead-row'));
+        currentVisibleRows = [...allRows];
 
         const style = document.createElement('style');
         style.id = 'dynamic-col-styles';
         document.head.appendChild(style);
 
-        allRows.forEach(r => r.style.display = 'none');
-
-        // 🚀 FIX: Restore the saved column order BEFORE building the dropdown menu
         restoreColumnOrder();
 
         const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols_leads') || '[]');
@@ -2074,36 +1363,43 @@
         refreshVisibleRows();
         setupFileUpload();
         restorePinnedFilters();
-
         renderCustomViews();
         renderSavedSidebarFilters();
-       
-        // Restore Sidebar filters on load
         restoreSidebarFiltersFromUrl();
         setupExcelResizing();
         initializeTooltips();
-    });
-    // ==========================================
-    // 2. JS FILTER/SORT REFRESH
-    // ==========================================
-    function refreshVisibleRows() {
-        const filteredRows = allRows.filter(row => !row.classList.contains('filtered-out'));
 
-        currentVisibleRows.forEach(r => r.style.display = 'none');
-        currentVisibleRows = [...filteredRows];
-        currentVisibleRows.forEach(r => r.style.display = '');
-
-        const totalCountBadge = document.getElementById('topTotalCount');
-        if (totalCountBadge) {
-            if (currentVisibleRows.length === allRows.length) {
-                totalCountBadge.innerText = '@totalRecords';
-            } else {
-                totalCountBadge.innerText = currentVisibleRows.length + ' (Filtered)';
-            }
+        if (localStorage.getItem('crm_filter_hidden') === 'true') {
+            document.getElementById('filterSidebarWrapper').classList.add('hidden-sidebar');
         }
+    });
 
-        const selectAllCb = document.getElementById('selectAllCb');
-        if (selectAllCb) selectAllCb.checked = false;
+    function refreshVisibleRows() {
+        currentVisibleRows = [];
+        allRows.forEach(r => {
+            const sidebarHidden = r.classList.contains('filtered-out');
+            let colHidden = false;
+            for (const key in r.dataset) {
+                if (key.startsWith('colFilter_') && r.dataset[key] === "hidden") {
+                    colHidden = true; break;
+                }
+            }
+            if (!sidebarHidden && !colHidden) {
+                r.style.display = '';
+                currentVisibleRows.push(r);
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        const originalTotal = document.getElementById('pageInfo') ? document.getElementById('pageInfo').innerText.match(/\d+ total/)?.[0]?.replace(' total', '') : allRows.length;
+        const displayCount = (currentVisibleRows.length === allRows.length) ? (originalTotal || allRows.length) : currentVisibleRows.length + ' (Filtered)';
+        
+        const topCountBadge = document.getElementById('topTotalCount');
+        const bottomCountBadge = document.getElementById('bottomTotalCount');
+        if (topCountBadge) topCountBadge.innerText = displayCount;
+        if (bottomCountBadge) bottomCountBadge.innerText = displayCount;
+
         updateSelectedCount();
     }
 
@@ -2544,6 +1840,17 @@
         updateCriteriaPattern();
     }
 
+    function toggleFilterSidebar() {
+        const sidebar = document.getElementById('filterSidebarWrapper');
+        if (sidebar.classList.contains('hidden-sidebar')) {
+            sidebar.classList.remove('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden', 'false');
+        } else {
+            sidebar.classList.add('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden', 'true');
+        }
+    }
+
     function removeCriteriaRow(btn) {
         const row = btn.closest('.criteria-row-builder');
         if (row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
@@ -2764,24 +2071,94 @@
         });
         refreshVisibleRows();
     }
-   
-    function toggleMoreFields() {
+
+    function triggerSidebarFilter(event, fieldName) {
+        if(event) { event.stopPropagation(); event.preventDefault(); }
+        
+        const sidebar = document.getElementById('filterSidebarWrapper');
+        if (sidebar) {
+            sidebar.classList.remove('hidden-sidebar');
+            localStorage.setItem('crm_filter_hidden', 'false');
+        }
+
+        const chk = document.getElementById('chk_' + fieldName);
+        if(chk) {
+            const item = chk.closest('.filter-field-item');
+            chk.checked = true;
+            item.classList.add('active');
+
+            chk.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            item.style.backgroundColor = '#eff6ff';
+            setTimeout(() => item.style.backgroundColor = '', 2000);
+
+            setTimeout(() => {
+                const inputToFocus = item.querySelector('input[type="text"].condition-val, input[type="date"], select.condition-val');
+                if (inputToFocus) inputToFocus.focus();
+            }, 150);
+        }
+    }
+
+    window.toggleSort = function(event, colIndex) {
+        if(event) { event.stopPropagation(); event.preventDefault(); }
+        let dir = sortStates[colIndex] === 'asc' ? 'desc' : 'asc';
+        sortStates[colIndex] = dir;
+        
+        document.querySelectorAll('th .fa-arrow-up-a-z, th .fa-arrow-down-z-a').forEach(icon => {
+            icon.className = 'fa-solid fa-sort text-muted header-action-icon';
+            icon.style.color = '';
+        });
+
+        const currentIcon = event.currentTarget;
+        currentIcon.className = dir === 'asc' ? 'fa-solid fa-arrow-up-a-z header-action-icon' : 'fa-solid fa-arrow-down-z-a header-action-icon';
+        currentIcon.style.color = 'var(--primary-blue)';
+
+        document.body.style.cursor = 'wait';
+        setTimeout(() => {
+            const tbody = document.getElementById("tableBody");
+            let rowsToSort = Array.from(tbody.querySelectorAll('tr:not(#noRecordsRow)'));
+
+            rowsToSort.sort((a, b) => {
+                const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+                const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+                const aText = aCol ? aCol.textContent.trim().toLowerCase() : '';
+                const bText = bCol ? bCol.textContent.trim().toLowerCase() : '';
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+
+                if (!isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '') {
+                    return dir === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+                if (aText < bText) return dir === 'asc' ? -1 : 1;
+                if (aText > bText) return dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+            rowsToSort.forEach(row => tbody.appendChild(row));
+            allRows = rowsToSort;
+            document.body.style.cursor = 'default';
+        }, 50);
+    };
+
+ window.toggleMoreFields = function() {
         const container = document.getElementById("moreFieldsContainer");
         const btn = document.getElementById("moreFieldsToggle");
         const icon = document.getElementById("moreFieldsIcon");
 
-        if (container.style.display === "none") {
+        if (!container) return;
+
+        if (container.style.display === "none" || container.style.display === "") {
             container.style.display = "block";
-            btn.classList.add("expanded");
-            icon.style.transform = "rotate(90deg)";
+            if (btn) btn.classList.add("expanded");
+            if (icon) icon.style.transform = "rotate(90deg)";
         } else {
             container.style.display = "none";
-            btn.classList.remove("expanded");
-            icon.style.transform = "rotate(0deg)";
+            if (btn) btn.classList.remove("expanded");
+            if (icon) icon.style.transform = "rotate(0deg)";
         }
-    }
+    };
 
-    document.addEventListener('change', function (e) {
+ document.addEventListener('change', function (e) {
+        
+        // 1. Due Date Logic: Enables/Disables toggles based on date selection
         if (e.target && e.target.id === 'modalDueDate') {
             const hasDate = !!e.target.value;
             const repeatToggle = document.getElementById('modalRepeatToggle');
@@ -2804,18 +2181,16 @@
             }
         }
 
+        // 2. Repeat Toggle Logic
         if (e.target && e.target.id === 'modalRepeatToggle') {
             const repeatPanel = document.getElementById('modalRepeatPanel');
-            if (repeatPanel) {
-                repeatPanel.style.display = e.target.checked ? 'block' : 'none';
-            }
+            if (repeatPanel) repeatPanel.style.display = e.target.checked ? 'block' : 'none';
         }
 
+        // 3. Reminder Toggle Logic
         if (e.target && e.target.id === 'modalReminderToggle') {
             const reminderPanel = document.getElementById('modalReminderPanel');
-            if (reminderPanel) {
-                reminderPanel.style.display = e.target.checked ? 'block' : 'none';
-            }
+            if (reminderPanel) reminderPanel.style.display = e.target.checked ? 'block' : 'none';
         }
     });
 
@@ -3163,96 +2538,84 @@
     };
 
     // --- EXCEL RESIZING FOR LEADS ---
-    function setupExcelResizing() {
-    const table = document.getElementById('leadsTable');
-    if (!table) return;
+  function setupExcelResizing() {
+        const table = document.getElementById('leadsTable');
+        if (!table) return;
 
-    table.style.tableLayout = "fixed";
-    table.style.width = "max-content";
-    table.style.minWidth = "100%"; 
+        // 🚀 SPEED FIX: table-layout: fixed means we ONLY size TH elements. TDs match instantly via CSS.
+        table.style.tableLayout = "fixed";
+        table.style.width = "100%"; 
 
-    // 🚀 NEW: Load saved widths from LocalStorage
-    let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_leads')) || {};
+        let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_leads')) || {};
+        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions):not(.dummy-filler-col)');
+        
+        cols.forEach(col => {
+            col.style.position = 'relative';
+            const colIndex = Array.from(col.parentNode.children).indexOf(col);
+            
+            let w = savedWidths[colIndex];
+            if (!w) {
+                const colName = col.getAttribute('data-col-name');
+                if (colName === 'LeadName') w = '250px';
+                else if (colName === 'Email') w = '220px';
+                else w = '160px'; 
+            }
 
-    const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions)');
+            if (w) {
+                col.style.width = w;
+                col.style.minWidth = w;
+                col.style.maxWidth = w;
+            }
 
-    cols.forEach((col, index) => {
-        col.style.position = 'relative';
-        const colIndex = index + 1; // Since checkbox is column 0
+            const resizer = document.createElement('div');
+            resizer.style.width = '8px';
+            resizer.style.height = '100%';
+            resizer.style.position = 'absolute';
+            resizer.style.right = '0';
+            resizer.style.top = '0';
+            resizer.style.cursor = 'col-resize';
+            resizer.style.userSelect = 'none';
+            resizer.style.zIndex = '10';
 
-        // 🚀 NEW: Apply saved width immediately if it exists
-        if (savedWidths[colIndex]) {
-            const w = savedWidths[colIndex];
-            col.style.width = w;
-            col.style.minWidth = w;
-            col.style.maxWidth = w;
+            resizer.addEventListener('mouseenter', () => resizer.style.backgroundColor = '#93c5fd');
+            resizer.addEventListener('mouseleave', () => resizer.style.backgroundColor = 'transparent');
+            col.appendChild(resizer);
 
-            const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-            rows.forEach(row => {
-                const td = row.children[colIndex];
-                if (td) {
-                    td.style.width = w;
-                    td.style.minWidth = w;
-                    td.style.maxWidth = w;
-                    td.style.overflow = 'hidden';
-                    td.style.textOverflow = 'ellipsis';
-                    td.style.whiteSpace = 'nowrap';
+            let startX, startWidth;
+            resizer.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                startX = e.pageX;
+                startWidth = col.offsetWidth;
+                document.body.style.cursor = 'col-resize';
+                
+                let animationFrameId;
+                
+                function mouseMoveHandler(e) {
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    animationFrameId = requestAnimationFrame(() => {
+                        const newWidth = Math.max(90, startWidth + (e.pageX - startX));
+                        col.style.width = `${newWidth}px`;
+                        col.style.minWidth = `${newWidth}px`;
+                        col.style.maxWidth = `${newWidth}px`;
+                    });
                 }
+
+                function mouseUpHandler() {
+                    document.body.style.cursor = 'default';
+                    document.removeEventListener('mousemove', mouseMoveHandler);
+                    document.removeEventListener('mouseup', mouseUpHandler);
+
+                    savedWidths[colIndex] = col.style.width;
+                    localStorage.setItem('crm_col_widths_leads', JSON.stringify(savedWidths));
+                }
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
             });
-        }
-
-        const resizer = document.createElement('div');
-        resizer.className = 'excel-resizer';
-        col.appendChild(resizer);
-
-        let startX, startWidth;
-
-        resizer.addEventListener('mousedown', function (e) {
-            e.preventDefault();
-            startX = e.pageX;
-            startWidth = col.offsetWidth;
-
-            resizer.classList.add('resizing');
-            document.body.style.cursor = 'col-resize';
-
-            document.addEventListener('mousemove', mouseMoveHandler);
-            document.addEventListener('mouseup', mouseUpHandler);
         });
-
-          function mouseMoveHandler(e) {
-            const newWidth = Math.max(40, startWidth + (e.pageX - startX));
-
-            col.style.width = `${newWidth}px`;
-            col.style.minWidth = `${newWidth}px`;
-            col.style.maxWidth = `${newWidth}px`;
-
-            const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-            rows.forEach(row => {
-                const td = row.children[colIndex];
-                if (td) {
-                    td.style.width = `${newWidth}px`;
-                    td.style.minWidth = `${newWidth}px`;
-                    td.style.maxWidth = `${newWidth}px`;
-                    td.style.overflow = 'hidden';
-                    td.style.textOverflow = 'ellipsis';
-                    td.style.whiteSpace = 'nowrap';
-                }
-            });
-        }
-
-            function mouseUpHandler() {
-            resizer.classList.remove('resizing');
-            document.body.style.cursor = 'default';
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-
-            // 🚀 NEW: Save the new width to LocalStorage so it survives reloads/clicks
-            savedWidths[colIndex] = col.style.width;
-            localStorage.setItem('crm_col_widths_leads', JSON.stringify(savedWidths));
-        }
-    });
-
-      const sidebar = document.querySelector('.filter-sidebar');
+    }
+    // --- Sidebar Resizer ---
+    const sidebar = document.querySelector('.filter-sidebar');
     if (sidebar) {
         sidebar.style.position = 'relative';
         const sideResizer = document.createElement('div');
@@ -3266,7 +2629,6 @@
 
         sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
         sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
-
         sidebar.appendChild(sideResizer);
 
         let sStartX, sStartWidth;
@@ -3285,12 +2647,11 @@
             }
         }
 
-           function sideMouseUp() {
+        function sideMouseUp() {
             document.removeEventListener('mousemove', sideMouseMove);
             document.removeEventListener('mouseup', sideMouseUp);
         }
     }
-}
 
     // ==========================================
     // 🚀 FIX: MISSING MODAL & MASS UPDATE LOGIC
@@ -3609,4 +2970,6 @@
             </div>`;
         document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
+
+
 </script>

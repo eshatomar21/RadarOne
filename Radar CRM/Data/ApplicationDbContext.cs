@@ -39,6 +39,8 @@ namespace Radar_CRM.Data
 
         public DbSet<Postcode> Postcodes { get; set; }
 
+        public DbSet<CallRecord> CallRecords { get; set; }
+
         public DbSet<ProductPaymentRow> ProductPaymentRows{ get; set; }
 
         public DbSet<DealPaymentRow> DealPaymentRows { get; set; }
