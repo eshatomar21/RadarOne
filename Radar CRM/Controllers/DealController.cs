@@ -82,16 +82,26 @@ namespace Radar_CRM.Controllers
                     var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                     var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
 
+                    // 🚀 FIX: Allow these predefined conditions to run even if the Value input is physically empty
+                    var noValueConditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        "is_empty", "is_not_empty", "today", "tomorrow", "yesterday",
+                        "till yesterday", "starting tomorrow", "this week", "this month",
+                        "this year", "previous week", "previous month", "previous year"
+                    };
+
                     foreach (var f in filters)
                     {
-                        if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+                        string cond = f.Condition?.ToLower().Trim() ?? "";
+
+                        // If it's empty AND doesn't match our allowed blank conditions, skip it
+                        if (string.IsNullOrWhiteSpace(f.Value) && !noValueConditions.Contains(cond)) continue;
 
                         var propertyInfo = typeof(Deal).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                         if (propertyInfo == null) continue;
 
                         string dbColName = propertyInfo.Name;
 
-                        // Switch complex navigation properties to their Foreign Key (Id)
                         if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
                         {
                             var idProp = typeof(Deal).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
@@ -103,35 +113,107 @@ namespace Radar_CRM.Controllers
                             else continue;
                         }
 
-                        // 🚀 Translates '+' back to space (e.g. "John+Doe" -> "John Doe")
                         string safeValue = f.Value?.Replace("+", " ") ?? "";
 
-                        // 1. DATE FILTERS (Fixed 'Between' parsing)
+                        // ==========================================
+                        // 1. DATE FILTERS (Fixed for EF Core Translations)
+                        // ==========================================
                         if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
                         {
-                            DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
-                            bool isValidDate = false;
+                            DateTime today = DateTime.Today;
 
-                            if (safeValue.Contains("|")) // Split 'between' dates
+                            if (cond == "today")
                             {
-                                var dates = safeValue.Split('|');
-                                if (DateTime.TryParse(dates[0], out d1) && DateTime.TryParse(dates[1], out d2)) isValidDate = true;
+                                var next = today.AddDays(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= today && EF.Property<DateTime?>(a, dbColName) < next);
                             }
-                            else if (DateTime.TryParse(safeValue, out d1))
+                            else if (cond == "yesterday")
                             {
-                                isValidDate = true;
+                                var yest = today.AddDays(-1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= yest && EF.Property<DateTime?>(a, dbColName) < today);
                             }
+                            else if (cond == "tomorrow")
+                            {
+                                var next = today.AddDays(1);
+                                var dayAfter = today.AddDays(2);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= next && EF.Property<DateTime?>(a, dbColName) < dayAfter);
+                            }
+                            else if (cond == "till yesterday")
+                            {
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) < today);
+                            }
+                            else if (cond == "starting tomorrow")
+                            {
+                                var next = today.AddDays(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= next);
+                            }
+                            else if (cond == "this week")
+                            {
+                                var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
+                                var endOfWeek = startOfWeek.AddDays(7);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfWeek && EF.Property<DateTime?>(a, dbColName) < endOfWeek);
+                            }
+                            else if (cond == "this month")
+                            {
+                                var startOfMonth = new DateTime(today.Year, today.Month, 1);
+                                var endOfMonth = startOfMonth.AddMonths(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfMonth && EF.Property<DateTime?>(a, dbColName) < endOfMonth);
+                            }
+                            else if (cond == "this year")
+                            {
+                                var startOfYear = new DateTime(today.Year, 1, 1);
+                                var endOfYear = startOfYear.AddYears(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfYear && EF.Property<DateTime?>(a, dbColName) < endOfYear);
+                            }
+                            else if (cond == "previous week")
+                            {
+                                var startOfPrevWeek = today.AddDays(-(int)today.DayOfWeek - 7);
+                                var endOfPrevWeek = startOfPrevWeek.AddDays(7);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfPrevWeek && EF.Property<DateTime?>(a, dbColName) < endOfPrevWeek);
+                            }
+                            else if (cond == "previous month")
+                            {
+                                var prevMonth = today.AddMonths(-1);
+                                var startOfPrevMonth = new DateTime(prevMonth.Year, prevMonth.Month, 1);
+                                var endOfPrevMonth = startOfPrevMonth.AddMonths(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfPrevMonth && EF.Property<DateTime?>(a, dbColName) < endOfPrevMonth);
+                            }
+                            else if (cond == "previous year")
+                            {
+                                var prevYear = today.AddYears(-1);
+                                var startOfPrevYear = new DateTime(prevYear.Year, 1, 1);
+                                var endOfPrevYear = startOfPrevYear.AddYears(1);
+                                query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= startOfPrevYear && EF.Property<DateTime?>(a, dbColName) < endOfPrevYear);
+                            }
+                            else
+                            {
+                                // Manual Date Inputs (Between, On, After, etc.)
+                                DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
+                                bool isValidDate = false;
 
-                            if (isValidDate)
-                            {
-                                if (f.Condition == "between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= d1 && EF.Property<DateTime?>(a, dbColName) <= d2);
-                                else if (f.Condition == "not between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) < d1 || EF.Property<DateTime?>(a, dbColName) > d2);
-                                else if (f.Condition == "on" || f.Condition == "is") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date == d1.Date);
-                                else if (f.Condition == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date < d1.Date);
-                                else if (f.Condition == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) != null && EF.Property<DateTime?>(a, dbColName).Value.Date > d1.Date);
+                                if (safeValue.Contains("|"))
+                                {
+                                    var dates = safeValue.Split('|');
+                                    if (DateTime.TryParse(dates[0], out d1) && DateTime.TryParse(dates[1], out d2)) isValidDate = true;
+                                }
+                                else if (DateTime.TryParse(safeValue, out d1))
+                                {
+                                    isValidDate = true;
+                                }
+
+                                if (isValidDate)
+                                {
+                                    if (cond == "between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= d1 && EF.Property<DateTime?>(a, dbColName) <= d2);
+                                    else if (cond == "not between") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) < d1 || EF.Property<DateTime?>(a, dbColName) > d2);
+                                    else if (cond == "on" || cond == "is") { var next = d1.AddDays(1); query = query.Where(a => EF.Property<DateTime?>(a, dbColName) >= d1 && EF.Property<DateTime?>(a, dbColName) < next); }
+                                    else if (cond == "before") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) < d1);
+                                    else if (cond == "after") query = query.Where(a => EF.Property<DateTime?>(a, dbColName) > d1);
+                                }
                             }
                         }
-                        // 2. ACCOUNT FILTERS (Auto-translates Text Names to IDs)
+                        // ==========================================
+                        // 2. TEXT & ID FILTERS
+                        // ==========================================
                         else if (dbColName.Equals("AccountId", StringComparison.OrdinalIgnoreCase))
                         {
                             if (int.TryParse(safeValue, out int accId))
@@ -142,38 +224,21 @@ namespace Radar_CRM.Controllers
                             else
                             {
                                 var searchValue = safeValue.ToLower().Trim();
-                                var matchingAccIds = _context.Accounts
-                                    .Where(acc => acc.AccountName != null && acc.AccountName.ToLower().Contains(searchValue))
-                                    .Select(acc => acc.Id)
-                                    .ToList();
-
-                                if (f.Condition == "contains" || f.Condition == "is")
-                                    query = query.Where(a => a.AccountId.HasValue && matchingAccIds.Contains(a.AccountId.Value));
-                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
-                                    query = query.Where(a => !a.AccountId.HasValue || !matchingAccIds.Contains(a.AccountId.Value));
+                                var matchingAccIds = _context.Accounts.Where(acc => acc.AccountName != null && acc.AccountName.ToLower().Contains(searchValue)).Select(acc => acc.Id).ToList();
+                                if (f.Condition == "contains" || f.Condition == "is") query = query.Where(a => a.AccountId.HasValue && matchingAccIds.Contains(a.AccountId.Value));
+                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not") query = query.Where(a => !a.AccountId.HasValue || !matchingAccIds.Contains(a.AccountId.Value));
                             }
                         }
-                        // 3. OWNER / USER FILTERS (Auto-translates User Names to IDs)
                         else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
                         {
                             var searchValue = safeValue.ToLower().Trim();
-                            var matchingUserIds = _context.Users
-                                .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
-                                            (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)) ||
-                                            (u.Id == searchValue)) // Directly match ID if they passed an ID
-                                .Select(u => u.Id)
-                                .ToList();
+                            var matchingUserIds = _context.Users.Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) || (u.Id == searchValue)).Select(u => u.Id).ToList();
 
-                            if (f.Condition == "contains" || f.Condition == "is")
-                                query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
-                                query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_empty")
-                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_not_empty")
-                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            if (f.Condition == "contains" || f.Condition == "is") query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not") query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
-                        // 4. STANDARD STRING FILTERS
                         else if (propertyInfo.PropertyType == typeof(string))
                         {
                             var searchValue = safeValue.ToLower().Trim();
@@ -186,24 +251,20 @@ namespace Radar_CRM.Controllers
                             else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                             else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
-                        // 5. NUMERIC FILTERS
-                        else
+                        else if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
                         {
-                            if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
+                            if (int.TryParse(safeValue, out int numVal))
                             {
-                                if (int.TryParse(safeValue, out int numVal))
-                                {
-                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
-                                }
+                                if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<int?>(a, dbColName) == numVal);
+                                else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<int?>(a, dbColName) != numVal);
                             }
-                            else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                        }
+                        else if (propertyInfo.PropertyType == typeof(decimal) || propertyInfo.PropertyType == typeof(decimal?))
+                        {
+                            if (decimal.TryParse(safeValue, out decimal decVal))
                             {
-                                if (decimal.TryParse(safeValue, out decimal decVal))
-                                {
-                                    if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
-                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
-                                }
+                                if (f.Condition == "is" || f.Condition == "contains") query = query.Where(a => EF.Property<decimal?>(a, dbColName) == decVal);
+                                else if (f.Condition == "is_not" || f.Condition == "does_not_contain") query = query.Where(a => EF.Property<decimal?>(a, dbColName) != decVal);
                             }
                         }
                     }

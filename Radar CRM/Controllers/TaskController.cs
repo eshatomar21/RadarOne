@@ -71,51 +71,110 @@ namespace Radar_CRM.Controllers
 
             // 2. FIX: Parse and Apply Advanced Filters dynamically
             string advancedFilters = Request.Query["advancedFilters"];
-
             if (!string.IsNullOrEmpty(advancedFilters))
             {
                 try
                 {
-                    var filters = JsonSerializer.Deserialize<List<AdvancedFilter>>(advancedFilters);
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<AdvancedFilter>>(advancedFilters, options);
+
+                    // 🚀 FIX: Do not drop these filters even if the user didn't type a value
+                    var noValueConditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "is_empty", "is_not_empty", "today", "tomorrow", "yesterday",
+                "till yesterday", "starting tomorrow", "this week", "this month",
+                "this year", "previous week", "previous month", "previous year"
+            };
+
                     if (filters != null && filters.Any())
                     {
                         foreach (var filter in filters)
                         {
-                            if (string.IsNullOrEmpty(filter.ColumnName) || string.IsNullOrEmpty(filter.Value)) continue;
+                            string cond = filter.Condition?.ToLower().Trim() ?? "";
+
+                            // 🚀 FIX: Allow predefined dates through the null check
+                            if (string.IsNullOrWhiteSpace(filter.Value) && !noValueConditions.Contains(cond)) continue;
 
                             string col = filter.ColumnName;
-                            // Auto-map UI friendly names to actual DB foreign key names
                             if (col == "TaskOwner" || col == "Owner") col = "TaskOwnerId";
                             if (col == "CreatedBy") col = "CreatedById";
                             if (col == "ModifiedBy") col = "ModifiedById";
 
-                            string val = filter.Value.Trim();
+                            string val = filter.Value?.Trim() ?? "";
                             string lowerVal = val.ToLower();
 
                             if (filter.IsDate)
                             {
-                                DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
-                                if (val.Contains("|"))
+                                DateTime today = DateTime.Today;
+
+                                // 🚀 DYNAMIC EF CORE DATE QUERIES
+                                if (cond == "today")
                                 {
-                                    var dates = val.Split('|');
-                                    DateTime.TryParse(dates[0], out d1);
-                                    DateTime.TryParse(dates[1], out d2);
+                                    var next = today.AddDays(1);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= today && EF.Property<DateTime?>(t, col) < next);
+                                }
+                                else if (cond == "yesterday")
+                                {
+                                    var yest = today.AddDays(-1);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= yest && EF.Property<DateTime?>(t, col) < today);
+                                }
+                                else if (cond == "tomorrow")
+                                {
+                                    var next = today.AddDays(1);
+                                    var dayAfter = today.AddDays(2);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= next && EF.Property<DateTime?>(t, col) < dayAfter);
+                                }
+                                else if (cond == "till yesterday")
+                                {
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) < today);
+                                }
+                                else if (cond == "starting tomorrow")
+                                {
+                                    var next = today.AddDays(1);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= next);
+                                }
+                                else if (cond == "this week")
+                                {
+                                    var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
+                                    var endOfWeek = startOfWeek.AddDays(7);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= startOfWeek && EF.Property<DateTime?>(t, col) < endOfWeek);
+                                }
+                                else if (cond == "this month")
+                                {
+                                    var startOfMonth = new DateTime(today.Year, today.Month, 1);
+                                    var endOfMonth = startOfMonth.AddMonths(1);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= startOfMonth && EF.Property<DateTime?>(t, col) < endOfMonth);
+                                }
+                                else if (cond == "this year")
+                                {
+                                    var startOfYear = new DateTime(today.Year, 1, 1);
+                                    var endOfYear = startOfYear.AddYears(1);
+                                    query = query.Where(t => EF.Property<DateTime?>(t, col) >= startOfYear && EF.Property<DateTime?>(t, col) < endOfYear);
                                 }
                                 else
                                 {
-                                    DateTime.TryParse(val, out d1);
-                                }
+                                    // Custom Selected Dates
+                                    DateTime d1 = DateTime.MinValue, d2 = DateTime.MaxValue;
+                                    bool isValidDate = false;
 
-                                // Apply Date Filters
-                                if (col == "DueDate")
-                                {
-                                    if (filter.Condition.Contains("between")) query = query.Where(t => t.DueDate >= d1 && t.DueDate <= d2);
-                                    else query = query.Where(t => t.DueDate != null && t.DueDate.Value.Date == d1.Date);
-                                }
-                                else if (col == "CreatedTime")
-                                {
-                                    if (filter.Condition.Contains("between")) query = query.Where(t => t.CreatedTime >= d1 && t.CreatedTime <= d2);
-                                    else query = query.Where(t => t.CreatedTime.Date == d1.Date);
+                                    if (val.Contains("|"))
+                                    {
+                                        var dates = val.Split('|');
+                                        if (DateTime.TryParse(dates[0], out d1) && DateTime.TryParse(dates[1], out d2)) isValidDate = true;
+                                    }
+                                    else if (DateTime.TryParse(val, out d1))
+                                    {
+                                        isValidDate = true;
+                                    }
+
+                                    if (isValidDate)
+                                    {
+                                        if (cond.Contains("not between")) query = query.Where(t => EF.Property<DateTime?>(t, col) < d1 || EF.Property<DateTime?>(t, col) > d2);
+                                        else if (cond.Contains("between")) query = query.Where(t => EF.Property<DateTime?>(t, col) >= d1 && EF.Property<DateTime?>(t, col) <= d2);
+                                        else if (cond == "on" || cond == "is") { var next = d1.AddDays(1); query = query.Where(t => EF.Property<DateTime?>(t, col) >= d1 && EF.Property<DateTime?>(t, col) < next); }
+                                        else if (cond == "before") query = query.Where(t => EF.Property<DateTime?>(t, col) < d1);
+                                        else if (cond == "after") query = query.Where(t => EF.Property<DateTime?>(t, col) > d1);
+                                    }
                                 }
                             }
                             else

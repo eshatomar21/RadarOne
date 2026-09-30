@@ -2120,12 +2120,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // ==========================================
     // 🚀 NEW FEATURE: SAVE INDIVIDUAL FIELD FILTERS
     // ==========================================
-    function saveFieldFilter(event, iconEl, fieldName) {
+   function saveFieldFilter(event, iconEl, fieldName) {
         event.stopPropagation();
-       
+        
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
-       
+        
         if(!cb.checked) {
             alert("Please check the box and set a value before saving this filter.");
             return;
@@ -2135,7 +2135,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const isDate = item.dataset.fieldType === "date";
         let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
 
-        if(!val && condition !== 'is_empty' && condition !== 'is_not_empty') {
+        // 🚀 FIX: Prevent alert for valid blank conditions
+        const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year'];
+        
+        if(!val && !noValueNeeded.includes(condition)) {
             alert("Please enter a value before saving.");
             return;
         }
@@ -2143,7 +2146,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_deals') || '[]');
         savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
         localStorage.setItem('crm_saved_sidebar_filters_deals', JSON.stringify(savedFilters));
-       
+        
         renderSavedSidebarFilters();
     }
 
@@ -2513,26 +2516,38 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const activeFilters = [];
+        const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year'];
 
         document.querySelectorAll('#criteriaRowsContainer .criteria-row-builder').forEach((row, index) => {
             const field = row.querySelector('.cv-field').value;
             const condition = row.querySelector('.cv-condition').value;
-            const val = row.querySelector('.cv-value').value;
-
+            
             let logicOperator = "AND";
             if (index > 0 && row.previousElementSibling && row.previousElementSibling.classList.contains('criteria-connector-vertical')) {
                 logicOperator = row.previousElementSibling.querySelector('.cv-logic').value;
             }
 
             if (field && condition) {
-                if (!val && !condition.includes('empty')) return; // Skip incomplete
+                let val = "";
+                let isDate = field.toLowerCase().includes('date') || field.toLowerCase().includes('time');
+
+                if (isDate) {
+                    let v1 = row.querySelector('.date-val-1') ? row.querySelector('.date-val-1').value : "";
+                    let v2 = row.querySelector('.date-val-2') ? row.querySelector('.date-val-2').value : "";
+                    val = (condition === 'between' || condition === 'not between') ? (v1 + "|" + v2) : v1;
+                } else {
+                    val = row.querySelector('.cv-value') ? row.querySelector('.cv-value').value : "";
+                }
+
+                // 🚀 FIX: Let predefined empty dates pass validation safely
+                if (!val && !noValueNeeded.includes(condition)) return; 
 
                 activeFilters.push({
                     LogicalOperator: index === 0 ? "" : logicOperator,
                     ColumnName: field,
                     Condition: condition,
-                    Value: val || "",
-                    IsDate: field.toLowerCase().includes('date') || field.toLowerCase().includes('time')
+                    Value: val,
+                    IsDate: isDate
                 });
             }
         });
