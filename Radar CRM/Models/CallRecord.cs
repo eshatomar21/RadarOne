@@ -14,26 +14,23 @@ namespace Radar_CRM.Models
         [Required]
         [MaxLength(20)]
         [Display(Name = "Customer Phone")]
-        public string CustomerPhone { get; set; }
+        public string CustomerPhone { get; set; } = "";
 
         [MaxLength(20)]
         [Display(Name = "Salesperson Phone")]
-        public string SalespersonPhone { get; set; }
+        public string? SalespersonPhone { get; set; } = "";
 
         [DataType(DataType.Url)]
-        public string RecordingUrl { get; set; }
+        public string? RecordingUrl { get; set; } = "";
 
         [Display(Name = "Duration (Seconds)")]
         public int DurationSeconds { get; set; }
 
-        // AI Results
-        public string TranscriptionText { get; set; }
-        public string AiSummary { get; set; }
+        // 🚀 FIX: Made nullable and added default fallback text
+        public string? TranscriptionText { get; set; } = "Processing...";
+        public string? AiSummary { get; set; } = "Processing...";
 
         public DateTime CallDate { get; set; } = DateTime.UtcNow;
-
-        // --- CRM Linking ---
-        // Nullable (?) because a call might belong to a Lead, an Account, both, or neither yet.
 
         public int? LeadId { get; set; }
 

@@ -41,13 +41,10 @@ namespace Radar_CRM.Controllers
                     return BadRequest(new { success = false, message = "Invalid data received." });
                 }
 
-                // Loop through the outer events array
                 foreach (var evt in events)
                 {
-                    // Safety check to ensure there are call logs
                     if (evt.call_logs == null || !evt.call_logs.Any()) continue;
 
-                    // Loop through the actual call logs
                     foreach (var payload in evt.call_logs)
                     {
                         if (string.IsNullOrWhiteSpace(payload.client_number)) continue;
@@ -66,16 +63,13 @@ namespace Radar_CRM.Controllers
                             int.TryParse(payload.duration, out parsedDuration);
                         }
 
-                        // 🚀 CRITICAL FIX: Enforce the [MaxLength(20)] constraint from your model
                         string customerPhoneSafe = payload.client_number ?? "";
                         if (customerPhoneSafe.Length > 20) customerPhoneSafe = customerPhoneSafe.Substring(0, 20);
 
-                        // 🚀 CRITICAL FIX: Enforce [MaxLength(20)] for SalespersonPhone
                         string salesPhoneSafe = !string.IsNullOrWhiteSpace(payload.emp_no) ? payload.emp_no : evt.emp_number;
                         salesPhoneSafe ??= "";
                         if (salesPhoneSafe.Length > 20) salesPhoneSafe = salesPhoneSafe.Substring(0, 20);
 
-                        // Safe URL length check
                         string urlSafe = payload.call_recording_url ?? "";
                         if (urlSafe.Length > 500) urlSafe = urlSafe.Substring(0, 500);
 
@@ -87,7 +81,10 @@ namespace Radar_CRM.Controllers
                             DurationSeconds = parsedDuration,
                             CallDate = DateTime.UtcNow,
                             LeadId = matchedLead?.Id,
-                            AccountId = matchedAccount?.Id
+                            AccountId = matchedAccount?.Id,
+                            // 🚀 FIX: Explicitly assign placeholders so SQL Server doesn't reject the row
+                            TranscriptionText = "Pending AI Transcription...",
+                            AiSummary = "Pending AI Summary..."
                         };
 
                         _context.CallRecords.Add(callRecord);
@@ -136,7 +133,6 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // Unwraps the exact SQL Error so you never get a generic crash again
                 string actualDbError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return StatusCode(500, new { success = false, message = "Database Error: " + actualDbError });
             }
