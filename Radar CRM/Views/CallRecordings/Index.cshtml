@@ -5,58 +5,138 @@
 }
 
 <style>
-    /* Premium SaaS UI Styling */
-    .table-custom th {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
+    /* Premium Enterprise SaaS Theme */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --bg-body: #f3f4f6;
+        --bg-surface: #ffffff;
+        --primary-blue: #0f172a;
+        --text-dark: #111827;
+        --text-main: #374151;
+        --text-muted: #6b7280;
+        --border-soft: #e5e7eb;
+        --radius-md: 4px;
+    }
+
+    body .content-area {
+        padding: 0 !important;
+        background-color: var(--bg-body);
+    }
+
+    body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-family: 'Inter', -apple-system, sans-serif;
+    }
+
+    /* Main Container layout */
+    .crm-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 70px);
+        width: 100%;
+        background: var(--bg-surface);
+        border-top: 1px solid var(--border-soft);
+    }
+
+    /* Unified Toolbar */
+    .table-toolbar {
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: var(--bg-surface);
+    }
+
+    .toolbar-title {
+        font-size: 1.1rem;
         font-weight: 700;
-        border-bottom: 2px solid #e2e8f0;
-        padding: 1.25rem 1rem;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
-    
-    .table-custom td {
-        vertical-align: middle;
-        padding: 1rem;
-        color: #334155;
-        border-bottom: 1px solid #f1f5f9;
+
+    /* Table Styling */
+    .table-container {
+        flex: 1;
+        overflow-y: auto;
     }
+
+    .table-custom {
+        margin-bottom: 0;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-custom thead th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-soft);
+            padding: 14px 16px;
+        }
+
+        .table-custom tbody td {
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            vertical-align: middle;
+            color: var(--text-dark);
+            font-weight: 500;
+            border-bottom: 1px solid #f1f5f9;
+            background-color: var(--bg-surface);
+        }
+
+        .table-custom tbody tr:hover td {
+            background-color: #f8fafc;
+        }
 
     /* Compact Audio Player */
     .audio-compact {
         height: 36px;
-        width: 180px;
+        width: 200px;
         outline: none;
     }
-    
-    .audio-compact::-webkit-media-controls-panel {
-        background-color: #f1f5f9;
-    }
+
+        .audio-compact::-webkit-media-controls-panel {
+            background-color: #f1f5f9;
+        }
 
     /* Linked CRM Badges */
     .linked-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 12px;
+        padding: 4px 12px;
         border-radius: 50rem;
         font-size: 0.75rem;
         font-weight: 700;
         margin-bottom: 4px;
         border: 1px solid transparent;
     }
-    .linked-account { 
-        background-color: #eff6ff; 
-        color: #1d4ed8; 
+
+    .linked-account {
+        background-color: #eff6ff;
+        color: #1d4ed8;
         border-color: #bfdbfe;
     }
-    .linked-lead { 
-        background-color: #f0fdf4; 
-        color: #15803d; 
+
+    .linked-lead {
+        background-color: #f0fdf4;
+        color: #15803d;
         border-color: #bbf7d0;
     }
-    
+
     /* Truncated Summary Column */
     .text-truncate-2 {
         display: -webkit-box;
@@ -65,17 +145,29 @@
         overflow: hidden;
         max-width: 280px;
         line-height: 1.4;
+        color: var(--text-muted);
     }
 
     /* Expandable Chat & Summary Boxes */
     .expand-btn {
         cursor: pointer;
-        color: #64748b;
-        transition: color 0.2s, transform 0.2s;
-        display: inline-block;
+        color: #94a3b8;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid transparent;
     }
-    .expand-btn:hover { color: #3b82f6; }
-    
+
+        .expand-btn:hover {
+            color: #2563eb;
+            background-color: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
     .expanded-row-bg {
         background-color: #f8fafc;
         border-top: 1px dashed #cbd5e1;
@@ -90,6 +182,7 @@
         color: #78350f;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         white-space: pre-wrap;
+        line-height: 1.6;
     }
 
     .chat-box {
@@ -97,62 +190,71 @@
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 16px;
-        max-height: 300px;
+        max-height: 350px;
         overflow-y: auto;
         font-size: 0.85rem;
         color: #475569;
         white-space: pre-wrap;
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        line-height: 1.6;
     }
 </style>
 
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="fw-bold mb-1" style="color: #0f172a;">Call Intelligence</h4>
-            <p class="text-muted mb-0" style="font-size: 0.9rem;">Review recordings, read chat transcripts, and analyze AI summaries.</p>
+<div class="crm-container">
+
+    <!-- Unified Table Toolbar -->
+    <div class="table-toolbar">
+        <h4 class="toolbar-title">
+            <i class="fa-solid fa-headset text-primary"></i> Call Intelligence Logs
+        </h4>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-light border fw-semibold text-muted px-3" onclick="window.location.reload();">
+                <i class="fa-solid fa-rotate-right me-1"></i> Refresh Logs
+            </button>
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-        <div class="table-responsive">
-            <table class="table table-hover table-custom mb-0">
-                <thead class="bg-light">
-                    <tr>
-                        <th class="ps-4" style="width: 40px;"></th> <!-- Expand Icon Column -->
-                        <th>Date & Duration</th>
-                        <th>Contact & Agent</th>
-                        <th>Recording</th>
-                        <th>CRM Link</th>
-                        <th>AI Snapshot</th>
-                        <th class="text-end pe-4">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var call in Model)
+    <!-- Scrollable Table Area -->
+    <div class="table-container custom-scrollbar">
+        <table class="table table-custom">
+            <thead>
+                <tr>
+                    <th class="text-center" style="width: 50px;"></th>
+                    <th>Date & Duration</th>
+                    <th>Contact & Agent</th>
+                    <th>Call Recording</th>
+                    <th>CRM Link</th>
+                    <th>AI Snapshot</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var call in Model)
                     {
                         <tr>
                             <!-- 1. Expand Toggle -->
-                            <td class="ps-4 text-center">
-                                <i class="bi bi-chevron-down expand-btn fs-5" data-bs-toggle="collapse" data-bs-target="#collapse-@call.Id" aria-expanded="false" onclick="toggleChevron(this)"></i>
-                            </td>
-                            
-                            <!-- 2. Date -->
-                            <td>
-                                <div class="fw-bold text-dark">@call.CallDate.ToString("dd MMM yyyy")</div>
-                                <div class="text-muted" style="font-size: 0.8rem;">
-                                    <i class="bi bi-clock me-1"></i> @call.CallDate.ToString("hh:mm tt") • @call.DurationSeconds sec
+                            <td class="text-center">
+                                <div class="expand-btn" data-bs-toggle="collapse" data-bs-target="#collapse-@call.Id" aria-expanded="false" onclick="toggleChevron(this)" title="View Transcript">
+                                    <i class="fa-solid fa-chevron-down"></i>
                                 </div>
                             </td>
-                            
+
+                            <!-- 2. Date & Duration -->
+                            <td>
+                                <div class="fw-bold text-dark">@call.CallDate.ToString("dd MMM yyyy")</div>
+                                <div class="text-muted mt-1" style="font-size: 0.75rem; font-weight: 600;">
+                                    <i class="fa-regular fa-clock me-1"></i> @call.CallDate.ToString("hh:mm tt") &nbsp;•&nbsp; @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
+                                </div>
+                            </td>
+
                             <!-- 3. Phones -->
                             <td>
-                                <div class="fw-semibold text-dark"><i class="bi bi-person-fill text-muted me-1"></i> @call.CustomerPhone</div>
-                                <div class="text-muted mt-1" style="font-size: 0.8rem;"><i class="bi bi-headset me-1"></i> @call.SalespersonPhone</div>
+                                <div class="fw-semibold text-dark"><i class="fa-solid fa-phone text-muted me-2" style="font-size:0.75rem;"></i> @call.CustomerPhone</div>
+                                <div class="text-muted mt-1" style="font-size: 0.8rem;"><i class="fa-solid fa-user-tie me-2" style="font-size:0.75rem;"></i> @call.SalespersonPhone</div>
                             </td>
-                            
-                            <!-- 4. Audio Player inline -->
+
+                            <!-- 4. Audio Player -->
                             <td>
                                 @if (!string.IsNullOrEmpty(call.RecordingUrl))
                                 {
@@ -165,59 +267,56 @@
                                     <span class="badge bg-secondary bg-opacity-10 text-secondary border">No Audio Link</span>
                                 }
                             </td>
-                            
-                            <!-- 5. Linked CRM with Exact Names -->
-                           <td>
-    @if (call.Account != null)
-    {
-        <div class="linked-badge linked-account shadow-sm">
-            <i class="bi bi-building"></i> @call.Account.AccountName
-        </div>
-    }
-    @if (call.Lead != null)
-    {
-        <div class="linked-badge linked-lead shadow-sm">
-            <i class="bi bi-person-badge"></i> @call.Lead.LeadName
-        </div>
-    }
-    @if (call.Account == null && call.Lead == null)
-    {
-        <span class="text-muted fst-italic" style="font-size: 0.8rem;">Unlinked</span>
-    }
-</td>
-                            
+
+                            <!-- 5. Linked CRM -->
+                            <td>
+                                @if (call.Account != null)
+                                {
+                                    <a href="@Url.Action("Edit", "Accounts", new { id = call.AccountId })" class="text-decoration-none">
+                                        <div class="linked-badge linked-account shadow-sm">
+                                            <i class="fa-regular fa-building"></i> @call.Account.AccountName
+                                        </div>
+                                    </a>
+                                }
+                                @if (call.Lead != null)
+                                {
+                                    <a href="@Url.Action("Edit", "Leads", new { id = call.LeadId })" class="text-decoration-none">
+                                        <div class="linked-badge linked-lead shadow-sm">
+                                            <i class="fa-regular fa-user"></i> @call.Lead.LeadName
+                                        </div>
+                                    </a>
+                                }
+                                @if (call.Account == null && call.Lead == null)
+                                {
+                                    <span class="text-muted fst-italic fw-semibold" style="font-size: 0.8rem;">Unlinked Number</span>
+                                }
+                            </td>
+
                             <!-- 6. Truncated Summary -->
                             <td>
                                 @if (!string.IsNullOrEmpty(call.AiSummary))
                                 {
-                                    <div class="text-muted text-truncate-2" title="Click arrow to expand">
+                                    <div class="text-truncate-2" title="Click arrow to expand">
                                         @call.AiSummary
                                     </div>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning"><i class="bi bi-cpu"></i> Processing...</span>
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning" style="font-size:0.75rem;"><i class="fa-solid fa-microchip fa-spin me-1"></i> Processing AI...</span>
                                 }
                             </td>
-                            
-                            <!-- 7. Action -->
-                            <td class="text-end pe-4">
-                                <a asp-action="Details" asp-route-id="@call.Id" class="btn btn-sm btn-primary rounded-pill px-4 fw-semibold shadow-sm">
-                                    Open
-                                </a>
-                            </td>
                         </tr>
-                        
+
                         <!-- EXPANDABLE ROW: Chat Box and Full Summary -->
                         <tr class="collapse" id="collapse-@call.Id">
-                            <td colspan="7" class="p-0 border-0">
+                            <td colspan="6" class="p-0 border-0">
                                 <div class="p-4 expanded-row-bg">
                                     <div class="row g-4">
-                                        
+
                                         <!-- Full AI Summary Box -->
                                         <div class="col-lg-5">
-                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center">
-                                                <i class="bi bi-magic text-warning me-2 fs-5"></i> Executive Summary
+                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center" style="font-size: 0.95rem;">
+                                                <i class="fa-solid fa-wand-magic-sparkles text-warning me-2"></i> Executive Summary
                                             </h6>
                                             <div class="summary-box">
                                                 @(string.IsNullOrEmpty(call.AiSummary) ? "The AI is currently analyzing this call. Please refresh in a moment." : call.AiSummary)
@@ -226,8 +325,8 @@
 
                                         <!-- Full Chat Transcription Box -->
                                         <div class="col-lg-7">
-                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center">
-                                                <i class="bi bi-chat-left-text-fill text-primary me-2 fs-5"></i> Audio Transcript
+                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center" style="font-size: 0.95rem;">
+                                                <i class="fa-solid fa-file-lines text-primary me-2"></i> Audio Transcript
                                             </h6>
                                             <div class="chat-box custom-scrollbar">
                                                 @(string.IsNullOrEmpty(call.TranscriptionText) ? "Transcription text is not available yet." : call.TranscriptionText)
@@ -239,22 +338,37 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-        </div>
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-microphone-slash mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                            <br /><span class="fw-semibold fs-5 text-dark">No call records found.</span>
+                            <p class="mt-1">Calls from Callyzer will automatically appear here.</p>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 
 @section Scripts {
     <script>
-        // Smoothly rotate the chevron icon when expanding/collapsing the chat row
-        function toggleChevron(icon) {
-            if (icon.classList.contains('bi-chevron-down')) {
-                icon.classList.replace('bi-chevron-down', 'bi-chevron-up');
-                icon.style.color = '#3b82f6'; // Highlight blue when open
+        // Smoothly rotate the FontAwesome chevron icon when expanding/collapsing the chat row
+        function toggleChevron(btn) {
+            const icon = btn.querySelector('i');
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                btn.style.backgroundColor = '#eff6ff';
+                btn.style.borderColor = '#bfdbfe';
+                btn.style.color = '#2563eb';
             } else {
-                icon.classList.replace('bi-chevron-up', 'bi-chevron-down');
-                icon.style.color = '#64748b'; // Revert to muted
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+                btn.style.backgroundColor = 'transparent';
+                btn.style.borderColor = 'transparent';
+                btn.style.color = '#94a3b8';
             }
         }
     </script>
