@@ -5,7 +5,6 @@ namespace Radar_CRM.DTOs
 {
     public class CallyzerWebhookEvent
     {
-        // Adding '?' makes the field optional so ASP.NET won't reject missing data
         public string? emp_name { get; set; }
         public string? emp_number { get; set; }
         public string? @event { get; set; }
@@ -15,14 +14,11 @@ namespace Radar_CRM.DTOs
     public class CallyzerWebhookPayload
     {
         public string? client_number { get; set; }
-
-        // This '?' specifically fixes your 400 error
         public string? emp_no { get; set; }
-
         public string? call_recording_url { get; set; }
 
-        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
-        public int duration { get; set; }
+        // 🚀 CHANGED TO STRING to prevent JSON parsing crashes when Callyzer sends "0" in quotes
+        public string? duration { get; set; }
 
         public string? call_type { get; set; }
     }

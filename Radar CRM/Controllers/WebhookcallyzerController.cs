@@ -34,85 +34,100 @@ namespace Radar_CRM.Controllers
         [HttpPost("callyzer")]
         public async System.Threading.Tasks.Task<IActionResult> ReceiveCallyzerData([FromBody] List<CallyzerWebhookEvent> events)
         {
-            if (events == null || !events.Any())
+            try
             {
-                return BadRequest(new { success = false, message = "Invalid data received." });
-            }
-
-            // Loop through the outer events array
-            foreach (var evt in events)
-            {
-                // Safety check to ensure there are call logs
-                if (evt.call_logs == null || !evt.call_logs.Any()) continue;
-
-                // Loop through the actual call logs
-                foreach (var payload in evt.call_logs)
+                if (events == null || !events.Any())
                 {
-                    // 🚀 FIX: Using client_number
-                    if (string.IsNullOrEmpty(payload.client_number)) continue;
+                    return BadRequest(new { success = false, message = "Invalid data received." });
+                }
 
-                    string phoneToMatch = payload.client_number.Replace("+", "").Trim();
+                // Loop through the outer events array
+                foreach (var evt in events)
+                {
+                    // Safety check to ensure there are call logs
+                    if (evt.call_logs == null || !evt.call_logs.Any()) continue;
 
-                    var matchedLead = await _context.Leads
-                        .FirstOrDefaultAsync(l => l.Phone.Contains(phoneToMatch));
-
-                    var matchedAccount = await _context.Accounts
-                        .FirstOrDefaultAsync(a => a.Phone.Contains(phoneToMatch));
-
-                    var callRecord = new CallRecord
+                    // Loop through the actual call logs
+                    foreach (var payload in evt.call_logs)
                     {
-                        CustomerPhone = payload.client_number, // 🚀 FIX: Using client_number
-                        // If emp_no is missing inside call_logs, fallback to the parent event emp_number
-                        SalespersonPhone = !string.IsNullOrEmpty(payload.emp_no) ? payload.emp_no : evt.emp_number,
-                        RecordingUrl = payload.call_recording_url, // 🚀 FIX: Using call_recording_url
-                        DurationSeconds = payload.duration,
-                        CallDate = DateTime.UtcNow,
-                        LeadId = matchedLead?.Id,
-                        AccountId = matchedAccount?.Id
-                    };
+                        if (string.IsNullOrWhiteSpace(payload.client_number)) continue;
 
-                    _context.CallRecords.Add(callRecord);
-                    await _context.SaveChangesAsync();
+                        string phoneToMatch = payload.client_number.Replace("+", "").Trim();
 
-                    if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
-                    {
-                        int savedCallId = callRecord.Id;
-                        string recordingUrl = callRecord.RecordingUrl;
-                        string apiKey = _openAiApiKey;
+                        // 🚀 FIX: Added null checks (l.Phone != null) so EF Core doesn't crash on empty DB records
+                        var matchedLead = await _context.Leads
+                            .FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
 
-                        _ = System.Threading.Tasks.Task.Run(async () =>
+                        var matchedAccount = await _context.Accounts
+                            .FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
+
+                        // 🚀 FIX: Safely parse the string duration to an integer
+                        int parsedDuration = 0;
+                        if (!string.IsNullOrWhiteSpace(payload.duration))
                         {
-                            using var scope = _scopeFactory.CreateScope();
-                            var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                            int.TryParse(payload.duration, out parsedDuration);
+                        }
 
-                            try
+                        var callRecord = new CallRecord
+                        {
+                            CustomerPhone = payload.client_number,
+                            SalespersonPhone = !string.IsNullOrWhiteSpace(payload.emp_no) ? payload.emp_no : evt.emp_number,
+                            RecordingUrl = payload.call_recording_url,
+                            DurationSeconds = parsedDuration,
+                            CallDate = DateTime.UtcNow,
+                            LeadId = matchedLead?.Id,
+                            AccountId = matchedAccount?.Id
+                        };
+
+                        _context.CallRecords.Add(callRecord);
+                        await _context.SaveChangesAsync();
+
+                        // --- Background Audio Processing ---
+                        if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
+                        {
+                            int savedCallId = callRecord.Id;
+                            string recordingUrl = callRecord.RecordingUrl;
+                            string apiKey = _openAiApiKey;
+
+                            _ = System.Threading.Tasks.Task.Run(async () =>
                             {
-                                byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
-                                if (audioBytes == null || audioBytes.Length == 0) return;
+                                using var scope = _scopeFactory.CreateScope();
+                                var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                                string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
-                                if (string.IsNullOrWhiteSpace(transcription)) return;
-
-                                string summary = await GenerateCallSummaryAsync(transcription, apiKey);
-
-                                var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
-                                if (recordToUpdate != null)
+                                try
                                 {
-                                    recordToUpdate.TranscriptionText = transcription;
-                                    recordToUpdate.AiSummary = summary;
-                                    await bgContext.SaveChangesAsync();
+                                    byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
+                                    if (audioBytes == null || audioBytes.Length == 0) return;
+
+                                    string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
+                                    if (string.IsNullOrWhiteSpace(transcription)) return;
+
+                                    string summary = await GenerateCallSummaryAsync(transcription, apiKey);
+
+                                    var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
+                                    if (recordToUpdate != null)
+                                    {
+                                        recordToUpdate.TranscriptionText = transcription;
+                                        recordToUpdate.AiSummary = summary;
+                                        await bgContext.SaveChangesAsync();
+                                    }
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[AI Background Error] Call ID {savedCallId}: {ex.Message}");
-                            }
-                        });
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[AI Background Error] Call ID {savedCallId}: {ex.Message}");
+                                }
+                            });
+                        }
                     }
                 }
-            }
 
-            return Ok(new { success = true, message = "Call logged and AI processing initiated." });
+                return Ok(new { success = true, message = "Call logged and AI processing initiated." });
+            }
+            catch (Exception ex)
+            {
+                // 🚀 FIX: Returns the exact crash details instead of a blank 500 error
+                return StatusCode(500, new { success = false, message = ex.Message, stack = ex.StackTrace });
+            }
         }
 
         // =========================================================================
