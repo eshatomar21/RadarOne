@@ -90,7 +90,7 @@ namespace Radar_CRM.Controllers
                         _context.CallRecords.Add(callRecord);
                         await _context.SaveChangesAsync();
 
-                        // --- Background Audio Processing ---
+                        // --- Background Audio Processing & File Saving ---
                         if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
                         {
                             int savedCallId = callRecord.Id;
@@ -104,17 +104,34 @@ namespace Radar_CRM.Controllers
 
                                 try
                                 {
+                                    // 1. Download the audio file
                                     byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
                                     if (audioBytes == null || audioBytes.Length == 0) return;
 
+                                    // 2. Define the exact local folder path
+                                    string folderPath = @"C:\CRM_files\Call_recordings";
+
+                                    // Ensure the directory exists, if not, create it automatically
+                                    if (!System.IO.Directory.Exists(folderPath))
+                                    {
+                                        System.IO.Directory.CreateDirectory(folderPath);
+                                    }
+
+                                    // 3. Create a unique filename and save to the C: drive
+                                    string fileName = $"call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
+                                    string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
+
+                                    await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
+
+                                    // 4. Send to AI for transcription and summary
                                     string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
-                                    if (string.IsNullOrWhiteSpace(transcription)) return;
+                                    string summary = string.IsNullOrWhiteSpace(transcription) ? "No speech detected." : await GenerateCallSummaryAsync(transcription, apiKey);
 
-                                    string summary = await GenerateCallSummaryAsync(transcription, apiKey);
-
+                                    // 5. Update the database record with the new Local File Path and AI results
                                     var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
                                     if (recordToUpdate != null)
                                     {
+                                        recordToUpdate.LocalFilePath = fullLocalPath; // Save path to DB
                                         recordToUpdate.TranscriptionText = transcription;
                                         recordToUpdate.AiSummary = summary;
                                         await bgContext.SaveChangesAsync();
@@ -122,7 +139,7 @@ namespace Radar_CRM.Controllers
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"[AI Background Error] Call ID {savedCallId}: {ex.Message}");
+                                    Console.WriteLine($"[Audio Processing Error] Call ID {savedCallId}: {ex.Message}");
                                 }
                             });
                         }

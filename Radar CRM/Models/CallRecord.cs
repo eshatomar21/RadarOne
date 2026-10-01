@@ -23,15 +23,19 @@ namespace Radar_CRM.Models
         [DataType(DataType.Url)]
         public string? RecordingUrl { get; set; } = "";
 
+        // 🚀 NEW: Stores the physical C: drive path of the downloaded recording
+        public string? LocalFilePath { get; set; }
+
         [Display(Name = "Duration (Seconds)")]
         public int DurationSeconds { get; set; }
 
-        // 🚀 FIX: Made nullable and added default fallback text
+        // AI Results
         public string? TranscriptionText { get; set; } = "Processing...";
         public string? AiSummary { get; set; } = "Processing...";
 
         public DateTime CallDate { get; set; } = DateTime.UtcNow;
 
+        // --- CRM Linking ---
         public int? LeadId { get; set; }
 
         [ForeignKey("LeadId")]

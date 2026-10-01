@@ -45,8 +45,8 @@
     "Order": 0,
     "Parameters": [
       {
-        "Name": "payload",
-        "Type": "Radar_CRM.DTOs.CallyzerWebhookPayload",
+        "Name": "events",
+        "Type": "System.Collections.Generic.List\u00601[[Radar_CRM.DTOs.CallyzerWebhookEvent, Radar CRM, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "IsRequired": true
       }
     ],
