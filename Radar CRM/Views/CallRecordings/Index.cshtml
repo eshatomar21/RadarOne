@@ -2,343 +2,249 @@
 
 @{
     ViewData["Title"] = "Call Intelligence Logs";
+    // Filter out rows that do not have a recording
+    var validCalls = Model.Where(c => !string.IsNullOrEmpty(c.RecordingUrl) || !string.IsNullOrEmpty(c.LocalFilePath)).OrderByDescending(c => c.CallDate);
+    int totalRecords = validCalls.Count();
 }
 
 <style>
-    /* Premium Enterprise SaaS Theme */
-    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
     :root {
-        --bg-body: #f3f4f6;
+        --bg-body: #f8fafc;
         --bg-surface: #ffffff;
-        --primary-blue: #0f172a;
-        --text-dark: #111827;
-        --text-main: #374151;
-        --text-muted: #6b7280;
-        --border-soft: #e5e7eb;
-        --radius-md: 4px;
-    }
-
-    body .content-area {
-        padding: 0 !important;
-        background-color: var(--bg-body);
+        --primary: #4f46e5;
+        --primary-hover: #4338ca;
+        --text-dark: #0f172a;
+        --text-muted: #64748b;
+        --border-soft: #e2e8f0;
     }
 
     body {
         background-color: var(--bg-body);
-        color: var(--text-main);
-        font-family: 'Inter', -apple-system, sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif;
     }
 
-    /* Main Container layout */
     .crm-container {
         display: flex;
         flex-direction: column;
         height: calc(100vh - 70px);
-        width: 100%;
         background: var(--bg-surface);
-        border-top: 1px solid var(--border-soft);
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        margin: 16px;
+        overflow: hidden;
     }
 
-    /* Unified Toolbar */
     .table-toolbar {
-        padding: 12px 24px;
+        padding: 16px 24px;
         border-bottom: 1px solid var(--border-soft);
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        background-color: var(--bg-surface);
+        align-items: center;
+        background: #ffffff;
     }
 
     .toolbar-title {
-        font-size: 1.1rem;
+        font-size: 1.25rem;
         font-weight: 700;
         color: var(--text-dark);
         margin: 0;
         display: flex;
         align-items: center;
-        gap: 10px;
     }
 
-    /* Table Styling */
-    .table-container {
-        flex: 1;
-        overflow-y: auto;
+    .record-count-badge {
+        font-size: 0.8rem;
+        padding: 4px 12px;
+        margin-left: 12px;
+        font-weight: 700;
+        vertical-align: middle;
     }
 
     .table-custom {
-        margin-bottom: 0;
+        margin: 0;
         width: 100%;
         border-collapse: separate;
         border-spacing: 0;
     }
 
-        .table-custom thead th {
-            background-color: #f8fafc;
-            color: var(--text-muted);
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: 1px solid var(--border-soft);
-            padding: 14px 16px;
-        }
-
-        .table-custom tbody td {
-            padding: 12px 16px;
-            font-size: 0.85rem;
-            vertical-align: middle;
-            color: var(--text-dark);
-            font-weight: 500;
-            border-bottom: 1px solid #f1f5f9;
-            background-color: var(--bg-surface);
-        }
-
-        .table-custom tbody tr:hover td {
-            background-color: #f8fafc;
-        }
-
-    /* Compact Audio Player */
-    .audio-compact {
-        height: 36px;
-        width: 200px;
-        outline: none;
+    .table-custom thead th {
+        background-color: #f8fafc;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border-soft);
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
 
-        .audio-compact::-webkit-media-controls-panel {
-            background-color: #f1f5f9;
-        }
+    .table-custom tbody td {
+        padding: 16px 24px;
+        font-size: 0.875rem;
+        vertical-align: middle;
+        color: var(--text-dark);
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.2s;
+    }
 
-    /* Linked CRM Badges */
+    .table-custom tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    .btn-action {
+        background-color: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-decoration: none;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-action:hover {
+        background-color: #2563eb;
+        color: #ffffff;
+    }
+
+    .audio-compact {
+        height: 32px;
+        width: 180px;
+    }
+
     .linked-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 12px;
-        border-radius: 50rem;
+        padding: 4px 10px;
+        border-radius: 6px;
         font-size: 0.75rem;
+        font-weight: 600;
+        background-color: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
         font-weight: 700;
-        margin-bottom: 4px;
-        border: 1px solid transparent;
     }
 
-    .linked-account {
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-    }
-
-    .linked-lead {
-        background-color: #f0fdf4;
-        color: #15803d;
-        border-color: #bbf7d0;
-    }
-
-    /* Truncated Summary Column */
-    .text-truncate-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        max-width: 280px;
-        line-height: 1.4;
-        color: var(--text-muted);
-    }
-
-    /* Expandable Chat & Summary Boxes */
-    .expand-btn {
-        cursor: pointer;
-        color: #94a3b8;
-        transition: all 0.2s;
+    .agent-highlight {
+        background-color: #eef2ff;
+        color: #4338ca;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        border: 1px solid transparent;
-    }
-
-        .expand-btn:hover {
-            color: #2563eb;
-            background-color: #eff6ff;
-            border-color: #bfdbfe;
-        }
-
-    .expanded-row-bg {
-        background-color: #f8fafc;
-        border-top: 1px dashed #cbd5e1;
-    }
-
-    .summary-box {
-        background: #fffbeb;
-        border-left: 4px solid #f59e0b;
-        padding: 16px;
-        border-radius: 0 8px 8px 0;
-        font-size: 0.9rem;
-        color: #78350f;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        white-space: pre-wrap;
-        line-height: 1.6;
-    }
-
-    .chat-box {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 16px;
-        max-height: 350px;
-        overflow-y: auto;
-        font-size: 0.85rem;
-        color: #475569;
-        white-space: pre-wrap;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-        line-height: 1.6;
+        border: 1px solid #c7d2fe;
     }
 </style>
 
 <div class="crm-container">
-
-    <!-- Unified Table Toolbar -->
     <div class="table-toolbar">
         <h4 class="toolbar-title">
-            <i class="fa-solid fa-headset text-primary"></i> Call Intelligence Logs
+            <i class="fa-solid fa-headset text-primary me-2"></i> Call Intelligence Logs
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill record-count-badge">
+                @totalRecords Total Recordings
+            </span>
         </h4>
-        <div class="d-flex align-items-center gap-2">
-            <!-- 🚀 NEW: Button to fetch old real data -->
-            <button class="btn btn-sm btn-primary border fw-semibold px-3 shadow-sm" onclick="syncHistoricalCalls(this)">
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary border-0 fw-semibold px-3 shadow-sm" style="background-color: var(--primary);" onclick="syncHistoricalCalls(this)">
                 <i class="fa-solid fa-cloud-arrow-down me-1"></i> Sync Old Calls
             </button>
             <button class="btn btn-sm btn-light border fw-semibold text-muted px-3" onclick="window.location.reload();">
-                <i class="fa-solid fa-rotate-right me-1"></i> Refresh Logs
+                <i class="fa-solid fa-rotate-right me-1"></i> Refresh
             </button>
         </div>
     </div>
 
-    <!-- Scrollable Table Area -->
-    <div class="table-container custom-scrollbar">
+    <div class="table-container custom-scrollbar" style="overflow-y: auto;">
         <table class="table table-custom">
             <thead>
                 <tr>
-                    <th class="text-center" style="width: 50px;"></th>
-                    <th>Date & Duration</th>
-                    <th>Contact & Agent</th>
-                    <th>Call Recording</th>
+                    <th>Date & Time</th>
+                    <th>Sales Agent</th>
+                    <th>Customer Contact</th>
+                    <th>Duration</th>
+                    <th>Recording</th>
                     <th>CRM Link</th>
-                    <th>AI Snapshot</th>
+                    <th class="text-end">Action</th>
                 </tr>
             </thead>
-            <tbody id="tableBody">
-                @if (Model != null && Model.Any())
+            <tbody>
+                @if (validCalls.Any())
                 {
-                    foreach (var call in Model)
+                    foreach (var call in validCalls)
                     {
                         <tr>
-                            <!-- 1. Expand Toggle -->
-                            <td class="text-center">
-                                <div class="expand-btn" data-bs-toggle="collapse" data-bs-target="#collapse-@call.Id" aria-expanded="false" onclick="toggleChevron(this)" title="View Transcript">
-                                    <i class="fa-solid fa-chevron-down"></i>
+                            <td>
+                                <div class="fw-bold">@call.CallDate.ToString("dd MMM yyyy")</div>
+                                <div class="text-muted mt-1" style="font-size: 0.75rem;">
+                                    <i class="fa-regular fa-clock"></i> @call.CallDate.ToString("hh:mm tt")
                                 </div>
                             </td>
-
-                            <!-- 2. Date & Duration -->
                             <td>
-                                <div class="fw-bold text-dark">@call.CallDate.ToString("dd MMM yyyy")</div>
-                                <div class="text-muted mt-1" style="font-size: 0.75rem; font-weight: 600;">
-                                    <i class="fa-regular fa-clock me-1"></i> @call.CallDate.ToString("hh:mm tt") &nbsp;•&nbsp; @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
+                                <div class="agent-highlight">
+                                    <i class="fa-solid fa-user-tie me-2"></i>
+                                    @(string.IsNullOrEmpty(call.SalespersonName) ? "Unknown Agent" : call.SalespersonName)
+                                </div>
+                                <div class="text-muted mt-1 ms-1" style="font-size: 0.8rem; font-weight: 600;">
+                                    <i class="fa-solid fa-phone me-1"></i> @(string.IsNullOrEmpty(call.SalespersonPhone) ? "N/A" : call.SalespersonPhone)
                                 </div>
                             </td>
-
-                            <!-- 3. Phones -->
                             <td>
-                                <div class="fw-semibold text-dark"><i class="fa-solid fa-phone text-muted me-2" style="font-size:0.75rem;"></i> @call.CustomerPhone</div>
-                                <div class="text-muted mt-1" style="font-size: 0.8rem;"><i class="fa-solid fa-user-tie me-2" style="font-size:0.75rem;"></i> @call.SalespersonPhone</div>
+                                <div class="fw-semibold text-dark">
+                                    <i class="fa-solid fa-phone text-muted me-2"></i>@call.CustomerPhone
+                                </div>
                             </td>
-
-                            <!-- 4. Audio Player -->
                             <td>
-                                @if (!string.IsNullOrEmpty(call.RecordingUrl))
+                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1">
+                                    @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
+                                </span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(call.LocalFilePath))
                                 {
-                                    <audio controls class="audio-compact rounded-pill shadow-sm">
-                                        <source src="@call.RecordingUrl" type="audio/mpeg">
+                                    <audio controls class="audio-compact">
+                                        <source src="/api/webhook/play-audio/@call.Id" type="audio/mpeg">
                                     </audio>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border">No Audio Link</span>
+                                    <span class="status-badge bg-warning bg-opacity-10 text-warning border border-warning">Downloading...</span>
                                 }
                             </td>
-
-                            <!-- 5. Linked CRM -->
                             <td>
                                 @if (call.Account != null)
                                 {
-                                    <a href="@Url.Action("Edit", "Accounts", new { id = call.AccountId })" class="text-decoration-none">
-                                        <div class="linked-badge linked-account shadow-sm">
-                                            <i class="fa-regular fa-building"></i> @call.Account.AccountName
-                                        </div>
-                                    </a>
+                                    <span class="linked-badge"><i class="fa-regular fa-building"></i> @call.Account.AccountName</span>
                                 }
-                                @if (call.Lead != null)
+                                else if (call.Lead != null)
                                 {
-                                    <a href="@Url.Action("Edit", "Leads", new { id = call.LeadId })" class="text-decoration-none">
-                                        <div class="linked-badge linked-lead shadow-sm">
-                                            <i class="fa-regular fa-user"></i> @call.Lead.LeadName
-                                        </div>
-                                    </a>
-                                }
-                                @if (call.Account == null && call.Lead == null)
-                                {
-                                    <span class="text-muted fst-italic fw-semibold" style="font-size: 0.8rem;">Unlinked Number</span>
-                                }
-                            </td>
-
-                            <!-- 6. Truncated Summary -->
-                            <td>
-                                @if (!string.IsNullOrEmpty(call.AiSummary))
-                                {
-                                    <div class="text-truncate-2" title="Click arrow to expand">
-                                        @call.AiSummary
-                                    </div>
+                                    <span class="linked-badge"><i class="fa-regular fa-user"></i> @call.Lead.LeadName</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning" style="font-size:0.75rem;"><i class="fa-solid fa-microchip fa-spin me-1"></i> Processing AI...</span>
+                                    <span class="text-muted fst-italic" style="font-size: 0.75rem;">Unlinked</span>
                                 }
                             </td>
-                        </tr>
-
-                        <!-- EXPANDABLE ROW: Chat Box and Full Summary -->
-                        <tr class="collapse" id="collapse-@call.Id">
-                            <td colspan="6" class="p-0 border-0">
-                                <div class="p-4 expanded-row-bg">
-                                    <div class="row g-4">
-
-                                        <!-- Full AI Summary Box -->
-                                        <div class="col-lg-5">
-                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center" style="font-size: 0.95rem;">
-                                                <i class="fa-solid fa-wand-magic-sparkles text-warning me-2"></i> Executive Summary
-                                            </h6>
-                                            <div class="summary-box">
-                                                @(string.IsNullOrEmpty(call.AiSummary) ? "The AI is currently analyzing this call. Please refresh in a moment." : call.AiSummary)
-                                            </div>
-                                        </div>
-
-                                        <!-- Full Chat Transcription Box -->
-                                        <div class="col-lg-7">
-                                            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center" style="font-size: 0.95rem;">
-                                                <i class="fa-solid fa-file-lines text-primary me-2"></i> Audio Transcript
-                                            </h6>
-                                            <div class="chat-box custom-scrollbar">
-                                                @(string.IsNullOrEmpty(call.TranscriptionText) ? "Transcription text is not available yet." : call.TranscriptionText)
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
+                            <td class="text-end">
+                                <a asp-controller="CallRecordings" asp-action="CallAnalysis" asp-route-id="@call.Id" class="btn-action shadow-sm">
+                                    <i class="fa-solid fa-chart-line"></i> View Analysis
+                                </a>
                             </td>
                         </tr>
                     }
@@ -346,10 +252,10 @@
                 else
                 {
                     <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
-                            <i class="fa-solid fa-microphone-slash mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
-                            <br /><span class="fw-semibold fs-5 text-dark">No call records found.</span>
-                            <p class="mt-1">Calls from Callyzer will automatically appear here.</p>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-microphone-slash mb-3" style="font-size:2.5rem; color:#cbd5e1;"></i>
+                            <h5 class="fw-bold text-dark">No Call Recordings Found</h5>
+                            <p class="mb-0">Only calls with valid recordings are displayed here.</p>
                         </td>
                     </tr>
                 }
@@ -360,36 +266,12 @@
 
 @section Scripts {
     <script>
-        // Smoothly rotate the FontAwesome chevron icon when expanding/collapsing the chat row
-        function toggleChevron(btn) {
-            const icon = btn.querySelector('i');
-            if (icon.classList.contains('fa-chevron-down')) {
-                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
-                btn.style.backgroundColor = '#eff6ff';
-                btn.style.borderColor = '#bfdbfe';
-                btn.style.color = '#2563eb';
-            } else {
-                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
-                btn.style.backgroundColor = 'transparent';
-                btn.style.borderColor = 'transparent';
-                btn.style.color = '#94a3b8';
-            }
-        }
-
-        // 🚀 NEW: Function to trigger the background import of old real calls
         function syncHistoricalCalls(btn) {
-            // Prompt for the Callyzer API Token
-            const token = prompt("Enter your Callyzer API Token to pull real historical data:");
-            if (!token) return;
-
             const originalHtml = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Syncing...';
             btn.disabled = true;
 
-            // Call the C# endpoint we built to fetch and download old recordings
-            fetch('/api/webhook/import-historical-callyzer?callyzerApiToken=' + encodeURIComponent(token.trim()), {
-                method: 'POST'
-            })
+            fetch('/api/webhook/import-historical-callyzer', { method: 'POST' })
             .then(async response => {
                 if (!response.ok) {
                     const err = await response.text();
@@ -399,8 +281,8 @@
             })
             .then(data => {
                 if(data.success) {
-                    alert(data.message);
-                    window.location.reload(); // Refresh to see the new rows
+                    alert(data.message); 
+                    window.location.reload(); 
                 } else {
                     alert("Import Failed: " + data.message);
                 }

@@ -31,16 +31,24 @@ namespace Radar_CRM.Controllers
             return View(callRecords);
         }
 
-        // 3. Map this method to /CallRecordings/Details/5
-        [Route("Detail/{id}")]
-        public async Task<IActionResult> Detail(int id)
+        // 🚀 NEW: Dedicated Call Analysis Page with explicit Route
+        [Route("CallAnalysis/{id?}")]
+        public async Task<IActionResult> CallAnalysis(int? id)
         {
+            if (id == null)
+            {
+                return NotFound("Call Record ID not provided.");
+            }
+
             var callRecord = await _context.CallRecords
                 .Include(c => c.Lead)
                 .Include(c => c.Account)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (callRecord == null) return NotFound();
+            if (callRecord == null)
+            {
+                return NotFound("Call Record not found in the database.");
+            }
 
             return View(callRecord);
         }

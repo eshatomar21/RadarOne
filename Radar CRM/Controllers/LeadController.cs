@@ -696,9 +696,14 @@ namespace Radar_CRM.Controllers
 
             // 🚀 FIX: Changed DealId to LeadId so it successfully finds the Lead's notes!
             ViewBag.ExistingNotes = await _context.Note
-                .Include(n => n.NoteOwner)
-                .Where(n => n.LeadId == id)
-                .OrderByDescending(n => n.CreatedDateTime)
+    .Include(n => n.NoteOwner)
+    .Where(n => n.LeadId == id)
+    .OrderByDescending(n => n.CreatedDateTime)
+    .ToListAsync();
+
+            // 🚀 ADDED: Fetch all tasks belonging to this Lead
+            ViewBag.Tasks = await _context.Tasks
+                .Where(t => t.LeadId == id)
                 .ToListAsync();
 
             // =========================================================
@@ -1098,6 +1103,40 @@ namespace Radar_CRM.Controllers
 
             return View(lead);
         }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken] // 🚀 FIX: Prevents ASP.NET from blocking the AJAX POST
+        [Route("Tasks/UpdateStatus")] // 🚀 FIX: Guarantees the URL matches exactly
+        public async Task<IActionResult> UpdateStatus(int id, string status)
+        {
+            if (id <= 0 || string.IsNullOrWhiteSpace(status))
+            {
+                return BadRequest(new { success = false, message = "Invalid Task ID or Status." });
+            }
+
+            try
+            {
+                var task = await _context.Tasks.FindAsync(id);
+
+                if (task == null)
+                {
+                    return NotFound(new { success = false, message = "Task not found." });
+                }
+
+                task.Status = status;
+
+                _context.Update(task);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { success = true, message = "Status updated successfully." });
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Database Error: " + ex.Message });
+            }
+        }
+
+
 
         private bool LeadExists(int id)
         {
