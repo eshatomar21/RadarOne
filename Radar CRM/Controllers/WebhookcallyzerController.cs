@@ -54,25 +54,36 @@ namespace Radar_CRM.Controllers
 
                         string phoneToMatch = payload.client_number.Replace("+", "").Trim();
 
-                        // 🚀 FIX: Added null checks (l.Phone != null) so EF Core doesn't crash on empty DB records
                         var matchedLead = await _context.Leads
                             .FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
 
                         var matchedAccount = await _context.Accounts
                             .FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
 
-                        // 🚀 FIX: Safely parse the string duration to an integer
                         int parsedDuration = 0;
                         if (!string.IsNullOrWhiteSpace(payload.duration))
                         {
                             int.TryParse(payload.duration, out parsedDuration);
                         }
 
+                        // 🚀 CRITICAL FIX: Enforce the [MaxLength(20)] constraint from your model
+                        string customerPhoneSafe = payload.client_number ?? "";
+                        if (customerPhoneSafe.Length > 20) customerPhoneSafe = customerPhoneSafe.Substring(0, 20);
+
+                        // 🚀 CRITICAL FIX: Enforce [MaxLength(20)] for SalespersonPhone
+                        string salesPhoneSafe = !string.IsNullOrWhiteSpace(payload.emp_no) ? payload.emp_no : evt.emp_number;
+                        salesPhoneSafe ??= "";
+                        if (salesPhoneSafe.Length > 20) salesPhoneSafe = salesPhoneSafe.Substring(0, 20);
+
+                        // Safe URL length check
+                        string urlSafe = payload.call_recording_url ?? "";
+                        if (urlSafe.Length > 500) urlSafe = urlSafe.Substring(0, 500);
+
                         var callRecord = new CallRecord
                         {
-                            CustomerPhone = payload.client_number,
-                            SalespersonPhone = !string.IsNullOrWhiteSpace(payload.emp_no) ? payload.emp_no : evt.emp_number,
-                            RecordingUrl = payload.call_recording_url,
+                            CustomerPhone = customerPhoneSafe,
+                            SalespersonPhone = salesPhoneSafe,
+                            RecordingUrl = urlSafe,
                             DurationSeconds = parsedDuration,
                             CallDate = DateTime.UtcNow,
                             LeadId = matchedLead?.Id,
@@ -125,11 +136,11 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // 🚀 FIX: Returns the exact crash details instead of a blank 500 error
-                return StatusCode(500, new { success = false, message = ex.Message, stack = ex.StackTrace });
+                // Unwraps the exact SQL Error so you never get a generic crash again
+                string actualDbError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, new { success = false, message = "Database Error: " + actualDbError });
             }
         }
-
         // =========================================================================
         // HELPER METHODS
         // =========================================================================
