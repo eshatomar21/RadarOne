@@ -105,7 +105,11 @@
     /* The Table */
     .table-responsive { overflow: auto; flex-grow: 1; width: 100%; }
     .table { margin-bottom: 0; white-space: nowrap; border-collapse: separate; border-spacing: 0; }
-    #leadsTable { width: 100% !important; min-width: max-content !important; }
+  #leadsTable {
+        table-layout: fixed !important;
+        width: 100% !important;
+        min-width: max-content !important;
+    }
 
     .table thead th, .table tbody td { border-right: 1px solid var(--border-dark) !important; }
     .table thead th:last-child, .table tbody td:last-child { border-right: none !important; }
@@ -145,7 +149,15 @@
     .table thead th.sticky-cb, .table thead th.sticky-actions { z-index: 12; background-color: var(--bg-surface); }
     
     /* Dummy Filler Column */
-    .dummy-filler-col { width: auto !important; max-width: none !important; min-width: 10px !important; padding: 0 !important; border: none !important; background: transparent !important; pointer-events: none; }
+   .dummy-filler-col {
+        width: auto !important; /* Allows it to absorb all remaining space */
+        max-width: none !important;
+        min-width: 10px !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        pointer-events: none;
+    }
 
     /* Custom Views Tabs */
     .custom-views-nav { display: flex; align-items: center; gap: 8px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
@@ -752,211 +764,11 @@
                             <input name="Subject" class="task-input" placeholder="E.g., Follow up call..." required />
                         </div>
 
-                        <!-- Dropdown to select Lead from the Index List -->
-                        <div class="col-md-6 form-group mb-4">
-                            <label class="task-label">Related Lead</label>
-                            <select name="LeadId" id="taskModalLeadId" class="task-input">
-                                <option value="">- Select Lead -</option>
-                                @if (Model != null)
-                                {
-                                    foreach (var lead in Model)
-                                    {
-                                        <option value="@lead.Id">@(string.IsNullOrEmpty(lead.LeadName) ? "Lead #" + lead.Id : lead.LeadName)</option>
-                                    }
-                                }
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 form-group mb-4">
-                            <label class="task-label">Due Date</label>
-                            <input name="DueDate" type="date" id="modalDueDate" class="task-input" />
-                        </div>
-
-                        <div class="col-md-6 form-group mb-4">
-                            <label class="task-label">Priority</label>
-                            <select name="Priority" class="task-input">
-                                <option value="Highest">Highest</option>
-                                <option value="High" selected>High</option>
-                                <option value="Normal">Normal</option>
-                                <option value="Low">Low</option>
-                                <option value="Lowest">Lowest</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 form-group mb-4">
-                            <label class="task-label">Task Owner</label>
-                            <select name="TaskOwnerId" asp-items="ViewBag.UsersList" class="task-input">
-                                <option value="">- Assign To -</option>
-                            </select>
-                        </div>
-
-                        <!-- Modern UI Toggles -->
-                        <div class="col-md-12 form-group mb-2 d-flex align-items-center gap-4 pt-3">
-                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
-                                <input class="form-check-input" type="checkbox" id="modalRepeatToggle" disabled>
-                                <label class="form-check-label ms-2" for="modalRepeatToggle">Repeat</label>
-                            </div>
-                            <div class="form-check form-switch task-switch m-0 p-0 ps-4">
-                                <input class="form-check-input" type="checkbox" id="modalReminderToggle" disabled>
-                                <label class="form-check-label ms-2" for="modalReminderToggle">Reminder</label>
-                            </div>
-                            <span class="text-muted ms-2" style="font-size:0.8rem;" id="modalRepeatHelpText">(Select Due Date first)</span>
-                        </div>
-
-                        <!-- Expandable Repeat Panel -->
-                        <div class="col-md-12 expandable-panel" id="modalRepeatPanel">
-                            <div class="row align-items-center mb-3">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
-                                <div class="col-9">
-                                    <select class="task-input w-50 mb-2" style="padding: 4px 8px;">
-                                        <option>Daily</option>
-                                        <option>Weekly</option>
-                                        <option>Monthly</option>
-                                        <option>Yearly</option>
-                                    </select>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="modalExcludeWeekends">
-                                        <label class="form-check-label text-muted" for="modalExcludeWeekends" style="font-size:0.85rem;">Except weekends and holidays.</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Ends</div>
-                                <div class="col-9">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsNever" checked>
-                                        <label class="form-check-label" for="modalEndsNever" style="font-size:0.85rem;">Never</label>
-                                    </div>
-                                    <div class="form-check mb-2 d-flex align-items-center gap-2">
-                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsAfter">
-                                        <label class="form-check-label" for="modalEndsAfter" style="font-size:0.85rem;">After</label>
-                                        <input type="number" class="form-control form-control-sm w-25 d-inline" value="1">
-                                        <span style="font-size:0.85rem;">Times</span>
-                                    </div>
-                                    <div class="form-check d-flex align-items-center gap-2">
-                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsOn">
-                                        <label class="form-check-label" for="modalEndsOn" style="font-size:0.85rem;">On</label>
-                                        <input type="date" class="form-control form-control-sm w-50 d-inline">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Expandable Reminder Panel -->
-                        <div class="col-md-12 expandable-panel" id="modalReminderPanel">
-                            <div class="form-check mb-3 d-flex align-items-center gap-2">
-                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindOnDate" checked>
-                                <label class="form-check-label" for="modalRemindOnDate" style="font-size:0.85rem;">On</label>
-                                <input type="date" class="form-control form-control-sm w-25 d-inline">
-                                <span style="font-size:0.85rem;">at</span>
-                                <input type="time" class="form-control form-control-sm w-25 d-inline">
-                            </div>
-                            <div class="form-check mb-4 d-flex align-items-center gap-2">
-                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindDays">
-                                <label class="form-check-label" for="modalRemindDays" style="font-size:0.85rem;">On</label>
-                                <select class="form-select form-select-sm w-25 d-inline">
-                                    <option>1 Day(s)</option>
-                                    <option>2 Day(s)</option>
-                                </select>
-                                <span style="font-size:0.85rem;">of due date at</span>
-                                <input type="time" class="form-control form-control-sm w-25 d-inline">
-                            </div>
-
-                            <div class="row align-items-center mb-3">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
-                                <div class="col-9">
-                                    <select class="task-input w-50" style="padding: 4px 8px;">
-                                        <option>None</option>
-                                        <option>Daily</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row align-items-center">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Notify</div>
-                                <div class="col-9">
-                                    <select class="task-input w-50" style="padding: 4px 8px;">
-                                        <option>Email</option>
-                                        <option>Popup</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 🚀 CORRECTED: Expandable "More Fields" Button -->
-                        <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="toggleMoreFields()">
-                            <span>More Fields</span>
-                            <i class="fa-solid fa-chevron-right" id="moreFieldsIcon" style="transition: transform 0.2s;"></i>
-                        </div>
-
-                        <!-- 🚀 CORRECTED: Hidden Extended Task Fields (Status & Description) -->
-                        <div id="moreFieldsContainer" style="display: none; padding-top: 24px; border-top: 1px dashed #e2e8f0; margin-top: 20px;">
-                            <div class="row">
-                                <div class="col-md-6 form-group mb-4">
-                                    <label class="task-label">Status</label>
-                                    <select name="Status" class="task-input">
-                                        <option value="Not Started" selected>Not Started</option>
-                                        <option value="In Progress">In Progress</option>
-                                        <option value="Waiting on someone else">Waiting on someone else</option>
-                                        <option value="Deferred">Deferred</option>
-                                        <option value="Completed">Completed</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="col-md-12 form-group mb-0">
-                                    <label class="task-label">Description</label>
-                                    <textarea name="Description" class="task-input" rows="3" placeholder="Add task details or description..."></textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div class="modal-footer task-modal-footer">
-                        <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn-task-save">Save Task</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ========================================================
-     MODERN SAAS QUICK CREATE TASK MODAL (Navy & Slate Theme)
-     ======================================================== -->
-<div class="modal fade" id="quickTaskModal" tabindex="-1" aria-labelledby="quickTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content task-modal-content">
-
-            <div class="modal-header task-modal-header">
-                <h5 class="modal-title task-modal-title" id="quickTaskModalLabel">
-                    <div style="background: var(--theme-navy-light, #eff6ff); color: var(--theme-navy-primary, #1e3a8a); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px;">
-                        <i class="fa-solid fa-check-square"></i>
-                    </div>
-                    Add New Task
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <form asp-controller="Tasks" asp-action="Create" method="post">
-                <div class="modal-body task-modal-body">
-                    <div class="row">
-                        <div class="col-md-12 form-group mb-4">
-                            <label class="task-label">Subject <span class="text-danger">*</span></label>
-                            <input name="Subject" class="task-input" placeholder="E.g., Follow up call..." required />
-                        </div>
-
-                        <!-- Dropdown to select Account from the Index List -->
+                        <!-- Dropdown to select Account -->
                         <div class="col-md-6 form-group mb-4">
                             <label class="task-label">Related Account</label>
-                            <select name="AccountId" id="taskModalAccountId" class="task-input">
+                            <select name="AccountId" id="taskModalAccountId" class="task-input" asp-items="ViewBag.AccountsList">
                                 <option value="">- Select Account -</option>
-                                @if (Model != null)
-                                {
-                                    foreach (var acc in Model)
-                                    {
-                                        <option value="@acc.Id">@acc.AccountName</option>
-                                    }
-                                }
                             </select>
                         </div>
 
@@ -1026,11 +838,6 @@
                                         <input type="number" class="form-control form-control-sm w-25 d-inline" value="1">
                                         <span style="font-size:0.85rem;">Times</span>
                                     </div>
-                                    <div class="form-check d-flex align-items-center gap-2">
-                                        <input class="form-check-input" type="radio" name="modalEndsRadio" id="modalEndsOn">
-                                        <label class="form-check-label" for="modalEndsOn" style="font-size:0.85rem;">On</label>
-                                        <input type="date" class="form-control form-control-sm w-50 d-inline">
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1043,40 +850,11 @@
                                 <input type="date" class="form-control form-control-sm w-25 d-inline">
                                 <span style="font-size:0.85rem;">at</span>
                                 <input type="time" class="form-control form-control-sm w-25 d-inline">
-                            </div>
-                            <div class="form-check mb-4 d-flex align-items-center gap-2">
-                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindDays">
-                                <label class="form-check-label" for="modalRemindDays" style="font-size:0.85rem;">On</label>
-                                <select class="form-select form-select-sm w-25 d-inline">
-                                    <option>1 Day(s)</option>
-                                    <option>2 Day(s)</option>
-                                </select>
-                                <span style="font-size:0.85rem;">of due date at</span>
-                                <input type="time" class="form-control form-control-sm w-25 d-inline">
-                            </div>
-
-                            <div class="row align-items-center mb-3">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Repeat type</div>
-                                <div class="col-9">
-                                    <select class="task-input w-50" style="padding: 4px 8px;">
-                                        <option>None</option>
-                                        <option>Daily</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row align-items-center">
-                                <div class="col-3 fw-bold text-muted" style="font-size:0.85rem;">Notify</div>
-                                <div class="col-9">
-                                    <select class="task-input w-50" style="padding: 4px 8px;">
-                                        <option>Email</option>
-                                        <option>Popup</option>
-                                    </select>
-                                </div>
                             </div>
                         </div>
 
                         <!-- Expandable "More Fields" Button -->
-                        <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="toggleMoreFields()">
+                        <div class="task-more-fields-btn" id="moreFieldsToggle" onclick="window.toggleMoreFields()">
                             <span>More Fields</span>
                             <i class="fa-solid fa-chevron-right" id="moreFieldsIcon" style="transition: transform 0.2s;"></i>
                         </div>
@@ -1086,13 +864,13 @@
                             <div class="row">
                                 <div class="col-md-6 form-group mb-4">
                                     <label class="task-label">Lead Name</label>
-                                    <select name="LeadId" class="task-input">
+                                    <select name="LeadId" id="taskModalLeadId" class="task-input">
                                         <option value="">- Select Lead -</option>
-                                        @if (ViewBag.RelatedLeads != null)
+                                        @if (Model != null)
                                         {
-                                            foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
+                                            foreach (var lead in Model)
                                             {
-                                                <option value="@lead.Id">@lead.LeadName</option>
+                                                <option value="@lead.Id">@(string.IsNullOrEmpty(lead.LeadName) ? "Lead #" + lead.Id : lead.LeadName)</option>
                                             }
                                         }
                                     </select>
@@ -1111,7 +889,6 @@
                                         <option value="Not a Doctor">Not a Doctor</option>
                                         <option value="Warm">Warm</option>
                                         <option value="Hot">Hot</option>
-                                        <option value="Not Interested">Not Interested</option>
                                     </select>
                                 </div>
 
@@ -1128,16 +905,15 @@
                         </div>
 
                     </div>
-                    <div class="modal-footer task-modal-footer">
-                        <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn-task-save">Save Task</button>
-                    </div>
+                </div>
+                <div class="modal-footer task-modal-footer">
+                    <button type="button" class="btn-task-cancel" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-task-save">Save Task</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
 
 <!-- Notes Offcanvas Panel -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
@@ -2138,7 +1914,7 @@
         }, 50);
     };
 
- window.toggleMoreFields = function() {
+window.toggleMoreFields = function() {
         const container = document.getElementById("moreFieldsContainer");
         const btn = document.getElementById("moreFieldsToggle");
         const icon = document.getElementById("moreFieldsIcon");
@@ -2156,9 +1932,9 @@
         }
     };
 
- document.addEventListener('change', function (e) {
+document.addEventListener('change', function (e) {
         
-        // 1. Due Date Logic: Enables/Disables toggles based on date selection
+        // A. Enable toggles only when a Due Date is selected
         if (e.target && e.target.id === 'modalDueDate') {
             const hasDate = !!e.target.value;
             const repeatToggle = document.getElementById('modalRepeatToggle');
@@ -2181,18 +1957,23 @@
             }
         }
 
-        // 2. Repeat Toggle Logic
+        // B. Handle Repeat Toggle visibility
         if (e.target && e.target.id === 'modalRepeatToggle') {
             const repeatPanel = document.getElementById('modalRepeatPanel');
-            if (repeatPanel) repeatPanel.style.display = e.target.checked ? 'block' : 'none';
+            if (repeatPanel) {
+                repeatPanel.style.display = e.target.checked ? 'block' : 'none';
+            }
         }
 
-        // 3. Reminder Toggle Logic
+        // C. Handle Reminder Toggle visibility
         if (e.target && e.target.id === 'modalReminderToggle') {
             const reminderPanel = document.getElementById('modalReminderPanel');
-            if (reminderPanel) reminderPanel.style.display = e.target.checked ? 'block' : 'none';
+            if (reminderPanel) {
+                reminderPanel.style.display = e.target.checked ? 'block' : 'none';
+            }
         }
     });
+
 
     // ==========================================
     // BULK EXPORT/DELETE LOGIC

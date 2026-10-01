@@ -372,9 +372,55 @@
         .table-container { height: 600px; }
     }
 
-    /* Dummy Filler Column */
-    #tasksTable { width: 100% !important; min-width: max-content !important; }
-    .dummy-filler-col { width: auto !important; max-width: none !important; min-width: 10px !important; padding: 0 !important; border: none !important; background: transparent !important; pointer-events: none; }
+   /* Dummy Filler Column */
+  /* 🚀 BUG FIX: Ensure table stretches naturally to allow horizontal scrolling */
+    #tasksTable { 
+        table-layout: fixed !important; 
+        width: 100% !important; 
+        min-width: max-content !important; 
+    }
+
+    .dummy-filler-col { 
+        width: auto !important; 
+        max-width: none !important; 
+        min-width: 10px !important; 
+        padding: 0 !important; 
+        border: none !important; 
+        background: transparent !important; 
+        pointer-events: none; 
+    }
+
+    /* 🚀 FIX: Excel Resizer Handle CSS */
+    .excel-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 8px; /* Increased slightly for easier grabbing */
+        height: 100%;
+        cursor: col-resize;
+        z-index: 10;
+        background-color: transparent;
+        transition: background-color 0.2s;
+    }
+    .excel-resizer:hover, .excel-resizer.resizing {
+        background-color: #3b82f6; 
+    }
+
+    /* Excel Resizer Handle */
+    .excel-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 5px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 10;
+        background-color: transparent;
+        transition: background-color 0.2s;
+    }
+    .excel-resizer:hover, .excel-resizer.resizing {
+        background-color: #3b82f6; /* Highlights blue when hovered/dragged */
+    }
 </style>
 
 <!-- Hidden Input for Files -->
@@ -2085,84 +2131,66 @@
     }
 
     // --- EXCEL RESIZING WITH WHITE SPACE FIX ---
-    function setupExcelResizing() {
+ window.setupExcelResizing = function() {
         const table = document.getElementById('tasksTable');
         if (!table) return;
 
+        // 🚀 SPEED FIX: table-layout: fixed means we ONLY need to size the TH elements.
         table.style.tableLayout = "fixed";
-        table.style.width = "max-content";
-        table.style.minWidth = "100%"; // Prevents white space bug
+        table.style.width = "100%"; 
 
         let savedWidths = JSON.parse(localStorage.getItem('crm_col_widths_tasks')) || {};
-        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions):not(.dummy-filler-col)');
-        
-        cols.forEach((col, index) => {
-            col.style.position = 'relative';
-            const colIndex = Array.from(col.parentNode.children).indexOf(col);
 
-            // Apply saved width
-            if (savedWidths[colIndex]) {
-                const w = savedWidths[colIndex];
+        const cols = table.querySelectorAll('thead th:not(.sticky-cb):not(.sticky-actions):not(.dummy-filler-col)');
+        cols.forEach(col => {
+            col.style.position = 'relative';
+
+            const colIndex = Array.from(col.parentNode.children).indexOf(col);
+            
+            // Apply saved width OR fallback
+            let w = savedWidths[colIndex];
+            if (!w) {
+                const colName = col.getAttribute('data-col-name');
+                if (colName === 'Subject') w = '250px';
+                else w = '150px';
+            }
+
+            if (w) {
                 col.style.width = w;
                 col.style.minWidth = w;
                 col.style.maxWidth = w;
-
-                const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-                rows.forEach(row => {
-                    const td = row.children[colIndex];
-                    if (td) {
-                        td.style.width = w;
-                        td.style.minWidth = w;
-                        td.style.maxWidth = w;
-                        td.style.overflow = 'hidden';
-                        td.style.textOverflow = 'ellipsis';
-                        td.style.whiteSpace = 'nowrap';
-                    }
-                });
             }
 
             const resizer = document.createElement('div');
             resizer.className = 'excel-resizer';
+
+            resizer.addEventListener('mouseenter', () => resizer.style.backgroundColor = '#93c5fd');
+            resizer.addEventListener('mouseleave', () => resizer.style.backgroundColor = 'transparent');
+            
             col.appendChild(resizer);
 
             let startX, startWidth;
 
-            resizer.addEventListener('mousedown', function(e) {
+            resizer.addEventListener('mousedown', function (e) {
                 e.preventDefault();
                 startX = e.pageX;
                 startWidth = col.offsetWidth;
-                
-                resizer.classList.add('resizing');
                 document.body.style.cursor = 'col-resize';
                 
                 let animationFrameId;
-
+                
                 function mouseMoveHandler(e) {
                     if (animationFrameId) cancelAnimationFrame(animationFrameId);
                     
                     animationFrameId = requestAnimationFrame(() => {
-                        const newWidth = Math.max(40, startWidth + (e.pageX - startX));
+                        const newWidth = Math.max(90, startWidth + (e.pageX - startX));
                         col.style.width = `${newWidth}px`;
                         col.style.minWidth = `${newWidth}px`;
                         col.style.maxWidth = `${newWidth}px`;
-
-                        const rows = table.querySelectorAll('tbody tr:not(#noRecordsRow)');
-                        rows.forEach(row => {
-                            const td = row.children[colIndex];
-                            if (td) {
-                                td.style.width = `${newWidth}px`;
-                                td.style.minWidth = `${newWidth}px`;
-                                td.style.maxWidth = `${newWidth}px`;
-                                td.style.overflow = 'hidden';
-                                td.style.textOverflow = 'ellipsis';
-                                td.style.whiteSpace = 'nowrap';
-                            }
-                        });
                     });
                 }
 
                 function mouseUpHandler() {
-                    resizer.classList.remove('resizing');
                     document.body.style.cursor = 'default';
                     document.removeEventListener('mousemove', mouseMoveHandler);
                     document.removeEventListener('mouseup', mouseUpHandler);
@@ -2171,13 +2199,14 @@
                     savedWidths[colIndex] = col.style.width;
                     localStorage.setItem('crm_col_widths_tasks', JSON.stringify(savedWidths));
                 }
-                
+
                 document.addEventListener('mousemove', mouseMoveHandler);
                 document.addEventListener('mouseup', mouseUpHandler);
             });
         });
 
-        const sidebar = document.querySelector('.filter-sidebar');
+       // Setup Sidebar Resizing
+       const sidebar = document.querySelector('.filter-sidebar');
         if (sidebar) {
             sidebar.style.position = 'relative';
             const sideResizer = document.createElement('div');
@@ -2188,14 +2217,14 @@
             sideResizer.style.top = '0';
             sideResizer.style.cursor = 'col-resize';
             sideResizer.style.userSelect = 'none';
-            
+
             sideResizer.addEventListener('mouseenter', () => sideResizer.style.backgroundColor = '#93c5fd');
             sideResizer.addEventListener('mouseleave', () => sideResizer.style.backgroundColor = 'transparent');
 
             sidebar.appendChild(sideResizer);
 
             let sStartX, sStartWidth;
-            sideResizer.addEventListener('mousedown', function(e) {
+            sideResizer.addEventListener('mousedown', function (e) {
                 sStartX = e.pageX;
                 sStartWidth = sidebar.offsetWidth;
                 document.addEventListener('mousemove', sideMouseMove);
@@ -2215,5 +2244,8 @@
                 document.removeEventListener('mouseup', sideMouseUp);
             }
         }
-    }
+    };
+    
+    // Ensure the function executes
+    window.setupExcelResizing();
 </script>
