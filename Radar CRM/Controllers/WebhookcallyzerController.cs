@@ -154,6 +154,162 @@ namespace Radar_CRM.Controllers
                 return StatusCode(500, new { success = false, message = "Database Error: " + actualDbError });
             }
         }
+
+        [HttpPost("import-historical-callyzer")]
+        public async System.Threading.Tasks.Task<IActionResult> ImportHistoricalData([FromQuery] string callyzerApiToken)
+        {
+            if (string.IsNullOrEmpty(callyzerApiToken))
+            {
+                return BadRequest(new { success = false, message = "Please provide your Callyzer API Token as a query parameter (?callyzerApiToken=YOUR_TOKEN)." });
+            }
+
+            try
+            {
+                // 1. Authenticate and Connect to Callyzer API
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", callyzerApiToken);
+
+                // Fetch the call logs directly from Callyzer's server
+                var response = await client.GetAsync("https://api.callyzer.co/v2/call-log");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string err = await response.Content.ReadAsStringAsync();
+                    return StatusCode(500, new { success = false, message = "Callyzer API error: " + err });
+                }
+
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(jsonResponse);
+
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("data", out var dataNode))
+                    return Ok(new { success = true, message = "No data found in Callyzer." });
+
+                // Find the array of call logs
+                JsonElement logsArray;
+                if (dataNode.ValueKind == JsonValueKind.Array)
+                {
+                    logsArray = dataNode;
+                }
+                else if (dataNode.TryGetProperty("data", out var nestedData) && nestedData.ValueKind == JsonValueKind.Array)
+                {
+                    logsArray = nestedData;
+                }
+                else
+                {
+                    return Ok(new { success = true, message = "No valid call logs array found." });
+                }
+
+                int processedCount = 0;
+
+                // 2. Setup Local Folder on C: Drive
+                string folderPath = @"C:\CRM_files\Call_recordings";
+                if (!System.IO.Directory.Exists(folderPath))
+                {
+                    System.IO.Directory.CreateDirectory(folderPath);
+                }
+
+                // 3. Loop through real historical calls
+                foreach (var log in logsArray.EnumerateArray())
+                {
+                    string clientNumber = log.TryGetProperty("client_number", out var cn) ? cn.GetString() : "";
+                    string recordingUrl = log.TryGetProperty("call_recording_url", out var ru) ? ru.GetString() : "";
+
+                    if (string.IsNullOrWhiteSpace(clientNumber)) continue;
+
+                    string phoneToMatch = clientNumber.Replace("+", "").Trim();
+
+                    // Check if this call already exists in DB to prevent duplicates
+                    bool alreadyExists = await _context.CallRecords.AnyAsync(c => c.RecordingUrl == recordingUrl && c.CustomerPhone.Contains(phoneToMatch));
+                    if (alreadyExists) continue;
+
+                    var matchedLead = await _context.Leads.FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
+                    var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
+
+                    int parsedDuration = 0;
+                    if (log.TryGetProperty("duration", out var durNode))
+                    {
+                        if (durNode.ValueKind == JsonValueKind.Number) parsedDuration = durNode.GetInt32();
+                        else if (durNode.ValueKind == JsonValueKind.String) int.TryParse(durNode.GetString(), out parsedDuration);
+                    }
+
+                    string empNo = log.TryGetProperty("emp_no", out var en) ? en.GetString() : "";
+
+                    // Safe string truncation to prevent SQL crashes
+                    string safeCustomerPhone = clientNumber.Length > 20 ? clientNumber.Substring(0, 20) : clientNumber;
+                    string safeSalesPhone = empNo?.Length > 20 ? empNo.Substring(0, 20) : (empNo ?? "");
+                    string safeUrl = recordingUrl?.Length > 500 ? recordingUrl.Substring(0, 500) : (recordingUrl ?? "");
+
+                    // 4. Save Record to Database initially
+                    var callRecord = new CallRecord
+                    {
+                        CustomerPhone = safeCustomerPhone,
+                        SalespersonPhone = safeSalesPhone,
+                        RecordingUrl = safeUrl,
+                        DurationSeconds = parsedDuration,
+                        CallDate = DateTime.UtcNow,
+                        LeadId = matchedLead?.Id,
+                        AccountId = matchedAccount?.Id,
+                        TranscriptionText = "Pending Background Download...",
+                        AiSummary = "Pending Background Download..."
+                    };
+
+                    _context.CallRecords.Add(callRecord);
+                    await _context.SaveChangesAsync();
+                    processedCount++;
+
+                    // 5. Download MP3 to C: Drive in the Background
+                    if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
+                    {
+                        int savedCallId = callRecord.Id;
+                        string currentUrl = callRecord.RecordingUrl;
+                        string apiKey = _openAiApiKey;
+
+                        _ = System.Threading.Tasks.Task.Run(async () =>
+                        {
+                            using var scope = _scopeFactory.CreateScope();
+                            var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                            try
+                            {
+                                byte[] audioBytes = await DownloadAudioBytesAsync(currentUrl);
+                                if (audioBytes != null && audioBytes.Length > 0)
+                                {
+                                    // Generate filename and save to physical C: drive folder
+                                    string fileName = $"historical_call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
+                                    string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
+                                    await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
+
+                                    // Run OpenAI Transcription
+                                    string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
+                                    string summary = string.IsNullOrWhiteSpace(transcription) ? "No speech detected." : await GenerateCallSummaryAsync(transcription, apiKey);
+
+                                    // 6. Update Database with the Local File Path
+                                    var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
+                                    if (recordToUpdate != null)
+                                    {
+                                        recordToUpdate.LocalFilePath = fullLocalPath; // Saves C:\CRM_files\...
+                                        recordToUpdate.TranscriptionText = transcription;
+                                        recordToUpdate.AiSummary = summary;
+                                        await bgContext.SaveChangesAsync();
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[Historical Download Error] {ex.Message}");
+                            }
+                        });
+                    }
+                }
+
+                return Ok(new { success = true, message = $"Successfully pulled {processedCount} historical calls from Callyzer. MP3 downloads and AI analysis are running in the background." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Historical Import Error: " + (ex.InnerException?.Message ?? ex.Message) });
+            }
+        }
         // =========================================================================
         // HELPER METHODS
         // =========================================================================
