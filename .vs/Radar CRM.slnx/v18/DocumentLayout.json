@@ -3,6 +3,18 @@
   "WorkspaceRootPath": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\controllers\\webhookcallyzercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\controllers\\webhookcallyzercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\dto\\callyzerwebhookpayload.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\dto\\callyzerwebhookpayload.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\controllers\\callcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\controllers\\callcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\views\\accounts\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\accounts\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
@@ -23,10 +35,6 @@
       "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\accounts\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\controllers\\webhookcallyzercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\controllers\\webhookcallyzercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
@@ -42,37 +50,63 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
+              "Title": "CallyzerWebhookPayload.cs",
+              "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\DTO\\CallyzerWebhookPayload.cs",
+              "RelativeDocumentMoniker": "Radar CRM\\DTO\\CallyzerWebhookPayload.cs",
+              "ToolTip": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\DTO\\CallyzerWebhookPayload.cs",
+              "RelativeToolTip": "Radar CRM\\DTO\\CallyzerWebhookPayload.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAAA1wB0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:49:39.915Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "CallController.cs",
+              "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Controllers\\CallController.cs",
+              "RelativeDocumentMoniker": "Radar CRM\\Controllers\\CallController.cs",
+              "ToolTip": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Controllers\\CallController.cs",
+              "RelativeToolTip": "Radar CRM\\Controllers\\CallController.cs",
+              "ViewState": "AgIAAA0AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-01T05:41:25.463Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "Create.cshtml",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Accounts\\Create.cshtml",
               "RelativeDocumentMoniker": "Radar CRM\\Views\\Accounts\\Create.cshtml",
               "ToolTip": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Accounts\\Create.cshtml",
               "RelativeToolTip": "Radar CRM\\Views\\Accounts\\Create.cshtml",
-              "ViewState": "AgIAAA8AAAAAAAAAAAAqwCAAAAAFAAAAAAAAAA==",
+              "ViewState": "AgIAAA8AAAAAAAAAAAAAAB8AAAAsAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
               "WhenOpened": "2026-10-01T04:54:55.092Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 0,
               "Title": "WebhookcallyzerController.cs",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Controllers\\WebhookcallyzerController.cs",
               "RelativeDocumentMoniker": "Radar CRM\\Controllers\\WebhookcallyzerController.cs",
               "ToolTip": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Controllers\\WebhookcallyzerController.cs",
               "RelativeToolTip": "Radar CRM\\Controllers\\WebhookcallyzerController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAFoAAAAAAAAAAAAowHMAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-09-30T13:33:58.568Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 8,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\appsettings.json",
               "RelativeDocumentMoniker": "Radar CRM\\appsettings.json",
@@ -84,7 +118,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 4,
               "Title": "Index.cshtml",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Tasks\\Index.cshtml",
               "RelativeDocumentMoniker": "Radar CRM\\Views\\Tasks\\Index.cshtml",
@@ -92,12 +126,11 @@
               "RelativeToolTip": "Radar CRM\\Views\\Tasks\\Index.cshtml",
               "ViewState": "AgIAAKcIAAAAAAAAAAAqwMkIAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-30T13:23:50.881Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-30T13:23:50.881Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 9,
               "Title": "AccountController.cs",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Controllers\\AccountController.cs",
               "RelativeDocumentMoniker": "Radar CRM\\Controllers\\AccountController.cs",
@@ -109,7 +142,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 5,
               "Title": "Index.cshtml",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Deals\\Index.cshtml",
               "RelativeDocumentMoniker": "Radar CRM\\Views\\Deals\\Index.cshtml",
@@ -117,12 +150,11 @@
               "RelativeToolTip": "Radar CRM\\Views\\Deals\\Index.cshtml",
               "ViewState": "AgIAANsJAAAAAAAAAAAqwPgJAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-30T12:33:11.633Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-30T12:33:11.633Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 7,
               "Title": "Index.cshtml",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Accounts\\Index.cshtml",
               "RelativeDocumentMoniker": "Radar CRM\\Views\\Accounts\\Index.cshtml",
@@ -130,12 +162,11 @@
               "RelativeToolTip": "Radar CRM\\Views\\Accounts\\Index.cshtml",
               "ViewState": "AgIAAFQOAAAAAAAAAAAqwGAOAAAhAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-30T12:17:31.589Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-30T12:17:31.589Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 6,
               "Title": "Index.cshtml",
               "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Leads\\Index.cshtml",
               "RelativeDocumentMoniker": "Radar CRM\\Views\\Leads\\Index.cshtml",
@@ -143,8 +174,7 @@
               "RelativeToolTip": "Radar CRM\\Views\\Leads\\Index.cshtml",
               "ViewState": "AgIAAHEDAAAAAAAAAAAqwJMDAAAGAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-09-30T11:12:40.001Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-30T11:12:40.001Z"
             }
           ]
         }

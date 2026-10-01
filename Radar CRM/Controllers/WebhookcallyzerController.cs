@@ -32,71 +32,84 @@ namespace Radar_CRM.Controllers
         }
 
         [HttpPost("callyzer")]
-        public async System.Threading.Tasks.Task<IActionResult> ReceiveCallyzerData([FromBody] CallyzerWebhookPayload payload)
+        public async System.Threading.Tasks.Task<IActionResult> ReceiveCallyzerData([FromBody] List<CallyzerWebhookEvent> events)
         {
-            if (payload == null || string.IsNullOrEmpty(payload.client_no))
+            if (events == null || !events.Any())
             {
                 return BadRequest(new { success = false, message = "Invalid data received." });
             }
 
-            string phoneToMatch = payload.client_no.Replace("+", "").Trim();
-
-            var matchedLead = await _context.Leads
-                .FirstOrDefaultAsync(l => l.Phone.Contains(phoneToMatch));
-
-            var matchedAccount = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.Phone.Contains(phoneToMatch));
-
-            var callRecord = new CallRecord
+            // Loop through the outer events array
+            foreach (var evt in events)
             {
-                CustomerPhone = payload.client_no,
-                SalespersonPhone = payload.emp_no,
-                RecordingUrl = payload.recording_url,
-                DurationSeconds = payload.duration,
-                CallDate = DateTime.UtcNow,
-                LeadId = matchedLead?.Id,
-                AccountId = matchedAccount?.Id
-            };
+                // Safety check to ensure there are call logs
+                if (evt.call_logs == null || !evt.call_logs.Any()) continue;
 
-            _context.CallRecords.Add(callRecord);
-            await _context.SaveChangesAsync();
-
-            if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
-            {
-                int savedCallId = callRecord.Id;
-                string recordingUrl = callRecord.RecordingUrl;
-                string apiKey = _openAiApiKey; // Capture the key for the background thread
-
-                _ = System.Threading.Tasks.Task.Run(async () =>
+                // Loop through the actual call logs
+                foreach (var payload in evt.call_logs)
                 {
-                    using var scope = _scopeFactory.CreateScope();
-                    var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    // 🚀 FIX: Using client_number
+                    if (string.IsNullOrEmpty(payload.client_number)) continue;
 
-                    try
+                    string phoneToMatch = payload.client_number.Replace("+", "").Trim();
+
+                    var matchedLead = await _context.Leads
+                        .FirstOrDefaultAsync(l => l.Phone.Contains(phoneToMatch));
+
+                    var matchedAccount = await _context.Accounts
+                        .FirstOrDefaultAsync(a => a.Phone.Contains(phoneToMatch));
+
+                    var callRecord = new CallRecord
                     {
-                        byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
-                        if (audioBytes == null || audioBytes.Length == 0) return;
+                        CustomerPhone = payload.client_number, // 🚀 FIX: Using client_number
+                        // If emp_no is missing inside call_logs, fallback to the parent event emp_number
+                        SalespersonPhone = !string.IsNullOrEmpty(payload.emp_no) ? payload.emp_no : evt.emp_number,
+                        RecordingUrl = payload.call_recording_url, // 🚀 FIX: Using call_recording_url
+                        DurationSeconds = payload.duration,
+                        CallDate = DateTime.UtcNow,
+                        LeadId = matchedLead?.Id,
+                        AccountId = matchedAccount?.Id
+                    };
 
-                        // Pass the API key to the helper method
-                        string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
-                        if (string.IsNullOrWhiteSpace(transcription)) return;
+                    _context.CallRecords.Add(callRecord);
+                    await _context.SaveChangesAsync();
 
-                        // Pass the API key to the helper method
-                        string summary = await GenerateCallSummaryAsync(transcription, apiKey);
+                    if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
+                    {
+                        int savedCallId = callRecord.Id;
+                        string recordingUrl = callRecord.RecordingUrl;
+                        string apiKey = _openAiApiKey;
 
-                        var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
-                        if (recordToUpdate != null)
+                        _ = System.Threading.Tasks.Task.Run(async () =>
                         {
-                            recordToUpdate.TranscriptionText = transcription;
-                            recordToUpdate.AiSummary = summary;
-                            await bgContext.SaveChangesAsync();
-                        }
+                            using var scope = _scopeFactory.CreateScope();
+                            var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                            try
+                            {
+                                byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
+                                if (audioBytes == null || audioBytes.Length == 0) return;
+
+                                string transcription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
+                                if (string.IsNullOrWhiteSpace(transcription)) return;
+
+                                string summary = await GenerateCallSummaryAsync(transcription, apiKey);
+
+                                var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
+                                if (recordToUpdate != null)
+                                {
+                                    recordToUpdate.TranscriptionText = transcription;
+                                    recordToUpdate.AiSummary = summary;
+                                    await bgContext.SaveChangesAsync();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[AI Background Error] Call ID {savedCallId}: {ex.Message}");
+                            }
+                        });
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[AI Background Error] Call ID {savedCallId}: {ex.Message}");
-                    }
-                });
+                }
             }
 
             return Ok(new { success = true, message = "Call logged and AI processing initiated." });
