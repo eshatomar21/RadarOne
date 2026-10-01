@@ -208,6 +208,10 @@
             <i class="fa-solid fa-headset text-primary"></i> Call Intelligence Logs
         </h4>
         <div class="d-flex align-items-center gap-2">
+            <!-- 🚀 NEW: Button to fetch old real data -->
+            <button class="btn btn-sm btn-primary border fw-semibold px-3 shadow-sm" onclick="syncHistoricalCalls(this)">
+                <i class="fa-solid fa-cloud-arrow-down me-1"></i> Sync Old Calls
+            </button>
             <button class="btn btn-sm btn-light border fw-semibold text-muted px-3" onclick="window.location.reload();">
                 <i class="fa-solid fa-rotate-right me-1"></i> Refresh Logs
             </button>
@@ -370,6 +374,45 @@
                 btn.style.borderColor = 'transparent';
                 btn.style.color = '#94a3b8';
             }
+        }
+
+        // 🚀 NEW: Function to trigger the background import of old real calls
+        function syncHistoricalCalls(btn) {
+            // Prompt for the Callyzer API Token
+            const token = prompt("Enter your Callyzer API Token to pull real historical data:");
+            if (!token) return;
+
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Syncing...';
+            btn.disabled = true;
+
+            // Call the C# endpoint we built to fetch and download old recordings
+            fetch('/api/webhook/import-historical-callyzer?callyzerApiToken=' + encodeURIComponent(token.trim()), {
+                method: 'POST'
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const err = await response.text();
+                    throw new Error(err);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if(data.success) {
+                    alert(data.message);
+                    window.location.reload(); // Refresh to see the new rows
+                } else {
+                    alert("Import Failed: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error("Sync Error:", error);
+                alert("Network error occurred while trying to sync historical data.");
+            })
+            .finally(() => {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            });
         }
     </script>
 }
