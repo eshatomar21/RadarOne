@@ -6,6 +6,19 @@
 
     // 🚀 FIX: Use FindFirst() instead of FindFirstValue() to avoid extension method errors
     string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+    // Prepare Notes for Detail View
+    var allNotes = ViewBag.ExistingNotes as IEnumerable<Radar_CRM.Models.Notes> ?? new List<Radar_CRM.Models.Notes>();
+    var topNotes = allNotes.Take(5).ToList();
+    var extraNotes = allNotes.Skip(5).ToList();
+
+    // Prepare Tasks for Detail View
+    var allTasks = ViewBag.RelatedTasks as IEnumerable<Radar_CRM.Models.Task> ?? new List<Radar_CRM.Models.Task>();
+    var openTasks = allTasks.Where(t => t.Status != "Completed").OrderBy(t => t.DueDate).ToList();
+    var closedTasks = allTasks.Where(t => t.Status == "Completed").OrderByDescending(t => t.DueDate).ToList();
+    
+    // Grab the most urgent open task for Next Action panel
+    var nextTask = openTasks.FirstOrDefault();
 }
 
 <!-- Bootstrap 5 -->
@@ -60,6 +73,95 @@
             flex-direction: column;
             overflow: hidden;
         }
+
+        /* =========================================
+       DETAIL VIEW (QUICK VIEW) CSS
+       ========================================= */
+    #detailViewContainer {
+        display: flex;
+        min-height: 100vh;
+        background: #f5f6f8;
+    }
+
+    /* Left Sidebar (Related List) - STICKY */
+    .detail-sidebar {
+        width: 240px;
+        background-color: var(--theme-navy-primary);
+        color: white;
+        padding: 20px 0;
+        flex-shrink: 0;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow-y: auto;
+    }
+
+        .detail-sidebar h6 {
+            padding: 0 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 15px;
+            color: #bfdbfe;
+        }
+
+    .related-list-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+        .related-list-menu li {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+            .related-list-menu li:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-left-color: white;
+            }
+
+            .related-list-menu li i {
+                width: 20px;
+                margin-right: 8px;
+            }
+
+    /* Main Detail Content */
+    .detail-main {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        background: #f5f6f8;
+    }
+
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 30px;
+        border-bottom: 1px solid var(--theme-border);
+        background: white;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .detail-content {
+        padding: 20px 30px;
+        overflow-y: auto;
+    }
+
+    .detail-section-card {
+        background: white;
+        border: 1px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
 
     /* 1. Header Area */
     .sf-header {
@@ -227,6 +329,95 @@
             .sf-input[readonly]:focus {
                 box-shadow: none;
             }
+
+            /* =========================================
+       DETAIL VIEW (QUICK VIEW) CSS
+       ========================================= */
+    #detailViewContainer {
+        display: flex;
+        min-height: 100vh;
+        background: #f5f6f8;
+    }
+
+    /* Left Sidebar (Related List) - STICKY */
+    .detail-sidebar {
+        width: 240px;
+        background-color: var(--theme-navy-primary);
+        color: white;
+        padding: 20px 0;
+        flex-shrink: 0;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow-y: auto;
+    }
+
+        .detail-sidebar h6 {
+            padding: 0 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 15px;
+            color: #bfdbfe;
+        }
+
+    .related-list-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+        .related-list-menu li {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+            .related-list-menu li:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-left-color: white;
+            }
+
+            .related-list-menu li i {
+                width: 20px;
+                margin-right: 8px;
+            }
+
+    /* Main Detail Content */
+    .detail-main {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        background: #f5f6f8;
+    }
+
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 30px;
+        border-bottom: 1px solid var(--theme-border);
+        background: white;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .detail-content {
+        padding: 20px 30px;
+        overflow-y: auto;
+    }
+
+    .detail-section-card {
+        background: white;
+        border: 1px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
 
     /* Section Headers */
     .pane-section-title {
@@ -517,6 +708,7 @@
         transition: 0.2s;
     }
 
+
         .btn-task-cancel:hover {
             background-color: #f1f5f9;
             color: #1e293b;
@@ -704,8 +896,244 @@
     }
 </style>
 
+<!-- ========================================================
+     1. DEFAULT VIEW (ZOHO DETAIL / QUICK EDIT)
+     ======================================================== -->
+<div id="detailViewContainer">
+    <!-- Left Sidebar: Related List -->
+    <div class="detail-sidebar">
+        <div class="px-4 mb-4 mt-2">
+            <h5 class="fw-bold m-0 text-white">@Model.AccountName</h5>
+            <small style="color: #bfdbfe;">Account</small>
+        </div>
+        <h6>Related List</h6>
+        <ul class="related-list-menu">
+            <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+            <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
+            <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-check"></i> Open Activities</li>
+            <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-check-double"></i> Closed Activities</li>
+            <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
+        </ul>
+    </div>
+
+    <!-- Main Detail Content -->
+    <div class="detail-main">
+        <div class="detail-header shadow-sm">
+            <div class="d-flex align-items-center gap-3">
+                <button type="button" class="btn btn-light rounded-circle border" onclick="window.history.back();" style="width: 36px; height: 36px; padding: 0;"><i class="fa-solid fa-arrow-left"></i></button>
+                <h4 class="m-0 fw-bold" style="color: var(--theme-navy-primary);">@Model.AccountName</h4>
+            </div>
+            <div>
+                <button type="button" class="btn btn-light border fw-bold px-4" onclick="toggleView('edit')"><i class="fa-solid fa-pencil me-2"></i> Edit</button>
+            </div>
+        </div>
+
+        <div class="detail-content">
+
+            <!-- Quick Edit Section (Syncs to main form) -->
+            <div class="detail-section-card">
+                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Owner</div>
+                            <div class="col-8">
+                                <select class="form-select form-select-sm border border-secondary" id="QuickAccountOwnerId" asp-items="ViewBag.UsersList" onchange="updateQuickField('AccountOwnerId', this.value)">
+                                    <option value="">- Select -</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Email ID</div>
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickEmail" value="@Model.Email" onchange="updateQuickField('Email', this.value)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Mobile Number</div>
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickMobileNumber" value="@Model.MobileNumber" onchange="updateQuickField('MobileNumber', this.value)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Profile Status</div>
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm border border-secondary bg-light" id="QuickProfileStatus" value="@Model.Profilestatus" readonly />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Alt Mobile</div>
+                            <div class="col-8">
+                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickAlternateMobile" value="@Model.AlternateMobile" onchange="updateQuickField('AlternateMobile', this.value)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Current Status</div>
+                            <div class="col-8">
+                                <select class="form-select form-select-sm border border-secondary" id="QuickCurrentStatus" onchange="updateQuickField('CurrentStatus', this.value)">
+                                    <option value="None">None</option>
+                                    <option value="User">User</option>
+                                    <option value="Non-User">Non-User</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Action -->
+            <div class="detail-section-card">
+                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Next Action</h6>
+                <div class="p-3 rounded d-flex align-items-center" style="background-color: var(--theme-navy-light); border: 1px solid #bfdbfe;">
+                    <span class="badge text-white me-3" style="background-color: var(--theme-navy-primary); font-size: 0.8rem; padding: 6px 10px;">ACTION</span>
+                    <span class="fw-medium text-dark" id="nextActionDisplay">
+                        @if (nextTask != null)
+                        {
+                            @($"{nextTask.Subject} - Due: {(nextTask.DueDate != null ? nextTask.DueDate.Value.ToString("dd MMM yyyy") : "N/A")}")
+                        }
+                        else
+                        {
+                            @:No upcoming actions scheduled.
+                        }
+                    </span>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div id="detailNotesSection" class="detail-section-card">
+                <h6 class="fw-bold mb-3 d-flex justify-content-between align-items-center border-bottom pb-2" style="color: var(--theme-navy-primary);">Notes <span class="badge bg-light text-dark border fw-normal">Recent First</span></h6>
+
+                <div class="inline-note-editor mb-4 shadow-sm" style="border: 2px solid #ea580c; border-radius: 8px; background-color: #fff7ed; overflow: hidden;">
+                    <div class="p-3">
+                        <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-1" placeholder="Title" style="background: transparent; font-size: 1.05rem; font-weight: 700; color: #431407;" />
+                        <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 0.95rem; color: #7c2d12; resize: none;"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2" style="background-color: #ffffff; border-top: 1px solid #fed7aa;">
+                        <div class="d-flex gap-3 align-items-center ps-2">
+                            <label for="inlineNoteFile" style="cursor: pointer; color: #ea580c; transition: 0.2s;" title="Attach File" onmouseover="this.style.color='#9a3412'" onmouseout="this.style.color='#ea580c'"><i class="fa-solid fa-paperclip fs-5"></i></label>
+                            <input type="file" id="inlineNoteFile" style="display: none;" />
+                            <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="width: 140px; background: transparent; color: #9a3412; cursor: pointer;">
+                                <option value="">- System User -</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="clearInlineNote()" style="color: #9a3412; border: 1px solid #fed7aa;">Cancel</button>
+                            <button type="button" class="btn btn-sm text-white fw-bold px-4" onclick="saveInlineNote()" style="background-color: #ea580c;">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="notesContainer">
+                    @foreach (var note in topNotes)
+                    {
+                        <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+                            <div class="d-flex align-items-center mb-1"><span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span><span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span></div>
+                            <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
+                            @if (!string.IsNullOrEmpty(note.AttachmentFileName))
+                            {
+                                <div class="mt-2"><a href="@Url.Action("DownloadNoteFile", "Accounts", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;"><i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName</a></div>
+                            }
+                        </div>
+                    }
+                    <div id="extraNotesContainer" style="display: none;">
+                        @foreach (var note in extraNotes)
+                        {
+                            <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+                                <div class="d-flex align-items-center mb-1"><span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span><span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span></div>
+                                <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
+                                @if (!string.IsNullOrEmpty(note.AttachmentFileName))
+                                {
+                                    <div class="mt-2"><a href="@Url.Action("DownloadNoteFile", "Accounts", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;"><i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName</a></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (extraNotes.Any())
+                    {
+                        <div class="text-center mt-3"><button id="viewPreviousNotesBtn" class="btn btn-light border text-primary text-sm w-100 fw-bold" onclick="toggleExtraNotes()">View Previous Notes</button></div>
+                    }
+                </div>
+            </div>
+
+            <!-- Open Tasks -->
+            <div id="detailOpenTasksSection" class="detail-section-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Activities</h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Add Task</button>
+                </div>
+                @if (openTasks.Any())
+                {
+                    <table class="zoho-task-table">
+                        <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
+                        <tbody id="openTasksTbody">
+                            @foreach (var t in openTasks)
+                            {
+                                <tr data-task-id="@t.Id">
+                                    <td class="text-primary fw-medium">@t.Subject</td>
+                                    <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                                    <td>@t.Priority</td>
+                                    <td>
+                                        <select class="form-select form-select-sm border task-status-dropdown" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #f8fafc; color: #1e3a8a; font-weight: 600;">
+                                            <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
+                                            <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
+                                            <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
+                                            <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
+                                            <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>
+                }
+            </div>
+
+            <!-- Closed Tasks -->
+            <div id="detailClosedTasksSection" class="detail-section-card">
+                <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
+                @if (closedTasks.Any())
+                {
+                    <table class="zoho-task-table" id="closedTasksTable">
+                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var t in closedTasks)
+                            {
+                                <tr data-task-id="@t.Id">
+                                    <td class="text-secondary text-decoration-line-through">@t.Subject</td>
+                                    <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                                    <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4" id="emptyClosedTasksPlaceholder"><i class="fa-solid fa-box-archive mb-2 fs-4"></i><br />No closed activities</div>
+                }
+            </div>
+            
+        </div>
+    </div>
+</div>
 <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
-<div class="page-wrapper">
+<div id="editViewContainer" style="display: none;">
+    <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
+    <div class="page-wrapper">
 
     <!-- MAIN FORM IS PLACED FIRST IN HTML SO IT APPEARS ON THE LEFT -->
     <form asp-action="Edit" method="post" id="accountForm" enctype="multipart/form-data" class="sf-container">
@@ -1681,84 +2109,96 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // ==========================================
-        // 1. INLINE NOTES UI LOGIC (Pastel Theme)
-        // ==========================================
-
-        // Auto-select the logged in user on page load for the inline note
-        document.addEventListener("DOMContentLoaded", function () {
-            const noteOwner = document.getElementById('inlineNoteOwner');
-            if (noteOwner) noteOwner.value = '@currentUserId';
-        });
+     
 
         function clearInlineNote() {
-            const titleInput = document.getElementById('inlineNoteTitle');
-            const descInput = document.getElementById('inlineNoteDesc');
-            const fileInput = document.getElementById('inlineNoteFile');
+        const titleInput = document.getElementById('inlineNoteTitle');
+        const descInput = document.getElementById('inlineNoteDesc');
+        const fileInput = document.getElementById('inlineNoteFile');
+        if (titleInput) titleInput.value = '';
+        if (descInput) descInput.value = '';
+        if (fileInput) fileInput.value = '';
+    }
 
-            if(titleInput) titleInput.value = '';
-            if(descInput) descInput.value = '';
-            if(fileInput) fileInput.value = '';
+       function saveInlineNote() {
+        const titleEl = document.getElementById('inlineNoteTitle');
+        const descEl = document.getElementById('inlineNoteDesc');
+        const fileInput = document.getElementById('inlineNoteFile');
+        const ownerDropdown = document.getElementById('inlineNoteOwner');
+
+        const title = titleEl ? titleEl.value.trim() : '';
+        const desc = descEl ? descEl.value.trim() : '';
+        const ownerId = ownerDropdown ? ownerDropdown.value : '';
+        const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
+        const dateTime = new Date().toLocaleString();
+
+        if (!desc && (!fileInput || fileInput.files.length === 0) && !title) {
+            alert('Please enter a title, content, or attach a file.');
+            return;
         }
 
-        function saveInlineNote() {
-            const titleEl = document.getElementById('inlineNoteTitle');
-            const descEl = document.getElementById('inlineNoteDesc');
-            const fileInput = document.getElementById('inlineNoteFile');
+        const formData = new FormData();
+        formData.append('accountId', '@Model.Id'); // Make sure your controller expects accountId
+        formData.append('noteTitle', title);
+        formData.append('description', desc);
+        formData.append('ownerId', ownerId);
 
-            const title = titleEl ? titleEl.value.trim() : '';
-            const desc = descEl ? descEl.value.trim() : '';
-            const fileName = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '';
-
-            const ownerDropdown = document.getElementById('inlineNoteOwner');
-            const ownerId = ownerDropdown ? ownerDropdown.value : '';
-            const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
-            const dateTime = new Date().toLocaleString();
-
-            if (!desc && !fileName && !title) {
-                alert('Please enter a title, content, or attach a file.');
-                return;
-            }
-
-            // Format Description safely for C# Backend
-            let finalDescription = desc;
-            if (title) {
-                finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
-            }
-
-          let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #0f172a;">${title}</div>` : '';
-
-        let fileHtml = fileName ? `
-        <div class="mt-2">
-            <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #0f766e; background: #ffffff; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #5eead4;">
-                <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
-            </span>
-        </div>` : '';
-
-        const noteHtml = `
-        <div class="saved-note-card p-3 mb-2" style="border: 1px solid #ccfbf1; border-left: 4px solid #1e3a8a; border-radius: 8px; background: #f0fdfa; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-            <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #99f6e4;">
-                <span class="fw-bold" style="font-size: 0.85rem; color: #1e3a8a;">
-                    <i class="fa-solid fa-circle-user me-1" style="color: #0d9488;"></i> ${ownerName}
-                </span>
-                <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">
-                    ${dateTime}
-                </span>
-            </div>
-            ${titleHtml}
-            <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
-            ${fileHtml}
-
-            <!-- Hidden inputs submit this new note to the backend when "Save Account" is clicked -->
-            <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
-            <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
-            <input type="hidden" name="SavedNoteDesc[]" value="${finalDescription}" />
-        </div>
-        `;
-
-        document.getElementById('savedNotesContainer').insertAdjacentHTML('afterbegin', noteHtml);
-        clearInlineNote();
+        if (fileInput && fileInput.files.length > 0) {
+            formData.append('attachment', fileInput.files[0]);
         }
+
+        const saveBtn = document.querySelector('button[onclick="saveInlineNote()"]');
+        const origText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        saveBtn.disabled = true;
+
+        fetch('@Url.Action("SaveNoteAjax", "Accounts")', { // Ensure Account Controller has this
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                saveBtn.innerHTML = origText;
+                saveBtn.disabled = false;
+
+                if (data.success) {
+                    const note = data.note;
+                    let titleHtml = note.noteTitle ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #431407;">${note.noteTitle}</div>` : '';
+                    let fileHtml = note.attachmentFileName ? `
+                    <div class="mt-2">
+                        <a href="@Url.Action("DownloadNoteAttachment", "Accounts")?fileName=${encodeURIComponent(note.attachmentFileName)}" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;">
+                            <i class="fa-solid fa-paperclip me-2"></i> ${note.attachmentFileName}
+                        </a>
+                    </div>` : '';
+
+                    const mainNoteHtml = `
+                    <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #e2e8f0;">
+                            <span class="fw-bold text-dark" style="font-size: 0.85rem;">
+                                <i class="fa-solid fa-circle-user me-1 text-muted"></i> ${note.ownerName}
+                            </span>
+                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">${note.createdDateTime}</span>
+                        </div>
+                        ${titleHtml}
+                        <div style="font-size: 0.85rem; color: #475569; white-space: pre-wrap; line-height: 1.4;">${note.description}</div>
+                        ${fileHtml}
+                    </div>`;
+
+                    const mainContainer = document.getElementById('notesContainer');
+                    if (mainContainer) mainContainer.insertAdjacentHTML('afterbegin', mainNoteHtml);
+
+                    clearInlineNote();
+                } else {
+                    alert("Failed to save note: " + data.message);
+                }
+            })
+            .catch(err => {
+                saveBtn.innerHTML = origText;
+                saveBtn.disabled = false;
+                console.error('Note Save Error:', err);
+                alert("An error occurred while saving the note.");
+            });
+    }
 
         // ==========================================
         // 2. SAFE TASK MODAL LAUNCHER (Fixes Freeze)
@@ -2210,4 +2650,197 @@
                 }
             });
         };
+
+        // =====================================
+// VIEW TOGGLE & SYNC LOGIC
+// =====================================
+function toggleView(view) {
+        const detailView = document.getElementById('detailViewContainer');
+        const editView = document.getElementById('editViewContainer');
+
+        if (view === 'edit') {
+            detailView.style.display = 'none';
+            editView.style.display = 'block'; // Make sure your Edit form wrapper has id="editViewContainer"
+        } else {
+            editView.style.display = 'none';
+            detailView.style.display = 'flex';
+
+            // Sync main edit form fields back to Quick Info view
+            const syncField = (quickId, realId) => {
+                const q = document.getElementById(quickId);
+                const r = document.getElementById(realId) || document.querySelector(`[name="${realId}"]`);
+                if (q && r) q.value = r.value;
+            };
+
+            syncField('QuickAccountOwnerId', 'AccountOwnerId');
+            syncField('QuickEmail', 'Email');
+            syncField('QuickMobileNumber', 'MobileNumber');
+            syncField('QuickAlternateMobile', 'AlternateMobile');
+            syncField('QuickCurrentStatus', 'CurrentStatus');
+            syncField('QuickProfileStatus', 'Profilestatus');
+        }
+    }
+function updateChevronBars() {
+    const statusVal = document.getElementById("actualStatusSelect")?.value || document.querySelector('select[name="CurrentStatus"]')?.value;
+    if (!statusVal) return;
+
+    const allItems = document.querySelectorAll(".sf-chevron-bar li");
+    allItems.forEach(item => {
+        item.classList.remove("active");
+        item.innerHTML = item.getAttribute("data-val");
+    });
+
+    const activeItems = document.querySelectorAll(`.sf-chevron-bar li[data-val="${statusVal}"]`);
+    activeItems.forEach(activeItem => {
+        activeItem.classList.add("active");
+        activeItem.innerHTML = statusVal + ' <i class="fa-solid fa-caret-down ms-1"></i>';
+    });
+}
+
+// Ensure the chevron updates on page load
+document.addEventListener("DOMContentLoaded", function () {
+        const quickOwner = document.getElementById('QuickAccountOwnerId');
+        if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
+        
+        const quickStatus = document.getElementById('QuickCurrentStatus');
+        if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
+    });
+
+    function toggleExtraNotes() {
+        const extra = document.getElementById('extraNotesContainer');
+        const btn = document.getElementById('viewPreviousNotesBtn');
+        if (extra.style.display === 'none') {
+            extra.style.display = 'block';
+            btn.innerText = 'Hide Previous Notes';
+        } else {
+            extra.style.display = 'none';
+            btn.innerText = 'View Previous Notes';
+        }
+    }
+
+// =====================================
+// QUICK INFO AUTO-SAVE FOR ACCOUNTS
+// =====================================
+function updateQuickField(fieldName, fieldValue) {
+        // 1. Sync data to the main hidden edit form
+        const editFormInput = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+        if (editFormInput) {
+            editFormInput.value = fieldValue;
+            editFormInput.dispatchEvent(new Event('change')); 
+        }
+
+        // 2. Format data for the Controller [FromForm] attributes
+        const formData = new URLSearchParams();
+        formData.append('id', '@Model.Id');
+        formData.append('field', fieldName);
+        formData.append('newValue', fieldValue); 
+
+        // 3. Send to Database
+        fetch('/Accounts/UpdateQuickInfo', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        })
+        .then(response => {
+            if (!response.ok) {
+                alert("Failed to automatically update " + fieldName + " in the database.");
+            } else {
+                console.log("Successfully saved " + fieldName);
+            }
+        })
+        .catch(err => {
+            console.error('Error updating quick info:', err);
+        });
+    }
+
+    // =====================================
+    // AJAX TASK SUBMISSION & STATUS UPDATE
+    // =====================================
+    function updateTaskStatus(selectElem, taskId) {
+        const newStatus = selectElem.value;
+        const row = selectElem.closest('tr');
+
+        selectElem.disabled = true; // Lock dropdown while saving
+
+        const formData = new URLSearchParams();
+        formData.append('id', taskId);
+        formData.append('status', newStatus);
+
+        const targetUrl = '/Tasks/UpdateStatus';
+
+        fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        })
+            .then(response => {
+                selectElem.disabled = false;
+                if (response.ok) {
+                    if (newStatus === 'Completed') {
+                        moveTaskToClosed(row);
+                    }
+                } else {
+                    alert('Failed to update task status in DB.');
+                    selectElem.value = 'Not Started';
+                }
+            })
+            .catch(err => {
+                selectElem.disabled = false;
+                console.error('Error updating task:', err);
+            });
+    }
+
+    // Move row from Open Activities to Closed Activities visually
+    function moveTaskToClosed(row) {
+        const subject = row.cells[0].innerText;
+        const dueDate = row.cells[1].innerText;
+
+        const newRow = document.createElement('tr');
+        
+        // Formats row exactly like the existing closed tasks list[cite: 8]
+        newRow.innerHTML = `
+                <td class="text-secondary text-decoration-line-through">${subject}</td>
+                <td>${dueDate}</td>
+                <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+            `;
+
+        let closedSection = document.getElementById('detailClosedTasksSection');
+        let closedTbody = closedSection.querySelector('tbody');
+        const emptyPlaceholder = document.getElementById('emptyClosedTasksPlaceholder');
+
+        // Remove empty state placeholder if it exists
+        if (emptyPlaceholder) {
+            emptyPlaceholder.remove();
+        }
+
+        // If table doesn't exist yet, create it
+        if (!closedTbody) {
+            closedSection.innerHTML = `
+                    <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
+                    <table class="zoho-task-table" id="closedTasksTable">
+                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                `;
+            closedTbody = closedSection.querySelector('tbody');
+        }
+
+        // Inject into top of closed list
+        closedTbody.insertBefore(newRow, closedTbody.firstChild);
+        row.remove(); // Remove from open list
+
+        // Update Next action & Empty placeholder if open table becomes empty
+        const openTbody = document.getElementById('openTasksTbody');
+        if (openTbody && openTbody.children.length === 0) {
+            document.getElementById('nextActionDisplay').innerText = "No upcoming actions scheduled.";
+            
+            const openTasksTable = openTbody.closest('table');
+            if (openTasksTable) {
+                openTasksTable.outerHTML = '<div class="text-center text-muted py-4" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>';
+            }
+        } else if (openTbody && openTbody.children.length > 0) {
+            const nextRow = openTbody.children[0];
+            document.getElementById('nextActionDisplay').innerText = `${nextRow.cells[0].innerText} - Due: ${nextRow.cells[1].innerText}`;
+        }
+    }
     </script>

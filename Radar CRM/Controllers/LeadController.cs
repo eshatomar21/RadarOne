@@ -977,6 +977,7 @@ namespace Radar_CRM.Controllers
                                 LeadId = lead.Id,
                                 DealName = lead.LeadName + " - Direct Deal",
                                 AccountId = lead.AccountId,
+                                AccountName = lead.AccountName,
                                 ContactPersonName = lead.ContactName,
                                 LeadName = lead.LeadName,
                                 LeadSource = lead.DataSources,
@@ -1103,6 +1104,43 @@ namespace Radar_CRM.Controllers
 
             return View(lead);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateQuickInfo(int leadId, string fieldName, string fieldValue)
+        {
+            var lead = await _context.Leads.FindAsync(leadId);
+            if (lead == null)
+            {
+                return NotFound();
+            }
+
+            // Set Modified Info
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            lead.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+
+            // Update the specific field dynamically
+            switch (fieldName)
+            {
+                case "LeadOwnerId": lead.LeadOwnerId = fieldValue; break;
+                case "EmailID": lead.EmailID = fieldValue; break;
+                case "MobileNumber": lead.MobileNumber = fieldValue; break;
+                case "DataSources": lead.DataSources = fieldValue; break;
+                case "AlternateMobile": lead.AlternateMobile = fieldValue; break;
+                case "LeadStatus": lead.LeadStatus = fieldValue; break;
+            }
+
+            try
+            {
+                _context.Update(lead);
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
 
         [HttpPost]
         [IgnoreAntiforgeryToken] // 🚀 FIX: Prevents ASP.NET from blocking the AJAX POST

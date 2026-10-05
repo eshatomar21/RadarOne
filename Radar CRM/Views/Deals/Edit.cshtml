@@ -1318,74 +1318,74 @@
             if (noteOwner) noteOwner.value = '@User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value';
         });
 
-        function clearInlineNote() {
-            const titleInput = document.getElementById('inlineNoteTitle');
-            const descInput = document.getElementById('inlineNoteDesc');
-            const fileInput = document.getElementById('inlineNoteFile');
-            
-            if(titleInput) titleInput.value = '';
-            if(descInput) descInput.value = '';
-            if(fileInput) fileInput.value = '';
-        }
+   function clearInlineNote() {
+    const titleInput = document.getElementById('inlineNoteTitle');
+    const descInput = document.getElementById('inlineNoteDesc');
+    const fileInput = document.getElementById('inlineNoteFile');
+    if (titleInput) titleInput.value = '';
+    if (descInput) descInput.value = '';
+    if (fileInput) fileInput.value = '';
+}
 
-        function saveInlineNote() {
-            const titleEl = document.getElementById('inlineNoteTitle');
-            const descEl = document.getElementById('inlineNoteDesc');
-            const fileInput = document.getElementById('inlineNoteFile');
+       function saveInlineNote() {
+    const titleEl = document.getElementById('inlineNoteTitle');
+    const descEl = document.getElementById('inlineNoteDesc');
+    const fileInput = document.getElementById('inlineNoteFile');
 
-            const title = titleEl ? titleEl.value.trim() : '';
-            const desc = descEl ? descEl.value.trim() : '';
-            const fileName = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '';
-            
-            const ownerDropdown = document.getElementById('inlineNoteOwner');
-            const ownerId = ownerDropdown ? ownerDropdown.value : '';
-            const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
-            const dateTime = new Date().toLocaleString();
+    const title = titleEl ? titleEl.value.trim() : '';
+    const desc = descEl ? descEl.value.trim() : '';
+    const fileName = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '';
 
-            if (!desc && !fileName && !title) {
-                alert('Please enter a title, content, or attach a file.');
-                return;
-            }
+    const ownerDropdown = document.getElementById('inlineNoteOwner');
+    const ownerId = ownerDropdown ? ownerDropdown.value : '';
+    const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
+    const dateTime = new Date().toLocaleString();
 
-            let finalDescription = desc;
-            if (title) {
-                finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
-            }
+    if (!desc && !fileName && !title) {
+        alert('Please enter a title, content, or attach a file.');
+        return;
+    }
 
-            let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #0f172a;">${title}</div>` : '';
-            let fileHtml = fileName ? `
-            <div class="mt-2">
-                <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #0f766e; background: #ffffff; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #5eead4;">
-                    <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
+    let finalDescription = desc;
+    if (title) finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
+
+    let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #431407;">${title}</div>` : '';
+    let fileHtml = fileName ? `
+        <div class="mt-2">
+            <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;">
+                <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
+            </span>
+        </div>` : '';
+
+    const mainNoteHtml = `
+        <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #e2e8f0;">
+                <span class="fw-bold text-dark" style="font-size: 0.85rem;">
+                    <i class="fa-solid fa-circle-user me-1 text-muted"></i> ${ownerName}
                 </span>
-            </div>` : '';
-
-            const noteHtml = `
-            <div class="saved-note-card p-3 mb-2" style="border: 1px solid #ccfbf1; border-left: 4px solid #1e3a8a; border-radius: 8px; background: #f0fdfa; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #99f6e4;">
-                    <span class="fw-bold" style="font-size: 0.85rem; color: #1e3a8a;">
-                        <i class="fa-solid fa-circle-user me-1" style="color: #0d9488;"></i> ${ownerName}
-                    </span>
-                    <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">
-                        ${dateTime}
-                    </span>
-                </div>
-                ${titleHtml}
-                <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
-                ${fileHtml}
-
-                <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
-                <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
-                <input type="hidden" name="SavedNoteDesc[]" value="${finalDescription}" />
+                <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">${dateTime}</span>
             </div>
-            `;
+            ${titleHtml}
+            <div style="font-size: 0.85rem; color: #475569; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
+            ${fileHtml}
+        </div>`;
 
-            const notesContainer = document.getElementById('savedNotesContainer');
-            if (notesContainer) {
-                notesContainer.insertAdjacentHTML('afterbegin', noteHtml);
-            }
-            clearInlineNote();
-        }
+    const mainContainer = document.getElementById('notesContainer');
+    if (mainContainer) mainContainer.insertAdjacentHTML('afterbegin', mainNoteHtml);
+
+    // 🚀 FIX: Removed [] brackets from input names. ASP.NET Core binds sequential identical names to Lists automatically; brackets break the binding.
+    const hiddenFields = `
+        <input type="hidden" name="SavedNoteOwner" value="${ownerId}" />
+        <input type="hidden" name="SavedNoteDateTime" value="${dateTime}" />
+        <input type="hidden" name="SavedNoteDesc" value="${finalDescription}" />
+    `;
+    document.getElementById('leadForm').insertAdjacentHTML('beforeend', hiddenFields);
+
+    clearInlineNote();
+    
+    // Trigger auto-save immediately
+    triggerMainFormAutoSave();
+}
 
         // =================================================================
         // 🚀 NEW: SAFE TASK MODAL LAUNCHER (Fixes Toggles & Freezes)

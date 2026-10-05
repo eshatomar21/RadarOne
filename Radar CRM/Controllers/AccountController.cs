@@ -25,7 +25,7 @@ namespace Radar_CRM.Controllers
             _configuration = configuration;
         }
 
-       
+
 
         // ==========================================
         // INDEX: GET (Hierarchical List View)
@@ -479,7 +479,8 @@ namespace Radar_CRM.Controllers
             var notes = await _context.Note
                 .Where(n => n.AccountId == accountId)
                 .OrderByDescending(n => n.CreatedDateTime)
-                .Select(n => new {
+                .Select(n => new
+                {
                     ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
                     createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
                     noteTitle = n.NoteTitle, // 🚀 THIS MUST BE HERE
@@ -1628,6 +1629,39 @@ namespace Radar_CRM.Controllers
         private bool AccountExists(int id)
         {
             return _context.Accounts.Any(e => e.Id == id);
+        }
+
+
+        // ==========================================
+        // QUICK INFO AUTO-SAVE: AJAX POST
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        [Route("Accounts/UpdateQuickInfo")]
+        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string value)
+        {
+            var account = await _context.Accounts.FindAsync(id);
+            if (account == null) return Json(new { success = false, message = "Account not found" });
+
+            // Safely handle null if the user clears the input
+            string safeValue = value ?? "";
+
+            switch (field)
+            {
+                case "AccountOwnerId": account.AccountOwnerId = safeValue; break;
+                case "Email": account.Email = safeValue; break;
+                case "MobileNumber": account.MobileNumber = safeValue; break;
+                case "AlternateMobile": account.AlternateMobile = safeValue; break;
+                case "CurrentStatus": account.CurrentStatus = safeValue; break;
+                default: return Json(new { success = false, message = "Invalid field mapping" });
+            }
+
+            // Update auditing
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+            account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
         }
     }
 }
