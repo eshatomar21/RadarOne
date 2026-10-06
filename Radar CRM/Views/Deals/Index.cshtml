@@ -1980,25 +1980,19 @@
         document.querySelectorAll('.filter-field-item.active').forEach(item => {
             const cb = item.querySelector('.field-checkbox');
             if (cb && cb.checked) {
-                let colName = cb.value;
+                let colName = cb.value; // 🚀 FIX: Keep the exact C# property name
                 const condition = item.querySelector('.condition-select').value;
                 const isDate = item.dataset.fieldType === "date";
-
-                if (colName === "DealOwner" || colName === "AccountOwner" || colName === "CoOwner" || colName === "DemoOwner") {
-                    colName += "Id";
-                } else if (colName === "AccountName") {
-                    colName = "AccountId";
-                }
 
                 let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
 
                 if (isDate && condition.toLowerCase().includes('between')) {
                     const val2 = item.querySelector('.date-val-2')?.value || '';
-                    val1 = val1 + "|" + val2; 
+                    val1 = val1 + "|" + val2;
                 }
 
                 activeFilters.push({
-                    LogicalOperator: "AND", 
+                    LogicalOperator: "AND",
                     ColumnName: colName,
                     Condition: condition,
                     Value: val1,

@@ -490,22 +490,34 @@ namespace Radar_CRM.Controllers
 
             return Json(notes);
         }
-
         [HttpPost]
         public async Task<IActionResult> SaveNoteAjax(int accountId, string noteTitle, string description, string ownerId, IFormFile attachment)
         {
             try
             {
+                // 1. Fallback to current logged-in user's ID if the UI dropdown was left blank
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                string finalOwnerId = string.IsNullOrWhiteSpace(ownerId) ? currentUserId : ownerId;
+
+                // 2. Safely resolve the correct Name for the UI
+                string ownerName = User.Identity?.Name ?? "System User"; // Default to identity name
+
+                if (!string.IsNullOrWhiteSpace(finalOwnerId))
+                {
+                    var user = await _context.Users.FindAsync(finalOwnerId);
+                    if (user != null)
+                    {
+                        ownerName = user.fullName ?? user.FirstName ?? ownerName;
+                    }
+                }
+
                 var note = new Notes
                 {
                     AccountId = accountId,
-                    NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
-
-                    // 🚀 FIX: Save the new Title and duplicate the text into both Content and Description
+                    NoteOwnerId = finalOwnerId,
                     NoteTitle = noteTitle ?? "",
                     NoteContent = description ?? "",
                     Description = description ?? "",
-
                     CreatedDateTime = DateTime.Now
                 };
 
@@ -529,14 +541,6 @@ namespace Radar_CRM.Controllers
                 _context.Note.Add(note);
                 await _context.SaveChangesAsync();
 
-                // Get owner name to pass back to UI
-                string ownerName = "System User";
-                if (!string.IsNullOrEmpty(note.NoteOwnerId))
-                {
-                    var user = await _context.Users.FindAsync(note.NoteOwnerId);
-                    if (user != null) ownerName = user.fullName ?? user.FirstName;
-                }
-
                 return Json(new
                 {
                     success = true,
@@ -544,7 +548,7 @@ namespace Radar_CRM.Controllers
                     {
                         ownerName = ownerName,
                         createdDateTime = note.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
-                        noteTitle = note.NoteTitle, // 🚀 FIX: Send Title back to the UI
+                        noteTitle = note.NoteTitle,
                         description = note.Description,
                         attachmentFileName = note.AttachmentFileName
                     }
@@ -1638,30 +1642,54 @@ namespace Radar_CRM.Controllers
         [HttpPost]
         [IgnoreAntiforgeryToken]
         [Route("Accounts/UpdateQuickInfo")]
-        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string value)
+        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string newValue)
         {
             var account = await _context.Accounts.FindAsync(id);
             if (account == null) return Json(new { success = false, message = "Account not found" });
 
-            // Safely handle null if the user clears the input
-            string safeValue = value ?? "";
+            // Safely extract the value without forcing text fields to NULL
+            string trimmedValue = newValue?.Trim() ?? "";
 
             switch (field)
             {
-                case "AccountOwnerId": account.AccountOwnerId = safeValue; break;
-                case "Email": account.Email = safeValue; break;
-                case "MobileNumber": account.MobileNumber = safeValue; break;
-                case "AlternateMobile": account.AlternateMobile = safeValue; break;
-                case "CurrentStatus": account.CurrentStatus = safeValue; break;
-                default: return Json(new { success = false, message = "Invalid field mapping" });
+                case "AccountOwnerId":
+                    // Foreign Keys MUST be null if empty, otherwise SQL throws an error
+                    account.AccountOwnerId = string.IsNullOrWhiteSpace(trimmedValue) ? null : trimmedValue;
+                    break;
+                case "Email":
+                    account.Email = trimmedValue;
+                    break;
+                case "MobileNumber":
+                    account.MobileNumber = trimmedValue;
+                    break;
+                case "AlternateMobile":
+                    account.AlternateMobile = trimmedValue;
+                    break;
+                case "CurrentStatus":
+                    account.CurrentStatus = trimmedValue;
+                    break;
+                default:
+                    return Json(new { success = false, message = "Invalid field mapping" });
             }
 
-            // Update auditing
-            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
-            account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                ? User.Identity.Name
+                : "System User";
 
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
+            account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                // If the Mobile Number fails to update (e.g., a duplicate exists in the database), 
+                // this will catch the exact SQL error so you can see it in your browser's Network tab.
+                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = trueError });
+            }
         }
     }
 }

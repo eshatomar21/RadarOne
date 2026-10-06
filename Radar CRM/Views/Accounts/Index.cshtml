@@ -1228,8 +1228,11 @@
                     {
                         foreach (var item in Model)
                         {
-                            <tr class="account-row" data-id="@item.Id">
-                               <td class="sticky-cb" style="width: 120px; min-width: 120px;">
+                            <!-- 🚀 FIX: Added onclick to the TR to make the entire row clickable -->
+                            <tr class="account-row" data-id="@item.Id" onclick="window.location.href='@Url.Action("Edit", "Accounts", new { id = item.Id })';" style="cursor: pointer;">
+
+                                <!-- 🚀 FIX: Added event.stopPropagation() so checking the box doesn't open the record -->
+                                <td class="sticky-cb" style="width: 120px; min-width: 120px;" onclick="event.stopPropagation()">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
                                         <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
                                        

@@ -664,6 +664,55 @@
             padding-top: 2px;
         }
 
+    /* =========================================
+           TASK TABLES (Open & Closed Activities)
+           ========================================= */
+    .zoho-task-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0;
+    }
+
+        .zoho-task-table th {
+            background-color: #f8fafc;
+            color: var(--theme-text-muted);
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 2px solid var(--theme-border);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .zoho-task-table td {
+            padding: 14px 16px;
+            font-size: 0.9rem;
+            color: var(--theme-text-main);
+            border-bottom: 1px solid var(--theme-border);
+            vertical-align: middle;
+        }
+
+        .zoho-task-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+            .zoho-task-table tbody tr:hover {
+                background-color: #f1f5f9;
+            }
+
+            .zoho-task-table tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+    .table-responsive-wrapper {
+        margin: 0 -24px -24px -24px; /* Pulls table to edges of the card */
+        border-radius: 0 0 8px 8px;
+        overflow: hidden;
+    }
+
+
+
     /* Sleek Expandable Button */
     .task-more-fields-btn {
         display: flex;
@@ -1066,70 +1115,77 @@
             </div>
 
             <!-- Open Tasks -->
-            <div id="detailOpenTasksSection" class="detail-section-card">
-                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+            <div id="detailOpenTasksSection" class="detail-section-card overflow-hidden">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-0">
                     <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Activities</h6>
                     <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Add Task</button>
                 </div>
-                @if (openTasks.Any())
-                {
-                    <table class="zoho-task-table">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
-                        <tbody id="openTasksTbody">
-                            @foreach (var t in openTasks)
-                            {
-                                <tr data-task-id="@t.Id">
-                                    <td class="text-primary fw-medium">@t.Subject</td>
-                                    <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                    <td>@t.Priority</td>
-                                    <td>
-                                        <select class="form-select form-select-sm border task-status-dropdown" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #f8fafc; color: #1e3a8a; font-weight: 600;">
-                                            <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
-                                            <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
-                                            <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
-                                            <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
-                                            <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
-                                        </select>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <div class="text-center text-muted py-4" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>
-                }
+
+                <div class="table-responsive-wrapper">
+                    @if (openTasks.Any())
+                    {
+                        <table class="zoho-task-table">
+                            <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
+                            <tbody id="openTasksTbody">
+                                @foreach (var t in openTasks)
+                                {
+                                    <tr data-task-id="@t.Id">
+                                        <td class="text-primary fw-semibold">@t.Subject</td>
+                                        <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                                        <td>@t.Priority</td>
+                                        <td>
+                                            <select class="form-select form-select-sm border task-status-dropdown shadow-none" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #ffffff; color: #1e3a8a; font-weight: 600;">
+                                                <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
+                                                <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
+                                                <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
+                                                <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
+                                                <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4 bg-white" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>
+                    }
+                </div>
             </div>
 
             <!-- Closed Tasks -->
-            <div id="detailClosedTasksSection" class="detail-section-card">
-                <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
-                @if (closedTasks.Any())
-                {
-                    <table class="zoho-task-table" id="closedTasksTable">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
-                        <tbody>
-                            @foreach (var t in closedTasks)
-                            {
-                                <tr data-task-id="@t.Id">
-                                    <td class="text-secondary text-decoration-line-through">@t.Subject</td>
-                                    <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                    <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <div class="text-center text-muted py-4" id="emptyClosedTasksPlaceholder"><i class="fa-solid fa-box-archive mb-2 fs-4"></i><br />No closed activities</div>
-                }
+            <div id="detailClosedTasksSection" class="detail-section-card overflow-hidden">
+                <h6 class="fw-bold border-bottom pb-3 mb-0" style="color: var(--theme-navy-primary);">Closed Activities</h6>
+
+                <div class="table-responsive-wrapper">
+                    @if (closedTasks.Any())
+                    {
+                        <table class="zoho-task-table" id="closedTasksTable">
+                            <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
+                            <tbody>
+                                @foreach (var t in closedTasks)
+                                {
+                                    <tr data-task-id="@t.Id">
+                                        <td class="text-secondary text-decoration-line-through">@t.Subject</td>
+                                        <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                                        <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4 bg-white" id="emptyClosedTasksPlaceholder"><i class="fa-solid fa-box-archive mb-2 fs-4"></i><br />No closed activities</div>
+                    }
+                </div>
             </div>
-            
-        </div>
-    </div>
+
+        </div> <!-- 🚀 MISSING TAG 1: Closes detail-content -->
+    </div> <!-- 🚀 MISSING TAG 2: Closes detail-main -->
 </div>
+<!-- 🚀 MISS
 <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
 <div id="editViewContainer" style="display: none;">
     <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
@@ -2698,14 +2754,23 @@ function updateChevronBars() {
 }
 
 // Ensure the chevron updates on page load
-document.addEventListener("DOMContentLoaded", function () {
-        const quickOwner = document.getElementById('QuickAccountOwnerId');
-        if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
-        
-        const quickStatus = document.getElementById('QuickCurrentStatus');
-        if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
-    });
+                            // Ensure the chevron and default owners update on page load
+                            document.addEventListener("DOMContentLoaded", function() {
+                                const quickOwner = document.getElementById('QuickAccountOwnerId');
+                                if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
 
+                                const quickStatus = document.getElementById('QuickCurrentStatus');
+                                if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
+
+                                // 🚀 CRITICAL FIX: Automatically set Note Owners to the Logged-In User instead of leaving it blank
+                                const loggedInUser = '@currentUserId';
+
+                                const inlineNoteOwner = document.getElementById('inlineNoteOwner');
+                                if (inlineNoteOwner) inlineNoteOwner.value = loggedInUser;
+
+                                const modalNoteOwner = document.getElementById('modalNoteOwner');
+                                if (modalNoteOwner) modalNoteOwner.value = loggedInUser;
+                            });
     function toggleExtraNotes() {
         const extra = document.getElementById('extraNotesContainer');
         const btn = document.getElementById('viewPreviousNotesBtn');
@@ -2756,39 +2821,38 @@ function updateQuickField(fieldName, fieldValue) {
     // =====================================
     // AJAX TASK SUBMISSION & STATUS UPDATE
     // =====================================
-    function updateTaskStatus(selectElem, taskId) {
-        const newStatus = selectElem.value;
-        const row = selectElem.closest('tr');
+                            function updateQuickField(fieldName, fieldValue) {
+                                // Sync data to the main hidden edit form
+                                const editFormInput = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+                                if (editFormInput) {
+                                    editFormInput.value = fieldValue;
+                                    editFormInput.dispatchEvent(new Event('change'));
+                                }
 
-        selectElem.disabled = true; // Lock dropdown while saving
+                                const formData = new URLSearchParams();
+                                formData.append('id', '@Model.Id');
+                                formData.append('field', fieldName);
+                                formData.append('newValue', fieldValue);
 
-        const formData = new URLSearchParams();
-        formData.append('id', taskId);
-        formData.append('status', newStatus);
-
-        const targetUrl = '/Tasks/UpdateStatus';
-
-        fetch(targetUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-        })
-            .then(response => {
-                selectElem.disabled = false;
-                if (response.ok) {
-                    if (newStatus === 'Completed') {
-                        moveTaskToClosed(row);
-                    }
-                } else {
-                    alert('Failed to update task status in DB.');
-                    selectElem.value = 'Not Started';
-                }
-            })
-            .catch(err => {
-                selectElem.disabled = false;
-                console.error('Error updating task:', err);
-            });
-    }
+                                // 🚀 FIX: Use Url.Action to ensure the route never gets lost
+                                fetch('@Url.Action("UpdateQuickInfo", "Accounts")', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                    body: formData.toString()
+                                })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (!data.success) {
+                                            // 🚀 FIX: Will alert you if SQL rejects the update (like a duplicate email/phone constraint)
+                                            alert("Quick Save Failed: " + data.message);
+                                        } else {
+                                            console.log("Successfully saved " + fieldName);
+                                        }
+                                    })
+                                    .catch(err => {
+                                        console.error('Error updating quick info:', err);
+                                    });
+                            }
 
     // Move row from Open Activities to Closed Activities visually
     function moveTaskToClosed(row) {
