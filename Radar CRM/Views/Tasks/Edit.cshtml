@@ -552,13 +552,55 @@
                     </div>
 
                     <!-- Read-Only Related To Field -->
+               <!-- 🚀 Clickable & Read-Only Related To Field -->
                     <div class="form-group">
                         <label class="sf-label text-primary fw-bold" style="color: var(--theme-primary) !important;">Related To</label>
-                        <input type="text" class="sf-input fw-bold" style="background-color: var(--theme-surface); border-color: var(--theme-primary); color: var(--theme-text-main);" 
-                               value="@ViewBag.RelatedEntityName" readonly tabindex="-1" 
-                               title="The entity from which this task was created" />
+                        
+                        @if (ViewBag.RelatedEntityId != null)
+                        {
+                            <a href="@ViewBag.RelatedEntityUrl" class="text-decoration-none w-100" style="max-width: 700px;" title="Click to open this @ViewBag.RelatedEntityType">
+                                <div class="input-group input-group-sm w-100">
+                                    <input type="text" class="form-control sf-input fw-bold m-0" 
+                                           style="background-color: var(--theme-surface); border-color: var(--theme-primary); color: var(--theme-primary); cursor: pointer;" 
+                                           value="@ViewBag.RelatedEntityName" readonly tabindex="-1" />
+                                    <span class="input-group-text bg-light border-primary text-primary" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </span>
+                                </div>
+                            </a>
+                        }
+                        else
+                        {
+                            <input type="text" class="sf-input fw-bold w-100" 
+                                   style="max-width: 700px; background-color: var(--theme-surface); border-color: var(--theme-border); color: var(--theme-text-muted);" 
+                                   value="No Related Record" readonly tabindex="-1" />
+                        }
                     </div>
 
+                    <!-- 🚀 FIX: Hidden Dropdowns MUST have a blank value to prevent defaulting to the first record (Piyush) -->
+                    <div style="display: none;">
+                        <div class="form-group">
+                            <label class="sf-label">Accounts</label>
+                            <select asp-for="AccountId" class="sf-select" id="AccountId">
+                                <option value="" selected>- No Account -</option>
+                                @if (Model.AccountId.HasValue)
+                                {
+                                    <option value="@Model.AccountId.Value" selected>@ViewBag.RelatedEntityName</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="sf-label">Leads</label>
+                            <select asp-for="LeadId" class="sf-select" id="LeadId">
+                                <option value="" selected>- No Lead -</option>
+                                @if (Model.LeadId.HasValue)
+                                {
+                                    <option value="@Model.LeadId.Value" selected>@ViewBag.RelatedEntityName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
                     <!-- Hidden Account & Lead Dropdowns to preserve form values -->
                     <div style="display: none;">
                         <div class="form-group">
@@ -821,9 +863,19 @@
                     <div class="sidebar-tab-active">Info</div>
                 </div>
                 
-                <div class="sidebar-content">
-                    <div class="sidebar-entity-title">
-                        @(ViewBag.RelatedEntityName ?? "New Record") <span class="sidebar-badge">@(ViewBag.RelatedEntityType ?? "Entity")</span>
+               <div class="sidebar-content">
+                    <div class="sidebar-entity-title align-items-center">
+                        @if (ViewBag.RelatedEntityId != null)
+                        {
+                            <a href="@ViewBag.RelatedEntityUrl" class="text-decoration-none d-flex align-items-center" style="color: var(--theme-text-main); transition: 0.2s;" onmouseover="this.style.color='var(--theme-primary)'" onmouseout="this.style.color='var(--theme-text-main)'" title="Open @ViewBag.RelatedEntityType">
+                                @(ViewBag.RelatedEntityName) <i class="fa-solid fa-arrow-up-right-from-square ms-2 text-muted" style="font-size: 0.9rem;"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <span>@(ViewBag.RelatedEntityName)</span>
+                        }
+                        <span class="sidebar-badge ms-auto">@(ViewBag.RelatedEntityType)</span>
                     </div>
                     
                     <div class="info-grid mt-4">

@@ -504,6 +504,7 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // EDIT: GET
         // ==========================================
+        [HttpGet]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
@@ -518,12 +519,42 @@ namespace Radar_CRM.Controllers
                 if (user != null) ViewBag.TaskOwnerName = user.fullName;
             }
 
-            ViewBag.ExistingNotes = await _context.Note.Where(n => n.TaskId == id).OrderByDescending(n => n.CreatedDateTime).ToListAsync();
+            ViewBag.ExistingNotes = await _context.Note
+                .Where(n => n.TaskId == id)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
+
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
 
+            // 🚀 AUTOMATICALLY LINK "RELATED TO" RECORD FOR UI
+            ViewBag.RelatedEntityName = "No Related Record";
+            ViewBag.RelatedEntityId = null;
+            ViewBag.RelatedEntityUrl = "#";
+            ViewBag.RelatedEntityType = "Record";
 
-
+            if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
+            {
+                var account = await _context.Accounts.FindAsync(taskModel.AccountId.Value);
+                if (account != null)
+                {
+                    ViewBag.RelatedEntityName = account.AccountName;
+                    ViewBag.RelatedEntityId = account.Id;
+                    ViewBag.RelatedEntityUrl = Url.Action("Edit", "Accounts", new { id = account.Id });
+                    ViewBag.RelatedEntityType = "Account";
+                }
+            }
+            else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
+            {
+                var lead = await _context.Leads.FindAsync(taskModel.LeadId.Value);
+                if (lead != null)
+                {
+                    ViewBag.RelatedEntityName = string.IsNullOrWhiteSpace(lead.LeadName) ? "Unnamed Lead" : lead.LeadName;
+                    ViewBag.RelatedEntityId = lead.Id;
+                    ViewBag.RelatedEntityUrl = Url.Action("Edit", "Leads", new { id = lead.Id });
+                    ViewBag.RelatedEntityType = "Lead";
+                }
+            }
 
             return View(taskModel);
         }

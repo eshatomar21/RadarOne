@@ -1848,28 +1848,32 @@
                                     }
                                     `;
 
-    let rowCount = @(Model?.PaymentRow != null && Model.PaymentRow.Count > 0 ? Model.PaymentRow.Count : 1);
+     let rowCount = @(Model?.PaymentRow != null ? Model.PaymentRow.Count : 0);
+
     function addRow() {
         const tbody = document.getElementById('paymentTbody');
         if (!tbody) return;
         const tr = document.createElement('tr');
         tr.className = 'payment-row';
+       
+        // 🚀 FIX 2: Use the current rowCount dynamically
         tr.innerHTML = `
-                                        <td><select name="PaymentRow[${rowCount}].DealType" class="z-input"><option value="">-None-</option><option value="New Sale">New Sale</option><option value="Upgrade">Upgrade</option><option value="Add On">Add On</option><option value="Stock Key">Stock Key</option><option value="Existing">Existing</option></select></td>
-                                        <td>
-                                        <select name="PaymentRow[${rowCount}].ProductId" class="z-input product-select" onchange="productSelected(this)">${productOptionsHtml}</select>
-                                        <input type="hidden" name="PaymentRow[${rowCount}].ProductName" class="product-name-hidden" value="" />
-                                        </td>
-                                        <td><input type="number" name="PaymentRow[${rowCount}].Quantity" class="z-input qty" value="1" onchange="calcRow(this)" /></td>
-                                        <td><input type="number" name="PaymentRow[${rowCount}].ProductPrice" class="z-input price" value="0" onchange="calcRow(this)" /></td>
-                                        <td><input type="number" name="PaymentRow[${rowCount}].Total" class="z-input total bg-light" readonly /></td>
-                                        <td><input type="number" name="PaymentRow[${rowCount}].DiscountPercent" class="z-input disc" value="0" onchange="calcRow(this)" /></td>
-                                        <td><input type="number" name="PaymentRow[${rowCount}].FinalAmount" class="z-input final bg-light" readonly /></td>
-                                        <td><button type="button" class="btn text-danger btn-sm" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
-                                        `;
+            <td><select name="PaymentRow[${rowCount}].DealType" class="z-input"><option value="">-None-</option><option value="New Sale">New Sale</option><option value="Upgrade">Upgrade</option><option value="Add On">Add On</option><option value="Stock Key">Stock Key</option><option value="Existing">Existing</option></select></td>
+            <td>
+            <select name="PaymentRow[${rowCount}].ProductId" class="z-input product-select" onchange="productSelected(this)">${productOptionsHtml}</select>
+            <input type="hidden" name="PaymentRow[${rowCount}].ProductName" class="product-name-hidden" value="" />
+            </td>
+            <td><input type="number" name="PaymentRow[${rowCount}].Quantity" class="z-input qty" value="1" onchange="calcRow(this)" /></td>
+            <td><input type="number" name="PaymentRow[${rowCount}].ProductPrice" class="z-input price" value="0" onchange="calcRow(this)" /></td>
+            <td><input type="number" name="PaymentRow[${rowCount}].Total" class="z-input total bg-light" readonly /></td>
+            <td><input type="number" name="PaymentRow[${rowCount}].DiscountPercent" class="z-input disc" value="0" onchange="calcRow(this)" /></td>
+            <td><input type="number" name="PaymentRow[${rowCount}].FinalAmount" class="z-input final bg-light" readonly /></td>
+            <td><button type="button" class="btn text-danger btn-sm" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
+        `;
         tbody.appendChild(tr);
         rowCount++;
     }
+
 
     function productSelected(selectElem) {
         const selectedId = selectElem.value;
@@ -1887,12 +1891,31 @@
         }
     }
 
-    function removeRow(btn) {
+     function removeRow(btn) {
         const row = btn.closest('tr');
         if (row) {
             row.remove();
             calcGrand();
+            reindexPaymentRows(); // 🚀 FIX 3: Re-index all remaining rows to prevent gaps
         }
+    }
+
+    
+    // 🚀 NEW: This function rewrites the names of all inputs in the table
+    // so they are always in perfect mathematical order (0, 1, 2, 3...)
+    function reindexPaymentRows() {
+        const rows = document.querySelectorAll('#paymentTbody .payment-row');
+        rows.forEach((row, index) => {
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (input.name) {
+                    // This uses Regex to find "PaymentRow[ANY_NUMBER]" and replaces it with "PaymentRow[current_index]"
+                    input.name = input.name.replace(/PaymentRow\[\d+\]/, `PaymentRow[${index}]`);
+                }
+            });
+        });
+        // Reset the global row count to match the new perfect sequence
+        rowCount = rows.length;
     }
 
     function calcRow(input) {
