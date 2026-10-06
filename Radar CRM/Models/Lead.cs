@@ -46,6 +46,8 @@ namespace Radar_CRM.Models
         public DateTime? LeadCreatedTime { get; set; }
 
         // --- Lead Information ---
+
+        [NotMapped]
         public string? Stage { get; set; }
         public decimal? Budget { get; set; }
         public decimal? ExpectedRevenue { get; set; }

@@ -847,6 +847,125 @@
             border-color: var(--theme-navy-primary);
         }
 
+        /* Ensures the verify buttons sit perfectly inside the new Zoho input wrapper */
+    .verify-group { display: flex; width: 100%; position: relative; }
+    .verify-group .z-input { padding-right: 85px; }
+    .verify-group .verify-btn {
+        position: absolute; right: 4px; top: 4px; bottom: 4px; border: none;
+        background: var(--theme-navy-light); color: var(--theme-navy-primary);
+        font-weight: 600; border-radius: 4px; padding: 0 16px; font-size: 0.8rem; transition: 0.2s;
+    }
+    .verify-group .verify-btn:hover { background: var(--theme-navy-primary); color: #fff; }
+
+    /* =========================================
+       EDIT VIEW CSS (CLEAN ZOHO ALIGNMENT)
+       ========================================= */
+    .z-edit-container {
+        background: #fff;
+        max-width: 1400px;
+        margin: 20px auto;
+        border: 1px solid var(--theme-border);
+        border-radius: 6px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+
+    .z-edit-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 30px;
+        border-bottom: 1px solid var(--theme-border);
+        background: #f8fafc;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .z-section-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--theme-navy-primary);
+        padding: 15px 30px;
+        margin: 0;
+        border-bottom: 1px solid var(--theme-border);
+        background: #f1f5f9;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .z-form-section {
+        padding: 24px 30px;
+        background: #fff;
+        margin: 0;
+        border-bottom: 1px solid var(--theme-border);
+    }
+
+    .z-field-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+        position: relative;
+    }
+
+    .z-label {
+        width: 35%;
+        text-align: right;
+        padding-right: 20px;
+        font-size: 0.85rem;
+        color: #475569;
+        font-weight: 600;
+    }
+
+    .z-input-wrapper {
+        width: 65%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .z-input {
+        width: 100%;
+        border: 1px solid #94a3b8;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        color: #1f2937;
+        transition: 0.2s;
+        background: #fff;
+        height: 38px;
+    }
+
+    .z-input:focus {
+        border-color: var(--theme-navy-primary);
+        box-shadow: 0 0 0 2px var(--theme-navy-light);
+        outline: none;
+    }
+
+    .z-input[readonly] {
+        background-color: #f8fafc;
+        color: #64748b;
+        cursor: not-allowed;
+    }
+
+   .verify-btn {
+        background: var(--theme-navy-light);
+        color: var(--theme-navy-primary);
+        border: 1px solid var(--theme-navy-primary);
+        font-weight: 600;
+        border-radius: 4px;
+        padding: 0 16px;
+        height: 38px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+  .verify-btn:hover {
+        background: var(--theme-navy-primary);
+        color: #fff;
+    }
+
     /* PREMIUM HOVER EFFECT ON LIST ITEMS */
     .rl-item {
         display: flex;
@@ -958,6 +1077,11 @@
         <h6>Related List</h6>
         <ul class="related-list-menu">
             <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+            
+            <!-- 🚀 ADDED: Links to Related Leads and Deals in Detail View -->
+            <li onclick="document.getElementById('detailLeadsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-users"></i> Leads</li>
+            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+            
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
             <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-check"></i> Open Activities</li>
             <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-check-double"></i> Closed Activities</li>
@@ -976,6 +1100,8 @@
                 <button type="button" class="btn btn-light border fw-bold px-4" onclick="toggleView('edit')"><i class="fa-solid fa-pencil me-2"></i> Edit</button>
             </div>
         </div>
+
+
 
         <div class="detail-content">
 
@@ -1058,6 +1184,66 @@
                 </div>
             </div>
 
+            <!-- 🚀 NEW: Related Leads Section -->
+           <div id="detailLeadsSection" class="detail-section-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Leads</h6>
+                    <!-- 🚀 ADDED: Button to Create a New Lead linked to this Account -->
+                    <a href="@Url.Action("Create", "Leads", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
+                        <i class="fa-solid fa-plus"></i> Add Lead
+                    </a>
+                </div>
+                @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
+                {
+                    <table class="zoho-task-table">
+                        <thead><tr><th>Lead Name</th><th>Mobile Number</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
+                            {
+                                <tr>
+                                    <td><a href="@Url.Action("Edit", "Leads", new { id = lead.Id })" class="text-primary fw-medium text-decoration-none">@(string.IsNullOrEmpty(lead.LeadName) ? "No Name Provided" : lead.LeadName)</a></td>
+                                    <td>@lead.MobileNumber</td>
+                                    <td><span class="badge bg-light text-dark border">@lead.LeadStatus</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4"><i class="fa-solid fa-users mb-2 fs-4"></i><br />No linked contacts</div>
+                }
+            </div>
+
+            <!-- 🚀 NEW: Related Deals Section -->
+            <div id="detailDealsSection" class="detail-section-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
+                    <!-- 🚀 ADDED: Button to Create a New Deal linked to this Account -->
+                    <a href="@Url.Action("Create", "Deals", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
+                        <i class="fa-solid fa-plus"></i> Add Deal
+                    </a>
+                </div>
+                @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
+                {
+                    <table class="zoho-task-table">
+                        <thead><tr><th>Deal Name</th><th>Stage</th></tr></thead>
+                        <tbody>
+                            @foreach (var deal in (IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals)
+                            {
+                                <tr>
+                                    <td><a href="@Url.Action("Edit", "Deals", new { id = deal.Id })" class="text-primary fw-medium text-decoration-none">@(string.IsNullOrEmpty(deal.DealName) ? "Unnamed Deal" : deal.DealName)</a></td>
+                                    <td><span class="badge bg-light text-dark border">@deal.Stage</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4"><i class="fa-solid fa-briefcase mb-2 fs-4"></i><br />No linked deals</div>
+                }
+            </div>
             <!-- Notes Section -->
             <div id="detailNotesSection" class="detail-section-card">
                 <h6 class="fw-bold mb-3 d-flex justify-content-between align-items-center border-bottom pb-2" style="color: var(--theme-navy-primary);">Notes <span class="badge bg-light text-dark border fw-normal">Recent First</span></h6>
@@ -1188,757 +1374,209 @@
 <!-- 🚀 MISS
 <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
 <div id="editViewContainer" style="display: none;">
-    <!-- START OF PAGE WRAPPER TO HOLD SIDEBAR AND FORM -->
-    <div class="page-wrapper">
-
-    <!-- MAIN FORM IS PLACED FIRST IN HTML SO IT APPEARS ON THE LEFT -->
-    <form asp-action="Edit" method="post" id="accountForm" enctype="multipart/form-data" class="sf-container">
-        <!-- CRITICAL: Hidden ID field to bind the existing record -->
+    <form asp-action="Edit" novalidate method="post" id="accountForm" enctype="multipart/form-data">
         <input type="hidden" asp-for="Id" />
 
-     <!-- 1. Header -->
-<div class="sf-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-    
-    <div class="sf-header-title">
-        <h1 style="margin: 0; font-size: 1.4rem; font-weight: 600; color: #1f2937; display: flex; align-items: center; gap: 12px;">
-            <span class="entity-type" style="background-color: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Account</span> 
-            Edit Account
-        </h1>
-    </div>
+        <div class="z-edit-container">
+            <div class="z-edit-header shadow-sm">
+                <h4 class="m-0" style="color:var(--theme-navy-primary); font-weight:700;">Edit Account - @Model.AccountName</h4>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light border px-4 fw-bold" onclick="toggleView('detail')">Cancel</button>
+                    <button type="submit" class="btn text-white px-5 fw-bold" style="background:var(--theme-navy-primary);">Save Account</button>
+                </div>
+            </div>
 
-    <div class="sf-header-actions">
-        <!-- Navy Blue Button with Back Arrow Icon -->
-        <a asp-action="Index" class="btn" style="background-color: #0A2540; color: #ffffff; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; border: none; box-shadow: 0 2px 4px rgba(10, 37, 64, 0.2);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            Back to Dashboard
-        </a>
-    </div>
+            <!-- SEC 1: MASTER DETAILS -->
+            <h5 class="z-section-title">Master Details</h5>
+            <div class="z-form-section row">
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Owner</div><div class="z-input-wrapper"><select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="z-input"><option value="">- Select Account Owner -</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Name <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="AccountName" class="z-input" required placeholder="Enter account name..." /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person Name</div><div class="z-input-wrapper"><input asp-for="ContactPersonName" class="z-input" placeholder="Enter full name" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Type</div><div class="z-input-wrapper"><select asp-for="AccountType" class="z-input" id="AccountType"><option value="None">None</option><option value="Individual">Individual</option><option value="Group">Group</option><option value="Institution">Institution</option><option value="Government Organisation">Government Organisation</option></select></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Status</div><div class="z-input-wrapper"><select asp-for="CurrentStatus" class="z-input"><option value="None">None</option><option value="User">User</option><option value="Non-User">Non-User</option></select></div></div></div>
+                <div class="col-md-6" id="divGroupName" style="display:none;"><div class="z-field-row"><div class="z-label">Group Name</div><div class="z-input-wrapper"><select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="z-input" id="GroupName"><option value="">-Select Group Name-</option></select></div></div></div>
 
-</div>
-        <!-- 2. Tabs -->
-        <ul class="nav sf-tabs" id="accountTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab">Main Details</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="address-tab" data-bs-toggle="tab" data-bs-target="#address" type="button" role="tab">Address Info</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="professional-tab" data-bs-toggle="tab" data-bs-target="#professional" type="button" role="tab">Professional & Software</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="purchase-tab" data-bs-toggle="tab" data-bs-target="#purchase" type="button" role="tab">Purchases & Tracking</button>
-            </li>
-        </ul>
+               <div class="col-md-6"><div class="z-field-row"><div class="z-label">Mobile Phone <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="MobileNumber" class="z-input" id="MobileNumber" placeholder="+1 202-555-0117" required /><button type="button" class="verify-btn" onclick="verifyPhone('MobileNumber')">Verify</button></div></div></div>
+               <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Mobile</div><div class="z-input-wrapper"><input asp-for="AlternateMobile" class="z-input" id="AlternateMobile" placeholder="Optional..." /><button type="button" class="verify-btn" onclick="verifyPhone('AlternateMobile')">Verify</button></div></div></div>
 
-        <!-- 4. Tab Content Area -->
-        <div class="tab-content" id="accountTabsContent" style="flex-grow: 1; display: flex; flex-direction: column;">
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input" id="Email" placeholder="email@example.com" required style="color: #1a56db;" /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
+               <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Email</div><div class="z-input-wrapper"><input asp-for="AlternateEmailID" class="z-input" id="AlternateEmailID" placeholder="Alternate email..." /><button type="button" class="verify-btn" onclick="verifyEmail('AlternateEmailID')">Verify</button></div></div></div>
 
-            <!-- MAIN TAB -->
-            <div class="tab-pane fade show active" id="main" role="tabpanel" style="padding: 32px 40px;">
-
-                <!-- Master Details -->
-                <h3 class="pane-section-title">Master Details</h3>
-                <div class="row">
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Data Source <span class="text-danger">*</span></label>
-                        <select asp-for="DataSource" class="sf-select" id="DataSource" required>
-                            <option value="">-None-</option>
-                            <option value="InboundCall">-InboundCall-</option>
-                            <option value="Referral/Dealer">-Referral/Dealer-</option>
-                            <option value="Meta Ads">Meta Ads</option>
-                            <option value="Google AdWords">-Google AdWords-</option>
-                            <option value="Outreach">-Outreach-</option>
-                            <option value="Group Lead">-Group Lead-</option>
-                            <option value="Institutiona">-Institutional-</option>
-                            <option value="Webinar">Webinar</option>
-                            <option value="KOMMO">KOMMO</option>
-                            <option value="Google Organic SEO">Google Organic SEO</option>
-                            <option value="Website Direct">Website Direct</option>
-                            <option value="YouTube">YouTube</option>
-                            <option value="LinkedIn">LinkedIn</option>
-                            <option value="Instagram Organic">Instagram Organic</option>
-                            <option value="Zoho Webinar">Zoho Webinar</option>
-                            <option value="Reference Doctor">Reference Doctor</option>
-                            <option value="Reference Dealer Partner">Reference Dealer Partner</option>
-                            <option value="Free Trial Self Register">Free Trial Self Register</option>
-                            <option value="Seminar Conference">Seminar Conference</option>
-                            <option value="Cold Calling">Cold Calling</option>
-                            <option value="WhatsApp Campaign">WhatsApp Campaign</option>
-                            <option value="Email Campaign">Email Campaign</option>
-                            <option value="Data Import Old DB">Data Import Old DB</option>
-                            <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
-                        </select>
-                    </div>
-
-                    
-
-
-                    <!-- Conditional Fields (Hidden by default) -->
-                    <div class="col-md-6 form-group" id="divMetaCampaign" style="display:none;">
-                        <label class="sf-label">Meta Campaign Name</label>
-                        <input name="MetaCampaignName" class="sf-input" placeholder="Enter campaign name..." />
-                    </div>
-                    <div class="col-md-6 form-group" id="divSeminarName" style="display:none;">
-                        <label class="sf-label">Seminar Name</label>
-                        <input name="SeminarName" class="sf-input" placeholder="Enter seminar name..." />
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Type</label>
-                        <select asp-for="AccountType" class="sf-select">
-                            <option value="None">None</option>
-                            <option value="Individual">Individual</option>
-                            <option value="Group">Group</option>
-                            <option value="Institution">Institution</option>
-                            <option value="Government Organisation">Government Organisation</option>
-                        </select>
-                    </div>
-
-                    <!-- FIX: Removed the extra nested <div class="row"> here -->
-                    <div class="col-md-6 form-group" id="divGroupName" style="display: none;">
-                        <label class="sf-label">Group Name</label>
-                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select" id="GroupName">
-                            <option value="">-Select Group Name-</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Current Status</label>
-                        <select asp-for="CurrentStatus" class="sf-select">
-                            <option value="None">None</option>
-                            <option value="User">User</option>
-                            <option value="Non-User">Non-User</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Owner</label>
-                        <select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
-                            <option value="">- Select Account Owner -</option>
-                        </select>
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(Model?.LeadStatus))
-                    {
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Lead Status</label>
-                            <input asp-for="LeadStatus" class="sf-input" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
+                <div class="col-md-6">
+                    <div class="z-field-row">
+                        <div class="z-label">Data Source <span class="text-danger">*</span></div>
+                        <div class="z-input-wrapper">
+                            <select asp-for="DataSource" class="z-input" id="DataSource" required>
+                                <option value="">-None-</option>
+                                <option value="InboundCall">-InboundCall-</option>
+                                <option value="Referral/Dealer">-Referral/Dealer-</option>
+                                <option value="Meta Ads">Meta Ads</option>
+                                <option value="Google AdWords">-Google AdWords-</option>
+                                <option value="Outreach">-Outreach-</option>
+                                <option value="Group Lead">-Group Lead-</option>
+                                <option value="Institutiona">-Institutional-</option>
+                                <option value="Webinar">Webinar</option>
+                                <option value="KOMMO">KOMMO</option>
+                                <option value="Google Organic SEO">Google Organic SEO</option>
+                                <option value="Website Direct">Website Direct</option>
+                                <option value="YouTube">YouTube</option>
+                                <option value="LinkedIn">LinkedIn</option>
+                                <option value="Instagram Organic">Instagram Organic</option>
+                                <option value="Zoho Webinar">Zoho Webinar</option>
+                                <option value="Reference Doctor">Reference Doctor</option>
+                                <option value="Reference Dealer Partner">Reference Dealer Partner</option>
+                                <option value="Free Trial Self Register">Free Trial Self Register</option>
+                                <option value="Seminar Conference">Seminar Conference</option>
+                                <option value="Cold Calling">Cold Calling</option>
+                                <option value="WhatsApp Campaign">WhatsApp Campaign</option>
+                                <option value="Email Campaign">Email Campaign</option>
+                                <option value="Data Import Old DB">Data Import Old DB</option>
+                                <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
+                            </select>
                         </div>
-                    } 
-
-
-                    <!-- Date of Entry -->
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Date of Entry</label>
-                        <input type="text" class="sf-input" value="@(Model?.DateOfEntry != null && Model.DateOfEntry != DateTime.MinValue ? Model.DateOfEntry.ToString("MMM dd, yyyy - hh:mm tt") : "N/A")" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
-
-                        <!-- Hidden input to retain actual DateTime value on form submission -->
-                        <input type="hidden" asp-for="DateOfEntry" />
                     </div>
+                </div>
+                <div class="col-md-6" id="divMetaCampaign" style="display:none;"><div class="z-field-row"><div class="z-label">Meta Campaign Name</div><div class="z-input-wrapper"><input name="MetaCampaignName" class="z-input" placeholder="Enter campaign name..." /></div></div></div>
+                <div class="col-md-6" id="divSeminarName" style="display:none;"><div class="z-field-row"><div class="z-label">Seminar Name</div><div class="z-input-wrapper"><input name="SeminarName" class="z-input" placeholder="Enter seminar name..." /></div></div></div>
 
-                    <!-- Created By -->
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Created By</label>
-                        @{
-                            string creatorName = !string.IsNullOrEmpty(Model?.CreatedBy) ? Model.CreatedBy : "System User";
-                        }
-                        <input type="text" class="sf-input" value="@creatorName" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification Status</div><div class="z-input-wrapper"><select asp-for="QualificationStatus" class="z-input"><option value="">-None-</option><option value="Qualified">Qualified</option><option value="Notqualified">Notqualified</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Pending Reason</div><div class="z-input-wrapper"><select asp-for="ProfilePendingReason" class="z-input"><option value="">-None-</option><option value="Connected">Connected</option><option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option><option value="Ringing">Ringing</option><option value="Switched Off">Switched Off</option><option value="Busy-Call Back Later">Busy-Call Back Later</option><option value="Not-Interested">Not-Interested</option><option value="Not a Doctor">Not a Doctor</option><option value="Student">Student</option><option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option></select></div></div></div>
 
-                        <!-- Hidden input to retain data so it doesn't erase on form save -->
-                        <input type="hidden" asp-for="CreatedBy" />
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Status</div><div class="z-input-wrapper"><input type="text" class="z-input" value="@Model.Profilestatus" readonly /><input type="hidden" asp-for="Profilestatus" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Rate</div><div class="z-input-wrapper"><input asp-for="ProfileRate" type="number" class="z-input" readonly /></div></div></div>
+                
+                @if (!string.IsNullOrEmpty(Model?.LeadStatus))
+                {
+                    <div class="col-md-6"><div class="z-field-row"><div class="z-label">Lead Status</div><div class="z-input-wrapper"><input asp-for="LeadStatus" class="z-input" readonly /></div></div></div>
+                }
+            </div>
+
+            <!-- SEC 2: ADDRESS INFORMATION -->
+            <h5 class="z-section-title">Address Information</h5>
+            <div class="z-form-section row">
+                <div class="col-md-6">
+                    <div style="text-align: center; margin-bottom: 20px;"><span class="text-muted fw-bold">Primary Address</span></div>
+                    <div class="z-field-row"><div class="z-label">Country</div><div class="z-input-wrapper"><select asp-for="Addr1_Country" class="z-input" id="Addr1_Country"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">State</div><div class="z-input-wrapper"><select asp-for="Addr1_State" class="z-input" id="Addr1_State"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">City</div><div class="z-input-wrapper"><select asp-for="Addr1_City" class="z-input" id="Addr1_City"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">Zip / Postal Code</div><div class="z-input-wrapper"><select asp-for="Addr1_Zip" class="z-input" id="Addr1_Zip"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">Flat / House No.</div><div class="z-input-wrapper"><input asp-for="Addr1_FlatHouse" class="z-input" placeholder="Apt, Suite, etc." /></div></div>
+                    <div class="z-field-row"><div class="z-label">Street Address</div><div class="z-input-wrapper"><input asp-for="Addr1_Street" class="z-input" placeholder="Street name and number" /></div></div>
+                    <div class="z-field-row"><div class="z-label">Latitude</div><div class="z-input-wrapper"><input asp-for="Addr1_Latitude" class="z-input" /></div></div>
+                    <div class="z-field-row"><div class="z-label">Longitude</div><div class="z-input-wrapper"><input asp-for="Addr1_Longitude" class="z-input" /></div></div>
+                </div>
+                <div class="col-md-6" style="border-left: 1px solid var(--theme-border);">
+                    <div style="text-align: center; margin-bottom: 20px;"><span class="text-muted fw-bold">Secondary Address</span></div>
+                    <div class="z-field-row"><div class="z-label">Country</div><div class="z-input-wrapper"><select asp-for="Addr2_Country" class="z-input" id="Addr2_Country"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">State</div><div class="z-input-wrapper"><select asp-for="Addr2_State" class="z-input" id="Addr2_State"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">City</div><div class="z-input-wrapper"><select asp-for="Addr2_City" class="z-input" id="Addr2_City"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">Zip / Postal Code</div><div class="z-input-wrapper"><select asp-for="Addr2_Zip" class="z-input" id="Addr2_Zip"></select></div></div>
+                    <div class="z-field-row"><div class="z-label">Flat / House No.</div><div class="z-input-wrapper"><input asp-for="Addr2_FlatHouse" class="z-input" placeholder="Apt, Suite, etc." /></div></div>
+                    <div class="z-field-row"><div class="z-label">Street Address</div><div class="z-input-wrapper"><input asp-for="Addr2_Street" class="z-input" placeholder="Street name and number" /></div></div>
+                    <div class="z-field-row"><div class="z-label">Latitude</div><div class="z-input-wrapper"><input asp-for="Addr2_Latitude" class="z-input" /></div></div>
+                    <div class="z-field-row"><div class="z-label">Longitude</div><div class="z-input-wrapper"><input asp-for="Addr2_Longitude" class="z-input" /></div></div>
+                </div>
+            </div>
+
+            <!-- SEC 3: PROFESSIONAL PROFILE & SOFTWARE -->
+            <h5 class="z-section-title">Professional Profile & Software</h5>
+            <div class="z-form-section row">
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Homeopathic Doctor</div><div class="z-input-wrapper"><select asp-for="IsHomeopathicDoctor" class="z-input"><option value="">-None-</option><option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option><option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option><option value="हां- बीएचएमएस">हां- बीएचएमएस</option><option value="नहीं">नहीं</option><option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option><option value="Yes - BHMS">Yes - BHMS</option><option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option><option value="Yes">Yes</option><option value="No">No</option><option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option><option value="Pursuing BHMS">Pursuing BHMS</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Work Type</div><div class="z-input-wrapper"><select asp-for="WorkType" class="z-input"><option value="">-None-</option><option value="Practicing">Practicing</option><option value="Job">Job</option><option value="Research">Research</option><option value="others">others</option></select></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Clinic Type</div><div class="z-input-wrapper"><select asp-for="ClinicType" class="z-input"><option value="">-None-</option><option value="Own">Own</option><option value="Visiting">Visiting</option><option value="Hospital Attached">Hospital Attached</option><option value="Govt.service">Govt.service</option><option value="Chain Clinics">Chain Clinics</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Have computer/Laptop?</div><div class="z-input-wrapper"><select asp-for="HasComputer" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Date of Birth</div><div class="z-input-wrapper"><input asp-for="DateOfBirth" type="date" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Age</div><div class="z-input-wrapper"><input asp-for="Age" type="number" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Years of Practice</div><div class="z-input-wrapper"><input asp-for="YearsOfPractice" type="number" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Patients per Day</div><div class="z-input-wrapper"><input asp-for="PatientsPerDay" type="number" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification</div><div class="z-input-wrapper"><select asp-for="Qualification" class="z-input"><option value="">-Select-</option><option value="BHMS">BHMS</option><option value="MD">MD</option><option value="BAMS">BAMS</option><option value="Student">Student</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">College Name</div><div class="z-input-wrapper"><input asp-for="CollegeName" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Year of Passing</div><div class="z-input-wrapper"><input asp-for="YearOfPassing" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Total Experience</div><div class="z-input-wrapper"><input asp-for="TotalExperience" type="number" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Average Patient Fee (₹)</div><div class="z-input-wrapper"><input asp-for="AveragePatientFee" type="number" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Number of Clinics</div><div class="z-input-wrapper"><input asp-for="NumberOfClinics" type="number" class="z-input" /></div></div></div>
+
+                <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">Software Details</h6></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Currently Using Software?</div><div class="z-input-wrapper"><select asp-for="CurrentlyUsingSoftware" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Software Name</div><div class="z-input-wrapper"><input asp-for="CurrentSoftwareName" class="z-input" /></div></div></div>
+            </div>
+
+            <!-- SEC 4: PURCHASES & TRACKING -->
+            <h5 class="z-section-title">Purchases & Tracking</h5>
+            <div class="z-form-section row">
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Product Purchased</div><div class="z-input-wrapper"><input asp-for="ProductPurchased" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Date</div><div class="z-input-wrapper"><input asp-for="PurchaseDate" type="date" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Value (₹)</div><div class="z-input-wrapper"><input asp-for="PurchaseValue" type="number" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Type</div><div class="z-input-wrapper"><select asp-for="PaymentType" class="z-input"><option value="">-None-</option><option value="Upfront">Upfront</option><option value="EMI - 3Months">EMI - 3Months</option><option value="EMI - 6Months">EMI - 6Months</option></select></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Status</div><div class="z-input-wrapper"><select asp-for="PaymentStatus" class="z-input"><option value="">-None-</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Partial">Partial</option><option value="Refunded">Refunded</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Completion (%)</div><div class="z-input-wrapper"><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Referral Source</div><div class="z-input-wrapper"><input asp-for="ReferralSource" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Invoice Number</div><div class="z-input-wrapper"><input asp-for="InvoiceNumber" class="z-input" /></div></div></div>
+
+                <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">Additional Contacts</h6></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 1</div><div class="z-input-wrapper"><input asp-for="ContactPerson1" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 1 Phone</div><div class="z-input-wrapper"><input asp-for="Contact1Phone" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 2</div><div class="z-input-wrapper"><input asp-for="ContactPerson2" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 2 Phone</div><div class="z-input-wrapper"><input asp-for="Contact2Phone" class="z-input" /></div></div></div>
+                
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 3</div><div class="z-input-wrapper"><input asp-for="ContactPerson3" class="z-input" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 3 Phone</div><div class="z-input-wrapper"><input asp-for="Contact3Phone" class="z-input" /></div></div></div>
+
+                <div class="col-md-12 mt-3">
+                    <div class="z-field-row">
+                        <div class="z-label" style="width: 17.5%;">Duplication Check</div>
+                        <div class="z-input-wrapper" style="width: 82.5%;">
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input asp-for="IsDuplicated" class="form-check-input m-0" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
+                                <label class="form-check-label m-0" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c; font-weight: 600;">Mark as Duplicated Account</label>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Modified By (Current) -->
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Modified By (Current)</label>
+            <!-- SEC 5: SYSTEM AUDITING -->
+            <h5 class="z-section-title">System Auditing</h5>
+            <div class="z-form-section row border-bottom-0">
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Date of Entry</div><div class="z-input-wrapper"><input type="text" class="z-input" value="@(Model?.DateOfEntry != null && Model.DateOfEntry != DateTime.MinValue ? Model.DateOfEntry.ToString("MMM dd, yyyy - hh:mm tt") : "N/A")" readonly /><input type="hidden" asp-for="DateOfEntry" /></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Created By</div><div class="z-input-wrapper"><input type="text" class="z-input" value="@(!string.IsNullOrEmpty(Model?.CreatedBy) ? Model.CreatedBy : "System User")" readonly /><input type="hidden" asp-for="CreatedBy" /></div></div></div>
+                <div class="col-md-6">
+                    <div class="z-field-row">
+                        <div class="z-label">Modified By</div><div class="z-input-wrapper">
                         @{
-                            // Grabs the currently logged-in user & live time
-                            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(User.Identity.Name) ? User.Identity.Name : "Current User";
+                            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "Current User";
                             string modifiedDisplay = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
                         }
-                        <input type="text" class="sf-input" value="@modifiedDisplay" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600;" />
-
-                        <!-- Submits the logged-in user name back to the database as the modifier -->
-                        <input type="hidden" name="ModifiedBy" value="@currentUser" />
-                    </div>
-
-                <!-- Primary Details -->
-                <h3 class="pane-section-title" style="margin-top: 12px;">Primary Details</h3>
-                <div class="row">
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Name <span class="text-danger">*</span></label>
-                        <input asp-for="AccountName" class="sf-input" style="font-weight: 600;" placeholder="Enter account name..." required />
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Contact Person Name</label>
-                        <input asp-for="ContactPersonName" class="sf-input" placeholder="Enter full name" />
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Mobile Phone <span class="text-danger">*</span></label>
-                        <div class="verify-group">
-                            <input asp-for="MobileNumber" class="sf-input" id="MobileNumber" placeholder="+1 202-555-0117" required />
-                            <button type="button" class="btn-verify" onclick="verifyPhone('MobileNumber')">Verify</button>
-                        </div>
-                    </div>
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Email  <span class="text-danger">*</span></label>
-                            <!-- 🚀 ADDED verify-group container -->
-                            <div class="verify-group">
-                                <input asp-for="Email" class="sf-input" id="Email" style="color: #1a56db;" placeholder="email@example.com" required />
-                                <button type="button" class="btn-verify" onclick="verifyEmail('Email')">Verify</button>
-                            </div>
-                        </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Alternate Mobile</label>
-                        <div class="verify-group">
-                            <input asp-for="AlternateMobile" class="sf-input" id="AlternateMobile" placeholder="Optional..." />
-                            <button type="button" class="btn-verify" onclick="verifyPhone('AlternateMobile')">Verify</button>
-                        </div>
-                    </div>
-
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Alternate Email</label>
-                            <!-- 🚀 ADDED verify-group container -->
-                            <div class="verify-group">
-                                <input asp-for="AlternateEmailID" class="sf-input" id="AlternateEmailID" placeholder="Alternate email..." />
-                                <button type="button" class="btn-verify" onclick="verifyEmail('AlternateEmailID')">Verify</button>
-                            </div>
-                        </div>
-                    <div class="row">
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Profile Pending Reason</label>
-                            <select asp-for="ProfilePendingReason" class="sf-select">
-                                <option value="">-None-</option>
-                                <option value="Connected">Connected</option>
-                                <option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option>
-                                <option value="Ringing">Ringing</option>
-                                <option value="Switched Off">Switched Off</option>
-                                <option value="Busy-Call Back Later">Busy-Call Back Later</option>
-                                <option value="Not-Interested">Not-Interested</option>
-                                <option value="Not a Doctor">Not a Doctor</option>
-                                <option value="Student">Student</option>
-                                <option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Qualification Status</label>
-                            <select asp-for="QualificationStatus" class="sf-select">
-                                <option value="">-None-</option>
-                                <option value="Qualified">Qualified</option>
-                                <option value="Notqualified">Notqualified</option>
-                            </select>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label class="sf-label">Profile Status</label>
-                                <select asp-for="Profilestatus" class="sf-select" disabled>
-                                    <option value="">-None-</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Strongly Completed">Strongly Completed</option>
-                                    <option value="Not Completed">Not Completed</option>
-                                    <option value="Not-Qualified">Not-Qualified</option>
-                                </select>
-                                <input type="hidden" asp-for="Profilestatus" />
-                            </div>
-
-                            <div class="col-md-6 form-group">
-                                <label class="sf-label">Profile Rate</label>
-                                <!-- Readonly because the backend calculates this automatically -->
-                                <input asp-for="ProfileRate" type="number" class="sf-input" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted);" />
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                    <!-- ==========================================
-     INLINE NOTES UI (PASTEL THEME)
-     ========================================== -->
-                    <h3 class="pane-section-title mt-4 border-bottom pb-2 mb-3">Notes & Attachments</h3>
-
-                    <!-- 🚀 The Inline Embedded Note Editor -->
-                    <div class="inline-note-editor mb-4 shadow-sm" style="border: 2px solid #84cc16; border-radius: 8px; background-color: #fefce8; overflow: hidden;">
-                        <div class="p-3">
-                            <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-1" placeholder="Title" style="background: transparent; font-size: 1.05rem; font-weight: 700; color: #0f172a;" />
-                            <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 0.95rem; color: #334155; resize: none;"></textarea>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center p-2" style="background-color: #ffffff; border-top: 1px solid #e2e8f0;">
-                            <div class="d-flex gap-3 align-items-center ps-2">
-                                <!-- Icon to click for attachments -->
-                                <label for="inlineNoteFile" style="cursor: pointer; color: #475569; transition: 0.2s;" title="Attach File" onmouseover="this.style.color='#0f172a'" onmouseout="this.style.color='#475569'">
-                                    <i class="fa-solid fa-paperclip fs-5"></i>
-                                </label>
-                                <input type="file" id="inlineNoteFile" style="display: none;" />
-
-                                <!-- Default Owner Dropdown -->
-                                <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="width: 140px; background: transparent; color: #64748b; cursor: pointer;">
-                                    <option value="">- System User -</option>
-                                </select>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="clearInlineNote()" style="color: #64748b; border: 1px solid #cbd5e1;">Cancel</button>
-                                <button type="button" class="btn btn-sm text-white fw-bold px-4" onclick="saveInlineNote()" style="background-color: #84cc16; box-shadow: 0 2px 4px rgba(132, 204, 22, 0.2); transition: 0.2s;" onmouseover="this.style.backgroundColor='#65a30d'" onmouseout="this.style.backgroundColor='#84cc16'">Save</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Container where saved notes will dynamically appear -->
-                    <div id="savedNotesContainer" class="mb-4">
-                        @if (ViewBag.ExistingNotes != null)
-                        {
-                            foreach (var note in (IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes)
-                            {
-                                <div class="saved-note-card p-3 mb-2" style="border: 1px solid #ccfbf1; border-left: 4px solid #1e3a8a; border-radius: 8px; background: #f0fdfa; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-
-                                    <!-- Navy & Teal Header (More Compact) -->
-                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #99f6e4;">
-                                        <span class="fw-bold" style="font-size: 0.85rem; color: #1e3a8a;">
-                                            <i class="fa-solid fa-circle-user me-1" style="color: #0d9488;"></i> @(note.NoteOwner?.fullName ?? "System User")
-                                        </span>
-                                        <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">
-                                            @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
-                                        </span>
-                                    </div>
-
-                                    <!-- Content (Thinner Margins) -->
-                                    @if (!string.IsNullOrEmpty(note.NoteTitle))
-                                    {
-                                        <div class="fw-bold mb-1" style="font-size: 0.95rem; color: #0f172a;">@note.NoteTitle</div>
-                                    }
-                                    <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap; line-height: 1.4;">@note.Description</div>
-
-                                    <!-- Compact Attachment Button -->
-                                    @if (!string.IsNullOrEmpty(note.AttachmentFileName))
-                                    {
-                                        <div class="mt-2">
-                                            <a href="@Url.Action("DownloadNoteFile", "Accounts", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #0f766e; background: #ffffff; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #5eead4; transition: 0.2s;" onmouseover="this.style.backgroundColor='#ccfbf1'" onmouseout="this.style.backgroundColor='#ffffff'">
-                                                <i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName
-                                            </a>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        }
-                    </div>
-                <!-- Duplication Checkbox -->
-                <div class="row">
-                    <div class="col-md-12 form-group pt-2 m-0">
-                        <div class="form-check d-flex align-items-center gap-2">
-                            <input asp-for="IsDuplicated" class="form-check-input m-0" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
-                            <label class="form-check-label m-0" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c; font-weight: 600;">Mark as Duplicated Account</label>
+                        <input type="text" class="z-input" value="@modifiedDisplay" readonly /><input type="hidden" name="ModifiedBy" value="@currentUser" />
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Edit Action Footer -->
+            <div class="d-flex justify-content-end gap-3 p-4 bg-light border-top">
+                <button type="button" class="btn btn-light border px-4 fw-bold" onclick="toggleView('detail')">Cancel</button>
+                <button type="submit" class="btn text-white px-5 fw-bold" style="background:var(--theme-navy-primary);">Save Account</button>
             </div>
         </div>
-            <!-- ADDRESS TAB -->
-            <div class="tab-pane fade" id="address" role="tabpanel" style="padding: 32px 40px;">
-                <div class="row">
-
-                    <!-- Address 1 Card -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="sf-card h-100">
-                            <div class="sf-card-title">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-                                Primary Address
-                            </div>
-
-                            <div class="row">
-                                <!-- Group 1: Country & State -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Country</label>
-                                    <select asp-for="Addr1_Country" class="sf-select" id="Addr1_Country">
-                                        <option value="">- Select Country -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">State <span class="text-danger"></span></label>
-                                    <select asp-for="Addr1_State" class="sf-select" id="Addr1_State">
-                                        <option value="">- Select State -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 2: City & Zip Code -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">City</label>
-                                    <select asp-for="Addr1_City" class="sf-select" id="Addr1_City">
-                                        <option value="">- Select City -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Zip / Postal Code</label>
-                                    <select asp-for="Addr1_Zip" class="sf-select" id="Addr1_Zip">
-                                        <option value="">- Select Zip Code -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 3: Street Details -->
-                                <div class="col-md-4 form-group mb-3">
-                                    <label class="sf-label">Flat / House No.</label>
-                                    <input asp-for="Addr1_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
-                                </div>
-                                <div class="col-md-8 form-group mb-3">
-                                    <label class="sf-label">Street Address</label>
-                                    <input asp-for="Addr1_Street" class="sf-input" placeholder="Street name and number" />
-                                </div>
-
-                                <!-- Group 4: Map Coordinates -->
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Latitude</label>
-                                    <input asp-for="Addr1_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
-                                </div>
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Longitude</label>
-                                    <input asp-for="Addr1_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Address 2 Card -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="sf-card h-100">
-                            <div class="sf-card-title" style="color: #6b7280; border-bottom-color: #e5e7eb;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-                                Secondary Address
-                            </div>
-
-                            <div class="row">
-                                <!-- Group 1: Country & State -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Country</label>
-                                    <select asp-for="Addr2_Country" class="sf-select" id="Addr2_Country">
-                                        <option value="">- Select Country -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">State</label>
-                                    <select asp-for="Addr2_State" class="sf-select" id="Addr2_State">
-                                        <option value="">- Select State -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 2: City & Zip Code -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">City</label>
-                                    <select asp-for="Addr2_City" class="sf-select" id="Addr2_City">
-                                        <option value="">- Select City -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Zip / Postal Code</label>
-                                    <select asp-for="Addr2_Zip" class="sf-select" id="Addr2_Zip">
-                                        <option value="">- Select Zip Code -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 3: Street Details -->
-                                <div class="col-md-4 form-group mb-3">
-                                    <label class="sf-label">Flat / House No.</label>
-                                    <input asp-for="Addr2_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
-                                </div>
-                                <div class="col-md-8 form-group mb-3">
-                                    <label class="sf-label">Street Address</label>
-                                    <input asp-for="Addr2_Street" class="sf-input" placeholder="Street name and number" />
-                                </div>
-
-                                <!-- Group 4: Map Coordinates -->
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Latitude</label>
-                                    <input asp-for="Addr2_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
-                                </div>
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Longitude</label>
-                                    <input asp-for="Addr2_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-            <!-- PROFESSIONAL TAB -->
-            <div class="tab-pane fade" id="professional" role="tabpanel" style="padding: 32px 40px;">
-                <h3 class="pane-section-title">Professional Profile</h3>
-                <div class="row">
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Homeopathic Doctor</label>
-                        <select asp-for="IsHomeopathicDoctor" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option>
-                            <option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option>
-                            <option value="हां- बीएचएमएस">हां- बीएचएमएस</option>
-                            <option value="नहीं">नहीं</option>
-                            <option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option>
-                            <option value="Yes - BHMS">Yes - BHMS</option>
-                            <option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                            <option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option>
-                            <option value="Pursuing BHMS">Pursuing BHMS</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Work Type</label>
-                        <select asp-for="WorkType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Practicing">Practicing</option>
-                            <option value="Job">Job</option>
-                            <option value="Research">Research</option>
-                            <option value="others">others</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Clinic Type</label>
-                        <select asp-for="ClinicType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Own">Own</option>
-                            <option value="Visiting">Visiting</option>
-                            <option value="Hospital Attached">Hospital Attached</option>
-                            <option value="Govt.service">Govt.service</option>
-                            <option value="Chain Clinics">Chain Clinics</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3 form-group"><label class="sf-label">Have computer/Laptop?</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Years of Practice</label><input asp-for="YearsOfPractice" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Patients per Day</label><input asp-for="PatientsPerDay" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Qualification</label>
-                        <select asp-for="Qualification" class="sf-select">
-                            <option value="">-Select-</option>
-                            <option value="BHMS">BHMS</option>
-                            <option value="MD">MD</option>
-                            <option value="BAMS">BAMS</option>
-                            <option value="Student">Student</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group"><label class="sf-label">College Name</label><input asp-for="CollegeName" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Year of Passing</label><input asp-for="YearOfPassing" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Total Experience</label><input asp-for="TotalExperience" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Average Patient Fee (₹)</label><input asp-for="AveragePatientFee" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Number of Clinics</label><input asp-for="NumberOfClinics" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Date of Birth</label><input asp-for="DateOfBirth" type="date" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Age</label><input asp-for="Age" type="number" class="sf-input" /></div>
-
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Software Details</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Currently Using Software?</label>
-                        <select asp-for="CurrentlyUsingSoftware" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select>
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Current Software Name</label>
-                        <input asp-for="CurrentSoftwareName" class="sf-input" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- PURCHASES & TRACKING TAB -->
-            <div class="tab-pane fade" id="purchase" role="tabpanel" style="padding: 32px 40px;">
-                <h3 class="pane-section-title">Product & Purchase Details</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group"><label class="sf-label">Product Purchased</label><input asp-for="ProductPurchased" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Date</label><input asp-for="PurchaseDate" type="date" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Value (₹)</label><input asp-for="PurchaseValue" type="number" class="sf-input" /></div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Payment Type</label>
-                        <select asp-for="PaymentType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Upfront">Upfront</option>
-                            <option value="EMI - 3Months">EMI - 3Months</option>
-                            <option value="EMI - 6Months">EMI - 6Months</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Payment Status</label>
-                        <select asp-for="PaymentStatus" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Paid">Paid</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Partial">Partial</option>
-                            <option value="Refunded">Refunded</option>
-                        </select>
-                    </div>
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Profile Completion Tracking</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group"><label class="sf-label">Profile Completion (%)</label><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Referral Source</label><input asp-for="ReferralSource" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Invoice Number</label><input asp-for="InvoiceNumber" class="sf-input" /></div>
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Additional Contacts</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 1</label>
-                        <input asp-for="ContactPerson1" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 1 Phone</label>
-                        <input asp-for="Contact1Phone" class="sf-input" />
-                    </div>
-                    <div class="col-md-4"></div> <!-- Spacer -->
-
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 2</label>
-                        <input asp-for="ContactPerson2" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 2 Phone</label>
-                        <input asp-for="Contact2Phone" class="sf-input" />
-                    </div>
-                    <div class="col-md-4"></div> <!-- Spacer -->
-
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 3</label>
-                        <input asp-for="ContactPerson3" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 3 Phone</label>
-                        <input asp-for="Contact3Phone" class="sf-input" />
-                    </div>
-                </div>
-            </div>
-
-        </div> <!-- End of Tab Content -->
-        <!-- 5. Footer Area (Save Button) -->
-        <div style="padding: 20px 32px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; justify-content: flex-end; gap: 16px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
-            <a asp-action="Index" class="btn" style="background: white; border: 1px solid #d1d5db; color: #374151; font-weight: 500; font-size: 0.9rem; padding: 10px 24px; border-radius: 6px; text-decoration: none;">Cancel</a>
-
-            <button type="submit" class="btn-sf-primary">
-                Save Account
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:6px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-        </div>
-
     </form>
-
-    <!-- ==========================================
-         PREMIUM NAVY & CREAM SIDEBAR (MOVED TO RIGHT)
-         ========================================== -->
-    <div class="sf-sidebar">
-        <!-- Navy Header -->
-        <div class="sidebar-header-box">
-            <i class="fa-solid fa-link"></i> Related Records
-        </div>
-
-        <!-- Cream Body -->
-        <div class="sidebar-body-box">
-
-            <!-- 1. Automatically Linked Contacts (Formerly Leads) -->
-            <div class="mb-4">
-                <div class="sidebar-section-title">Leads</div>
-
-                @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
-                {
-                    foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
-                    {
-                        <a href="@Url.Action("Edit", "Leads", new { id = lead.Id })" class="rl-item">
-                            <span><i class="fa-solid fa-user main-icon me-2"></i> @(string.IsNullOrEmpty(lead.LeadName) ? "No Name Provided" : lead.LeadName)</span>
-                            <i class="fa-solid fa-chevron-right chevron-icon"></i>
-                        </a>
-                    }
-                }
-                else
-                {
-                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No linked contacts</div>
-                }
-            </div>
-
-            <!-- 2. Automatically Linked Deals -->
-            <div class="mb-4">
-                <div class="sidebar-section-title">Deals</div>
-
-                @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
-                {
-                    foreach (var deal in (IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals)
-                    {
-                        <a href="@Url.Action("Edit", "Deals", new { id = deal.Id })" class="rl-item">
-                            <span><i class="fa-solid fa-briefcase main-icon me-2"></i> @(string.IsNullOrEmpty(deal.DealName) ? "Unnamed Deal" : deal.DealName)</span>
-                            <i class="fa-solid fa-chevron-right chevron-icon"></i>
-                        </a>
-                    }
-                }
-                else
-                {
-                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No linked deals</div>
-                }
-            </div>
-
-            <!-- 3. Related Tasks -->
-            <div class="sidebar-section-title">
-                <span>Tasks</span>
-                <!-- 🚀 FIX: Only use onclick. Remove data-bs-toggle to prevent double-firing -->
-                <button type="button" class="btn-sidebar-add" onclick="openTaskModal()" title="Add Task">
-                    <i class="fa-solid fa-plus"></i>
-                </button>
-            </div>
-
-                @if (ViewBag.RelatedTasks != null && ((IEnumerable<Radar_CRM.Models.Task>)ViewBag.RelatedTasks).Any())
-                {
-                    foreach (var task in (IEnumerable<Radar_CRM.Models.Task>)ViewBag.RelatedTasks)
-                    {
-                        <a href="@Url.Action("Edit", "Tasks", new { id = task.Id })" class="rl-item">
-                            <span class="text-truncate" style="max-width: 120px;"><i class="fa-solid fa-check-square main-icon me-2"></i> @task.Subject</span>
-                            <span class="rl-badge">@task.Status</span>
-                        </a>
-                    }
-                }
-                else
-                {
-                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No open tasks</div>
-                }
-            </div>
-
-            <!-- 4. Notes Preview -->
-            <div class="mb-2">
-                <div class="sidebar-section-title">
-                    <span>Recent Notes</span>
-                    <button type="button" class="btn-sidebar-add" onclick="openNoteModal()" title="Add Note">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-
-                @if (ViewBag.ExistingNotes != null && ((IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes).Any())
-                {
-                    foreach (var note in ((IEnumerable<Radar_CRM.Models.Notes>)ViewBag.ExistingNotes).Take(3))
-                    {
-                        <div class="sidebar-note-card">
-                            <div class="sidebar-note-meta">@note.CreatedDateTime.ToString("MMM dd") • @(note.NoteOwner?.fullName ?? "System User")</div>
-                            <div class="sidebar-note-text">@note.Description</div>
-                        </div>
-                    }
-                    <a href="javascript:void(0);" onclick="document.getElementById('main-tab').click(); document.getElementById('savedNotesContainer').scrollIntoView({behavior: 'smooth'});" class="text-primary" style="font-size: 0.85rem; text-decoration: none; font-weight: 600; display: block; text-align: right; margin-top: 12px;">
-                        View all notes <i class="fa-solid fa-arrow-right"></i>
-                    </a>
-                }
-                else
-                {
-                    <div class="text-muted fst-italic ps-1" style="font-size: 0.8rem;">No notes yet</div>
-                }
-            </div>
-
-        </div>
-    </div>
-    <!-- END OF PREMIUM SIDEBAR -->
-
 </div>
 
+   
 <!-- ========================================================
      MODERN SAAS NOTE MODAL (Matches Task Modal UI)
      ======================================================== -->
@@ -2906,5 +2544,45 @@ function updateQuickField(fieldName, fieldValue) {
             const nextRow = openTbody.children[0];
             document.getElementById('nextActionDisplay').innerText = `${nextRow.cells[0].innerText} - Due: ${nextRow.cells[1].innerText}`;
         }
+    }
+
+    // =====================================
+    // AJAX: UPDATE TASK STATUS & MOVE ROW
+    // =====================================
+    function updateTaskStatus(selectElement, taskId) {
+        const newStatus = selectElement.value;
+        const row = selectElement.closest('tr');
+
+        // Optional: Disable dropdown while processing
+        selectElement.disabled = true;
+
+        const formData = new URLSearchParams();
+        formData.append('id', taskId);
+        formData.append('status', newStatus);
+
+        // Call your Tasks controller to update the database
+        fetch('/Tasks/UpdateStatus', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        })
+        .then(response => response.json())
+        .then(data => {
+            selectElement.disabled = false;
+            
+            // Move it visually to the "Closed" table if completed
+            if (newStatus === "Completed") {
+                moveTaskToClosed(row);
+            }
+        })
+        .catch(err => {
+            selectElement.disabled = false;
+            console.error('Task update error:', err);
+            
+            // Fallback: If you don't have a backend endpoint yet but want the UI to work anyway
+            if (newStatus === "Completed") {
+                 moveTaskToClosed(row);
+            }
+        });
     }
     </script>

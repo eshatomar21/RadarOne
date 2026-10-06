@@ -546,6 +546,9 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("Remarks")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Stage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal?>("SubTotal")
                         .HasColumnType("decimal(18,2)");
 
@@ -1008,9 +1011,6 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SocialLeadID")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Stage")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal?>("SubTotal")

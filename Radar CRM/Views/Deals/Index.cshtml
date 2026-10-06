@@ -704,77 +704,118 @@
                         </th>
                     </tr>
                 </thead>
-                <tbody id="tableBody">
-                    @if (Model != null && Model.Any())
+              <tbody id="tableBody">
+    @if (Model != null && Model.Any())
+    {
+        var userLookup = ((SelectList)ViewBag.UsersList)?.ToDictionary(x => x.Value.ToLower(), x => x.Text) ?? new Dictionary<string, string>();
+        var accountLookup = ((SelectList)ViewBag.AccountsList)?.ToDictionary(x => x.Value.ToLower(), x => x.Text) ?? new Dictionary<string, string>();
+
+        foreach (var item in Model)
+        {
+            <tr class="deal-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Deals", new { id = item.Id })'">
+                <td class="sticky-cb" style="width: 50px; min-width: 50px;" onclick="event.stopPropagation()">
+                    <div class="d-flex align-items-center justify-content-center w-100">
+                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                    </div>
+                </td>
+                @{
+                    int tdIndex = 0;
+                    foreach (var prop in tableProps)
                     {
-                        foreach (var item in Model)
+                        string value = "";
+                        var rawValue = prop.GetValue(item, null);
+
+                        if (rawValue != null)
                         {
-                            <tr class="deal-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Deals", new { id = item.Id })'">
-                                <td class="sticky-cb" style="width: 50px; min-width: 50px;" onclick="event.stopPropagation()">
-                                    <div class="d-flex align-items-center justify-content-center w-100">
-                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
-                                    </div>
-                                </td>
-                                @{
-                                    int tdIndex = 0;
-                                    foreach (var prop in tableProps)
-                                    {
-                                        string value = "";
-                                        var rawValue = prop.GetValue(item, null);
-
-                                        if (rawValue != null)
-                                        {
-                                            value = rawValue.ToString(); // The JS `formatUserAndAccountIDs` replaces the values!
-                                        }
-
-                                        <td data-col-index="@tdIndex">
-                                            @if (prop.Name == "DealName")
-                                            {
-                                                <a href="@Url.Action("Edit", "Deals", new { id = item.Id })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value</a>
-                                            }
-                                            else if (prop.Name == "PaymentStatus" || prop.Name == "Stage")
-                                            {
-                                                @if (value.ToLower() == "paid" || value.ToLower() == "won" || value.ToLower() == "closed won")
-                                                { <span class="badge-soft-success">@value</span> }
-                                                else if (value.ToLower() == "lost" || value.ToLower() == "closed lost" || value.ToLower() == "refunded")
-                                                { <span class="badge-soft-danger">@value</span> }
-                                                else if (!string.IsNullOrEmpty(value))
-                                                { <span class="badge-soft-warning">@value</span> }
-                                            }
-                                            else
-                                            { @value }
-                                        </td>
-                                        tdIndex++;
-                                    }
+                            // 🚀 FIX: Handle Navigation Properties (like DealOwner or Account)
+                            if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+                            {
+                                // Attempt 1: Look for the corresponding foreign key (e.g., "DealOwner" -> "DealOwnerId")
+                                var fkProp = item.GetType().GetProperty(prop.Name + "Id");
+                                if (fkProp != null)
+                                {
+                                    value = fkProp.GetValue(item, null)?.ToString() ?? "";
                                 }
-                                <td class="dummy-filler-col"></td>
-                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-                                    <div class="d-flex align-items-center justify-content-center gap-2">
-                                        @{
-                                            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
-                                            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
-                                            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
-                                        }
-                                        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("DealName")?.GetValue(item, null)?.ToString() ?? "Deal")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
-                                            <i class="fa-regular fa-comment-dots"></i> Notes
-                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                                else
+                                {
+                                    // Attempt 2: Extract a readable property directly from the object
+                                    var displayProp = prop.PropertyType.GetProperty("FullName") ?? 
+                                                      prop.PropertyType.GetProperty("Name") ?? 
+                                                      prop.PropertyType.GetProperty("UserName") ?? 
+                                                      prop.PropertyType.GetProperty("FirstName") ?? 
+                                                      prop.PropertyType.GetProperty("AccountName");
+                                    
+                                    value = displayProp != null ? displayProp.GetValue(rawValue)?.ToString() ?? "" : "";
+                                }
+                            }
+                            else
+                            {
+                                value = rawValue.ToString(); 
+                            }
+
+                            // Dictionary Lookup: Map IDs to Names
+                            if (!string.IsNullOrEmpty(value))
+                            {
+                                string lowerValue = value.ToLower();
+                                if (userLookup.ContainsKey(lowerValue))
+                                {
+                                    value = userLookup[lowerValue];
+                                }
+                                else if (accountLookup.ContainsKey(lowerValue))
+                                {
+                                    value = accountLookup[lowerValue];
+                                }
+                            }
                         }
+
+                        <td data-col-index="@tdIndex">
+                            @if (prop.Name == "DealName")
+                            {
+                                <a href="@Url.Action("Edit", "Deals", new { id = item.Id })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value</a>
+                            }
+                            else if (prop.Name == "PaymentStatus" || prop.Name == "Stage")
+                            {
+                                @if (value.ToLower() == "paid" || value.ToLower() == "won" || value.ToLower() == "closed won")
+                                { <span class="badge-soft-success">@value</span> }
+                                else if (value.ToLower() == "lost" || value.ToLower() == "closed lost" || value.ToLower() == "refunded")
+                                { <span class="badge-soft-danger">@value</span> }
+                                else if (!string.IsNullOrEmpty(value))
+                                { <span class="badge-soft-warning">@value</span> }
+                            }
+                            else
+                            { @value }
+                        </td>
+                        tdIndex++;
                     }
-                    else
-                    {
-                        <tr id="noRecordsRow">
-                            <td colspan="50" class="text-center py-5 text-muted">
-                                <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
-                                <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
-                                <p class="mt-1">Try adjusting your filters or upload new data.</p>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
+                }
+                <td class="dummy-filler-col"></td>
+                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        @{
+                            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
+                            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
+                            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
+                        }
+                        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("DealName")?.GetValue(item, null)?.ToString() ?? "Deal")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+                            <i class="fa-regular fa-comment-dots"></i> Notes
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        }
+    }
+    else
+    {
+        <tr id="noRecordsRow">
+            <td colspan="50" class="text-center py-5 text-muted">
+                <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
+                <p class="mt-1">Try adjusting your filters or upload new data.</p>
+            </td>
+        </tr>
+    }
+</tbody>
             </table>
         </div>
 

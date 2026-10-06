@@ -694,6 +694,19 @@ namespace Radar_CRM.Controllers
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             ViewBag.ProductPrices = _context.Products.ToDictionary(p => p.Id, p => p.UnitPrice);
 
+            // 🚀 NEW: Fetch the Deals linked to this Lead
+            ViewBag.RelatedDeals = await _context.Deals
+                .Where(d => d.LeadId == id)
+                .ToListAsync();
+
+            // 🚀 NEW: Fetch the Account linked to this Lead (if applicable)
+            if (lead.AccountId != null && lead.AccountId != 0)
+            {
+                ViewBag.RelatedAccounts = await _context.Accounts
+                    .Where(a => a.Id == lead.AccountId)
+                    .ToListAsync();
+            }
+
             // 🚀 FIX: Changed DealId to LeadId so it successfully finds the Lead's notes!
             ViewBag.ExistingNotes = await _context.Note
     .Include(n => n.NoteOwner)
@@ -730,6 +743,18 @@ namespace Radar_CRM.Controllers
                     lead.DealId = linkedDeal.Id;
                     lead.DealName = linkedDeal.DealName;
                 }
+            }
+
+            // 🚀 FIX: explicitly fetch the Account using the Lead's AccountId column
+            if (lead.AccountId != null && lead.AccountId != 0)
+            {
+                ViewBag.RelatedAccounts = await _context.Accounts
+                    .Where(a => a.Id == lead.AccountId)
+                    .ToListAsync();
+            }
+            else
+            {
+                ViewBag.RelatedAccounts = new List<Radar_CRM.Models.Account>();
             }
 
             return View(lead);
@@ -875,19 +900,23 @@ namespace Radar_CRM.Controllers
                     // =========================================================
                     // 🚀 NEW: SYNC UPDATES TO THE LINKED ACCOUNT
                     // =========================================================
+                    // 🚀 FIX: Declare trueAccountName OUTSIDE the if-block so the Deal logic can see it
+                    string trueAccountName = lead.AccountName;
+
                     if (lead.AccountId.HasValue)
                     {
                         var linkedAccount = await _context.Accounts.FindAsync(lead.AccountId.Value);
                         if (linkedAccount != null)
                         {
+                            // Capture the true account name so we can pass it to the Deal later
+                            trueAccountName = linkedAccount.AccountName;
+
                             // --- Core Identifiers ---
                             linkedAccount.ContactPersonName = lead.ContactName;
-                            linkedAccount.AccountName = lead.LeadName;
 
                             // --- Ownership Mapping ---
                             linkedAccount.AccountOwnerId = lead.AccountOwnerId;
                             linkedAccount.CoOwnerId = lead.CoOwnerId;
-
 
                             // --- Source Mapping ---
                             linkedAccount.DataSource = lead.DataSources;
@@ -956,14 +985,14 @@ namespace Radar_CRM.Controllers
                     }
 
                     // =========================================================
-                    // 🚀 DIRECT DEAL CREATION WITH NOTE TRANSFER (WITH LOGS)
+                    // 🚀 DIRECT DEAL CREATION WITH NOTE & PAYMENT TRANSFER
                     // =========================================================
                     if (lead.Stage == "Direct Deal")
                     {
                         System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Checking if Deal exists for LeadName: '{lead.LeadName}'...");
                         bool dealExists = _context.Deals.Any(d => d.LeadName == lead.LeadName);
 
-                        // 🚀 1. AUTOMATICALLY CHANGE LEAD STAGE TO 'WON'
+                        // 1. AUTOMATICALLY CHANGE LEAD STAGE TO 'WON'
                         lead.Stage = "Won";
                         _context.Update(lead);
 
@@ -977,7 +1006,10 @@ namespace Radar_CRM.Controllers
                                 LeadId = lead.Id,
                                 DealName = lead.LeadName + " - Direct Deal",
                                 AccountId = lead.AccountId,
-                                AccountName = lead.AccountName,
+
+                                // 🚀 Passed the safely declared variable here
+                                AccountName = trueAccountName,
+
                                 ContactPersonName = lead.ContactName,
                                 LeadName = lead.LeadName,
                                 LeadSource = lead.DataSources,
@@ -987,7 +1019,6 @@ namespace Radar_CRM.Controllers
                                 AccountType = lead.AccountType,
                                 CreatedBy = lead.CreatedBy,
 
-                                // 🚀 FIX: Assign proper DateTime object, not a string
                                 DateOfEntry = DateTime.Now,
                                 MetaCampaignName = lead.MetaCampaignName,
                                 PaymentMode = lead.PaymentMode,
@@ -996,9 +1027,19 @@ namespace Radar_CRM.Controllers
                                 SubTotal = lead.SubTotal ?? 0m,
                                 Taxes = lead.Taxes ?? 0m,
                                 Adjustment = lead.Adjustment ?? 0m,
-                                GrandTotal = lead.GrandTotal ?? 0m,
-                                PaymentRows = savedRows.Select(row => new DealPaymentRow
+                                GrandTotal = lead.GrandTotal ?? 0m
+                            };
+                            // 1. SAVE THE NEW DEAL FIRST TO GENERATE THE NEW DEAL ID
+                            _context.Deals.Add(newDeal);
+                            await _context.SaveChangesAsync();
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Successfully created Deal with ID: {newDeal.Id}");
+
+                            // 🚀 FIX 4: Explicitly force-save the Product & Payment rows using the newly generated Deal ID
+                            if (savedRows.Any())
+                            {
+                                var dealPaymentRows = savedRows.Select(row => new DealPaymentRow
                                 {
+                                    DealId = newDeal.Id, // Link strictly to the new Deal
                                     DealType = row.DealType,
                                     ProductId = row.ProductId,
                                     ProductName = row.ProductName,
@@ -1007,12 +1048,11 @@ namespace Radar_CRM.Controllers
                                     Amount = row.Total ?? 0,
                                     Discount = row.DiscountPercent ?? 0,
                                     Total = row.FinalAmount ?? 0
-                                }).ToList()
-                            };
+                                }).ToList();
 
-                            // 1. SAVE THE NEW DEAL FIRST TO GENERATE THE NEW DEAL ID
-                            _context.Deals.Add(newDeal);
-                            await _context.SaveChangesAsync();
+                                _context.AddRange(dealPaymentRows);
+                                await _context.SaveChangesAsync();
+                            }
                             System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Successfully created Deal with ID: {newDeal.Id}");
 
                             // ==========================================

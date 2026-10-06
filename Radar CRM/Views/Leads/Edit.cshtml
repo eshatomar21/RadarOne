@@ -402,6 +402,11 @@
         <h6>Related List</h6>
         <ul class="related-list-menu">
             <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+            
+            <!-- 🚀 ADDED: Links to Related Accounts and Deals -->
+            <li onclick="document.getElementById('detailAccountsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-building"></i> Accounts</li>
+            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+            
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
             <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-check"></i> Open Activities</li>
             <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-check-double"></i> Closed Activities</li>
@@ -436,10 +441,42 @@
                 </ul>
             </div>
 
-            <!-- Quick Edit Section (Syncs to main form) -->
+           <!-- Quick Edit Section (Syncs to main form) -->
             <div class="detail-section-card">
                 <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
                 <div class="row">
+                    
+                   <!-- 🚀 ADDED: Clickable Account Link (Read-Only) -->
+<div class="col-md-6 mb-3">
+    <div class="row align-items-center">
+        <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Name</div>
+        <div class="col-8">
+            <div class="input-group input-group-sm">
+                
+                <!-- 🚀 FIX: Replaced Dropdown with a Read-Only Input -->
+                <!-- It automatically finds the Account Name from your existing ViewBag.AccountsList -->
+                <input type="text" class="form-control border border-secondary bg-light" 
+                       value="@(((SelectList)ViewBag.AccountsList)?.FirstOrDefault(a => a.Value == Model.AccountId?.ToString())?.Text ?? "No Account Linked")" 
+                       readonly 
+                       style="cursor: not-allowed; color: #475569; font-weight: 600;" />
+                
+                @if (Model.AccountId != null && Model.AccountId.ToString() != "0" && Model.AccountId.ToString() != "")
+                {
+                    <a href="@Url.Action("Edit", "Accounts", new { id = Model.AccountId })" 
+                       class="btn border border-secondary" 
+                       style="background-color: #f8fafc; color: var(--theme-navy-primary);" 
+                       title="Open Linked Account">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                }
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+                   
+
                     <div class="col-md-6 mb-3">
                         <div class="row align-items-center">
                             <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Lead Owner</div>
@@ -531,6 +568,75 @@
                         }
                     </span>
                 </div>
+            </div>
+
+          <!-- 🚀 RELATED ACCOUNTS SECTION -->
+            <div id="detailAccountsSection" class="detail-section-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Accounts</h6>
+                    <a href="@Url.Action("Create", "Accounts", new { leadId = Model.Id })" class="btn btn-sm text-white fw-bold" style="background-color: var(--theme-navy-primary);">
+                        <i class="fa-solid fa-plus me-1"></i> Add Account
+                    </a>
+                </div>
+                @if (ViewBag.RelatedAccounts != null && ((IEnumerable<Radar_CRM.Models.Account>)ViewBag.RelatedAccounts).Any())
+                {
+                    <table class="zoho-task-table">
+                        <thead><tr><th>Account Name</th><th>Mobile Number</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var acc in (IEnumerable<Radar_CRM.Models.Account>)ViewBag.RelatedAccounts)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="@Url.Action("Edit", "Accounts", new { id = acc.Id })" class="text-primary fw-bold text-decoration-none">
+                                            @(string.IsNullOrEmpty(acc.AccountName) ? "No Name Provided" : acc.AccountName)
+                                            <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.75rem;"></i>
+                                        </a>
+                                    </td>
+                                    <td>@acc.MobileNumber</td>
+                                    <td><span class="badge bg-light text-dark border">@acc.CurrentStatus</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4"><i class="fa-solid fa-building mb-2 fs-4"></i><br />No linked accounts</div>
+                }
+            </div>
+
+            <!-- 🚀 RELATED DEALS SECTION -->
+            <div id="detailDealsSection" class="detail-section-card">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
+                    <a href="@Url.Action("Create", "Deals", new { leadId = Model.Id })" class="btn btn-sm text-white fw-bold" style="background-color: var(--theme-navy-primary);">
+                        <i class="fa-solid fa-plus me-1"></i> Add Deal
+                    </a>
+                </div>
+                @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
+                {
+                    <table class="zoho-task-table">
+                        <thead><tr><th>Deal Name</th><th>Stage</th></tr></thead>
+                        <tbody>
+                            @foreach (var deal in (IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="@Url.Action("Edit", "Deals", new { id = deal.Id })" class="text-primary fw-bold text-decoration-none">
+                                            @(string.IsNullOrEmpty(deal.DealName) ? "Unnamed Deal" : deal.DealName)
+                                            <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size: 0.75rem;"></i>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">@deal.Stage</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4"><i class="fa-solid fa-briefcase mb-2 fs-4"></i><br />No linked deals</div>
+                }
             </div>
 
             <!-- Notes Section -->
@@ -1174,6 +1280,7 @@
                 const r = document.getElementById(realId);
                 if (q && r) q.value = r.value;
             };
+            syncField('QuickAccountId', 'AccountId');
             syncField('QuickLeadOwnerId', 'LeadOwnerId');
             syncField('QuickEmailID', 'EmailID');
             syncField('QuickMobileNumber', 'MobileNumber');
@@ -1219,6 +1326,7 @@
     // AJAX TASK SUBMISSION & STATUS UPDATE
     // =====================================
     document.addEventListener("DOMContentLoaded", function () {
+
         const taskForm = document.querySelector('#quickTaskModal form');
 
         if (taskForm) {

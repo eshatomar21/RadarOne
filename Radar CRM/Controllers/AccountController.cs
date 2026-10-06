@@ -1639,6 +1639,9 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // QUICK INFO AUTO-SAVE: AJAX POST
         // ==========================================
+        // ==========================================
+        // QUICK INFO AUTO-SAVE: AJAX POST
+        // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
         [Route("Accounts/UpdateQuickInfo")]
@@ -1647,46 +1650,59 @@ namespace Radar_CRM.Controllers
             var account = await _context.Accounts.FindAsync(id);
             if (account == null) return Json(new { success = false, message = "Account not found" });
 
-            // Safely extract the value without forcing text fields to NULL
+            // Safely extract the value
             string trimmedValue = newValue?.Trim() ?? "";
-
-            switch (field)
-            {
-                case "AccountOwnerId":
-                    // Foreign Keys MUST be null if empty, otherwise SQL throws an error
-                    account.AccountOwnerId = string.IsNullOrWhiteSpace(trimmedValue) ? null : trimmedValue;
-                    break;
-                case "Email":
-                    account.Email = trimmedValue;
-                    break;
-                case "MobileNumber":
-                    account.MobileNumber = trimmedValue;
-                    break;
-                case "AlternateMobile":
-                    account.AlternateMobile = trimmedValue;
-                    break;
-                case "CurrentStatus":
-                    account.CurrentStatus = trimmedValue;
-                    break;
-                default:
-                    return Json(new { success = false, message = "Invalid field mapping" });
-            }
-
-            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
-                ? User.Identity.Name
-                : "System User";
-
-            account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
 
             try
             {
+                // 🚀 FIX: Use Reflection to dynamically update ANY field passed from the frontend
+                var propertyInfo = typeof(Account).GetProperty(field, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                if (propertyInfo != null)
+                {
+                    Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+                    object safeValue = null;
+
+                    // 🚀 FIX: Prevent Null Reference Errors on Required Fields (Like Email)
+                    if (t == typeof(string))
+                    {
+                        safeValue = trimmedValue == "-None-" ? "" : trimmedValue;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(trimmedValue) && trimmedValue != "-None-")
+                    {
+                        if (t == typeof(DateTime))
+                        {
+                            if (DateTime.TryParse(trimmedValue, out DateTime d)) safeValue = d;
+                        }
+                        else
+                        {
+                            safeValue = Convert.ChangeType(trimmedValue, t);
+                        }
+                    }
+
+                    // Apply the value to the model
+                    propertyInfo.SetValue(account, safeValue, null);
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Invalid field mapping: " + field });
+                }
+
+                string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                    ? User.Identity.Name
+                    : "System User";
+
+                account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
+
+                // Explicitly tell Entity Framework to update the record
+                _context.Update(account);
                 await _context.SaveChangesAsync();
+
                 return Json(new { success = true });
             }
             catch (Exception ex)
             {
-                // If the Mobile Number fails to update (e.g., a duplicate exists in the database), 
-                // this will catch the exact SQL error so you can see it in your browser's Network tab.
+                // ⚠️️ NOTE: If the email already belongs to someone else, SQL will reject it here
                 string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return Json(new { success = false, message = trueError });
             }

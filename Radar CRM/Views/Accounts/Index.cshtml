@@ -10,18 +10,22 @@
     string currentSearch = Context.Request.Query["search"];
     string currentSortCol = Context.Request.Query["sortCol"];
     string currentSortDir = Context.Request.Query["sortDir"];
-    string advancedFilters = Context.Request.Query["advancedFilters"]; // 🚀 MOVED HERE
+    string advancedFilters = Context.Request.Query["advancedFilters"];
 
-    // EXCLUSION LIST: Removed ZohoRecordId, AccountOwnerId, and CoOwnerId as requested
-    var excludedFields = new[] { "ZohoRecordId" };
-    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    // 🚀 FIX: Explicitly exclude relational tables from rendering as columns
+    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals" };
 
-    // Using reflection to get table properties dynamically, excluding the specified fields
+    // Using FindFirst instead of FindFirstValue to prevent extension method errors
+    string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+    // 🚀 FIX: Add filters to block IsGenericType and ICollection`1
     var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-         .Where(p => !excludedFields.Contains(p.Name))
+         .Where(p => !excludedFields.Contains(p.Name) &&
+                     !p.PropertyType.IsGenericType &&
+                     p.PropertyType.Name != "ICollection`1")
          .ToArray();
-         
-    // 🚀 SPEED FIX: Cache Reflection for User objects to prevent thousands of slow lookups
+
+    // Cache Reflection for User objects to prevent thousands of slow lookups
     var userPropCache = new System.Collections.Generic.Dictionary<Type, System.Reflection.PropertyInfo>();
 }
 
@@ -1235,11 +1239,11 @@
                                 <td class="sticky-cb" style="width: 120px; min-width: 120px;" onclick="event.stopPropagation()">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
                                         <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
-                                       
+
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
                                             string tooltipText = "No pending tasks";
-                                            string displayDateText = ""; // 🚀 NEW: Holds the text to show next to the flag
+                                            string displayDateText = "";
                                             var tasksDict = ViewBag.AccountTasks as System.Collections.Generic.Dictionary<int, dynamic>;
 
                                             if (tasksDict != null && tasksDict.ContainsKey(item.Id))
@@ -1258,34 +1262,30 @@
                                                     else if (dueDate.Value.Date < DateTime.Today)
                                                     {
                                                         flagColor = "#ef4444"; // Red for Overdue
-                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Sep 30
+                                                        displayDateText = dueDate.Value.ToString("MMM d");
                                                     }
                                                     else
                                                     {
                                                         flagColor = "#22c55e"; // Green for Future
-                                                        displayDateText = dueDate.Value.ToString("MMM d"); // e.g., Oct 1
+                                                        displayDateText = dueDate.Value.ToString("MMM d");
                                                     }
-                                                   
-                                                    tooltipText = $"<div class='text-start'><div class='fw-bold mb-1'>{subject}</div><span class='text-muted'>{dueDate.Value.ToString("dd/MM/yyyy")}</span></div>";
+
+                                                    // 🚀 FIX: Removed HTML tags to show clean text in the tooltip
+                                                    tooltipText = $"{subject} (Due: {dueDate.Value.ToString("dd/MM/yyyy")})";
                                                 }
                                             }
                                         }
 
-                                        <!-- Group the flag and text together so the tooltip applies to both -->
+                                        <!-- 🚀 FIX: Removed Bootstrap tooltip attributes to use the clean native browser tooltip -->
                                         <div class="d-flex align-items-center gap-1"
                                              style="cursor: pointer; transition: transform 0.2s;"
-                                             data-bs-toggle="tooltip"
-                                             data-bs-html="true"
-                                             data-bs-placement="right"
-                                             data-bs-custom-class="custom-tooltip"
                                              title="@tooltipText"
                                              onmouseover="this.style.transform='scale(1.1)'"
                                              onmouseout="this.style.transform='scale(1)'">
-                                             
+
                                             <i class="fa-solid fa-bookmark fs-5 flex-shrink-0" style="color: @flagColor;"></i>
-                                           
-                                            <!-- 🚀 NEW: Shows the date text for ALL active flags -->
-                                            @if(!string.IsNullOrEmpty(displayDateText))
+
+                                            @if (!string.IsNullOrEmpty(displayDateText))
                                             {
                                                 <span class="fw-bold text-nowrap" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">@displayDateText</span>
                                             }

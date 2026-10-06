@@ -41,6 +41,8 @@ namespace Radar_CRM.Models
         public string? AccountName { get; set; }
         public string? ContactPersonName { get; set; }
         public string? LeadName { get; set; }
+
+        public string? Stage { get; set; }
         public string? MetaCampaignName { get; set; }
 
         // --- Dropdowns & Statuses ---

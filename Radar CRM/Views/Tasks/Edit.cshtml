@@ -12,56 +12,63 @@
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 <style>
-    /* Premium Enterprise CRM Typography & Base - Navy & Cream Theme */
+    /* Premium Cream & Light SaaS Typography & Base */
     @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
-        --theme-bg-cream: #Fdfbf7;
-        --theme-surface: #ffffff;
-        --theme-navy-primary: #1e3a8a;
-        --theme-navy-hover: #1e40af;
-        --theme-navy-light: #eff6ff;
-        --theme-text-main: #1f2937;
-        --theme-text-muted: #64748b;
-        --theme-border: #e2e8f0;
-        --theme-green: #16a34a; 
-        --theme-zoho-green: #4caf50; 
+        /* Light Cream Theme Colors */
+        --theme-bg-main: #FDFBF7; /* Soft cream background */
+        --theme-surface: #FFFFFF; /* Pure white for forms and panels */
+        --theme-sidebar-bg: #FAFAF9; /* Ultra-light warm gray/cream for sidebar */
+        
+        /* Accents */
+        --theme-primary: #4F46E5; /* Indigo accent for primary actions */
+        --theme-primary-hover: #4338CA;
+        --theme-primary-light: #EEF2FF;
+        
+        /* Text & Borders */
+        --theme-text-main: #1E293B; /* Deep slate for high contrast */
+        --theme-text-muted: #64748B;
+        --theme-border: #E2E8F0;
+        --theme-input-bg: #F8FAFC;
+        
+        /* Status Colors */
+        --theme-green: #10B981; 
+        --theme-green-hover: #059669;
+        --theme-danger: #EF4444;
     }
 
     body {
-        background-color: var(--theme-bg-cream);
+        background-color: var(--theme-bg-main);
         font-family: 'Inter', sans-serif;
         color: var(--theme-text-main);
         -webkit-font-smoothing: antialiased;
         margin: 0;
         padding: 0;
-        overflow: hidden; /* Manage scrolling internally */
     }
 
-    /* Full Width & Height Container */
+    /* Container */
     .sf-container {
-        background-color: var(--theme-surface);
+        background-color: var(--theme-bg-main);
         width: 100%;
         max-width: 100%;
         margin: 0;
-        height: 100vh;
         display: flex;
         flex-direction: column;
         border: none;
         border-radius: 0;
-        box-shadow: none;
     }
 
-    /* Sticky Full-Width Header */
+    /* Header */
     .sf-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 16px 40px;
+        padding: 20px 40px;
         background-color: var(--theme-surface);
         border-bottom: 1px solid var(--theme-border);
         z-index: 100;
-        flex-shrink: 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
 
     .sf-header-title {
@@ -70,22 +77,22 @@
         gap: 16px;
     }
 
-        .sf-header-title h1 {
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: var(--theme-navy-primary);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            letter-spacing: -0.02em;
-        }
+    .sf-header-title h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--theme-text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        letter-spacing: -0.02em;
+    }
 
     .sf-close-btn {
-        background: transparent;
-        border: 1px solid var(--theme-border);
-        width: 34px;
-        height: 34px;
+        background: var(--theme-surface);
+        border: 2px solid var(--theme-border);
+        width: 38px;
+        height: 38px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
@@ -95,69 +102,94 @@
         transition: all 0.2s ease;
     }
 
-        .sf-close-btn:hover {
-            background: var(--theme-navy-light);
-            color: var(--theme-navy-primary);
-            border-color: var(--theme-navy-light);
-        }
+    .sf-close-btn:hover {
+        background: var(--theme-primary-light);
+        color: var(--theme-primary);
+        border-color: var(--theme-primary-light);
+    }
 
     .btn-sf-primary {
-        background-color: var(--theme-navy-primary);
-        color: var(--theme-surface);
+        background-color: var(--theme-primary);
+        color: #ffffff;
         border: none;
-        padding: 8px 24px;
+        padding: 10px 28px;
         border-radius: 6px;
-        font-weight: 500;
-        font-size: 0.95rem;
+        font-weight: 600;
+        font-size: 1.05rem;
         cursor: pointer;
         transition: all 0.3s ease;
     }
 
-        .btn-sf-primary:hover {
-            background-color: var(--theme-navy-hover);
-        }
+    .btn-sf-primary:hover {
+        background-color: var(--theme-primary-hover);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+    }
 
-    /* Clean Centered Layout */
+    .btn-light.border {
+        background-color: var(--theme-surface) !important;
+        border-color: var(--theme-border) !important;
+        color: var(--theme-text-main) !important;
+    }
+    
+    .btn-light.border:hover {
+        background-color: var(--theme-input-bg) !important;
+    }
+
+    /* 2-Column Layout Wrapper */
+    .content-split-wrapper {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        background-color: var(--theme-bg-main);
+    }
+
+    /* Form Area */
     .layout-wrapper {
         display: flex;
         flex-direction: column;
         flex-grow: 1;
-        overflow-y: auto;
-        background-color: var(--theme-surface);
-        padding: 32px 0;
+        padding: 40px 0;
     }
 
     .main-form-area {
         width: 100%;
-        max-width: 880px;
+        max-width: 900px;
         margin: 0 auto;
-        padding: 0 24px;
+        padding: 0 40px;
+        background-color: var(--theme-surface);
+        border-radius: 12px;
+        border: 1px solid var(--theme-border);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.03);
+        padding-bottom: 40px;
     }
 
-    /* Fixed Footer for Save Button */
+    /* Fixed Footer */
     .form-footer {
-        background-color: #f8fafc;
+        background-color: var(--theme-surface);
         border-top: 1px solid var(--theme-border);
-        padding: 16px 40px;
+        padding: 20px 40px;
         display: flex;
         justify-content: flex-end;
         align-items: center;
         gap: 16px;
-        flex-shrink: 0;
+        position: sticky;
+        bottom: 0;
+        z-index: 50;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.02);
     }
 
-    /* Form Fields */
+    /* Form Fields - BIGGER & BOLDER */
     .form-group {
-        margin-bottom: 24px;
+        margin-bottom: 28px;
         display: flex;
         align-items: center;
     }
 
     .sf-label {
-        font-size: 0.9rem;
-        color: var(--theme-text-muted);
-        font-weight: 500;
-        width: 180px;
+        font-size: 1.05rem;
+        color: var(--theme-text-main);
+        font-weight: 600;
+        width: 200px;
         flex-shrink: 0;
         margin-bottom: 0;
     }
@@ -168,127 +200,307 @@
     }
 
     .sf-input, .sf-select {
-        border: 1px solid var(--theme-border);
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 0.9rem;
+        border: 2px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 1.05rem;
+        font-weight: 500;
         color: var(--theme-text-main);
-        background-color: #fafaf9;
+        background-color: var(--theme-input-bg);
         transition: all 0.2s ease;
     }
 
-        .sf-input:focus, .sf-select:focus {
-            outline: none;
-            border-color: var(--theme-navy-primary);
-            background-color: var(--theme-surface);
-            box-shadow: 0 0 0 3px var(--theme-navy-light);
-        }
-
-    /* Select2 Theme Adjustments */
-    .select2-container--default .select2-selection--single {
-        background-color: #fafaf9;
-        border: 1px solid var(--theme-border);
-        border-radius: 6px;
-        height: 38px;
-        padding: 4px 6px;
+    .sf-input:focus, .sf-select:focus {
+        outline: none;
+        border-color: var(--theme-primary);
+        background-color: var(--theme-surface);
+        box-shadow: 0 0 0 4px var(--theme-primary-light);
+    }
+    
+    .sf-input[readonly] {
+        background-color: #F1F5F9;
+        border-color: var(--theme-border);
+        color: var(--theme-text-muted);
+        cursor: not-allowed;
     }
 
-        .select2-container--default .select2-selection--single:focus {
-            border-color: var(--theme-navy-primary);
-        }
+    /* Select2 Light Theme Adjustments */
+    .select2-container--default .select2-selection--single {
+        background-color: var(--theme-input-bg);
+        border: 2px solid var(--theme-border);
+        border-radius: 8px;
+        height: 48px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--theme-text-main);
+        font-size: 1.05rem;
+        font-weight: 500;
+    }
+
+    .select2-container--default .select2-selection--single:focus,
+    .select2-container--default.select2-container--open .select2-selection--single {
+        border-color: var(--theme-primary);
+        background-color: var(--theme-surface);
+    }
+    
+    .select2-dropdown {
+        background-color: var(--theme-surface);
+        border: 1px solid var(--theme-border);
+        color: var(--theme-text-main);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+    
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: var(--theme-input-bg);
+    }
+    
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: var(--theme-primary);
+        color: white;
+    }
 
     .pane-section-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--theme-navy-primary);
-        margin-bottom: 24px;
-        margin-top: 32px;
-        padding-bottom: 8px;
-        border-bottom: 2px solid var(--theme-navy-light);
-        max-width: 880px;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--theme-primary);
+        margin-bottom: 30px;
+        margin-top: 40px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--theme-primary-light);
     }
 
     /* Repeat/Reminder Custom Panels */
     .expandable-panel {
         display: none;
-        background-color: #ffffff;
-        border: 1px solid var(--theme-border);
-        border-radius: 6px;
-        padding: 20px;
+        background-color: var(--theme-surface);
+        border: 2px solid var(--theme-border);
+        border-radius: 8px;
+        padding: 24px;
         margin-top: 10px;
-        margin-left: 180px;
+        margin-left: 200px;
         margin-bottom: 24px;
-        max-width: 550px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        max-width: 600px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
     }
 
     .panel-footer {
         border-top: 1px solid var(--theme-border);
-        padding-top: 15px;
-        margin-top: 20px;
+        padding-top: 20px;
+        margin-top: 24px;
         display: flex;
         justify-content: flex-end;
-        gap: 10px;
+        gap: 12px;
     }
 
     .btn-panel-cancel {
-        background-color: #fff;
-        border: 1px solid var(--theme-border);
+        background-color: var(--theme-surface);
+        border: 2px solid var(--theme-border);
         color: var(--theme-text-main);
-        padding: 6px 16px;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        cursor: pointer;
-    }
-
-        .btn-panel-cancel:hover {
-            background-color: #f8fafc;
-        }
-
-    .btn-panel-done {
-        background-color: var(--theme-zoho-green);
-        border: 1px solid var(--theme-zoho-green);
-        color: white;
-        padding: 6px 16px;
-        border-radius: 4px;
-        font-size: 0.85rem;
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-size: 0.95rem;
         font-weight: 600;
         cursor: pointer;
     }
 
-        .btn-panel-done:hover {
-            background-color: #43a047;
-        }
+    .btn-panel-cancel:hover {
+        background-color: var(--theme-input-bg);
+    }
+
+    .btn-panel-done {
+        background-color: var(--theme-green);
+        border: 2px solid var(--theme-green);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .btn-panel-done:hover {
+        background-color: var(--theme-green-hover);
+        border-color: var(--theme-green-hover);
+    }
 
     .custom-radio-group {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 14px;
     }
 
     .inline-input-control {
         display: inline-block;
-        width: 60px;
-        padding: 4px 8px;
-        margin: 0 8px;
-        border: 1px solid var(--theme-border);
-        border-radius: 4px;
-        background-color: #fafaf9;
+        width: 70px;
+        padding: 6px 10px;
+        margin: 0 10px;
+        border: 2px solid var(--theme-border);
+        border-radius: 6px;
+        background-color: var(--theme-surface);
+        color: var(--theme-text-main);
         text-align: center;
+        font-weight: 600;
     }
 
     .inline-date-control {
         display: inline-block;
-        padding: 4px 8px;
-        margin: 0 8px;
+        padding: 6px 10px;
+        margin: 0 10px;
+        border: 2px solid var(--theme-border);
+        border-radius: 6px;
+        background-color: var(--theme-surface);
+        color: var(--theme-text-main);
+        font-weight: 600;
+    }
+
+    /* SIDEBAR STYLES */
+    .sidebar-panel {
+        width: 400px;
+        background-color: var(--theme-sidebar-bg);
+        border-left: 1px solid var(--theme-border);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        padding-top: 20px;
+    }
+
+    .sidebar-tabs {
+        display: flex;
+        border-bottom: 2px solid var(--theme-border);
+        padding: 0 24px;
+    }
+
+    .sidebar-tab-active {
+        padding: 16px 8px;
+        font-weight: 700;
+        color: var(--theme-text-main);
+        border-bottom: 4px solid var(--theme-primary);
+        margin-bottom: -2px;
+        font-size: 1.1rem;
+    }
+
+    .sidebar-content {
+        padding: 30px 24px;
+    }
+
+    .sidebar-entity-title {
+        color: var(--theme-text-main);
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sidebar-badge {
+        background-color: var(--theme-primary-light);
+        color: var(--theme-primary);
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 16px 20px;
+        font-size: 0.95rem;
+        margin-bottom: 12px;
+    }
+
+    .info-label {
+        color: var(--theme-text-muted);
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .info-value {
+        color: var(--theme-text-main);
+        font-weight: 600;
+        word-break: break-all;
+    }
+    
+    .info-link {
+        color: var(--theme-primary);
+        text-decoration: none;
+    }
+    
+    .info-link:hover {
+        text-decoration: underline;
+    }
+
+    .more-info-link {
+        display: block;
+        text-align: right;
+        color: var(--theme-primary);
+        font-size: 0.95rem;
+        font-weight: 600;
+        text-decoration: none;
+        margin-bottom: 40px;
+        margin-top: 10px;
+    }
+
+    .activities-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        color: var(--theme-text-main);
+        margin-bottom: 20px;
+        font-size: 1.1rem;
+        border-top: 1px solid var(--theme-border);
+        padding-top: 24px;
+    }
+
+    .activities-add {
+        color: var(--theme-primary);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .activity-accordion {
+        background-color: var(--theme-surface);
         border: 1px solid var(--theme-border);
-        border-radius: 4px;
-        background-color: #fafaf9;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        font-size: 1rem;
+        color: var(--theme-text-main);
+        font-weight: 600;
+        transition: 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    
+    .activity-accordion:hover {
+        border-color: var(--theme-primary-light);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+    }
+
+    .activity-count {
+        background-color: var(--theme-input-bg);
+        color: var(--theme-text-main);
+        border: 1px solid var(--theme-border);
+        padding: 2px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        margin-left: 10px;
     }
 </style>
 
-<form asp-action="Edit" method="post" id="taskForm" style="height: 100%; margin: 0;">
+<form asp-action="Edit" method="post" id="taskForm">
 
     <!-- Hidden IDs -->
     <input type="hidden" asp-for="Id" />
@@ -300,302 +512,359 @@
         <div class="sf-header">
             <div class="sf-header-title">
                 <button type="button" class="sf-close-btn" onclick="window.history.back();">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
                 <h1>Task Edit: @Model.Subject</h1>
             </div>
-            <div class="sf-header-actions d-flex gap-2 align-items-center">
-                <a asp-action="Index" class="btn btn-light border fw-medium" style="font-size: 0.95rem;">Cancel</a>
+            <div class="sf-header-actions d-flex gap-3 align-items-center">
+                <a asp-action="Index" class="btn btn-light border fw-bold" style="padding: 10px 24px;">Cancel</a>
                 <button type="submit" class="btn-sf-primary">Update Task</button>
             </div>
         </div>
 
-        <!-- Layout Body -->
-        <div class="layout-wrapper">
-            <div class="main-form-area">
-                <h3 class="pane-section-title mt-0">Task Information</h3>
+        <!-- NEW 2-COLUMN LAYOUT -->
+        <div class="content-split-wrapper">
+            
+            <!-- Left Column: Layout Body -->
+            <div class="layout-wrapper">
+                <div class="main-form-area">
+                    <h3 class="pane-section-title">Task Information</h3>
 
-                <!-- Task Owner -->
-                <div class="form-group">
-                    <label class="sf-label">Task Owner</label>
-                    <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId">
-                        @if (!string.IsNullOrEmpty(Model?.TaskOwnerId))
-                        {
-                            <option value="@Model.TaskOwnerId" selected>@(Model.TaskOwner ?? "Current Owner")</option>
-                        }
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Subject <span class="text-danger">*</span></label>
-                    <input asp-for="Subject" class="sf-input" required />
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Due Date</label>
-                    <input asp-for="DueDate" type="date" class="sf-input" id="dueDateInput" />
-                </div>
-
-                <!-- Accounts -->
-                <div class="form-group">
-                    <label class="sf-label">Accounts</label>
-                    <select asp-for="AccountId" class="sf-select" id="AccountId" asp-items="ViewBag.AccountsList">
-                        <option value="">-- Select Account --</option>
-                    </select>
-                </div>
-
-                <!-- Leads -->
-                <div class="form-group">
-                    <label class="sf-label">Leads</label>
-                    <select asp-for="LeadId" class="sf-select" id="LeadId" asp-items="ViewBag.LeadsList">
-                        <option value="">-- Select Lead --</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Mobile</label>
-                    <input asp-for="Mobile" class="sf-input" />
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Lead Status</label>
-                    <select asp-for="LeadStatus" class="sf-select">
-                        <option value="">-None-</option>
-                        <option value="New">New</option>
-                        <option value="Contacted">Contacted</option>
-                        <option value="Qualified">Qualified</option>
-                        <option value="Lost">Lost</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Status</label>
-                    <select asp-for="Status" class="sf-select">
-                        <option value="Not Started">Not Started</option>
-                        <option value="Deferred">Deferred</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Waiting on input">Waiting on input</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="sf-label">Priority</label>
-                    <select asp-for="Priority" class="sf-select">
-                        <option value="Highest">Highest</option>
-                        <option value="High">High</option>
-                        <option value="Normal">Normal</option>
-                        <option value="Low">Low</option>
-                        <option value="Lowest">Lowest</option>
-                    </select>
-                </div>
-
-                <!-- ============================================== -->
-                <!-- REPEAT TOGGLE AND PANEL                        -->
-                <!-- ============================================== -->
-                <div class="form-group mb-1">
-                    <label class="sf-label">Repeat</label>
-                    <div class="form-check form-switch m-0 d-flex align-items-center">
-                        <input class="form-check-input mt-0" type="checkbox" id="repeatToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
-                        <span class="text-muted ms-2" style="font-size:0.8rem; display: @(Model.DueDate.HasValue ? "none" : "inline");" id="repeatHelpText">(Select Due Date first)</span>
-                        <span id="repeatSummaryText" class="ms-3 fw-medium" style="display:none; font-size: 0.85rem; color: var(--theme-navy-primary);">
-                            Daily, Ends Never
-                            <a href="javascript:void(0)" class="ms-2 text-decoration-underline text-muted" onclick="openRepeatPanel()">Edit</a>
-                        </span>
+                    <!-- Task Owner -->
+                    <div class="form-group">
+                        <label class="sf-label">Task Owner</label>
+                        <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId">
+                            @if (!string.IsNullOrEmpty(Model?.TaskOwnerId))
+                            {
+                                <option value="@Model.TaskOwnerId" selected>@(Model.TaskOwner ?? "Current Owner")</option>
+                            }
+                        </select>
                     </div>
-                </div>
 
-                <div class="expandable-panel" id="repeatPanel">
-                    <div class="row align-items-center mb-3">
-                        <div class="col-3 text-muted" style="font-size:0.9rem;">Repeat type</div>
-                        <div class="col-9">
-                            <select asp-for="Repeat" class="sf-select" style="width: 150px; border:none; border-bottom: 1px solid #ccc; border-radius:0; padding: 2px 4px; background: transparent;">
-                                <option value="Daily">Daily</option>
-                                <option value="Weekly">Weekly</option>
-                                <option value="Monthly">Monthly</option>
-                                <option value="Yearly">Yearly</option>
+                    <div class="form-group">
+                        <label class="sf-label">Subject <span class="text-danger">*</span></label>
+                        <input asp-for="Subject" class="sf-input" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label">Due Date</label>
+                        <input asp-for="DueDate" type="date" class="sf-input" id="dueDateInput" />
+                    </div>
+
+                    <!-- Read-Only Related To Field -->
+                    <div class="form-group">
+                        <label class="sf-label text-primary fw-bold" style="color: var(--theme-primary) !important;">Related To</label>
+                        <input type="text" class="sf-input fw-bold" style="background-color: var(--theme-surface); border-color: var(--theme-primary); color: var(--theme-text-main);" 
+                               value="@ViewBag.RelatedEntityName" readonly tabindex="-1" 
+                               title="The entity from which this task was created" />
+                    </div>
+
+                    <!-- Hidden Account & Lead Dropdowns to preserve form values -->
+                    <div style="display: none;">
+                        <div class="form-group">
+                            <label class="sf-label">Accounts</label>
+                            <select asp-for="AccountId" class="sf-select" id="AccountId" asp-items="ViewBag.AccountsList">
+                                <option value="">-- Select Account --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="sf-label">Leads</label>
+                            <select asp-for="LeadId" class="sf-select" id="LeadId" asp-items="ViewBag.LeadsList">
+                                <option value="">-- Select Lead --</option>
                             </select>
                         </div>
                     </div>
-                    <div class="row mb-3">
-                        <div class="col-3"></div>
-                        <div class="col-9">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="exceptWeekends" name="ExceptWeekends">
-                                <label class="form-check-label text-dark" for="exceptWeekends" style="font-size:0.9rem;">
-                                    Except weekends and holidays.
-                                </label>
-                            </div>
+
+                    <div class="form-group">
+                        <label class="sf-label">Mobile</label>
+                        <input asp-for="Mobile" class="sf-input" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label">Lead Status</label>
+                        <select asp-for="LeadStatus" class="sf-select">
+                            <option value="">-None-</option>
+                            <option value="New">New</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Qualified">Qualified</option>
+                            <option value="Lost">Lost</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label">Status</label>
+                        <select asp-for="Status" class="sf-select">
+                            <option value="Not Started">Not Started</option>
+                            <option value="Deferred">Deferred</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Waiting on input">Waiting on input</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="sf-label">Priority</label>
+                        <select asp-for="Priority" class="sf-select">
+                            <option value="Highest">Highest</option>
+                            <option value="High">High</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Low">Low</option>
+                            <option value="Lowest">Lowest</option>
+                        </select>
+                    </div>
+
+                    <!-- ============================================== -->
+                    <!-- REPEAT TOGGLE AND PANEL                        -->
+                    <!-- ============================================== -->
+                    <div class="form-group mb-2 mt-4">
+                        <label class="sf-label">Repeat</label>
+                        <div class="form-check form-switch m-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0" type="checkbox" id="repeatToggle" style="width: 45px; height: 24px;" @(Model.DueDate.HasValue ? "" : "disabled")>
+                            <span class="text-muted ms-3" style="font-size:0.95rem; font-weight:600; display: @(Model.DueDate.HasValue ? "none" : "inline");" id="repeatHelpText">(Select Due Date first)</span>
+                            <span id="repeatSummaryText" class="ms-3 fw-bold" style="display:none; font-size: 1rem; color: var(--theme-primary);">
+                                Daily, Ends Never
+                                <a href="javascript:void(0)" class="ms-3 text-decoration-underline" style="color: var(--theme-text-muted);" onclick="openRepeatPanel()">Edit</a>
+                            </span>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-3 text-muted pt-1" style="font-size:0.9rem;">Ends</div>
-                        <div class="col-9">
-                            <div class="custom-radio-group">
-                                <div class="form-check d-flex align-items-center">
-                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsNever" value="Never" checked>
-                                    <label class="form-check-label ms-2 text-dark" for="endsNever" style="font-size:0.9rem;">Never</label>
-                                </div>
-                                <div class="form-check d-flex align-items-center">
-                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsAfter" value="After">
-                                    <label class="form-check-label ms-2 text-dark" for="endsAfter" style="font-size:0.9rem;">
-                                        After <input type="number" class="inline-input-control" value="1" min="1" name="RepeatEndsAfterTimes"> Times
-                                    </label>
-                                </div>
-                                <div class="form-check d-flex align-items-center">
-                                    <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsOn" value="On">
-                                    <label class="form-check-label ms-2 text-dark" for="endsOn" style="font-size:0.9rem;">
-                                        On <input type="date" class="inline-date-control text-muted" name="RepeatEndsOnDate">
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="panel-footer">
-                        <button type="button" class="btn-panel-cancel" onclick="cancelRepeatPanel()">Cancel</button>
-                        <button type="button" class="btn-panel-done" onclick="saveRepeatPanel()">Done</button>
-                    </div>
-                </div>
 
-                <!-- ============================================== -->
-                <!-- REMINDER TOGGLE AND PANEL                      -->
-                <!-- ============================================== -->
-                <div class="form-group mt-3 mb-1">
-                    <label class="sf-label">Reminder</label>
-                    <div class="form-check form-switch m-0 d-flex align-items-center">
-                        <input class="form-check-input mt-0" type="checkbox" id="reminderToggle" @(Model.DueDate.HasValue ? "" : "disabled")>
-                        <span id="reminderSummaryText" class="ms-3 fw-medium" style="display:none; font-size: 0.85rem; color: var(--theme-navy-primary);">
-                            Reminder Set
-                            <a href="javascript:void(0)" class="ms-2 text-decoration-underline text-muted" onclick="openReminderPanel()">Edit</a>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="expandable-panel" id="reminderPanel">
-                    <div class="d-flex align-items-center gap-2 mb-4" style="font-size:0.9rem; color: var(--theme-navy-primary);">
-                        <span class="text-muted">On</span>
-                        <input type="date" class="inline-date-control" id="reminderDateInput" name="ReminderDatePart">
-                        <span class="text-muted">at</span>
-                        <input type="time" class="inline-date-control" id="reminderTimeInput" name="ReminderTimePart">
-                    </div>
-                    <div class="row align-items-center">
-                        <div class="col-3 text-muted" style="font-size:0.9rem;">Notify</div>
-                        <div class="col-9 border-bottom pb-1">
-                            <select class="sf-select w-50" name="ReminderNotifyType" style="border:none; background: transparent; padding: 2px 4px;">
-                                <option value="Email">Email</option>
-                                <option value="Popup">Popup</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="panel-footer mt-4">
-                        <button type="button" class="btn-panel-cancel" onclick="cancelReminderPanel()">Cancel</button>
-                        <button type="button" class="btn-panel-done" onclick="saveReminderPanel()">Done</button>
-                    </div>
-                </div>
-
-                <!-- 🚀 FIXED: Audit Information Section -->
-                <h3 class="pane-section-title">Audit Information</h3>
-                
-                <div class="form-group">
-                    <label class="sf-label" asp-for="CreatedBy">Created By</label>
-                    <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(!string.IsNullOrEmpty(Model.CreatedBy) ? Model.CreatedBy : Model.CreatedById ?? "System")" readonly tabindex="-1" />
-                </div>
-                <div class="form-group">
-                    <label class="sf-label" asp-for="CreatedTime">Created Time</label>
-                    <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@Model.CreatedTime.ToString("MMM dd, yyyy hh:mm tt")" readonly tabindex="-1" />
-                </div>
-                <div class="form-group">
-                    <label class="sf-label" asp-for="ModifiedBy">Modified By</label>
-                    <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(!string.IsNullOrEmpty(Model.ModifiedBy) ? Model.ModifiedBy : Model.ModifiedById ?? "-")" readonly tabindex="-1" />
-                </div>
-                <div class="form-group">
-                    <label class="sf-label" asp-for="ModifiedTime">Modified Time</label>
-                    <input class="sf-input text-muted" style="background-color: #f3f4f6; cursor: not-allowed;" value="@(Model.ModifiedTime.HasValue ? Model.ModifiedTime.Value.ToString("MMM dd, yyyy hh:mm tt") : "-")" readonly tabindex="-1" />
-                </div>
-                <!-- End of Audit Information Section -->
-
-                <h3 class="pane-section-title">Description Information</h3>
-                <div class="form-group" style="align-items: flex-start;">
-                    <label class="sf-label" style="padding-top: 8px;">Description</label>
-                    <textarea asp-for="Description" class="sf-input" rows="4"></textarea>
-                </div>
-                
-                <!-- ==========================================
-                     INLINE NOTES UI (PASTEL INDIGO THEME)
-                     ========================================== -->
-                <div class="notes-section" style="background-color: var(--theme-surface); border: none; padding: 0;">
-                    <h3 class="pane-section-title mt-0 border-bottom pb-2 mb-3">Notes & Attachments</h3>
-
-                    <div class="inline-note-editor mb-4 shadow-sm" style="border: 2px solid #4f46e5; border-radius: 8px; background-color: #eef2ff; overflow: hidden;">
-                        <div class="p-3">
-                            <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-1" placeholder="Title" style="background: transparent; font-size: 1.05rem; font-weight: 700; color: #312e81;" />
-                            <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 0.95rem; color: #3730a3; resize: none;"></textarea>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between align-items-center p-2" style="background-color: #ffffff; border-top: 1px solid #c7d2fe;">
-                            <div class="d-flex gap-3 align-items-center ps-2">
-                                <label for="inlineNoteFile" style="cursor: pointer; color: #4f46e5; transition: 0.2s;" title="Attach File" onmouseover="this.style.color='#312e81'" onmouseout="this.style.color='#4f46e5'">
-                                    <i class="fa-solid fa-paperclip fs-5"></i>
-                                </label>
-                                <input type="file" id="inlineNoteFile" style="display: none;" />
-                                
-                                <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="width: 140px; background: transparent; color: #4f46e5; cursor: pointer;">
-                                    <option value="">- System User -</option>
+                    <div class="expandable-panel" id="repeatPanel">
+                        <div class="row align-items-center mb-4">
+                            <div class="col-3 text-muted fw-bold" style="font-size:1rem;">Repeat type</div>
+                            <div class="col-9">
+                                <select asp-for="Repeat" class="sf-select" style="width: 200px;">
+                                    <option value="Daily">Daily</option>
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Yearly">Yearly</option>
                                 </select>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-sm btn-light fw-bold px-3" onclick="clearInlineNote()" style="color: #4f46e5; border: 1px solid #a5b4fc; height: 32px;">Cancel</button>
-                                <button type="button" class="btn btn-sm text-white fw-bold px-4" onclick="saveInlineNote()" style="background-color: #4f46e5; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2); transition: 0.2s; height: 32px;" onmouseover="this.style.backgroundColor='#3730a3'" onmouseout="this.style.backgroundColor='#4f46e5'">Save</button>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-3"></div>
+                            <div class="col-9">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="exceptWeekends" name="ExceptWeekends" style="width:18px; height:18px;">
+                                    <label class="form-check-label ms-2 fw-bold" for="exceptWeekends" style="color: var(--theme-text-main); font-size:1rem;">
+                                        Except weekends and holidays.
+                                    </label>
+                                </div>
                             </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3 text-muted fw-bold pt-1" style="font-size:1rem;">Ends</div>
+                            <div class="col-9">
+                                <div class="custom-radio-group">
+                                    <div class="form-check d-flex align-items-center">
+                                        <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsNever" value="Never" checked style="width:18px; height:18px;">
+                                        <label class="form-check-label ms-2 fw-bold" for="endsNever" style="color: var(--theme-text-main); font-size:1rem;">Never</label>
+                                    </div>
+                                    <div class="form-check d-flex align-items-center mt-2">
+                                        <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsAfter" value="After" style="width:18px; height:18px;">
+                                        <label class="form-check-label ms-2 fw-bold" for="endsAfter" style="color: var(--theme-text-main); font-size:1rem;">
+                                            After <input type="number" class="inline-input-control" value="1" min="1" name="RepeatEndsAfterTimes"> Times
+                                        </label>
+                                    </div>
+                                    <div class="form-check d-flex align-items-center mt-2">
+                                        <input class="form-check-input mt-0" type="radio" name="RepeatEnds" id="endsOn" value="On" style="width:18px; height:18px;">
+                                        <label class="form-check-label ms-2 fw-bold" for="endsOn" style="color: var(--theme-text-main); font-size:1rem;">
+                                            On <input type="date" class="inline-date-control" name="RepeatEndsOnDate">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-footer">
+                            <button type="button" class="btn-panel-cancel" onclick="cancelRepeatPanel()">Cancel</button>
+                            <button type="button" class="btn-panel-done" onclick="saveRepeatPanel()">Done</button>
                         </div>
                     </div>
 
-                    <div id="notesContainer">
-                        @if (ViewBag.ExistingNotes != null && ((IEnumerable<dynamic>)ViewBag.ExistingNotes).Any())
-                        {
-                            foreach (var note in ViewBag.ExistingNotes)
-                            {
-                                <div class="saved-note-card p-3 mb-2" style="border: 1px solid #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 8px; background: #eef2ff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #c7d2fe;">
-                                        <span class="fw-bold" style="font-size: 0.85rem; color: #3730a3;">
-                                            <i class="fa-solid fa-circle-user me-1" style="color: #4f46e5;"></i> @(note.NoteOwner?.fullName ?? "System User")
-                                        </span>
-                                        <span style="font-size: 0.75rem; color: #4f46e5; font-weight: 600;">
-                                            @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
-                                        </span>
-                                    </div>
-                                    
-                                    @if (note.GetType().GetProperty("NoteTitle") != null && !string.IsNullOrEmpty((string)note.NoteTitle))
-                                    {
-                                        <div class="fw-bold mb-1" style="font-size: 0.95rem; color: #312e81;">@note.NoteTitle</div>
-                                    }
-                                    <div style="font-size: 0.85rem; color: #3730a3; white-space: pre-wrap; line-height: 1.4;">@note.Description</div>
+                    <!-- ============================================== -->
+                    <!-- REMINDER TOGGLE AND PANEL                      -->
+                    <!-- ============================================== -->
+                    <div class="form-group mt-4 mb-2">
+                        <label class="sf-label">Reminder</label>
+                        <div class="form-check form-switch m-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0" type="checkbox" id="reminderToggle" style="width: 45px; height: 24px;" @(Model.DueDate.HasValue ? "" : "disabled")>
+                            <span id="reminderSummaryText" class="ms-3 fw-bold" style="display:none; font-size: 1rem; color: var(--theme-primary);">
+                                Reminder Set
+                                <a href="javascript:void(0)" class="ms-3 text-decoration-underline" style="color: var(--theme-text-muted);" onclick="openReminderPanel()">Edit</a>
+                            </span>
+                        </div>
+                    </div>
 
-                                    @if (note.GetType().GetProperty("AttachmentFileName") != null && !string.IsNullOrEmpty((string)note.AttachmentFileName))
-                                    {
-                                        <div class="mt-2">
-                                            <a href="@Url.Action("DownloadNoteFile", "Tasks", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: #4f46e5; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #3730a3; transition: 0.2s;" onmouseover="this.style.backgroundColor='#3730a3'" onmouseout="this.style.backgroundColor='#4f46e5'">
-                                                <i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName
-                                            </a>
+                    <div class="expandable-panel" id="reminderPanel">
+                        <div class="d-flex align-items-center gap-3 mb-4 fw-bold" style="font-size:1rem; color: var(--theme-text-main);">
+                            <span class="text-muted">On</span>
+                            <input type="date" class="inline-date-control" id="reminderDateInput" name="ReminderDatePart">
+                            <span class="text-muted">at</span>
+                            <input type="time" class="inline-date-control" id="reminderTimeInput" name="ReminderTimePart">
+                        </div>
+                        <div class="row align-items-center mt-4">
+                            <div class="col-3 text-muted fw-bold" style="font-size:1rem;">Notify</div>
+                            <div class="col-9">
+                                <select class="sf-select w-50" name="ReminderNotifyType">
+                                    <option value="Email">Email</option>
+                                    <option value="Popup">Popup</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="panel-footer mt-5">
+                            <button type="button" class="btn-panel-cancel" onclick="cancelReminderPanel()">Cancel</button>
+                            <button type="button" class="btn-panel-done" onclick="saveReminderPanel()">Done</button>
+                        </div>
+                    </div>
+
+                    <h3 class="pane-section-title">Audit Information</h3>
+                    
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CreatedBy">Created By</label>
+                        <input class="sf-input" value="@(!string.IsNullOrEmpty(Model.CreatedBy) ? Model.CreatedBy : Model.CreatedById ?? "System")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="CreatedTime">Created Time</label>
+                        <input class="sf-input" value="@Model.CreatedTime.ToString("MMM dd, yyyy hh:mm tt")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ModifiedBy">Modified By</label>
+                        <input class="sf-input" value="@(!string.IsNullOrEmpty(Model.ModifiedBy) ? Model.ModifiedBy : Model.ModifiedById ?? "-")" readonly tabindex="-1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="sf-label" asp-for="ModifiedTime">Modified Time</label>
+                        <input class="sf-input" value="@(Model.ModifiedTime.HasValue ? Model.ModifiedTime.Value.ToString("MMM dd, yyyy hh:mm tt") : "-")" readonly tabindex="-1" />
+                    </div>
+
+                    <h3 class="pane-section-title">Description Information</h3>
+                    <div class="form-group" style="align-items: flex-start;">
+                        <label class="sf-label" style="padding-top: 12px;">Description</label>
+                        <textarea asp-for="Description" class="sf-input" rows="5"></textarea>
+                    </div>
+                    
+                    <!-- ==========================================
+                         INLINE NOTES UI (Dark Theme)
+                         ========================================== -->
+                    <div class="notes-section" style="background-color: transparent; border: none; padding: 0; margin-top: 40px;">
+                        <h3 class="pane-section-title border-bottom pb-2 mb-4">Notes & Attachments</h3>
+
+                        <div class="inline-note-editor mb-5" style="border: 2px solid var(--theme-border); border-radius: 10px; background-color: var(--theme-input-bg); overflow: hidden;">
+                            <div class="p-3">
+                                <input type="text" id="inlineNoteTitle" class="form-control border-0 shadow-none mb-2" placeholder="Title" style="background: transparent; font-size: 1.15rem; font-weight: 700; color: var(--theme-text-main);" />
+                                <textarea id="inlineNoteDesc" class="form-control border-0 shadow-none fw-medium" rows="3" placeholder="What's this note about?" style="background: transparent; font-size: 1.05rem; color: var(--theme-text-muted); resize: none;"></textarea>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center p-3" style="background-color: var(--theme-surface); border-top: 1px solid var(--theme-border);">
+                                <div class="d-flex gap-4 align-items-center ps-2">
+                                    <label for="inlineNoteFile" style="cursor: pointer; color: var(--theme-primary); transition: 0.2s;" title="Attach File" onmouseover="this.style.color='var(--theme-text-main)'" onmouseout="this.style.color='var(--theme-primary)'">
+                                        <i class="fa-solid fa-paperclip fs-4"></i>
+                                    </label>
+                                    <input type="file" id="inlineNoteFile" style="display: none;" />
+                                    
+                                    <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-bold" asp-items="ViewBag.UsersList" style="width: 160px; background: transparent; color: var(--theme-primary); cursor: pointer; font-size: 1rem;">
+                                        <option value="">- System User -</option>
+                                    </select>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <button type="button" class="btn btn-sm btn-panel-cancel fw-bold px-4" onclick="clearInlineNote()" style="height: 38px;">Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-sf-primary fw-bold px-5" onclick="saveInlineNote()" style="height: 38px; padding: 0;">Save</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="notesContainer">
+                            @if (ViewBag.ExistingNotes != null && ((IEnumerable<dynamic>)ViewBag.ExistingNotes).Any())
+                            {
+                                foreach (var note in ViewBag.ExistingNotes)
+                                {
+                                    <div class="saved-note-card p-4 mb-3" style="border: 1px solid var(--theme-border); border-left: 5px solid var(--theme-primary); border-radius: 10px; background: var(--theme-input-bg);">
+                                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2" style="border-bottom: 1px solid var(--theme-border);">
+                                            <span class="fw-bold" style="font-size: 1rem; color: var(--theme-text-main);">
+                                                <i class="fa-solid fa-circle-user me-2" style="color: var(--theme-primary);"></i> @(note.NoteOwner?.fullName ?? "System User")
+                                            </span>
+                                            <span style="font-size: 0.85rem; color: var(--theme-text-muted); font-weight: 600;">
+                                                @note.CreatedDateTime.ToString("dd/MM/yyyy hh:mm tt")
+                                            </span>
                                         </div>
-                                    }
+                                        
+                                        @if (note.GetType().GetProperty("NoteTitle") != null && !string.IsNullOrEmpty((string)note.NoteTitle))
+                                        {
+                                            <div class="fw-bold mb-2" style="font-size: 1.1rem; color: var(--theme-text-main);">@note.NoteTitle</div>
+                                        }
+                                        <div class="fw-medium" style="font-size: 1rem; color: var(--theme-text-muted); white-space: pre-wrap; line-height: 1.5;">@note.Description</div>
+
+                                        @if (note.GetType().GetProperty("AttachmentFileName") != null && !string.IsNullOrEmpty((string)note.AttachmentFileName))
+                                        {
+                                            <div class="mt-3">
+                                                <a href="@Url.Action("DownloadNoteFile", "Tasks", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-bold" style="font-size: 0.85rem; color: #ffffff; background: var(--theme-primary); padding: 6px 14px; border-radius: 6px; display: inline-flex; align-items: center; transition: 0.2s;" onmouseover="this.style.backgroundColor='var(--theme-primary-hover)'" onmouseout="this.style.backgroundColor='var(--theme-primary)'">
+                                                    <i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-muted text-center py-4 fw-bold" style="font-size:1.1rem;" id="noNotesPlaceholder">
+                                    No notes added yet.
                                 </div>
                             }
-                        }
-                        else
-                        {
-                            <div class="text-muted text-center py-3" style="font-size:0.9rem;" id="noNotesPlaceholder">
-                                No notes added yet.
-                            </div>
-                        }
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Right Column Info Sidebar (No email, no meetings, dynamic names) -->
+            <div class="sidebar-panel">
+                <div class="sidebar-tabs">
+                    <div class="sidebar-tab-active">Info</div>
+                </div>
+                
+                <div class="sidebar-content">
+                    <div class="sidebar-entity-title">
+                        @(ViewBag.RelatedEntityName ?? "New Record") <span class="sidebar-badge">@(ViewBag.RelatedEntityType ?? "Entity")</span>
+                    </div>
+                    
+                    <div class="info-grid mt-4">
+                        <div class="info-label">Budget</div>
+                        <div class="info-value">@(ViewBag.Budget ?? "-")</div>
+                        
+                        <div class="info-label">Owner</div>
+                        <div class="info-value">@(ViewBag.LeadOwnerName ?? "-")</div>
+                        
+                        <div class="info-label">Mobile Number</div>
+                        <div class="info-value">@(ViewBag.LeadMobile ?? "-") <i class="fa-solid fa-phone ms-2" style="font-size: 0.9rem; color: var(--theme-text-muted);"></i></div>
+                        
+                        <div class="info-label">Email ID</div>
+                        <div class="info-value"><a href="mailto:@ViewBag.LeadEmail" class="info-link">@(ViewBag.LeadEmail ?? "-")</a></div>
+                        
+                        <div class="info-label">Data Sources</div>
+                        <div class="info-value">@(ViewBag.LeadSource ?? "-")</div>
+                        
+                        <div class="info-label">Status</div>
+                        <div class="info-value">@(ViewBag.LeadStatusValue ?? "-")</div>
+                    </div>
+                    
+                    <a href="#" class="more-info-link">More Info</a>
+                    
+                    <div class="activities-header">
+                        Open Activities
+                        <a href="#" class="activities-add">+ New</a>
+                    </div>
+                    
+                    <div class="activity-accordion">
+                        <div>Tasks <span class="activity-count">1</span></div>
+                        <i class="fa-solid fa-chevron-down text-muted" style="font-size: 0.9rem;"></i>
+                    </div>
+                </div>
+            </div>
+            
         </div>
         
-        <!-- 🚀 NEW: Fixed Bottom Footer -->
+        <!-- Fixed Bottom Footer -->
         <div class="form-footer">
-            <a asp-action="Index" class="btn btn-light border fw-medium" style="font-size: 0.95rem;">Cancel</a>
+            <a asp-action="Index" class="btn btn-light border fw-bold" style="padding: 10px 24px;">Cancel</a>
             <button type="submit" class="btn-sf-primary">Update Task</button>
         </div>
 
@@ -624,7 +893,7 @@
                 }
             });
 
-            // Apply 'Type and Search' to Account Dropdown using AJAX
+            // Initialize Hidden Dropdowns
             $('#AccountId').select2({
                 placeholder: "-- Search Accounts --",
                 allowClear: true,
@@ -639,7 +908,6 @@
                 }
             });
 
-            // Apply 'Type and Search' to Lead Dropdown using AJAX
             $('#LeadId').select2({
                 placeholder: "-- Search Leads --",
                 allowClear: true,
@@ -655,7 +923,7 @@
             });
         });
 
-        // Panel Elements    
+        // Panel Elements   
         const repeatPanel = document.getElementById('repeatPanel');
         const reminderPanel = document.getElementById('reminderPanel');
         const repeatToggle = document.getElementById('repeatToggle');
@@ -750,7 +1018,7 @@
         }
 
         // =================================================================
-        // 🚀 NEW: INLINE NOTES JAVASCRIPT (PASTEL INDIGO)
+        // 🚀 INLINE NOTES JAVASCRIPT
         // =================================================================
         document.addEventListener("DOMContentLoaded", function () {
             const noteOwner = document.getElementById('inlineNoteOwner');
@@ -792,26 +1060,26 @@
                 finalDescription = `[ ${title.toUpperCase()} ]\n${desc}`;
             }
 
-            let titleHtml = title ? `<div class="fw-bold mb-1" style="font-size: 0.95rem; color: #312e81;">${title}</div>` : '';
+            let titleHtml = title ? `<div class="fw-bold mb-2" style="font-size: 1.1rem; color: var(--theme-text-main);">${title}</div>` : '';
             let fileHtml = fileName ? `
-            <div class="mt-2">
-                <span class="fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: #4f46e5; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; border: 1px solid #3730a3;">
+            <div class="mt-3">
+                <span class="fw-bold" style="font-size: 0.85rem; color: #ffffff; background: var(--theme-primary); padding: 6px 14px; border-radius: 6px; display: inline-flex; align-items: center;">
                     <i class="fa-solid fa-paperclip me-2"></i> ${fileName}
                 </span>
             </div>` : '';
 
             const noteHtml = `
-            <div class="saved-note-card p-3 mb-2" style="border: 1px solid #e0e7ff; border-left: 4px solid #4f46e5; border-radius: 8px; background: #eef2ff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid #c7d2fe;">
-                    <span class="fw-bold" style="font-size: 0.85rem; color: #3730a3;">
-                        <i class="fa-solid fa-circle-user me-1" style="color: #4f46e5;"></i> ${ownerName}
+            <div class="saved-note-card p-4 mb-3" style="border: 1px solid var(--theme-border); border-left: 5px solid var(--theme-primary); border-radius: 10px; background: var(--theme-input-bg);">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2" style="border-bottom: 1px solid var(--theme-border);">
+                    <span class="fw-bold" style="font-size: 1rem; color: var(--theme-text-main);">
+                        <i class="fa-solid fa-circle-user me-2" style="color: var(--theme-primary);"></i> ${ownerName}
                     </span>
-                    <span style="font-size: 0.75rem; color: #4f46e5; font-weight: 600;">
+                    <span style="font-size: 0.85rem; color: var(--theme-text-muted); font-weight: 600;">
                         ${dateTime}
                     </span>
                 </div>
                 ${titleHtml}
-                <div style="font-size: 0.85rem; color: #3730a3; white-space: pre-wrap; line-height: 1.4;">${desc}</div>
+                <div class="fw-medium" style="font-size: 1rem; color: var(--theme-text-muted); white-space: pre-wrap; line-height: 1.5;">${desc}</div>
                 ${fileHtml}
 
                 <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
