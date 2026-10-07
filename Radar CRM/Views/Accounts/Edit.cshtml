@@ -16,7 +16,7 @@
     var allTasks = ViewBag.RelatedTasks as IEnumerable<Radar_CRM.Models.Task> ?? new List<Radar_CRM.Models.Task>();
     var openTasks = allTasks.Where(t => t.Status != "Completed").OrderBy(t => t.DueDate).ToList();
     var closedTasks = allTasks.Where(t => t.Status == "Completed").OrderByDescending(t => t.DueDate).ToList();
-    
+   
     // Grab the most urgent open task for Next Action panel
     var nextTask = openTasks.FirstOrDefault();
 }
@@ -1092,11 +1092,11 @@
         <h6>Related List</h6>
         <ul class="related-list-menu">
             <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
-            
+           
             <!-- 🚀 ADDED: Links to Related Leads and Deals in Detail View -->
             <li onclick="document.getElementById('detailLeadsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-users"></i> Leads</li>
             <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
-            
+           
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
             <li onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Create Task</li>
            <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})">
@@ -1141,7 +1141,7 @@
 <div class="detail-section-card">
     <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
     <div class="row">
-        
+       
         <!-- Account Owner -->
         <div class="col-md-6 mb-3">
             <div class="row align-items-center">
@@ -1247,7 +1247,7 @@
                 </div>
             </div>
         </div>
-        
+       
     </div>
 </div>
 
@@ -1524,10 +1524,10 @@
             <div class="z-form-section row">
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Owner</div><div class="z-input-wrapper"><select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="z-input"><option value="">- Select Account Owner -</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Name <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="AccountName" class="z-input" required placeholder="Enter account name..." /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person Name</div><div class="z-input-wrapper"><input asp-for="ContactPersonName" class="z-input" placeholder="Enter full name" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Type</div><div class="z-input-wrapper"><select asp-for="AccountType" class="z-input" id="AccountType"><option value="None">None</option><option value="Individual">Individual</option><option value="Group">Group</option><option value="Institution">Institution</option><option value="Government Organisation">Government Organisation</option></select></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Status</div><div class="z-input-wrapper"><select asp-for="CurrentStatus" class="z-input"><option value="None">None</option><option value="User">User</option><option value="Non-User">Non-User</option></select></div></div></div>
                 <div class="col-md-6" id="divGroupName" style="display:none;"><div class="z-field-row"><div class="z-label">Group Name</div><div class="z-input-wrapper"><select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="z-input" id="GroupName"><option value="">-Select Group Name-</option></select></div></div></div>
 
@@ -1579,7 +1579,7 @@
 
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Status</div><div class="z-input-wrapper"><input type="text" class="z-input" value="@Model.Profilestatus" readonly /><input type="hidden" asp-for="Profilestatus" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Rate</div><div class="z-input-wrapper"><input asp-for="ProfileRate" type="number" class="z-input" readonly /></div></div></div>
-                
+               
                 @if (!string.IsNullOrEmpty(Model?.LeadStatus))
                 {
                     <div class="col-md-6"><div class="z-field-row"><div class="z-label">Lead Status</div><div class="z-input-wrapper"><input asp-for="LeadStatus" class="z-input" readonly /></div></div></div>
@@ -1618,27 +1618,27 @@
             <div class="z-form-section row">
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Homeopathic Doctor</div><div class="z-input-wrapper"><select asp-for="IsHomeopathicDoctor" class="z-input"><option value="">-None-</option><option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option><option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option><option value="हां- बीएचएमएस">हां- बीएचएमएस</option><option value="नहीं">नहीं</option><option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option><option value="Yes - BHMS">Yes - BHMS</option><option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option><option value="Yes">Yes</option><option value="No">No</option><option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option><option value="Pursuing BHMS">Pursuing BHMS</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Work Type</div><div class="z-input-wrapper"><select asp-for="WorkType" class="z-input"><option value="">-None-</option><option value="Practicing">Practicing</option><option value="Job">Job</option><option value="Research">Research</option><option value="others">others</option></select></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Clinic Type</div><div class="z-input-wrapper"><select asp-for="ClinicType" class="z-input"><option value="">-None-</option><option value="Own">Own</option><option value="Visiting">Visiting</option><option value="Hospital Attached">Hospital Attached</option><option value="Govt.service">Govt.service</option><option value="Chain Clinics">Chain Clinics</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Have computer/Laptop?</div><div class="z-input-wrapper"><select asp-for="HasComputer" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Date of Birth</div><div class="z-input-wrapper"><input asp-for="DateOfBirth" type="date" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Age</div><div class="z-input-wrapper"><input asp-for="Age" type="number" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Years of Practice</div><div class="z-input-wrapper"><input asp-for="YearsOfPractice" type="number" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Patients per Day</div><div class="z-input-wrapper"><input asp-for="PatientsPerDay" type="number" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification</div><div class="z-input-wrapper"><select asp-for="Qualification" class="z-input"><option value="">-Select-</option><option value="BHMS">BHMS</option><option value="MD">MD</option><option value="BAMS">BAMS</option><option value="Student">Student</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">College Name</div><div class="z-input-wrapper"><input asp-for="CollegeName" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Year of Passing</div><div class="z-input-wrapper"><input asp-for="YearOfPassing" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Total Experience</div><div class="z-input-wrapper"><input asp-for="TotalExperience" type="number" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Average Patient Fee (₹)</div><div class="z-input-wrapper"><input asp-for="AveragePatientFee" type="number" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Number of Clinics</div><div class="z-input-wrapper"><input asp-for="NumberOfClinics" type="number" class="z-input" /></div></div></div>
 
                 <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">Software Details</h6></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Currently Using Software?</div><div class="z-input-wrapper"><select asp-for="CurrentlyUsingSoftware" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Software Name</div><div class="z-input-wrapper"><input asp-for="CurrentSoftwareName" class="z-input" /></div></div></div>
             </div>
@@ -1648,24 +1648,24 @@
             <div class="z-form-section row">
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Product Purchased</div><div class="z-input-wrapper"><input asp-for="ProductPurchased" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Date</div><div class="z-input-wrapper"><input asp-for="PurchaseDate" type="date" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Value (₹)</div><div class="z-input-wrapper"><input asp-for="PurchaseValue" type="number" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Type</div><div class="z-input-wrapper"><select asp-for="PaymentType" class="z-input"><option value="">-None-</option><option value="Upfront">Upfront</option><option value="EMI - 3Months">EMI - 3Months</option><option value="EMI - 6Months">EMI - 6Months</option></select></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Status</div><div class="z-input-wrapper"><select asp-for="PaymentStatus" class="z-input"><option value="">-None-</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Partial">Partial</option><option value="Refunded">Refunded</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Completion (%)</div><div class="z-input-wrapper"><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Referral Source</div><div class="z-input-wrapper"><input asp-for="ReferralSource" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Invoice Number</div><div class="z-input-wrapper"><input asp-for="InvoiceNumber" class="z-input" /></div></div></div>
 
                 <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">Additional Contacts</h6></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 1</div><div class="z-input-wrapper"><input asp-for="ContactPerson1" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 1 Phone</div><div class="z-input-wrapper"><input asp-for="Contact1Phone" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 2</div><div class="z-input-wrapper"><input asp-for="ContactPerson2" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 2 Phone</div><div class="z-input-wrapper"><input asp-for="Contact2Phone" class="z-input" /></div></div></div>
-                
+               
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 3</div><div class="z-input-wrapper"><input asp-for="ContactPerson3" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 3 Phone</div><div class="z-input-wrapper"><input asp-for="Contact3Phone" class="z-input" /></div></div></div>
 
@@ -1716,7 +1716,7 @@
 <div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content task-modal-content">
-            
+           
             <div class="modal-header task-modal-header">
                 <h5 class="modal-title task-modal-title" id="noteModalLabel">
                     <div style="background: #fef3c7; color: #d97706; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
@@ -2032,24 +2032,23 @@
             });
     }
 
-        // ==========================================
-        // 2. SAFE TASK MODAL LAUNCHER (Fixes Freeze)
-        // ==========================================
-               function openTaskModal() {
-            const modalEl = document.getElementById('quickTaskModal');
-            if (modalEl) {
-                // 1. Move modal to the body root to prevent CSS z-index trapping (Fixes the freeze)
-                document.body.appendChild(modalEl);
-
-                // 2. Default the Task Owner to the current logged in user
-                const ownerDropdown = document.getElementById('taskOwnerDropdown');
-                if(ownerDropdown) ownerDropdown.value = '@currentUserId';
-
-                // 3. Open safely via JavaScript
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                modal.show();
-            }
+    function openTaskModal() {
+        // 🚀 FIX: Automatically select the logged-in user when modal opens
+        const ownerDropdown = document.getElementById('taskOwnerDropdown');
+        if (ownerDropdown) {
+            ownerDropdown.value = '@currentUserId';
         }
+
+        const modalEl = document.getElementById('quickTaskModal');
+        if (modalEl) {
+            // Safely move modal to the root body to escape the blurred backdrop
+            if (modalEl.parentNode !== document.body) {
+                document.body.appendChild(modalEl);
+            }
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    }
 
         // ==========================================
         // 3. AUTO-CALCULATE PROFILE RATE & STATUS
@@ -2552,14 +2551,14 @@ function updateChevronBars() {
         // ==========================================
         const dueDaysInput = document.getElementById('TaskDueDays');
         const dueDateInput = document.getElementById('TaskDueDate');
-        
+       
         if (dueDaysInput && dueDateInput) {
             // Calculate Date from Days
             dueDaysInput.addEventListener('input', function () {
                 if (this.value) {
                     let d = new Date();
                     d.setDate(d.getDate() + parseInt(this.value));
-                    
+                   
                     // Format YYYY-MM-DD for the date input
                     const year = d.getFullYear();
                     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -2569,7 +2568,7 @@ function updateChevronBars() {
                     dueDateInput.value = '';
                 }
             });
-            
+           
             // Calculate Days from Date
             dueDateInput.addEventListener('change', function () {
                 if (this.value) {
@@ -2577,7 +2576,7 @@ function updateChevronBars() {
                     let today = new Date();
                     d.setHours(0, 0, 0, 0);
                     today.setHours(0, 0, 0, 0);
-                    
+                   
                     let diffTime = d.getTime() - today.getTime();
                     let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                     dueDaysInput.value = diffDays;
@@ -2608,17 +2607,17 @@ function updateQuickField(fieldName, fieldValue) {
         const editFormInput = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
         if (editFormInput) {
             editFormInput.value = fieldValue;
-            editFormInput.dispatchEvent(new Event('change')); 
+            editFormInput.dispatchEvent(new Event('change'));
         }
 
         // 2. Format data for the Controller [FromForm] attributes
         const formData = new URLSearchParams();
         formData.append('id', '@Model.Id');
         formData.append('field', fieldName);
-        formData.append('newValue', fieldValue); 
+        formData.append('newValue', fieldValue);
 
         // 3. Send to Database
-        fetch('/Accounts/UpdateQuickInfo', { 
+        fetch('/Accounts/UpdateQuickInfo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString()
@@ -2673,14 +2672,18 @@ function updateQuickField(fieldName, fieldValue) {
 
     // Move row from Open Activities to Closed Activities visually
     function moveTaskToClosed(row) {
-        const subject = row.cells[0].innerText;
-        const dueDate = row.cells[1].innerText;
+        const subjectHtml = row.cells[0].innerHTML; // Keeps link intact
+
+        // 🚀 FIX: In Accounts, Task Owner is column index 1, Due Date is index 2
+        const ownerName = row.cells[1] ? row.cells[1].textContent.trim() : "System User";
+        const dueDate = row.cells[2].innerText;
 
         const newRow = document.createElement('tr');
-        
-        // Formats row exactly like the existing closed tasks list[cite: 8]
+
+        // Ensure the new row matches the 4 columns of the Closed Tasks table
         newRow.innerHTML = `
-                <td class="text-secondary text-decoration-line-through">${subject}</td>
+                <td class="text-secondary text-decoration-line-through">${subjectHtml}</td>
+                <td><span class="text-muted fw-medium">${ownerName}</span></td>
                 <td>${dueDate}</td>
                 <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
             `;
@@ -2697,12 +2700,12 @@ function updateQuickField(fieldName, fieldValue) {
         // If table doesn't exist yet, create it
         if (!closedTbody) {
             closedSection.innerHTML = `
-                    <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
-                    <table class="zoho-task-table" id="closedTasksTable">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                `;
+                        <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Task</h6>
+                        <table class="zoho-task-table" id="closedTasksTable">
+                            <thead><tr><th>Subject</th><th>Task Owner</th><th>Due Date</th><th>Status</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    `;
             closedTbody = closedSection.querySelector('tbody');
         }
 
@@ -2713,22 +2716,24 @@ function updateQuickField(fieldName, fieldValue) {
         // Update Next action & Empty placeholder if open table becomes empty
         const openTbody = document.getElementById('openTasksTbody');
         if (openTbody && openTbody.children.length === 0) {
-            document.getElementById('nextActionDisplay').innerText = "No upcoming actions scheduled.";
-            
+            const nextActionEl = document.getElementById('nextActionDisplay');
+            if (nextActionEl) nextActionEl.innerText = "No upcoming actions scheduled.";
+
             const openTasksTable = openTbody.closest('table');
             if (openTasksTable) {
-                openTasksTable.outerHTML = '<div class="text-center text-muted py-4" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>';
+                openTasksTable.outerHTML = '<div class="text-center text-muted py-4 bg-white" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>';
             }
         } else if (openTbody && openTbody.children.length > 0) {
             const nextRow = openTbody.children[0];
-            document.getElementById('nextActionDisplay').innerText = `${nextRow.cells[0].innerText} - Due: ${nextRow.cells[1].innerText}`;
+            const nextActionEl = document.getElementById('nextActionDisplay');
+            if (nextActionEl) nextActionEl.innerText = `${nextRow.cells[0].innerText} - Due: ${nextRow.cells[2].innerText}`;
         }
     }
 
     // =====================================
     // AJAX: UPDATE TASK STATUS & MOVE ROW
     // =====================================
-   function updateTaskStatus(selectElement, taskId) {
+    function updateTaskStatus(selectElement, taskId) {
         const newStatus = selectElement.value;
         const row = selectElement.closest('tr');
 
@@ -2739,32 +2744,38 @@ function updateQuickField(fieldName, fieldValue) {
         formData.append('id', taskId);
         formData.append('status', newStatus);
 
-        // 🚀 Call the new Accounts controller endpoint
-        fetch('/Accounts/UpdateTaskStatus', { 
+        // 🚀 FIX: Use @Url.Action to prevent 404 errors on live IIS servers
+        fetch('@Url.Action("UpdateTaskStatus", "Accounts")', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString()
         })
-        .then(response => response.json())
-        .then(data => {
-            selectElement.disabled = false;
-            
-            if (data.success) {
-                // 🚀 Only move it visually to the "Closed" table if the DB successfully saved it
-                if (newStatus === "Completed") {
-                    moveTaskToClosed(row);
+            .then(response => {
+                // 🚀 FIX: Catch 404/500 errors BEFORE trying to parse HTML as JSON
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
                 }
-            } else {
-                alert("Database Error: " + data.message);
-                selectElement.value = "Not Started"; // Revert to old value if it fails
-            }
-        })
-        .catch(err => {
-            selectElement.disabled = false;
-            console.error('Task update error:', err);
-            alert("Network connection error. Status was not saved.");
-            selectElement.value = "Not Started"; // Revert to old value if network fails
-        });
+                return response.json();
+            })
+            .then(data => {
+                selectElement.disabled = false;
+
+                if (data.success) {
+                    // 🚀 Only move it visually to the "Closed" table if the DB successfully saved it
+                    if (newStatus === "Completed") {
+                        moveTaskToClosed(row);
+                    }
+                } else {
+                    alert("Database Error: " + data.message);
+                    selectElement.value = "Not Started"; // Revert to old value if it fails
+                }
+            })
+            .catch(err => {
+                selectElement.disabled = false;
+                console.error('Task update error:', err);
+                alert("Network connection error. Status was not saved.");
+                selectElement.value = "Not Started"; // Revert to old value if network fails
+            });
     }
 
    // =====================================
@@ -2785,11 +2796,11 @@ function updateQuickField(fieldName, fieldValue) {
     function saveInlineField(inputId, actionDivId, dbFieldName) {
         const inputEl = document.getElementById(inputId);
         const newValue = inputEl.value;
-        
+       
         // Update the original data tracker and hide the buttons
         inputEl.setAttribute('data-original', newValue);
         document.getElementById(actionDivId).classList.add('d-none');
-        
+       
         // Route to your existing AJAX save function
         updateQuickField(dbFieldName, newValue);
     }
@@ -2807,26 +2818,26 @@ function cancelInlineField(inputId, actionDivId) {
 function saveInlineField(inputId, actionDivId, dbFieldName) {
     const inputEl = document.getElementById(inputId);
     const newValue = inputEl.value;
-    
+   
     // Update the original data tracker and hide the buttons
     inputEl.setAttribute('data-original', newValue);
     document.getElementById(actionDivId).style.setProperty('display', 'none', 'important');
-    
+   
     // Route to your existing AJAX save function
     updateQuickField(dbFieldName, newValue);
 }
 
-// =====================================
-    // AJAX QUICK TASK SUBMISSION (NO REDIRECT)
+    // =====================================
+    // 2. AJAX QUICK TASK SUBMISSION (WITH RELOAD)
     // =====================================
     function submitQuickTask(event, form) {
-        event.preventDefault(); // Stop the form from redirecting
+        event.preventDefault(); // Stop the form from redirecting normally
 
         const submitBtn = form.querySelector('button[type="submit"]');
         const origText = submitBtn.innerHTML;
 
         // Show loading state
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
         submitBtn.disabled = true;
 
         const formData = new FormData(form);
@@ -2835,38 +2846,23 @@ function saveInlineField(inputId, actionDivId, dbFieldName) {
             method: 'POST',
             body: formData
         })
-        .then(async response => {
-            if (response.ok) {
-                // It might be a 200 OK but returning HTML if ModelState is invalid.
-                // Let's ensure it's either a JSON success or a redirect.
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.includes("text/html")) {
-                    console.warn("Server returned HTML. This usually means a required field was missing and ModelState is invalid.");
-                    // Still reload to show whatever the server did, or let the user know.
+            .then(async response => {
+                if (response.ok || response.redirected) {
+                    // 🚀 FIX: Reload the page instantly to get the real Database ID for the task!
+                    window.location.reload();
+                } else {
+                    const errorText = await response.text();
+                    console.error("Task Creation Server Error:", errorText);
+                    alert("Failed to create the task. Check the console (F12) for the exact error.");
+                    submitBtn.innerHTML = origText;
+                    submitBtn.disabled = false;
                 }
-
-                // Task created successfully: close modal and refresh
-                const modalEl = document.getElementById('quickTaskModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if(modal) modal.hide();
-                
-                form.reset(); 
-                window.location.reload(); 
-            } else {
-                // 🚀 FIX: Log the exact server error text to the F12 console
-                const errorText = await response.text();
-                console.error("Task Creation Server Error:", errorText);
-                alert("Failed to create the task. Check the console (F12) for the exact error.");
-                
+            })
+            .catch(error => {
+                console.error("Error creating task:", error);
+                alert("A server error occurred while saving the task.");
                 submitBtn.innerHTML = origText;
                 submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error("Error creating task:", error);
-            alert("A server error occurred while saving the task.");
-            submitBtn.innerHTML = origText;
-            submitBtn.disabled = false;
-        });
+            });
     }
     </script>
