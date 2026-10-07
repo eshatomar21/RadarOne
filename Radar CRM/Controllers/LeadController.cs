@@ -513,7 +513,7 @@ namespace Radar_CRM.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Edit", new { id = lead.Id });
             }
 
             // Fallback if model state fails
@@ -1147,65 +1147,92 @@ namespace Radar_CRM.Controllers
 
         [HttpPost]
         [IgnoreAntiforgeryToken]
-        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string value)
+        [Route("Leads/UpdateQuickInfo")]
+        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string newValue) // 🚀 FIX: Parameter changed to newValue to match JS
         {
             var lead = await _context.Leads.FindAsync(id);
-            if (lead == null)
-            {
-                return NotFound(new { success = false, message = "Lead not found." });
-            }
+            if (lead == null) return Json(new { success = false, message = "Lead not found." });
 
-            string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
-            lead.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
-
-            switch (field)
-            {
-                case "LeadOwnerId": lead.LeadOwnerId = value; break;
-                case "EmailID": lead.EmailID = value; break;
-                case "MobileNumber": lead.MobileNumber = value; break;
-                case "DataSources": lead.DataSources = value; break; // Ensure value matches DB column size limits
-                case "AlternateMobile": lead.AlternateMobile = value; break;
-                case "LeadStatus": lead.LeadStatus = value; break;
-            }
+            string trimmedValue = newValue?.Trim() ?? "";
 
             try
             {
+                // 🚀 FIX: Use Reflection to dynamically update ANY field passed from the frontend
+                var propertyInfo = typeof(Lead).GetProperty(field, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                if (propertyInfo != null)
+                {
+                    Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+                    object safeValue = null;
+
+                    if (t == typeof(string))
+                    {
+                        safeValue = trimmedValue == "-None-" ? "" : trimmedValue;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(trimmedValue) && trimmedValue != "-None-")
+                    {
+                        if (t == typeof(DateTime))
+                        {
+                            if (DateTime.TryParse(trimmedValue, out DateTime d)) safeValue = d;
+                        }
+                        else
+                        {
+                            safeValue = Convert.ChangeType(trimmedValue, t);
+                        }
+                    }
+
+                    propertyInfo.SetValue(lead, safeValue, null);
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Invalid field mapping: " + field });
+                }
+
+                string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+                lead.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
+                lead.ModifiedTime = DateTime.Now;
+
                 _context.Update(lead);
                 await _context.SaveChangesAsync();
-                return Ok(new { success = true });
+
+                return Json(new { success = true });
             }
             catch (Exception ex)
             {
-                // 🚀 FIX: Extracts deep SQL errors (e.g., String truncated, FK conflicts)
                 string errorDetails = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return StatusCode(500, new { success = false, message = errorDetails });
+                return Json(new { success = false, message = errorDetails });
             }
         }
 
         [HttpPost]
         [IgnoreAntiforgeryToken]
-        [Route("Leads/UpdateTaskStatus")] // 🚀 FIX: The route must exactly match the JavaScript fetch URL
+        [Route("Leads/UpdateTaskStatus")]
         public async Task<IActionResult> UpdateTaskStatus(int id, string status)
         {
             if (id <= 0 || string.IsNullOrWhiteSpace(status))
             {
-                return BadRequest(new { success = false, message = "Invalid Task ID or Status." });
+                return Json(new { success = false, message = "Invalid Task ID or Status." }); // 🚀 FIX: Return JSON instead of BadRequest
             }
 
             try
             {
                 var task = await _context.Tasks.FindAsync(id);
-                if (task == null) return NotFound(new { success = false, message = "Task not found." });
+                if (task == null) return Json(new { success = false, message = "Task not found." }); // 🚀 FIX: Return JSON
 
                 task.Status = status;
+
+                string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+                task.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
+                task.ModifiedTime = DateTime.Now;
+
                 _context.Update(task);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { success = true, message = "Status updated successfully." });
+                return Json(new { success = true, message = "Status updated successfully." });
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "Database Error: " + ex.Message });
+                return Json(new { success = false, message = "Database Error: " + ex.Message });
             }
         }
 

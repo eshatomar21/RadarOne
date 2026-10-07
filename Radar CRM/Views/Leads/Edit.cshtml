@@ -1484,38 +1484,44 @@
     });
 
     // 🚀 NEW: Function to Update Task Status via AJAX
-function updateTaskStatus(selectElem, taskId) {
-    const newStatus = selectElem.value;
-    const row = selectElem.closest('tr');
-    selectElem.disabled = true;
+function updateTaskStatus(selectElement, taskId) {
+    const newStatus = selectElement.value;
+    const row = selectElement.closest('tr');
+
+    // Optional: Disable dropdown while processing
+    selectElement.disabled = true;
 
     const formData = new URLSearchParams();
     formData.append('id', taskId);
     formData.append('status', newStatus);
 
-    // Matches the C# route we just fixed
-    fetch('/Leads/UpdateTaskStatus', {
+    // Call your Tasks controller to update the database
+    fetch('/Leads/UpdateTaskStatus', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString()
     })
-    .then(response => {
-        selectElem.disabled = false;
-        if (response.ok) {
-            if (newStatus === 'Completed') {
+    .then(response => response.json())
+    .then(data => {
+        selectElement.disabled = false;
+        
+        if (data.success) {
+            // Move it visually to the "Closed" table if completed
+            if (newStatus === "Completed") {
                 moveTaskToClosed(row);
             }
         } else {
-            alert('Failed to update task status in DB.');
-            selectElem.value = 'Not Started';
+            alert('Failed to update task status in DB: ' + data.message);
+            selectElement.value = 'Not Started'; // Revert back
         }
     })
     .catch(err => {
-        selectElem.disabled = false;
-        console.error('Error:', err);
+        selectElement.disabled = false;
+        console.error('Task update error:', err);
+        alert('Network Error: Could not connect to server.');
+        selectElement.value = 'Not Started'; // Revert back
     });
 }
-
     // Move row from Open Activities to Closed Activities visually without refreshing page
    function moveTaskToClosed(row) {
     const subjectHtml = row.cells[0].innerHTML; // Keeps the clickable link intact
@@ -1703,40 +1709,40 @@ function updateTaskStatus(selectElem, taskId) {
     // =====================================
     // QUICK INFO AUTO-SAVE JAVASCRIPT
     // =====================================
- function updateQuickField(fieldName, fieldValue) {
-    // 1. Keep the main Edit Form in sync
-    const editFormInput = document.getElementById(fieldName);
-    if (editFormInput) {
-        editFormInput.value = fieldValue;
-        editFormInput.dispatchEvent(new Event('change')); // Triggers cascading logic
-    }
-
-    // 2. Fire the AJAX call to save instantly
-    const formData = new URLSearchParams();
-    
-    // 🚀 FIX: These keys ('id', 'field', 'value') now perfectly match the C# parameters
-    formData.append('id', '@Model.Id');
-    formData.append('field', fieldName);
-    formData.append('value', fieldValue);
-
-    fetch('/Leads/UpdateQuickInfo', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString()
-    })
-    .then(response => {
-        if (!response.ok) {
-            alert("Failed to automatically update " + fieldName + " in the database.");
-        } else {
-            console.log("Successfully saved " + fieldName);
-            // Optional: You could show a small toast notification here instead of an alert
+function updateQuickField(fieldName, fieldValue) {
+        // 1. Keep the main Edit Form in sync
+        const editFormInput = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+        if (editFormInput) {
+            editFormInput.value = fieldValue;
+            editFormInput.dispatchEvent(new Event('change')); // Triggers cascading logic
         }
-    })
-    .catch(err => {
-        console.error('Error updating quick info:', err);
-        alert("Network Error: Could not update " + fieldName);
-    });
-}
+
+        // 2. Fire the AJAX call to save instantly
+        const formData = new URLSearchParams();
+        
+        // 🚀 FIX: These keys ('id', 'field', 'newValue') now perfectly match the C# parameters
+        formData.append('id', '@Model.Id');
+        formData.append('field', fieldName);
+        formData.append('newValue', fieldValue);
+
+        fetch('@Url.Action("UpdateQuickInfo", "Leads")', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        })
+        .then(response => response.json()) // 🚀 FIX: Safely parse JSON response
+        .then(data => {
+            if (!data.success) {
+                alert("Failed to automatically update " + fieldName + " in the database.\n" + data.message);
+            } else {
+                console.log("Successfully saved " + fieldName);
+            }
+        })
+        .catch(err => {
+            console.error('Error updating quick info:', err);
+            alert("Network Error: Could not update " + fieldName);
+        });
+    }
 
     function openTaskModal() {
         const ownerDropdown = document.getElementById('taskOwnerDropdown');
