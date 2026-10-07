@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Radar_CRM.Models
 {
@@ -26,6 +27,12 @@ namespace Radar_CRM.Models
         public int? LeadId { get; set; }
         public string? RelatedToId { get; set; }
         public string? RelatedTo { get; set; }
+
+        [ForeignKey("AccountId")]
+        public virtual Account? Account { get; set; }
+
+        [ForeignKey("LeadId")]
+        public virtual Lead? Lead { get; set; }
 
         // Status & Priority
         public string? Status { get; set; }

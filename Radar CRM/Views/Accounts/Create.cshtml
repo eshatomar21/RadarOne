@@ -10,19 +10,17 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
 <style>
-    /* Premium Enterprise CRM Typography & Base - Navy & Cream Theme */
     @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
-        --theme-bg-cream: #Fdfbf7; /* Soft cream background */
-        --theme-surface: #ffffff; /* Pure white for cards/modals */
-        --theme-navy-primary: #1e3a8a; /* Deep Navy Blue */
-        --theme-navy-hover: #1e40af; /* Slightly lighter Navy for hover */
-        --theme-navy-light: #eff6ff; /* Very pale blue/cream hybrid for accents */
+        --theme-bg-cream: #Fdfbf7;
+        --theme-surface: #ffffff;
+        --theme-navy-primary: #1e3a8a;
+        --theme-navy-hover: #1e40af;
+        --theme-navy-light: #eff6ff;
         --theme-text-main: #1f2937;
         --theme-text-muted: #64748b;
         --theme-border: #e2e8f0;
-        --theme-shadow-float: 0 20px 40px -10px rgba(30, 58, 138, 0.08); /* Navy-tinted shadow */
     }
 
     body {
@@ -32,378 +30,175 @@
         -webkit-font-smoothing: antialiased;
     }
 
-    /* Main Modal/Drawer Container - Floating Document Vibe */
-    .sf-container {
-        background-color: var(--theme-surface);
-        width: 98%;
-        max-width: 1800px;
-        margin: 30px auto;
-        min-height: 90vh;
-        border-radius: 16px;
-        box-shadow: var(--theme-shadow-float);
-        display: flex;
-        flex-direction: column;
-        border: 1px solid rgba(255, 255, 255, 0.5); /* Seamless edge */
+    /* =========================================
+       CREATE VIEW CSS (CLEAN ZOHO ALIGNMENT)
+       ========================================= */
+ .z-edit-container {
+        background: #fff;
+        max-width: 1400px;
+        margin: 40px auto;
+        padding: 0 !important; /* Forces edge-to-edge alignment */
+        border: 1px solid var(--theme-border);
+        border-radius: 6px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         overflow: hidden;
     }
 
-    /* 1. Header Area */
-    .sf-header {
+  .z-edit-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 24px 40px;
-        background-color: var(--theme-surface);
-        border-bottom: 1px solid var(--theme-border);
-    }
-
-    .sf-header-title {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-        .sf-header-title h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--theme-navy-primary);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            letter-spacing: -0.02em;
-        }
-
-        .sf-header-title .entity-type {
-            color: var(--theme-navy-primary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            background: var(--theme-navy-light);
-            padding: 6px 14px;
-            border-radius: 20px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-    .sf-close-btn {
-        background: transparent;
-        border: 1px solid var(--theme-border);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--theme-text-muted);
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-        .sf-close-btn:hover {
-            background: var(--theme-navy-light);
-            color: var(--theme-navy-primary);
-            border-color: var(--theme-navy-light);
-            transform: rotate(90deg);
-        }
-
-    /* Primary Button */
-    .btn-sf-primary {
+        padding: 20px 30px;
         background-color: var(--theme-navy-primary);
-        color: var(--theme-surface);
-        border: none;
-        padding: 10px 28px;
-        border-radius: 8px;
-        font-weight: 500;
-        font-size: 0.95rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
-    }
-
-        .btn-sf-primary:hover {
-            background-color: var(--theme-navy-hover);
-            box-shadow: 0 6px 16px rgba(30, 58, 138, 0.25);
-            transform: translateY(-1px);
-        }
-
-    /* 2. Tabs - Minimalist like the reference image */
-    .sf-tabs {
-        display: flex;
-        border-bottom: 1px solid var(--theme-border);
-        padding: 0 40px;
-        background-color: var(--theme-surface);
-        gap: 40px;
-        margin: 0;
-    }
-
-    .sf-tab {
-        background: none;
-        border: none;
-        padding: 20px 0;
-        color: var(--theme-text-muted);
-        font-weight: 500;
-        font-size: 0.95rem;
-        cursor: pointer;
-        border-bottom: 3px solid transparent;
-        margin-bottom: -1px;
-        transition: all 0.2s;
-    }
-
-        .sf-tab:hover {
-            color: var(--theme-navy-primary);
-        }
-
-        .sf-tab.active {
-            color: var(--theme-navy-primary);
-            border-bottom: 3px solid var(--theme-navy-primary);
-            font-weight: 600;
-        }
-
-    /* Form Inputs - Clean, airy layout */
-    .form-group {
-        margin-bottom: 28px;
-    }
-
-    .sf-label {
-        display: block;
-        font-size: 0.85rem;
-        color: var(--theme-text-muted);
-        margin-bottom: 8px;
-        font-weight: 500;
-    }
-
-    .sf-input, .sf-select {
+        margin: 0 !important;
         width: 100%;
-        border: 1px solid var(--theme-border);
-        border-radius: 6px; /* Slightly smaller radius to match the thinner profile */
-        padding: 6px 12px; /* Reduced vertical padding to thin out the box */
-        height: 36px; /* Fixed thinner height */
-        font-size: 0.85rem; /* Adjusted font size to fit the compact box perfectly */
-        color: var(--theme-text-main);
-        background-color: #fafaf9;
-        transition: all 0.2s ease-in-out;
-    }
-
-        .sf-input:hover, .sf-select:hover {
-            border-color: #cbd5e1;
-            background-color: var(--theme-surface);
-        }
-
-        .sf-input:focus, .sf-select:focus {
-            outline: none;
-            border-color: var(--theme-navy-primary);
-            background-color: var(--theme-surface);
-            box-shadow: 0 0 0 3px var(--theme-navy-light); /* Slightly thinner shadow */
-        }
-
-        .sf-input[readonly] {
-            background-color: transparent;
-            border-color: transparent;
-            border-bottom: 1px dashed var(--theme-border);
-            border-radius: 0;
-            padding-left: 0;
-            color: var(--theme-text-main);
-            font-weight: 500;
-            cursor: default;
-            height: auto; /* Allow readonly fields to rest naturally */
-        }
-
-            .sf-input[readonly]:focus {
-                box-shadow: none;
-            }
-    /* Section Headers */
-    .pane-section-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--theme-navy-primary);
-        margin-bottom: 24px;
-        margin-top: 16px;
-        padding-bottom: 0;
         border-bottom: none;
-        letter-spacing: -0.01em;
     }
 
-    /* Header Container */
-    .sf-header {
-        background-color: #ffffff;
-        padding: 16px 24px;
-        border-bottom: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        font-family: system-ui, -apple-system, sans-serif;
-    }
-
-    /* Flexbox to push title left and button right */
-    .sf-header-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-
-        /* Title Styling */
-        .sf-header-title h1 {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-            color: #0f172a;
-        }
-
-    /* Modern Pill Badge for 'Account' */
-    .entity-type {
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        background-color: #f1f5f9; /* Light gray background */
-        color: #475569; /* Slate text */
-        padding: 4px 12px;
-        border-radius: 20px;
-    }
-
-    /* Navy Blue Back Button */
-    .sf-back-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 16px;
-        background-color: #1e3a8a; /* Deep Navy Blue */
-        color: #ffffff; /* White text */
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 600;
-        border-radius: 6px;
-        transition: background-color 0.2s ease;
-    }
-
-        /* Darker Navy on Hover */
-        .sf-back-btn:hover {
-            background-color: #172554;
-        }
-
-        /* Arrow micro-animation on hover */
-        .sf-back-btn svg {
-            transition: transform 0.2s ease;
-        }
-
-        .sf-back-btn:hover svg {
-            transform: translateX(-4px);
-        }
-
-    /* Cards - Layered effect */
-    .sf-card {
-        border: 1px solid var(--theme-border);
-        border-radius: 12px;
-        padding: 32px;
-        margin-bottom: 24px;
-        background-color: var(--theme-surface);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-        transition: box-shadow 0.3s ease;
-    }
-
-        .sf-card:hover {
-            box-shadow: var(--theme-shadow-float);
-        }
-
-    .sf-card-title {
-        font-size: 1.1rem;
+    .z-section-title {
+        font-size: 1.05rem;
         font-weight: 600;
         color: var(--theme-navy-primary);
-        margin-bottom: 24px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
+        padding: 15px 30px;
+        margin: 0;
         border-bottom: 1px solid var(--theme-border);
-        padding-bottom: 16px;
+        background: #f1f5f9;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
 
-    /* Input Group for Verify Buttons */
-    .verify-group {
+    .z-form-section {
+        padding: 24px 30px;
+        background: #fff;
+        margin: 0;
+        border-bottom: 1px solid var(--theme-border);
+    }
+
+    .z-field-row {
         display: flex;
+        align-items: center;
+        margin-bottom: 16px;
         position: relative;
     }
 
-        .verify-group .sf-input {
-            padding-right: 90px; /* Space for the button inside */
-        }
+    .z-label {
+        width: 35%;
+        text-align: right;
+        padding-right: 20px;
+        font-size: 0.85rem;
+        color: #475569;
+        font-weight: 600;
+    }
 
-        .verify-group .btn-verify {
-            position: absolute;
-            right: 4px;
-            top: 4px;
-            bottom: 4px;
-            border: none;
-            background: var(--theme-navy-light);
-            color: var(--theme-navy-primary);
-            font-weight: 600;
-            border-radius: 6px;
-            padding: 0 16px;
-            font-size: 0.8rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
+    .z-input-wrapper {
+        width: 65%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-            .verify-group .btn-verify:hover {
-                background: var(--theme-navy-primary);
-                color: var(--theme-surface);
-            }
+    .z-input {
+        width: 100%;
+        border: 1px solid #94a3b8;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        color: #1f2937;
+        transition: 0.2s;
+        background: #fff;
+        height: 38px;
+    }
+
+    .z-input:focus {
+        border-color: var(--theme-navy-primary);
+        box-shadow: 0 0 0 2px var(--theme-navy-light);
+        outline: none;
+    }
+
+    .z-input[readonly], .z-input:disabled {
+        background-color: #f8fafc;
+        color: #64748b;
+        cursor: not-allowed;
+    }
+
+    /* Premium Save Button */
+    .btn-save-modern {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 10px 28px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-save-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        color: #ffffff;
+    }
+
+    .btn-save-modern:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+
+    .verify-btn {
+        background: var(--theme-navy-light);
+        color: var(--theme-navy-primary);
+        border: 1px solid var(--theme-navy-primary);
+        font-weight: 600;
+        border-radius: 4px;
+        padding: 0 16px;
+        height: 38px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: 0.2s;
+        white-space: nowrap;
+    }
+
+    .verify-btn:hover {
+        background: var(--theme-navy-primary);
+        color: #fff;
+    }
 </style>
 
 <form asp-action="Create" method="post" id="accountForm" enctype="multipart/form-data">
-    <div class="sf-container">
+    <div class="z-edit-container">
 
-        <div class="sf-header">
-            <div class="sf-header-title">
-                <!-- Title & Badge (Left Side) -->
-                <h1>
-                    <span class="entity-type">Account</span>
-                    New Account
-                </h1>
-
-                <!-- Back to Dashboard Button (Right Side) -->
-                <a asp-controller="Accounts" asp-action="Index" class="sf-back-btn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    <span>Back to Dashboard</span>
+        <!-- HEADER -->
+        <div class="z-edit-header shadow-sm d-flex align-items-center justify-content-between" style="background-color: var(--theme-navy-primary); padding: 20px 30px; border-bottom: none;">
+            <div class="z-header-title d-flex align-items-center m-0">
+                <div style="background: rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                    <i class="fa-solid fa-building text-white fs-5"></i>
+                </div>
+                <span class="text-white" style="font-size: 1.35rem; font-weight: 600; letter-spacing: 0.02em;">Create New Account</span>
+            </div>
+            
+            <div class="d-flex gap-3 align-items-center">
+                <a asp-controller="Accounts" asp-action="Index" class="text-white text-decoration-none d-flex align-items-center pe-4 border-end" style="border-color: rgba(255,255,255,0.2) !important; font-size: 0.95rem; font-weight: 500; transition: 0.2s;" onmouseover="this.style.opacity='0.8';" onmouseout="this.style.opacity='1';">
+                    <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
+                </a>
+                <a asp-controller="Accounts" asp-action="Index" class="btn px-4 fw-bold shadow-sm" style="background-color: #f1f3f5; border: 1px solid #e2e8f0; color: #1e293b; transition: 0.2s; font-size: 0.95rem;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f1f3f5'; this.style.color='#1e293b';">
+                    Cancel
                 </a>
             </div>
         </div>
 
-        <!-- 2. Tabs -->
-        <ul class="nav sf-tabs" id="accountTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab">Main Details</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="address-tab" data-bs-toggle="tab" data-bs-target="#address" type="button" role="tab">Address Info</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="professional-tab" data-bs-toggle="tab" data-bs-target="#professional" type="button" role="tab">Professional & Software</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="sf-tab" id="purchase-tab" data-bs-toggle="tab" data-bs-target="#purchase" type="button" role="tab">Purchases & Tracking</button>
-            </li>
-        </ul>
-
-        <!-- 4. Tab Content Area -->
-        <div class="tab-content" id="accountTabsContent" style="flex-grow: 1; display: flex; flex-direction: column;">
-
-            <!-- MAIN TAB -->
-            <div class="tab-pane fade show active" id="main" role="tabpanel" style="padding: 32px 40px;">
-
-                <!-- Master Details -->
-                <h3 class="pane-section-title">Master Details</h3>
-                <div class="row">
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Data Source <span class="text-danger">*</span></label>
-                        <select asp-for="DataSource" class="sf-select" id="DataSource" required>
+        <!-- SEC 1: MASTER DETAILS -->
+        <h5 class="z-section-title">Master Details</h5>
+        <div class="z-form-section row">
+            <div class="col-md-6">
+                <div class="z-field-row">
+                    <div class="z-label">Data Source <span class="text-danger">*</span></div>
+                    <div class="z-input-wrapper">
+                        <select asp-for="DataSource" class="z-input" id="DataSource" required>
                             <option value="">-None-</option>
                             <option value="InboundCall">-InboundCall-</option>
                             <option value="Referral/Dealer">-Referral/Dealer-</option>
@@ -431,22 +226,18 @@
                             <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
                         </select>
                     </div>
+                </div>
+            </div>
 
-                 
+            <!-- Hidden Fields Preserved -->
+            <div class="col-md-6" id="divMetaCampaign" style="display:none;"><div class="z-field-row"><div class="z-label">Meta Campaign Name</div><div class="z-input-wrapper"><input name="MetaCampaignName" class="z-input" placeholder="Enter campaign name..." /></div></div></div>
+            <div class="col-md-6" id="divSeminarName" style="display:none;"><div class="z-field-row"><div class="z-label">Seminar Name</div><div class="z-input-wrapper"><input name="SeminarName" class="z-input" placeholder="Enter seminar name..." /></div></div></div>
 
-                    <!-- Conditional Fields (Hidden by default) -->
-                    <div class="col-md-6 form-group" id="divMetaCampaign" style="display:none;">
-                        <label class="sf-label">Meta Campaign Name</label>
-                        <input name="MetaCampaignName" class="sf-input" placeholder="Enter campaign name..." />
-                    </div>
-                    <div class="col-md-6 form-group" id="divSeminarName" style="display:none;">
-                        <label class="sf-label">Seminar Name</label>
-                        <input name="SeminarName" class="sf-input" placeholder="Enter seminar name..." />
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Type</label>
-                        <select asp-for="AccountType" class="sf-select">
+            <div class="col-md-6">
+                <div class="z-field-row">
+                    <div class="z-label">Account Type</div>
+                    <div class="z-input-wrapper">
+                        <select asp-for="AccountType" class="z-input" id="AccountType">
                             <option value="None">None</option>
                             <option value="Individual">Individual</option>
                             <option value="Group">Group</option>
@@ -454,508 +245,174 @@
                             <option value="Government Organisation">Government Organisation</option>
                         </select>
                     </div>
+                </div>
+            </div>
 
-                    <!-- FIX: Removed the extra nested <div class="row"> here -->
-                    <div class="col-md-6 form-group" id="divGroupName" style="display: none;">
-                        <label class="sf-label">Group Name</label>
-                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select" id="GroupName">
+            <div class="col-md-6" id="divGroupName" style="display: none;">
+                <div class="z-field-row">
+                    <div class="z-label">Group Name</div>
+                    <div class="z-input-wrapper">
+                        <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="z-input" id="GroupName">
                             <option value="">-Select Group Name-</option>
                         </select>
                     </div>
+                </div>
+            </div>
 
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Current Status</label>
-                        <select asp-for="CurrentStatus" class="sf-select">
+            <div class="col-md-6">
+                <div class="z-field-row">
+                    <div class="z-label">Current Status</div>
+                    <div class="z-input-wrapper">
+                        <select asp-for="CurrentStatus" class="z-input">
                             <option value="None">None</option>
                             <option value="User">User</option>
                             <option value="Non-User" selected>Non-User</option>
                         </select>
                     </div>
+                </div>
+            </div>
 
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Owner</label>
-                        <select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="sf-select">
+            <div class="col-md-6">
+                <div class="z-field-row">
+                    <div class="z-label">Account Owner</div>
+                    <div class="z-input-wrapper">
+                        <select asp-for="AccountOwnerId" asp-items="ViewBag.UsersList" class="z-input">
                             <option value="">- Select Account Owner -</option>
                         </select>
                     </div>
-
-       
-
-                    <!-- Hidden Date of Entry field -->
-                    <div class="col-md-6 form-group" style="display: none;">
-                        <label class="sf-label">Date of Entry</label>
-                        <input asp-for="DateOfEntry" class="sf-input" type="datetime-local" />
-                    </div>
-                </div>
-
-                <!-- Primary Details -->
-                <h3 class="pane-section-title" style="margin-top: 12px;">Primary Details</h3>
-                <div class="row">
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Account Name <span class="text-danger">*</span></label>
-                        <input asp-for="AccountName" class="sf-input" style="font-weight: 600;" placeholder="Enter account name..." required />
-                    </div>
-
-                  
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Contact Person Name</label>
-                        <input asp-for="ContactPersonName" class="sf-input" placeholder="Enter full name" />
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Mobile Phone <span class="text-danger">*</span></label>
-                        <div class="verify-group">
-                            <input asp-for="MobileNumber" class="sf-input" id="MobileNumber" placeholder="+1 202-555-0117" required />
-                            <button type="button" class="btn-verify" onclick="verifyPhone('MobileNumber')">Verify</button>
-                        </div>
-                    </div>
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Email  <span class="text-danger">*</span></label>
-                        <!-- 🚀 ADDED verify-group container -->
-                        <div class="verify-group">
-                            <input asp-for="Email" class="sf-input" id="Email" style="color: #1a56db;" placeholder="email@example.com" required />
-                            <button type="button" class="btn-verify" onclick="verifyEmail('Email')">Verify</button>
-                        </div>
-                    </div>
-
-                    <!-- Removed the duplicate <div class="col-md-6"> that was breaking your grid here! -->
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Alternate Mobile</label>
-                        <div class="verify-group">
-                            <input asp-for="AlternateMobile" class="sf-input" id="AlternateMobile" placeholder="Optional..." />
-                            <button type="button" class="btn-verify" onclick="verifyPhone('AlternateMobile')">Verify</button>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Alternate Email</label>
-                        <!-- 🚀 ADDED verify-group container -->
-                        <div class="verify-group">
-                            <input asp-for="AlternateEmailID" class="sf-input" id="AlternateEmailID" placeholder="Alternate email..." />
-                            <button type="button" class="btn-verify" onclick="verifyEmail('AlternateEmailID')">Verify</button>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Profile Pending Reason</label>
-                            <select asp-for="ProfilePendingReason" class="sf-select">
-                                <option value="">-None-</option>
-                                <option value="Connected">Connected</option>
-                                <option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option>
-                                <option value="Ringing">Ringing</option>
-                                <option value="Switched Off">Switched Off</option>
-                                <option value="Busy-Call Back Later">Busy-Call Back Later</option>
-                                <option value="Not-Interested">Not-Interested</option>
-                                <option value="Not a Doctor">Not a Doctor</option>
-                                <option value="Student">Student</option>
-                                <option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group">
-                            <label class="sf-label">Qualification Status</label>
-                            <select asp-for="QualificationStatus" class="sf-select">
-                                <option value="">-None-</option>
-                                <option value="Qualified">Qualified</option>
-                                <option value="Notqualified">Notqualified</option>
-                            </select>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label class="sf-label">Profile Status</label>
-                                <select asp-for="Profilestatus" class="sf-select" disabled>
-                                    <option value="">-None-</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Strongly Completed">Strongly Completed</option>
-                                    <option value="Not Completed">Not Completed</option>
-                                    <option value="Not-Qualified">Not-Qualified</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-6 form-group">
-                                <label class="sf-label">Profile Rate</label>
-                                <!-- Readonly because the backend calculates this automatically -->
-                                <input asp-for="ProfileRate" type="number" class="sf-input" readonly style="background-color: #f1f5f9; color: var(--theme-text-muted);" />
-                            </div>
-                        </div>
-
-                </div>
-                </div>
-
-                <!-- ==========================================
-                     NEW MODAL-BASED NOTES & ATTACHMENTS UI
-                     ========================================== -->
-                <div class="d-flex justify-content-between align-items-center mt-4 border-bottom pb-2 mb-3">
-                    <h3 class="pane-section-title border-0 m-0 p-0">Notes & Attachments</h3>
-                    <button type="button" class="btn btn-sm" onclick="openNoteModal()" style="background-color: #e0e7ff; color: #1a56db; font-weight: 600; border-radius: 6px; font-size: 0.85rem; padding: 6px 14px;">
-                        <i class="fa-solid fa-plus me-1"></i> Add Note
-                    </button>
-                </div>
-
-                <!-- Container where saved notes will dynamically appear -->
-                <div id="savedNotesContainer" class="mb-4"></div>
-
-                <!-- Duplication Checkbox -->
-                <div class="row">
-                    <div class="col-md-12 form-group pt-2 m-0">
-                        <div class="form-check d-flex align-items-center gap-2">
-                            <input asp-for="IsDuplicated" class="form-check-input m-0" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
-                            <label class="form-check-label m-0" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c; font-weight: 600;">Mark as Duplicated Account</label>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            <!-- ADDRESS TAB -->
-            <div class="tab-pane fade" id="address" role="tabpanel" style="padding: 32px 40px;">
-                <div class="row">
-
-                    <!-- Address 1 Card -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="sf-card h-100">
-                            <div class="sf-card-title">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56db" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-                                Primary Address
-                            </div>
-
-                            <div class="row">
-                                <!-- Group 1: Country & State -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Country</label>
-                                    <select asp-for="Addr1_Country" class="sf-select" id="Addr1_Country">
-                                        <option value="">- Select Country -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">State <span class="text-danger"></span></label>
-                                    <select asp-for="Addr1_State" class="sf-select" id="Addr1_State">
-                                        <option value="">- Select State -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 2: City & Zip Code -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">City</label>
-                                    <select asp-for="Addr1_City" class="sf-select" id="Addr1_City">
-                                        <option value="">- Select City -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Zip / Postal Code</label>
-                                    <select asp-for="Addr1_Zip" class="sf-select" id="Addr1_Zip">
-                                        <option value="">- Select Zip Code -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 3: Street Details -->
-                                <div class="col-md-4 form-group mb-3">
-                                    <label class="sf-label">Flat / House No.</label>
-                                    <input asp-for="Addr1_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
-                                </div>
-                                <div class="col-md-8 form-group mb-3">
-                                    <label class="sf-label">Street Address</label>
-                                    <input asp-for="Addr1_Street" class="sf-input" placeholder="Street name and number" />
-                                </div>
-
-                                <!-- Group 4: Map Coordinates -->
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Latitude</label>
-                                    <input asp-for="Addr1_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
-                                </div>
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Longitude</label>
-                                    <input asp-for="Addr1_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Address 2 Card -->
-                    <div class="col-lg-6 mb-4">
-                        <div class="sf-card h-100">
-                            <div class="sf-card-title" style="color: #6b7280; border-bottom-color: #e5e7eb;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-                                Secondary Address
-                            </div>
-
-                            <div class="row">
-                                <!-- Group 1: Country & State -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Country</label>
-                                    <select asp-for="Addr2_Country" class="sf-select" id="Addr2_Country">
-                                        <option value="">- Select Country -</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">State</label>
-                                    <select asp-for="Addr2_State" class="sf-select" id="Addr2_State">
-                                        <option value="">- Select State -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 2: City & Zip Code (FIXED LAYOUT DIV HERE) -->
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">City</label>
-                                    <select asp-for="Addr2_City" class="sf-select" id="Addr2_City">
-                                        <option value="">- Select City -</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-6 form-group mb-3">
-                                    <label class="sf-label">Zip / Postal Code</label>
-                                    <select asp-for="Addr2_Zip" class="sf-select" id="Addr2_Zip">
-                                        <option value="">- Select Zip Code -</option>
-                                    </select>
-                                </div>
-
-                                <!-- Group 3: Street Details -->
-                                <div class="col-md-4 form-group mb-3">
-                                    <label class="sf-label">Flat / House No.</label>
-                                    <input asp-for="Addr2_FlatHouse" class="sf-input" placeholder="Apt, Suite, etc." />
-                                </div>
-                                <div class="col-md-8 form-group mb-3">
-                                    <label class="sf-label">Street Address</label>
-                                    <input asp-for="Addr2_Street" class="sf-input" placeholder="Street name and number" />
-                                </div>
-
-                                <!-- Group 4: Map Coordinates -->
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Latitude</label>
-                                    <input asp-for="Addr2_Latitude" class="sf-input" placeholder="e.g. 40.7128" />
-                                </div>
-                                <div class="col-md-6 form-group mb-0">
-                                    <label class="sf-label">Longitude</label>
-                                    <input asp-for="Addr2_Longitude" class="sf-input" placeholder="e.g. -74.0060" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+            <div class="col-md-6" style="display: none;">
+                <div class="z-field-row">
+                    <div class="z-label">Date of Entry</div>
+                    <div class="z-input-wrapper"><input asp-for="DateOfEntry" class="z-input" type="datetime-local" /></div>
                 </div>
             </div>
-                <!-- Professional tab can now safely start below this! -->
-            <!-- PROFESSIONAL TAB -->
-            <div class="tab-pane fade" id="professional" role="tabpanel" style="padding: 32px 40px;">
-                <h3 class="pane-section-title">Professional Profile</h3>
-                <div class="row">
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Homeopathic Doctor</label>
-                        <select asp-for="IsHomeopathicDoctor" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option>
-                            <option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option>
-                            <option value="हां- बीएचएमएस">हां- बीएचएमएस</option>
-                            <option value="नहीं">नहीं</option>
-                            <option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option>
-                            <option value="Yes - BHMS">Yes - BHMS</option>
-                            <option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                            <option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option>
-                            <option value="Pursuing BHMS">Pursuing BHMS</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Work Type</label>
-                        <select asp-for="WorkType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Practicing">Practicing</option>
-                            <option value="Job">Job</option>
-                            <option value="Research">Research</option>
-                            <option value="others">others</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Clinic Type</label>
-                        <select asp-for="ClinicType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Own">Own</option>
-                            <option value="Visiting">Visiting</option>
-                            <option value="Hospital Attached">Hospital Attached</option>
-                            <option value="Govt.service">Govt.service</option>
-                            <option value="Chain Clinics">Chain Clinics</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3 form-group"><label class="sf-label">Have computer/Laptop?</label><select asp-for="HasComputer" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Years of Practice</label><input asp-for="YearsOfPractice" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Patients per Day</label><input asp-for="PatientsPerDay" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group">
-                        <label class="sf-label">Qualification</label>
-                        <select asp-for="Qualification" class="sf-select">
-                            <option value="">-Select-</option>
-                            <option value="BHMS">BHMS</option>
-                            <option value="MD">MD</option>
-                            <option value="BAMS">BAMS</option>
-                            <option value="Student">Student</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 form-group"><label class="sf-label">College Name</label><input asp-for="CollegeName" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Year of Passing</label><input asp-for="YearOfPassing" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Total Experience</label><input asp-for="TotalExperience" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Average Patient Fee (₹)</label><input asp-for="AveragePatientFee" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Number of Clinics</label><input asp-for="NumberOfClinics" type="number" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Date of Birth</label><input asp-for="DateOfBirth" type="date" class="sf-input" /></div>
-                    <div class="col-md-3 form-group"><label class="sf-label">Age</label><input asp-for="Age" type="number" class="sf-input" /></div>
-
-                  
-            
-
-                
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Software Details</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Currently Using Software?</label>
-                        <select asp-for="CurrentlyUsingSoftware" class="sf-select"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select>
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Current Software Name</label>
-                        <input asp-for="CurrentSoftwareName" class="sf-input" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- PURCHASES & TRACKING TAB -->
-            <div class="tab-pane fade" id="purchase" role="tabpanel" style="padding: 32px 40px;">
-                <h3 class="pane-section-title">Product & Purchase Details</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group"><label class="sf-label">Product Purchased</label><input asp-for="ProductPurchased" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Date</label><input asp-for="PurchaseDate" type="date" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Purchase Value (₹)</label><input asp-for="PurchaseValue" type="number" class="sf-input" /></div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Payment Type</label>
-                        <select asp-for="PaymentType" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Upfront">Upfront</option>
-                            <option value="EMI - 3Months">EMI - 3Months</option>
-                            <option value="EMI - 6Months">EMI - 6Months</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Payment Status</label>
-                        <select asp-for="PaymentStatus" class="sf-select">
-                            <option value="">-None-</option>
-                            <option value="Paid">Paid</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Partial">Partial</option>
-                            <option value="Refunded">Refunded</option>
-                        </select>
-                    </div>
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Profile Completion Tracking</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group"><label class="sf-label">Profile Completion (%)</label><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Referral Source</label><input asp-for="ReferralSource" class="sf-input" /></div>
-                    <div class="col-md-4 form-group"><label class="sf-label">Invoice Number</label><input asp-for="InvoiceNumber" class="sf-input" /></div>
-                </div>
-
-                <h3 class="pane-section-title" style="margin-top: 12px;">Additional Contacts</h3>
-                <div class="row">
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 1</label>
-                        <input asp-for="ContactPerson1" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 1 Phone</label>
-                        <input asp-for="Contact1Phone" class="sf-input" />
-                    </div>
-                    <div class="col-md-4"></div> <!-- Spacer -->
-
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 2</label>
-                        <input asp-for="ContactPerson2" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 2 Phone</label>
-                        <input asp-for="Contact2Phone" class="sf-input" />
-                    </div>
-                    <div class="col-md-4"></div> <!-- Spacer -->
-
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact Person 3</label>
-                        <input asp-for="ContactPerson3" class="sf-input" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="sf-label">Contact 3 Phone</label>
-                        <input asp-for="Contact3Phone" class="sf-input" />
-                    </div>
-                </div>
-            </div>
-
-        </div> <!-- End of Tab Content -->
-        <!-- 5. Footer Area (Save Button) -->
-        <div style="padding: 20px 32px; border-top: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; justify-content: flex-end; gap: 16px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
-            <a asp-action="Index" class="btn" style="background: white; border: 1px solid #d1d5db; color: #374151; font-weight: 500; font-size: 0.9rem; padding: 10px 24px; border-radius: 6px; text-decoration: none;">Cancel</a>
-
-            <button type="submit" class="btn-sf-primary">
-                Save Account
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:6px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
         </div>
 
-    </div>
+        <!-- SEC 2: PRIMARY DETAILS -->
+        <h5 class="z-section-title">Primary Details</h5>
+        <div class="z-form-section row">
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Name <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="AccountName" class="z-input fw-bold" placeholder="Enter account name..." required /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person Name</div><div class="z-input-wrapper"><input asp-for="ContactPersonName" class="z-input" placeholder="Enter full name" /></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Mobile Phone <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="MobileNumber" class="z-input" id="MobileNumber" placeholder="+1 202-555-0117" required /><button type="button" class="verify-btn" onclick="verifyPhone('MobileNumber')">Verify</button></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input text-primary" id="Email" placeholder="email@example.com" required /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Mobile</div><div class="z-input-wrapper"><input asp-for="AlternateMobile" class="z-input" id="AlternateMobile" placeholder="Optional..." /><button type="button" class="verify-btn" onclick="verifyPhone('AlternateMobile')">Verify</button></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Email</div><div class="z-input-wrapper"><input asp-for="AlternateEmailID" class="z-input" id="AlternateEmailID" placeholder="Alternate email..." /><button type="button" class="verify-btn" onclick="verifyEmail('AlternateEmailID')">Verify</button></div></div></div>
+
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Pending Reason</div><div class="z-input-wrapper"><select asp-for="ProfilePendingReason" class="z-input"><option value="">-None-</option><option value="Connected">Connected</option><option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option><option value="Ringing">Ringing</option><option value="Switched Off">Switched Off</option><option value="Busy-Call Back Later">Busy-Call Back Later</option><option value="Not-Interested">Not-Interested</option><option value="Not a Doctor">Not a Doctor</option><option value="Student">Student</option><option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification Status</div><div class="z-input-wrapper"><select asp-for="QualificationStatus" class="z-input"><option value="">-None-</option><option value="Qualified">Qualified</option><option value="Notqualified">Notqualified</option></select></div></div></div>
+
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Status</div><div class="z-input-wrapper"><select asp-for="Profilestatus" class="z-input" disabled><option value="">-None-</option><option value="Completed">Completed</option><option value="Strongly Completed">Strongly Completed</option><option value="Not Completed">Not Completed</option><option value="Not-Qualified">Not-Qualified</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Rate</div><div class="z-input-wrapper"><input asp-for="ProfileRate" type="number" class="z-input" id="ProfileRate" readonly /></div></div></div>
+        </div>
+
+    
+
+        <!-- SEC 4: ADDRESS INFORMATION -->
+        <h5 class="z-section-title">Address Information</h5>
+        <div class="z-form-section row">
+            <!-- Primary Address -->
+            <div class="col-md-6 pe-4">
+                <h6 class="mb-3 text-muted fw-bold border-bottom pb-2">Primary Address</h6>
+                <div class="z-field-row"><div class="z-label">Country</div><div class="z-input-wrapper"><select asp-for="Addr1_Country" class="z-input" id="Addr1_Country"></select></div></div>
+                <div class="z-field-row"><div class="z-label">State <span class="text-danger">*</span></div><div class="z-input-wrapper"><select asp-for="Addr1_State" class="z-input" id="Addr1_State"></select></div></div>
+                <div class="z-field-row"><div class="z-label">City</div><div class="z-input-wrapper"><select asp-for="Addr1_City" class="z-input" id="Addr1_City"></select></div></div>
+                <div class="z-field-row"><div class="z-label">Zip / Postal Code</div><div class="z-input-wrapper"><select asp-for="Addr1_Zip" class="z-input" id="Addr1_Zip"></select></div></div>
+                <div class="z-field-row"><div class="z-label">Flat / House No.</div><div class="z-input-wrapper"><input asp-for="Addr1_FlatHouse" class="z-input" placeholder="Apt, Suite, etc." /></div></div>
+                <div class="z-field-row"><div class="z-label">Street Address</div><div class="z-input-wrapper"><input asp-for="Addr1_Street" class="z-input" placeholder="Street name and number" /></div></div>
+                <div class="z-field-row"><div class="z-label">Latitude</div><div class="z-input-wrapper"><input asp-for="Addr1_Latitude" class="z-input" placeholder="e.g. 40.7128" /></div></div>
+                <div class="z-field-row"><div class="z-label">Longitude</div><div class="z-input-wrapper"><input asp-for="Addr1_Longitude" class="z-input" placeholder="e.g. -74.0060" /></div></div>
+            </div>
+            <!-- Secondary Address -->
+            <div class="col-md-6 ps-4" style="border-left: 1px solid var(--theme-border);">
+                <h6 class="mb-3 text-muted fw-bold border-bottom pb-2">Secondary Address</h6>
+                <div class="z-field-row"><div class="z-label">Country</div><div class="z-input-wrapper"><select asp-for="Addr2_Country" class="z-input" id="Addr2_Country"></select></div></div>
+                <div class="z-field-row"><div class="z-label">State</div><div class="z-input-wrapper"><select asp-for="Addr2_State" class="z-input" id="Addr2_State"></select></div></div>
+                <div class="z-field-row"><div class="z-label">City</div><div class="z-input-wrapper"><select asp-for="Addr2_City" class="z-input" id="Addr2_City"></select></div></div>
+                <div class="z-field-row"><div class="z-label">Zip / Postal Code</div><div class="z-input-wrapper"><select asp-for="Addr2_Zip" class="z-input" id="Addr2_Zip"></select></div></div>
+                <div class="z-field-row"><div class="z-label">Flat / House No.</div><div class="z-input-wrapper"><input asp-for="Addr2_FlatHouse" class="z-input" placeholder="Apt, Suite, etc." /></div></div>
+                <div class="z-field-row"><div class="z-label">Street Address</div><div class="z-input-wrapper"><input asp-for="Addr2_Street" class="z-input" placeholder="Street name and number" /></div></div>
+                <div class="z-field-row"><div class="z-label">Latitude</div><div class="z-input-wrapper"><input asp-for="Addr2_Latitude" class="z-input" placeholder="e.g. 40.7128" /></div></div>
+                <div class="z-field-row"><div class="z-label">Longitude</div><div class="z-input-wrapper"><input asp-for="Addr2_Longitude" class="z-input" placeholder="e.g. -74.0060" /></div></div>
+            </div>
+        </div>
+
+        <!-- SEC 5: PROFESSIONAL PROFILE & SOFTWARE -->
+        <h5 class="z-section-title">Professional Profile & Software</h5>
+        <div class="z-form-section row">
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Homeopathic Doctor</div><div class="z-input-wrapper"><select asp-for="IsHomeopathicDoctor" class="z-input"><option value="">-None-</option><option value="Yes — MD(Homeopathy)">Yes — MD(Homeopathy)</option><option value="मैं होम्योपैथी डॉक्टर नहीं हूँ।">मैं होम्योपैथी डॉक्टर नहीं हूँ।</option><option value="हां- बीएचएमएस">हां- बीएचएमएस</option><option value="नहीं">नहीं</option><option value="बीएचएमएस की पढ़ाई कर रहा हूँ">बीएचएमएस की पढ़ाई कर रहा हूँ</option><option value="Yes - BHMS">Yes - BHMS</option><option value="Not a Homeopath Doctor">Not a Homeopath Doctor</option><option value="Yes">Yes</option><option value="No">No</option><option value="Not a Homeopathy Doctor">Not a Homeopathy Doctor</option><option value="Pursuing BHMS">Pursuing BHMS</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Clinic Type</div><div class="z-input-wrapper"><select asp-for="ClinicType" class="z-input"><option value="">-None-</option><option value="Own">Own</option><option value="Visiting">Visiting</option><option value="Hospital Attached">Hospital Attached</option><option value="Govt.service">Govt.service</option><option value="Chain Clinics">Chain Clinics</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Work Type</div><div class="z-input-wrapper"><select asp-for="WorkType" class="z-input"><option value="">-None-</option><option value="Practicing">Practicing</option><option value="Job">Job</option><option value="Research">Research</option><option value="others">others</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Have computer/Laptop?</div><div class="z-input-wrapper"><select asp-for="HasComputer" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Date of Birth</div><div class="z-input-wrapper"><input asp-for="DateOfBirth" type="date" class="z-input" id="DateOfBirth" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Age</div><div class="z-input-wrapper"><input asp-for="Age" type="number" class="z-input" id="Age" readonly /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Years of practice</div><div class="z-input-wrapper"><input asp-for="YearsOfPractice" type="number" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Total experience</div><div class="z-input-wrapper"><input asp-for="TotalExperience" type="number" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Number of Clinics</div><div class="z-input-wrapper"><input asp-for="NumberOfClinics" type="number" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Patients per Day</div><div class="z-input-wrapper"><input asp-for="PatientsPerDay" type="number" class="z-input" /></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification</div><div class="z-input-wrapper"><select asp-for="Qualification" class="z-input"><option value="">-Select-</option><option value="BHMS">BHMS</option><option value="MD">MD</option><option value="BAMS">BAMS</option><option value="Student">Student</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Year of passing</div><div class="z-input-wrapper"><input asp-for="YearOfPassing" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">College Name</div><div class="z-input-wrapper"><input asp-for="CollegeName" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Avg Patient Fee (₹)</div><div class="z-input-wrapper"><input asp-for="AveragePatientFee" type="number" class="z-input" /></div></div></div>
+
+            <div class="col-12 mt-3 pt-3 border-top"><h6 class="fw-bold text-muted ps-4 mb-3">Software Tools</h6></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Currently Using Software?</div><div class="z-input-wrapper"><select asp-for="CurrentlyUsingSoftware" class="z-input"><option value="">-Select-</option><option value="Yes">Yes</option><option value="No">No</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Software Name</div><div class="z-input-wrapper"><input asp-for="CurrentSoftwareName" class="z-input" /></div></div></div>
+        </div>
+
+        <!-- SEC 6: PURCHASES & TRACKING -->
+        <h5 class="z-section-title">Product, Purchases & Tracking</h5>
+        <div class="z-form-section row">
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Product Purchased</div><div class="z-input-wrapper"><input asp-for="ProductPurchased" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Date</div><div class="z-input-wrapper"><input asp-for="PurchaseDate" type="date" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Value (₹)</div><div class="z-input-wrapper"><input asp-for="PurchaseValue" type="number" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Type</div><div class="z-input-wrapper"><select asp-for="PaymentType" class="z-input"><option value="">-None-</option><option value="Upfront">Upfront</option><option value="EMI - 3Months">EMI - 3Months</option><option value="EMI - 6Months">EMI - 6Months</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Status</div><div class="z-input-wrapper"><select asp-for="PaymentStatus" class="z-input"><option value="">-None-</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Partial">Partial</option><option value="Refunded">Refunded</option></select></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Referral Source</div><div class="z-input-wrapper"><input asp-for="ReferralSource" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Completion (%)</div><div class="z-input-wrapper"><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Invoice Number</div><div class="z-input-wrapper"><input asp-for="InvoiceNumber" class="z-input" /></div></div></div>
+        </div>
+
+        <!-- SEC 7: ADDITIONAL CONTACTS -->
+        <h5 class="z-section-title">Additional Contacts</h5>
+        <div class="z-form-section row border-bottom-0 pb-4">
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 1</div><div class="z-input-wrapper"><input asp-for="ContactPerson1" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 1 Phone</div><div class="z-input-wrapper"><input asp-for="Contact1Phone" class="z-input" /></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 2</div><div class="z-input-wrapper"><input asp-for="ContactPerson2" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 2 Phone</div><div class="z-input-wrapper"><input asp-for="Contact2Phone" class="z-input" /></div></div></div>
+            
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 3</div><div class="z-input-wrapper"><input asp-for="ContactPerson3" class="z-input" /></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 3 Phone</div><div class="z-input-wrapper"><input asp-for="Contact3Phone" class="z-input" /></div></div></div>
+        </div>
+
+        <div class="col-12 form-check d-flex align-items-center gap-2 m-0 mt-3 pt-3 border-top">
+                <input asp-for="IsDuplicated" class="form-check-input m-0 border-secondary" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
+                <label class="form-check-label m-0 fw-bold" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c;">Mark as Duplicated Account</label>
+            </div>
+        </div>
+
+        <!-- FOOTER BUTTONS -->
+        <div class="d-flex justify-content-end align-items-center gap-3 p-4 border-top" style="background-color: #f8fafc; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">
+            <a asp-action="Index" class="btn fw-bold px-4" style="background-color: #ffffff; border: 1px solid #cbd5e1; color: #475569; border-radius: 8px; padding: 10px 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: 0.2s;" onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#ffffff'; this.style.color='#475569';">
+                Cancel
+            </a>
+            <button type="submit" id="saveAccountBtn" class="btn-save-modern">
+                <i class="fa-solid fa-check"></i> Save Account
+            </button>
+        </div>
+        
+    </div> <!-- This final div safely closes the z-edit-container -->
 </form>
 
 
 
-<!-- ========================================================
-     THE NEW MODAL FOR CREATING NOTES
-     ======================================================== -->
-<div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content shadow-lg" style="border: none; border-radius: 12px;">
-
-            <!-- Modal Header -->
-            <div class="modal-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 20px 24px;">
-                <h5 class="modal-title fw-bold" id="noteModalLabel" style="color: #1e293b; font-size: 1.15rem;">
-                    <i class="fa-regular fa-pen-to-square text-primary me-2"></i> Add New Note
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <!-- Modal Body (Input Fields) -->
-            <div class="modal-body" style="padding: 24px;">
-                <div class="row">
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Note Owner</label>
-                        <!-- Use asp-items to automatically populate the dropdown from your database -->
-                        <select id="modalNoteOwner" class="sf-select" asp-items="ViewBag.UsersList">
-                            <option value="">- System User -</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-6 form-group">
-                        <label class="sf-label">Date & Time</label>
-                        <!-- This is automatically populated by JS when the pop-up opens -->
-                        <input type="text" id="modalNoteDateTime" class="sf-input" style="background-color: #f1f5f9; color: #64748b;" readonly />
-                    </div>
-
-                    <div class="col-md-12 form-group">
-                        <label class="sf-label">Attachment</label>
-                        <input type="file" id="modalNoteFile" class="sf-input" style="padding: 7px 12px;" />
-                    </div>
-
-                    <div class="col-md-12 form-group m-0">
-                        <label class="sf-label">Note Description</label>
-                        <textarea id="modalNoteDesc" class="sf-input" rows="4" placeholder="Write your note details here..."></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal Footer (Save/Cancel) -->
-            <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; padding: 16px 24px;">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 500; font-size: 0.9rem;">Cancel</button>
-                <button type="button" class="btn-sf-primary" onclick="saveNote()" style="font-weight: 600; font-size: 0.9rem;">Save Note</button>
-            </div>
-
-        </div>
-    </div>
-</div>
 
 <!-- PROFILE PENDING REASON MODAL -->
 <div class="modal fade" id="pendingReasonModal" tabindex="-1" aria-hidden="true">
@@ -1023,6 +480,7 @@
 
 <!-- Bootstrap JS bundle required for Tab switching & Modals -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
     // ==========================================
@@ -1141,48 +599,56 @@
     });
     }
 
-    // 1. Global variable to store the API data
+   // 1. Global variable to store the API data
     let globalRegionData = [];
 
-    // 2. Fetch data from the free API as soon as the page loads
-        document.addEventListener("DOMContentLoaded", function () {
+    // ==========================================
+    // 2. ADDRESS CASCADING DROPDOWNS FIX
+    // ==========================================
+    document.addEventListener("DOMContentLoaded", function () {
         // 1. Fetch Countries on page load
         fetch('@Url.Action("GetCountries", "Postcode")')
         .then(res => {
-        if (!res.ok) throw new Error("Server returned status: " + res.status);
-        return res.json();
+            if (!res.ok) throw new Error("HTTP Status " + res.status);
+            return res.json();
         })
         .then(countries => {
-        if (!countries || countries.length === 0) {
-        console.warn("0 countries found. Ensure you have uploaded Postcode data.");
-        } else {
-        populateDropdown('Addr1_Country', countries, 'Select Country');
-        populateDropdown('Addr2_Country', countries, 'Select Country');
-        }
+            if (!countries || countries.length === 0) {
+                console.warn("0 countries returned from API.");
+            } else {
+                populateDropdown('Addr1_Country', countries, 'Select Country');
+                populateDropdown('Addr2_Country', countries, 'Select Country');
+            }
         })
         .catch(err => console.error("Error loading countries:", err));
 
         // 2. Initialize Cascading Logic for both addresses
         setupCascadingDropdowns('Addr1_Country', 'Addr1_State', 'Addr1_City', 'Addr1_Zip');
         setupCascadingDropdowns('Addr2_Country', 'Addr2_State', 'Addr2_City', 'Addr2_Zip');
-        });
+    });
 
-        // Helper function to build dropdown options
-        function populateDropdown(dropdownId, dataList, defaultText) {
+    // Helper function to build dropdown options safely
+    function populateDropdown(dropdownId, dataList, defaultText) {
         const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
 
         dropdown.innerHTML = '<option value="">- ' + defaultText + ' -</option>';
-        dataList.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item;
-        opt.textContent = item;
-        dropdown.appendChild(opt);
-        });
+        
+        // Prevent crashes if dataList is wrapped in another object property
+        if (!Array.isArray(dataList)) {
+            dataList = dataList.data || dataList.results || [];
         }
 
-        // Master function to handle the Country -> State -> City -> Zip flow
-        function setupCascadingDropdowns(countryId, stateId, cityId, zipId) {
+        dataList.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = typeof item === 'object' ? (item.name || item.value || item.id || item.text) : item;
+            opt.textContent = typeof item === 'object' ? (item.name || item.text || item.value) : item;
+            dropdown.appendChild(opt);
+        });
+    }
+
+    // Master function to handle the Country -> State -> City -> Zip flow
+    function setupCascadingDropdowns(countryId, stateId, cityId, zipId) {
         const countryEl = document.getElementById(countryId);
         const stateEl = document.getElementById(stateId);
         const cityEl = document.getElementById(cityId);
@@ -1190,54 +656,55 @@
 
         // Country Change -> Load States
         if (countryEl) {
-        countryEl.addEventListener('change', function () {
-        const country = this.value;
-        if (stateEl) stateEl.innerHTML = '<option value="">- Select State -</option>';
-        if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
-        if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+            countryEl.addEventListener('change', function () {
+                const country = this.value;
+                if (stateEl) stateEl.innerHTML = '<option value="">- Select State -</option>';
+                if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
+                if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
-        if (country) {
-        fetch('@Url.Action("GetStates", "Postcode")?country=' + encodeURIComponent(country))
-        .then(res => res.json())
-        .then(states => populateDropdown(stateId, states, 'Select State'))
-        .catch(err => console.error("Error fetching States:", err));
-        }
-        });
+                if (country) {
+                    fetch('@Url.Action("GetStates", "Postcode")?country=' + encodeURIComponent(country))
+                    .then(res => res.json())
+                    .then(states => populateDropdown(stateId, states, 'Select State'))
+                    .catch(err => console.error("Error fetching States:", err));
+                }
+            });
         }
 
         // State Change -> Load Cities
         if (stateEl) {
-        stateEl.addEventListener('change', function () {
-        const state = this.value;
-        if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
-        if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+            stateEl.addEventListener('change', function () {
+                const state = this.value;
+                if (cityEl) cityEl.innerHTML = '<option value="">- Select City -</option>';
+                if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
-        if (state) {
-        fetch('@Url.Action("GetCities", "Postcode")?state=' + encodeURIComponent(state))
-        .then(res => res.json())
-        .then(cities => populateDropdown(cityId, cities, 'Select City'))
-        .catch(err => console.error("Error fetching Cities:", err));
-        }
-        });
+                if (state) {
+                    fetch('@Url.Action("GetCities", "Postcode")?state=' + encodeURIComponent(state))
+                    .then(res => res.json())
+                    .then(cities => populateDropdown(cityId, cities, 'Select City'))
+                    .catch(err => console.error("Error fetching Cities:", err));
+                }
+            });
         }
 
         // City Change -> Fetch and Populate Zip Code Dropdown
         if (cityEl) {
-        cityEl.addEventListener('change', function () {
-        const city = this.value;
-        const state = stateEl ? stateEl.value : '';
+            cityEl.addEventListener('change', function () {
+                const city = this.value;
+                const state = stateEl ? stateEl.value : '';
 
-        if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
+                if (zipEl) zipEl.innerHTML = '<option value="">- Select Zip Code -</option>';
 
-        if (city && state) {
-        fetch('@Url.Action("GetZipCodes", "Postcode")?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
-        .then(res => res.json())
-        .then(zipCodes => populateDropdown(zipId, zipCodes, 'Select Zip Code'))
-        .catch(err => console.error("Error fetching Zip Codes:", err));
+                if (city && state) {
+                    fetch('@Url.Action("GetZipCodes", "Postcode")?city=' + encodeURIComponent(city) + '&state=' + encodeURIComponent(state))
+                    .then(res => res.json())
+                    .then(zipCodes => populateDropdown(zipId, zipCodes, 'Select Zip Code'))
+                    .catch(err => console.error("Error fetching Zip Codes:", err));
+                }
+            });
         }
-        });
-        }
-        }
+    }
+
         // ==========================================
     // 3. AUTO-CALCULATE AGE FROM DOB
     // ==========================================
@@ -1387,150 +854,157 @@
     }
 
  
-    // ==========================================
+ // ==========================================
     // 5. FORM SUBMISSION & VALIDATION POPUPS
     // ==========================================
     document.getElementById('accountForm').addEventListener('submit', function (e) {
+        e.preventDefault(); // Stop default submission
 
-    // --- STEP 1: CHECK ALL MANDATORY FIELDS FIRST ---
-    let isMandatoryValid = true;
-    // Grabs every input/select on the form that has the 'required' attribute
-    const requiredFields = this.querySelectorAll('[required]');
+        // --- STEP 1: CHECK MANDATORY FIELDS ---
+        let isMandatoryValid = true;
+        const requiredFields = this.querySelectorAll('[required]');
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                isMandatoryValid = false;
+                field.style.boxShadow = "0 0 0 3px #ef4444";
+                setTimeout(() => field.style.boxShadow = "none", 3500);
+            }
+        });
 
-    requiredFields.forEach(field => {
-    if (!field.value.trim()) {
-    isMandatoryValid = false;
-    // Highlight the missing field in red
-    field.style.boxShadow = "0 0 0 3px #ef4444";
-    setTimeout(() => field.style.boxShadow = "none", 3500);
-    }
+        if (!isMandatoryValid) {
+            const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
+            if (mandatoryModalEl) new bootstrap.Modal(mandatoryModalEl).show();
+            else alert("Please fill in all mandatory fields marked with an asterisk (*).");
+            return;
+        }
+
+        // --- STEP 2: ADDRESS VALIDATION ---
+        const addrCountry = document.getElementById('Addr1_Country')?.value.trim() || "";
+        const addrState = document.getElementById('Addr1_State')?.value.trim() || "";
+        
+        if (addrCountry === "" || addrState === "") {
+            const addressModalEl = document.getElementById('addressValidationModal');
+            if (addressModalEl) new bootstrap.Modal(addressModalEl).show();
+            else alert("You forgot to complete the Primary Address! Please select both a Country and a State.");
+            
+            const stateField = document.getElementById('Addr1_State');
+            if (stateField) {
+                stateField.focus();
+                stateField.style.boxShadow = "0 0 0 3px #ef4444";
+                setTimeout(() => stateField.style.boxShadow = "none", 3500);
+            }
+            return;
+        }
+
+        // --- STEP 3: PROFESSIONAL PROFILE CHECK (< 4 Fields) ---
+        const profileFieldsList = [
+            'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
+            'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
+            'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
+            'DateOfBirth', 'Age', 'PatientsPerDay'
+        ];
+
+        let filledFieldsCount = 0;
+        profileFieldsList.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.value.trim() !== '' && el.value.trim() !== '-None-') {
+                filledFieldsCount++;
+            }
+        });
+
+        const reasonValue = document.getElementById('ProfilePendingReason')?.value.trim() || "";
+
+        // If less than 4 fields are filled AND no reason is provided
+        if (filledFieldsCount < 4 && (reasonValue === "" || reasonValue === "-None-")) {
+            const pendingModalEl = document.getElementById('pendingReasonModal');
+            if (pendingModalEl) new bootstrap.Modal(pendingModalEl).show();
+            else alert("Your professional profile has fewer than 4 fields filled! Please select a Profile Pending Reason.");
+            
+            const reasonField = document.getElementById('ProfilePendingReason');
+            if (reasonField) {
+                reasonField.focus();
+                reasonField.style.boxShadow = "0 0 0 3px #ef4444";
+                setTimeout(() => reasonField.style.boxShadow = "none", 3500);
+            }
+            return;
+        }
+
+        // --- STEP 4: QUALIFIED STATUS CONFIRMATION ---
+        const qualStatus = document.getElementById('QualificationStatus')?.value;
+        const formToSubmit = this;
+
+        if (qualStatus === 'Qualified') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: 'Are you sure you want to make this account a Lead?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor: '#ef4444',
+                    confirmButtonText: 'Yes, make it!',
+                    cancelButtonText: 'No, cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        submitFormAjax(formToSubmit);
+                    }
+                });
+                return; // Wait for user's click
+            } else {
+                if(!confirm('Are you sure you want to make this account a Lead?')) return;
+            }
+        }
+
+        // If not 'Qualified', submit normally
+        submitFormAjax(formToSubmit);
     });
 
-    if (!isMandatoryValid) {
-    e.preventDefault(); // Stop submission
+    // Helper function to handle AJAX submission and Redirects
+    function submitFormAjax(formElement) {
+        const submitBtn = document.getElementById('saveAccountBtn') || formElement.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.disabled = true;
 
-    // Trigger the Missing Fields Modal
-    const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
-    if (mandatoryModalEl) {
-    const mandatoryModal = new bootstrap.Modal(mandatoryModalEl);
-    mandatoryModal.show();
-    } else {
-    alert("Please fill in all mandatory fields marked with an asterisk (*).");
+        const formData = new FormData(formElement);
+
+        fetch(formElement.action, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => {
+            if (response.redirected) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: 'Awesome!',
+                        text: 'Account saved successfully.',
+                        icon: 'success',
+                        showConfirmButton: false,
+                        timer: 2000, 
+                        timerProgressBar: true
+                    }).then(() => {
+                        window.location.href = response.url; // Auto-redirects to Edit Page
+                    });
+                } else {
+                    window.location.href = response.url;
+                }
+            } else if (response.ok) {
+                window.location.href = '@Url.Action("Index", "Accounts")';
+            } else {
+                throw new Error("Server error");
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: 'Oops!', text: 'Something went wrong while saving.', icon: 'error' });
+            } else {
+                alert('Something went wrong while saving.');
+            }
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
     }
-    return; // Stop executing further code until they fix the missing fields
-    }
-
-
-    // --- STEP 2: EXISTING PROFILE PENDING REASON CHECK ---
-    function getFieldValue(fieldName) {
-    const el = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
-    return el ? el.value.trim() : "";
-    }
-
-    // Grab the State value to see if they filled it out
-    const stateValue = getFieldValue('Addr1_State');
-
-    const q1 = getFieldValue('IsHomeopathicDoctor');
-    const q2 = getFieldValue('WorkType');
-    const q3 = getFieldValue('ClinicType');
-    const q4 = getFieldValue('HasComputer');
-    const reasonValue = getFieldValue('ProfilePendingReason');
-
-    const isProfileIncomplete = (
-    q1 === "" || q1 === "-None-" || q1 === "false" ||
-    q2 === "" || q2 === "-None-" || q2 === "false" ||
-    q3 === "" || q3 === "-None-" || q3 === "false" ||
-    q4 === "" || q4 === "-None-" || q4 === "false"
-    );
-
-    // NEW LOGIC: Only show the Profile Pending popup if the State is NOT filled
-    if (stateValue === "" && isProfileIncomplete && (reasonValue === "" || reasonValue === "-None-")) {
-    e.preventDefault(); // Stop submission
-
-    const modalEl = document.getElementById('pendingReasonModal');
-    if (modalEl) {
-    const myModal = new bootstrap.Modal(modalEl);
-    myModal.show();
-    } else {
-    alert("Your profile is incomplete! Please select a Profile Pending Reason.");
-    }
-
-    const mainTab = document.getElementById('main-tab');
-    if (mainTab) {
-    new bootstrap.Tab(mainTab).show();
-    }
-
-    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
-    if (reasonField) {
-    reasonField.focus();
-    reasonField.style.boxShadow = "0 0 0 3px #ef4444";
-    setTimeout(() => reasonField.style.boxShadow = "none", 3500);
-    }
-    }
-    });
-
-    // Placeholder for account lookup logic
-    function openAccountLookup() {
-    alert("Lookup UI would open here!");
-    }
-
-    // 🚀 NEW: Email Verification Logic
-    window.verifyEmail = function(fieldId) {
-    // Safely find the input by ID
-    const emailInput = document.getElementById(fieldId);
-
-    if (!emailInput) {
-    alert("Error: Input field not found. Check HTML IDs.");
-    return;
-    }
-
-    const email = (emailInput.value || '').trim();
-    const mainEmail = document.getElementById('Email')?.value?.trim() || '';
-    const altEmail = document.getElementById('AlternateEmailID')?.value?.trim() || '';
-
-    if (!email) {
-    alert('Please enter an email address first before verifying.');
-    return;
-    }
-
-    // Prevent Main Email and Alternate Email from being identical
-    if (fieldId === 'AlternateEmailID' && mainEmail && altEmail && mainEmail.toLowerCase() === altEmail.toLowerCase()) {
-    alert('❌ Email and Alternate Email cannot be the exact same!');
-    return;
-    }
-
-    // Add a small loading indicator to the button
-    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
-    let originalBtnText = 'Verify';
-    if (btn) {
-    originalBtnText = btn.innerText;
-    btn.innerText = '...';
-    btn.disabled = true;
-    }
-
-    fetch('@Url.Action("CheckEmailDuplicate", "Accounts")?email=' + encodeURIComponent(email))
-    .then(async response => {
-    if (!response.ok) throw new Error("HTTP Status " + response.status);
-    return response.json();
-    })
-    .then(data => {
-    if (data.error) {
-    alert('⚠️ Database Error: ' + data.message);
-    } else if (data.isDuplicate) {
-    alert('⚠️ WARNING: This email already exists in another account record!');
-    } else {
-    alert('✅ This email is valid and unique in the system.');
-    }
-    })
-    .catch(error => {
-    console.error("Error verifying email:", error);
-    alert("Could not connect to the server. Check your browser console (F12) for details.");
-    })
-    .finally(() => {
-    if (btn) {
-    btn.innerText = originalBtnText;
-    btn.disabled = false;
-    }
-    });
-    };
 </script>

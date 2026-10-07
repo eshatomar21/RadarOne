@@ -1146,27 +1146,26 @@ namespace Radar_CRM.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateQuickInfo(int leadId, string fieldName, string fieldValue)
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string value)
         {
-            var lead = await _context.Leads.FindAsync(leadId);
+            var lead = await _context.Leads.FindAsync(id);
             if (lead == null)
             {
-                return NotFound();
+                return NotFound(new { success = false, message = "Lead not found." });
             }
 
-            // Set Modified Info
             string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
             lead.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
 
-            // Update the specific field dynamically
-            switch (fieldName)
+            switch (field)
             {
-                case "LeadOwnerId": lead.LeadOwnerId = fieldValue; break;
-                case "EmailID": lead.EmailID = fieldValue; break;
-                case "MobileNumber": lead.MobileNumber = fieldValue; break;
-                case "DataSources": lead.DataSources = fieldValue; break;
-                case "AlternateMobile": lead.AlternateMobile = fieldValue; break;
-                case "LeadStatus": lead.LeadStatus = fieldValue; break;
+                case "LeadOwnerId": lead.LeadOwnerId = value; break;
+                case "EmailID": lead.EmailID = value; break;
+                case "MobileNumber": lead.MobileNumber = value; break;
+                case "DataSources": lead.DataSources = value; break; // Ensure value matches DB column size limits
+                case "AlternateMobile": lead.AlternateMobile = value; break;
+                case "LeadStatus": lead.LeadStatus = value; break;
             }
 
             try
@@ -1177,15 +1176,16 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = ex.Message });
+                // 🚀 FIX: Extracts deep SQL errors (e.g., String truncated, FK conflicts)
+                string errorDetails = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, new { success = false, message = errorDetails });
             }
         }
 
-
         [HttpPost]
-        [IgnoreAntiforgeryToken] // 🚀 FIX: Prevents ASP.NET from blocking the AJAX POST
-        [Route("Tasks/UpdateStatus")] // 🚀 FIX: Guarantees the URL matches exactly
-        public async Task<IActionResult> UpdateStatus(int id, string status)
+        [IgnoreAntiforgeryToken]
+        [Route("Leads/UpdateTaskStatus")] // 🚀 FIX: The route must exactly match the JavaScript fetch URL
+        public async Task<IActionResult> UpdateTaskStatus(int id, string status)
         {
             if (id <= 0 || string.IsNullOrWhiteSpace(status))
             {
@@ -1195,14 +1195,9 @@ namespace Radar_CRM.Controllers
             try
             {
                 var task = await _context.Tasks.FindAsync(id);
-
-                if (task == null)
-                {
-                    return NotFound(new { success = false, message = "Task not found." });
-                }
+                if (task == null) return NotFound(new { success = false, message = "Task not found." });
 
                 task.Status = status;
-
                 _context.Update(task);
                 await _context.SaveChangesAsync();
 

@@ -13,8 +13,7 @@
     string advancedFilters = Context.Request.Query["advancedFilters"];
 
     // EXCLUSION LIST: Hide raw foreign keys and background properties from the table
-    var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId" };
-    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Account", "Lead", "Deal" };    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
     
     // Dynamically get all properties of the Task model, excluding the specified fields and Lists
     var tableProps = typeof(Radar_CRM.Models.Task).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -107,6 +106,8 @@
         transform: translateY(var(--btn-depth));
         box-shadow: 0 0 0 #f87171, 0 1px 2px rgba(220,38,38,0.1);
     }
+
+
 
     .crm-container {
         display: flex;
@@ -271,17 +272,17 @@
     .table tbody tr:hover td { background-color: #f8fafc; }
 
     /* Sticky Columns (Checkboxes & Actions) */
-    .sticky-cb {
-        position: sticky;
-        left: 0;
-        width: 50px; 
-        min-width: 50px;
-        text-align: center;
-        z-index: 11;
-        border-right: 1px solid var(--border-soft) !important;
-        background-color: var(--bg-surface);
-        resize: none !important;
-    }
+  .sticky-cb {
+    position: sticky;
+    left: 0;
+    width: 120px; /* 🚀 Increased to fit checkbox + flag */
+    min-width: 120px;
+    text-align: left; /* 🚀 Align left instead of center */
+    z-index: 11;
+    border-right: 1px solid var(--border-soft) !important;
+    background-color: var(--bg-surface);
+    resize: none !important;
+}
 
     .sticky-actions {
         position: sticky;
@@ -590,82 +591,146 @@
             </div>
             <button type="button" class="btn-saas" onclick="openCustomViewModal()">View</button>
             
-            <a href="@Url.Action("Create", "Tasks")" class="btn btn-primary d-inline-flex align-items-center fw-semibold border-0 shadow-sm" style="background-color: #2563eb; font-size: 0.85rem; padding: 7px 18px; border-radius: 4px; gap: 8px;">
-                <i class="fa-solid fa-plus"></i> Create Task
-            </a>
+            @* <a href="@Url.Action("Create", "Tasks")" class="btn btn-primary d-inline-flex align-items-center fw-semibold border-0 shadow-sm" style="background-color: #2563eb; font-size: 0.85rem; padding: 7px 18px; border-radius: 4px; gap: 8px;"> *@
+                @* <i class="fa-solid fa-plus"></i> Create Task *@
+            @* </a> *@
         </div>
 
-        <div class="table-responsive" id="tableWrapper">
-            <table class="table" id="tasksTable">
-                <thead>
-                    <tr>
-                        <th class="sticky-cb" style="width: 110px; min-width: 110px;">
-                            <div class="d-flex align-items-center justify-content-start w-100 ps-3">
-                                <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+      <div class="table-responsive" id="tableWrapper">
+    <table class="table" id="tasksTable">
+        <thead>
+            <tr>
+                <th class="sticky-cb" style="width: 120px; min-width: 120px;">
+                    <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
+                        <input class="form-check-input m-0 border-secondary flex-shrink-0" type="checkbox" id="selectAllCb" onchange="toggleAllRowCheckboxes(this)">
+                        <i class="fa-solid fa-bookmark text-muted fs-5" style="opacity:0.4;" title="Task Due Status"></i>
+                    </div>
+                </th>
+                @if (tableProps.Length > 0)
+                {
+                    int colIndex = 0;
+                    foreach (var prop in tableProps)
+                    {
+                        <th data-col-index="@colIndex" data-col-name="@prop.Name">
+                            <div class="th-content d-flex justify-content-between align-items-center w-100">
+                                <span class="text-truncate flex-grow-1" style="max-width: calc(100% - 30px);" title="@prop.Name">@prop.Name</span>
+                                <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                    <i class="fa-solid fa-sort text-muted header-action-icon" onclick="toggleSort(event, @colIndex)" title="Sort"></i>
+                                    <i class="fa-solid fa-filter text-muted header-action-icon" onclick="triggerSidebarFilter(event, '@prop.Name')" title="Filter"></i>
+                                </div>
                             </div>
                         </th>
-                        @if (tableProps.Length > 0)
-                        {
-                            int colIndex = 0;
-                            foreach (var prop in tableProps)
-                            {
-                                <th data-col-index="@colIndex" data-col-name="@prop.Name">
-                                    <div class="th-content d-flex justify-content-between align-items-center w-100">
-                                        <span class="text-truncate flex-grow-1" style="max-width: calc(100% - 30px);" title="@prop.Name">@prop.Name</span>
-                                        <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
-                                            <i class="fa-solid fa-sort text-muted header-action-icon" onclick="toggleSort(event, @colIndex)" title="Sort"></i>
-                                            <i class="fa-solid fa-filter text-muted header-action-icon" onclick="triggerSidebarFilter(event, '@prop.Name')" title="Filter"></i>
-                                        </div>
-                                    </div>
-                                </th>
-                                colIndex++;
-                            }
-                        }
-                        <th class="dummy-filler-col"></th>
-                        <th class="sticky-actions text-center">
-                            <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
-                        </th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    @if (Model != null && Model.Any())
-                    {
-                        foreach (var item in Model)
-                        {
-                            <tr class="task-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Tasks", new { id = item.Id })'">
-                                <td class="sticky-cb" style="width: 50px; min-width: 50px;" onclick="event.stopPropagation()">
-                                    <div class="d-flex align-items-center justify-content-center w-100">
-                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
-                                    </div>
-                                </td>
+                        colIndex++;
+                    }
+                }
+                <th class="dummy-filler-col"></th>
+                <th class="sticky-actions text-center">
+                    <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
+                </th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            @if (Model != null && Model.Any())
+            {
+                foreach (var item in Model)
+                {
+                    <tr class="task-row" data-id="@item.Id" style="cursor: pointer;" onclick="window.location.href='@Url.Action("Edit", "Tasks", new { id = item.Id })'">
+                        <td class="sticky-cb" style="width: 120px; min-width: 120px;" onclick="event.stopPropagation()">
+                            <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
+                                <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
                                 @{
+                                    string flagColor = "#cbd5e1"; // Default Gray
+                                    string tooltipText = "No due date";
+                                    string displayDateText = "";
+
+                                    if (item.DueDate.HasValue)
+                                    {
+                                        if (item.Status == "Completed")
+                                        {
+                                            flagColor = "#22c55e"; // Green
+                                            displayDateText = "Done";
+                                            tooltipText = "Completed";
+                                        }
+                                        else if (item.DueDate.Value.Date == DateTime.Today)
+                                        {
+                                            flagColor = "#f97316"; // Orange
+                                            displayDateText = "Today";
+                                            tooltipText = "Due Today";
+                                        }
+                                        else if (item.DueDate.Value.Date < DateTime.Today)
+                                        {
+                                            flagColor = "#ef4444"; // Red
+                                            displayDateText = item.DueDate.Value.ToString("MMM d");
+                                            tooltipText = $"Overdue (Due: {item.DueDate.Value.ToString("dd/MM/yyyy")})";
+                                        }
+                                        else
+                                        {
+                                            flagColor = "#3b82f6"; // Blue
+                                            displayDateText = item.DueDate.Value.ToString("MMM d");
+                                            tooltipText = $"Due: {item.DueDate.Value.ToString("dd/MM/yyyy")}";
+                                        }
+                                    }
+                                }
+                                <div class="d-flex align-items-center gap-1"
+                                     style="cursor: pointer; transition: transform 0.2s;"
+                                     title="@tooltipText"
+                                     onmouseover="this.style.transform='scale(1.1)'"
+                                     onmouseout="this.style.transform='scale(1)'">
+                                    <i class="fa-solid fa-bookmark fs-5 flex-shrink-0" style="color: @flagColor;"></i>
+                                    @if (!string.IsNullOrEmpty(displayDateText))
+                                    {
+                                        <span class="fw-bold text-nowrap" style="color: @flagColor; font-size: 0.75rem; letter-spacing: 0.02em;">@displayDateText</span>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                     @{
                                     int tdIndex = 0;
                                     foreach (var prop in tableProps)
                                     {
                                         string value = "";
                                         var rawValue = prop.GetValue(item, null);
 
-                                        if (rawValue != null)
+                                        // 🚀 RESOLVE NAMES DIRECTLY IN C#
+                                        if (prop.Name == "TaskOwner")
                                         {
-                                            var type = rawValue.GetType();
-                                            if (type.Name.Contains("User") || type.Name.Contains("Account"))
-                                            {
-                                                if (!propCache.ContainsKey(type)) {
-                                                    propCache[type] = type.GetProperty("fullName") ?? type.GetProperty("FirstName") ?? type.GetProperty("AccountName");
-                                                }
-                                                var nameProp = propCache[type];
-                                                value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown";
-                                            }
-                                            else
-                                            {
-                                                value = rawValue.ToString();
-                                            }
+                                            var usersList = ViewBag.UsersList as SelectList;
+                                            var ownerId = item.TaskOwnerId ?? rawValue?.ToString();
+                                            var matchedUser = Enumerable.FirstOrDefault(usersList, u => u.Value == ownerId);
+                                            value = matchedUser != null ? matchedUser.Text : (rawValue?.ToString() ?? "Unassigned");
+                                        }
+                                        else if (prop.Name == "RelatedTo")
+                                        {
+                                            // Extract the actual Name from the linked Account or Lead
+                                            if (item.AccountId != null) value = item.Account?.AccountName ?? "Unknown Account";
+                                            else if (item.LeadId != null) value = item.Lead?.LeadName ?? "Unknown Lead";
+                                            else value = rawValue?.ToString() ?? "-";
+                                        }
+                                        else if (rawValue != null)
+                                        {
+                                            value = rawValue.ToString();
                                         }
 
                                         <td data-col-index="@tdIndex">
                                             @if (prop.Name == "Subject")
                                             {
                                                 <a href="@Url.Action("Edit", "Tasks", new { id = item.Id })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value</a>
+                                            }
+                                            // 🚀 DYNAMIC CLICKABLE "RELATED TO" LOGIC
+                                            else if (prop.Name == "RelatedTo")
+                                            {
+                                                if (item.AccountId != null)
+                                                {
+                                                    <a href="@Url.Action("Edit", "Accounts", new { id = item.AccountId })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size:0.7rem;"></i></a>
+                                                }
+                                                else if (item.LeadId != null)
+                                                {
+                                                    <a href="@Url.Action("Edit", "Leads", new { id = item.LeadId })" class="text-primary fw-bold text-decoration-none" onclick="event.stopPropagation()">@value <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size:0.7rem;"></i></a>
+                                                }
+                                                else
+                                                {
+                                                    @value
+                                                }
                                             }
                                             else if (prop.Name == "Status")
                                             {
@@ -693,36 +758,36 @@
                                         tdIndex++;
                                     }
                                 }
-                                <td class="dummy-filler-col"></td>
-                                <td class="sticky-actions text-center" onclick="event.stopPropagation()">
-                                    <div class="d-flex align-items-center justify-content-center gap-2">
-                                        @{
-                                            var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
-                                            int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
-                                            string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
-                                        }
-                                        <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("Subject")?.GetValue(item, null)?.ToString() ?? "Task")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
-                                            <i class="fa-regular fa-comment-dots"></i> Notes
-                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
-                    else
-                    {
-                        <tr id="noRecordsRow">
-                            <td colspan="50" class="text-center py-5 text-muted">
-                                <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
-                                <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
-                                <p class="mt-1">Try adjusting your filters or upload new data.</p>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                        <td class="dummy-filler-col"></td>
+                        <td class="sticky-actions text-center" onclick="event.stopPropagation()">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                @{
+                                    var countsDict = ViewBag.NoteCounts as Dictionary<int, int>;
+                                    int noteCount = countsDict != null && countsDict.ContainsKey(item.Id) ? countsDict[item.Id] : 0;
+                                    string badgeClass = noteCount > 0 ? "bg-primary" : "bg-secondary";
+                                }
+                                <button class="btn btn-sm position-relative" style="background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;" onclick="openNotesPanel('@item.Id', '@(item.GetType().GetProperty("Subject")?.GetValue(item, null)?.ToString() ?? "Task")')" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f8fafc'; this.style.color='#475569';">
+                                    <i class="fa-regular fa-comment-dots"></i> Notes
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill @badgeClass shadow-sm" style="font-size: 0.65rem; border: 2px solid #ffffff; padding: 0.3em 0.5em;">@noteCount</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr id="noRecordsRow">
+                    <td colspan="50" class="text-center py-5 text-muted">
+                        <i class="fa-regular fa-folder-open mb-3" style="font-size:3rem; color:#cbd5e1;"></i>
+                        <br /><span class="fw-semibold fs-5 text-dark">No records found.</span>
+                        <p class="mt-1">Try adjusting your filters or upload new data.</p>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
 
         <div class="pagination-container">
             <div class="d-flex align-items-center gap-3">
@@ -1267,7 +1332,7 @@
         });
     };
 
-    window.saveFieldFilter = function(event, iconEl, fieldName) {
+   window.saveFieldFilter = function(event, iconEl, fieldName) {
         event.stopPropagation();
         const item = iconEl.closest('.filter-field-item');
         const cb = item.querySelector('.field-checkbox');
@@ -1277,9 +1342,18 @@
             return;
         }
 
-        const condition = item.querySelector('.condition-select').value;
+        const conditionSelect = item.querySelector('.condition-select');
+        const condition = conditionSelect.value;
         const isDate = item.dataset.fieldType === "date";
-        let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
+        
+        const inputEl = isDate ? item.querySelector('.date-val-1') : item.querySelector('.condition-val');
+        let val = inputEl.value;
+
+        // 🚀 FIX: Capture the Display Name for Dropdowns so we don't show the raw ID
+        let displayVal = val;
+        if (inputEl.tagName === 'SELECT' && inputEl.selectedIndex > -1) {
+            displayVal = inputEl.options[inputEl.selectedIndex].text;
+        }
 
         const noValueNeeded = ['is_empty', 'is_not_empty', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year'];
         
@@ -1289,13 +1363,14 @@
         }
 
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_tasks') || '[]');
-        savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
+        // Save both the backend ID (val) and frontend name (displayVal)
+        savedFilters.push({ fieldName, condition, val, displayVal, isDate, id: Date.now() });
         localStorage.setItem('crm_saved_sidebar_filters_tasks', JSON.stringify(savedFilters));
         
         renderSavedSidebarFilters();
     };
 
-    function renderSavedSidebarFilters() {
+  function renderSavedSidebarFilters() {
         const section = document.getElementById('savedFiltersSection');
         const container = document.getElementById('savedFiltersContainer');
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters_tasks') || '[]');
@@ -1310,9 +1385,18 @@
         savedFilters.forEach(f => {
             const badge = document.createElement('div');
             badge.className = 'badge bg-white text-dark border shadow-sm p-2 d-flex align-items-center gap-2';
+            
+            // 🚀 FIX: Force check the dictionary for User IDs to ensure the Name ALWAYS displays
+            let showText = f.displayVal ? f.displayVal : f.val;
+            if (f.fieldName.includes("Owner") || f.fieldName.includes("Created") || f.fieldName.includes("Modified")) {
+                if (userLookup[f.val]) {
+                    showText = userLookup[f.val];
+                }
+            }
+
             badge.innerHTML = `
                 <span onclick="applySavedSidebarFilter(${f.id})" style="cursor:pointer;" title="Click to instantly apply this filter">
-                    <i class="fa-solid fa-filter text-primary me-1"></i> ${f.fieldName} ${f.condition} <span class="text-primary">${f.val}</span>
+                    <i class="fa-solid fa-filter text-primary me-1"></i> ${f.fieldName} ${f.condition} <span class="text-primary">${showText}</span>
                 </span>
                 <i class="fa-solid fa-xmark text-danger" style="cursor:pointer; opacity: 0.6;" onclick="deleteSavedSidebarFilter(${f.id}, event)" title="Remove"></i>
             `;
@@ -1414,7 +1498,7 @@
         }
     };
 
-    function renderCustomViews() {
+   function renderCustomViews() {
         const container = document.getElementById('customViewsTabsContainer');
         const menu = document.getElementById('unpinnedViewsMenu');
         const savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
@@ -1423,7 +1507,7 @@
         const activeViewName = urlParams.get('activeView') || 'All Tasks';
 
         if(container) {
-            container.innerHTML = `<a href="#" class="view-tab ${activeViewName === 'All Tasks' ? 'active shadow-sm' : ''}" onclick="applyCustomView('All Tasks', [])">All Tasks</a>`;
+            container.innerHTML = `<a href="#" class="view-tab ${activeViewName === 'All Tasks' ? 'active shadow-sm' : ''}" onclick="applyCustomView('All Tasks')">All Tasks</a>`;
         }
 
         if(menu) {
@@ -1433,24 +1517,24 @@
 
         savedViews.forEach(view => {
             const isActive = activeViewName === view.name;
-            const filterStr = JSON.stringify(view.filters).replace(/"/g, '&quot;');
+            const safeName = view.name.replace(/'/g, "\\'"); // Prevent JS crashes if name contains a quote
 
             if (view.isPinned !== false) {
                 const tabHtml = `
                     <div class="view-tab ${isActive ? 'active shadow-sm' : ''} d-flex align-items-center gap-2" style="${isActive ? 'background-color: #eff6ff;' : ''}">
-                        <i class="fa-solid fa-thumbtack pin-icon" style="color: ${isActive ? 'var(--primary-blue)' : '#64748b'}; cursor: pointer; transform: rotate(-45deg); transition: 0.2s;" onclick="toggleViewPinStatus('${view.name}', event)" title="Unpin View"></i>
-                        <a href="#" class="text-decoration-none fw-bold" style="color: ${isActive ? 'var(--primary-blue)' : 'var(--text-muted)'};" onclick="applyCustomView('${view.name}', ${filterStr})">${view.name}</a>
-                        <i class="fa-solid fa-xmark ms-2" style="font-size: 0.8rem; cursor: pointer; color: #ef4444; opacity: 0.6;" onclick="deleteCustomView('${view.name}', event)" title="Delete View"></i>
+                        <i class="fa-solid fa-thumbtack pin-icon" style="color: ${isActive ? 'var(--primary-blue)' : '#64748b'}; cursor: pointer; transform: rotate(-45deg); transition: 0.2s;" onclick="toggleViewPinStatus('${safeName}', event)" title="Unpin View"></i>
+                        <a href="#" class="text-decoration-none fw-bold" style="color: ${isActive ? 'var(--primary-blue)' : 'var(--text-muted)'};" onclick="applyCustomView('${safeName}')">${view.name}</a>
+                        <i class="fa-solid fa-xmark ms-2" style="font-size: 0.8rem; cursor: pointer; color: #ef4444; opacity: 0.6;" onclick="deleteCustomView('${safeName}', event)" title="Delete View"></i>
                     </div>
                 `;
                 if(container) container.insertAdjacentHTML('beforeend', tabHtml);
             } else {
                 const liHtml = `
                     <li class="unpinned-item d-flex align-items-center justify-content-between px-3 py-1">
-                        <a class="dropdown-item fw-medium text-muted d-flex align-items-center p-0" href="#" onclick="applyCustomView('${view.name}', ${filterStr})">
-                            <i class="fa-solid fa-thumbtack me-3" style="opacity: 0.4; cursor: pointer;" onclick="toggleViewPinStatus('${view.name}', event)"></i> ${view.name}
+                        <a class="dropdown-item fw-medium text-muted d-flex align-items-center p-0" href="#" onclick="applyCustomView('${safeName}')">
+                            <i class="fa-solid fa-thumbtack me-3" style="opacity: 0.4; cursor: pointer;" onclick="toggleViewPinStatus('${safeName}', event)"></i> ${view.name}
                         </a>
-                        <i class="fa-solid fa-xmark" style="font-size: 0.8rem; cursor: pointer; color: #ef4444; opacity: 0.6;" onclick="deleteCustomView('${view.name}', event)" title="Delete View"></i>
+                        <i class="fa-solid fa-xmark" style="font-size: 0.8rem; cursor: pointer; color: #ef4444; opacity: 0.6;" onclick="deleteCustomView('${safeName}', event)" title="Delete View"></i>
                     </li>
                 `;
                 if(menu) menu.insertBefore(document.createRange().createContextualFragment(liHtml), menu.querySelector('.dropdown-divider').parentElement);
@@ -1562,7 +1646,6 @@
     window.addCriteriaRow = function() {
         const container = document.getElementById('criteriaRowsContainer');
         const rowCount = container.querySelectorAll('.criteria-row-builder').length + 1;
-        const firstRowFields = container.querySelector('.cv-field').innerHTML;
 
         const andLine = document.createElement('div');
         andLine.className = 'criteria-connector-vertical d-flex align-items-center mb-2';
@@ -1579,11 +1662,19 @@
 
         const row = document.createElement('div');
         row.className = 'criteria-row-builder d-flex align-items-center gap-2 mb-2';
+        
+        // Strip out selected status from first row options
+        const baseOptionsHtml = Array.from(document.querySelector('.cv-field').options)
+                                     .filter(o => o.value)
+                                     .map(o => `<option value="${o.value}">${o.text}</option>`)
+                                     .join('');
+
         row.innerHTML = `
             <div class="criteria-num" style="width: 30px; height: 30px; border: 1px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: #64748b; font-weight: 600; flex-shrink: 0;">${rowCount}</div>
             <select class="form-select criteria-builder-select cv-module" disabled style="max-width: 150px;"><option value="Tasks" selected>Tasks</option></select>
             <select class="form-select criteria-builder-select cv-field" style="max-width: 200px;" onchange="handleCriteriaFieldChange(this)">
-                ${firstRowFields}
+                <option value="" disabled selected>None</option>
+                ${baseOptionsHtml}
             </select>
             <select class="form-select criteria-builder-select cv-condition" style="max-width: 150px;"><option value="" disabled selected>Select Field First</option></select>
             <div class="cv-value-container d-flex" style="flex-grow:1;"><input type="text" class="form-control criteria-builder-input cv-value" placeholder="Value" style="width:100%;" disabled></div>
@@ -1610,7 +1701,7 @@
         updateCriteriaPattern();
     };
 
-    window.saveAndApplyCustomView = function() {
+   window.saveAndApplyCustomView = function() {
         const viewName = document.getElementById('customViewName').value.trim();
         if (!viewName) {
             alert("Please enter a Custom View Name.");
@@ -1651,7 +1742,8 @@
                 }
 
                 activeFilters.push({
-                    LogicalOperator: index === 0 ? "" : logicOperator,
+                    // Guarantee first operator is blank, preserving accurate AND/OR chains
+                    LogicalOperator: activeFilters.length === 0 ? "" : logicOperator, 
                     ColumnName: field,
                     Condition: condition,
                     Value: val || "",
@@ -1671,17 +1763,26 @@
         localStorage.setItem('crm_user_views_tasks', JSON.stringify(savedViews));
 
         bootstrap.Modal.getInstance(document.getElementById('createCustomViewModal')).hide();
-        applyCustomView(viewName, activeFilters);
+        
+        applyCustomView(viewName); // Execute passing only the name
     };
 
-    window.applyCustomView = function(viewName, filterObj) {
+   window.applyCustomView = function(viewName) {
         document.body.style.cursor = 'wait';
         const urlParams = new URLSearchParams(window.location.search);
 
-        if (viewName === 'All Tasks' || filterObj.length === 0) {
+        if (viewName === 'All Tasks') {
             urlParams.delete('advancedFilters');
         } else {
-            urlParams.set('advancedFilters', JSON.stringify(filterObj));
+            let savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
+            let view = savedViews.find(v => v.name === viewName);
+            
+            // Read directly from local storage to prevent string-corruption
+            if (view && view.filters && view.filters.length > 0) {
+                urlParams.set('advancedFilters', JSON.stringify(view.filters));
+            } else {
+                urlParams.delete('advancedFilters');
+            }
         }
 
         urlParams.set('activeView', viewName);

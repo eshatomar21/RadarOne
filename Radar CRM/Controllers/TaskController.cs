@@ -41,7 +41,10 @@ namespace Radar_CRM.Controllers
             ViewBag.UsersList = new SelectList(await _context.Users.ToListAsync(), "Id", "fullName");
 
             int pageSize = 100;
-            var query = _context.Tasks.AsQueryable();
+            var query = _context.Tasks
+.Include(t => t.Account)
+.Include(t => t.Lead)
+.AsQueryable();
 
             bool isAdmin = !string.IsNullOrWhiteSpace(currentUser.Profile) &&
                            (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
@@ -420,7 +423,6 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
-                    // 🚀 FIX: Assign Creation Audit Fields dynamically
                     string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                     string currentUserName = User.FindFirstValue(ClaimTypes.Name);
 
@@ -434,6 +436,26 @@ namespace Radar_CRM.Controllers
                         if (user != null) taskModel.TaskOwner = user.fullName;
                     }
 
+                    // 🚀 NEW: Auto-Populate RelatedTo and RelatedToId based on attached Account or Lead
+                    if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
+                    {
+                        var account = await _context.Accounts.FindAsync(taskModel.AccountId.Value);
+                        if (account != null)
+                        {
+                            taskModel.RelatedToId = account.Id.ToString();
+                            taskModel.RelatedTo = account.AccountName;
+                        }
+                    }
+                    else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
+                    {
+                        var lead = await _context.Leads.FindAsync(taskModel.LeadId.Value);
+                        if (lead != null)
+                        {
+                            taskModel.RelatedToId = lead.Id.ToString();
+                            taskModel.RelatedTo = string.IsNullOrWhiteSpace(lead.LeadName) ? "Unnamed Lead" : lead.LeadName;
+                        }
+                    }
+
                     _context.Tasks.Add(taskModel);
                     await _context.SaveChangesAsync();
 
@@ -443,13 +465,11 @@ namespace Radar_CRM.Controllers
                 }
                 catch (Exception ex)
                 {
-                    // 🔥 SHOW THE TRUE ERROR ON THE UI
                     var trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                     ModelState.AddModelError(string.Empty, "Database Save Failed: " + trueError);
                 }
             }
 
-            // Fallback: Restore names for the Select2 dropdowns so they don't break if validation fails
             if (!string.IsNullOrEmpty(taskModel.TaskOwnerId))
             {
                 var user = await _context.Users.FindAsync(taskModel.TaskOwnerId);
@@ -458,7 +478,6 @@ namespace Radar_CRM.Controllers
 
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
-
 
             return View(taskModel);
         }
@@ -527,32 +546,64 @@ namespace Radar_CRM.Controllers
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
 
-            // 🚀 AUTOMATICALLY LINK "RELATED TO" RECORD FOR UI
+            // 🚀 DEFAULT FALLBACKS FOR SIDEBAR
             ViewBag.RelatedEntityName = "No Related Record";
             ViewBag.RelatedEntityId = null;
             ViewBag.RelatedEntityUrl = "#";
             ViewBag.RelatedEntityType = "Record";
 
+            ViewBag.Budget = "-";
+            ViewBag.LeadOwnerName = "-";
+            ViewBag.LeadMobile = "-";
+            ViewBag.LeadEmail = "-";
+            ViewBag.LeadSource = "-";
+            ViewBag.LeadStatusValue = "-";
+
+            // 🚀 FIX: FETCH ACCOUNT DETAILS & FILL SIDEBAR
+            // 🚀 FIX: FETCH ACCOUNT DETAILS & FILL SIDEBAR
             if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
             {
-                var account = await _context.Accounts.FindAsync(taskModel.AccountId.Value);
+                var account = await _context.Accounts
+                    .Include(a => a.AccountOwner) // Load Account Owner Name
+                    .FirstOrDefaultAsync(a => a.Id == taskModel.AccountId.Value);
+
                 if (account != null)
                 {
                     ViewBag.RelatedEntityName = account.AccountName;
                     ViewBag.RelatedEntityId = account.Id;
                     ViewBag.RelatedEntityUrl = Url.Action("Edit", "Accounts", new { id = account.Id });
                     ViewBag.RelatedEntityType = "Account";
+
+                    // 🚀 FIX: Safely set Budget to "-" since Accounts don't have ExpectedRevenue
+                    ViewBag.Budget = "-";
+                    ViewBag.LeadOwnerName = account.AccountOwner?.fullName ?? "System User";
+                    ViewBag.LeadMobile = !string.IsNullOrWhiteSpace(account.MobileNumber) ? account.MobileNumber : "-";
+                    ViewBag.LeadEmail = !string.IsNullOrWhiteSpace(account.Email) ? account.Email : "-";
+                    ViewBag.LeadSource = !string.IsNullOrWhiteSpace(account.DataSource) ? account.DataSource : "-";
+                    ViewBag.LeadStatusValue = !string.IsNullOrWhiteSpace(account.CurrentStatus) ? account.CurrentStatus : "-";
                 }
             }
+            // 🚀 FIX: FETCH LEAD DETAILS & FILL SIDEBAR
             else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
             {
-                var lead = await _context.Leads.FindAsync(taskModel.LeadId.Value);
+                var lead = await _context.Leads
+                    .Include(l => l.LeadOwner) // Load Lead Owner Name
+                    .FirstOrDefaultAsync(l => l.Id == taskModel.LeadId.Value);
+
                 if (lead != null)
                 {
                     ViewBag.RelatedEntityName = string.IsNullOrWhiteSpace(lead.LeadName) ? "Unnamed Lead" : lead.LeadName;
                     ViewBag.RelatedEntityId = lead.Id;
                     ViewBag.RelatedEntityUrl = Url.Action("Edit", "Leads", new { id = lead.Id });
                     ViewBag.RelatedEntityType = "Lead";
+
+                    // Map actual Lead data to sidebar ViewBags
+                    ViewBag.Budget = lead.Budget?.ToString() ?? "-";
+                    ViewBag.LeadOwnerName = lead.LeadOwner?.fullName ?? "System User";
+                    ViewBag.LeadMobile = !string.IsNullOrWhiteSpace(lead.MobileNumber) ? lead.MobileNumber : "-";
+                    ViewBag.LeadEmail = !string.IsNullOrWhiteSpace(lead.EmailID) ? lead.EmailID : "-";
+                    ViewBag.LeadSource = !string.IsNullOrWhiteSpace(lead.DataSources) ? lead.DataSources : "-";
+                    ViewBag.LeadStatusValue = !string.IsNullOrWhiteSpace(lead.LeadStatus) ? lead.LeadStatus : "-";
                 }
             }
 
@@ -580,7 +631,6 @@ namespace Radar_CRM.Controllers
             {
                 try
                 {
-                    // 🚀 FIX: Assign Modification Audit Fields dynamically
                     string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                     string currentUserName = User.FindFirstValue(ClaimTypes.Name);
 
@@ -592,6 +642,26 @@ namespace Radar_CRM.Controllers
                     {
                         var user = await _context.Users.FindAsync(taskModel.TaskOwnerId);
                         if (user != null) taskModel.TaskOwner = user.fullName;
+                    }
+
+                    // 🚀 NEW: Auto-Populate RelatedTo and RelatedToId based on attached Account or Lead
+                    if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
+                    {
+                        var account = await _context.Accounts.FindAsync(taskModel.AccountId.Value);
+                        if (account != null)
+                        {
+                            taskModel.RelatedToId = account.Id.ToString();
+                            taskModel.RelatedTo = account.AccountName;
+                        }
+                    }
+                    else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
+                    {
+                        var lead = await _context.Leads.FindAsync(taskModel.LeadId.Value);
+                        if (lead != null)
+                        {
+                            taskModel.RelatedToId = lead.Id.ToString();
+                            taskModel.RelatedTo = string.IsNullOrWhiteSpace(lead.LeadName) ? "Unnamed Lead" : lead.LeadName;
+                        }
                     }
 
                     _context.Update(taskModel);
@@ -608,7 +678,6 @@ namespace Radar_CRM.Controllers
                 }
                 catch (Exception ex)
                 {
-                    // 🔥 SHOW THE TRUE ERROR ON THE UI
                     var trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                     ModelState.AddModelError(string.Empty, "Database Update Failed: " + trueError);
                 }
@@ -616,7 +685,6 @@ namespace Radar_CRM.Controllers
 
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
-
 
             return View(taskModel);
         }

@@ -489,6 +489,14 @@
                 color: var(--theme-surface);
             }
 
+            /* 🚀 NEW: Inline Quick Edit Styles */
+    .quick-edit-input:focus {
+        border-color: #22c55e !important;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+    }
+    .inline-actions i { transition: transform 0.1s; }
+    .inline-actions i:hover { transform: scale(1.15); }
+
     /* --- SIDEBAR BOX STYLING --- */
     .sf-sidebar {
         width: 300px;
@@ -517,6 +525,13 @@
         gap: 10px;
         border-bottom: 4px solid var(--theme-bg-cream);
     }
+
+    .quick-edit-input:focus {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+}
+.inline-actions i { transition: transform 0.1s; }
+.inline-actions i:hover { transform: scale(1.15); }
 
     /* --- SLEEK SAAS SLATE MODAL STYLING --- */
     .modal-slate-header {
@@ -1083,8 +1098,25 @@
             <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
             
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
-            <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-check"></i> Open Activities</li>
-            <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-check-double"></i> Closed Activities</li>
+            <li onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Create Task</li>
+           <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="fa-solid fa-list-check"></i> Open Task</span>
+                    @if(openTasks.Count > 0)
+                    {
+                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem;">@openTasks.Count</span>
+                    }
+                </div>
+            </li>
+            <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span><i class="fa-solid fa-check-double"></i> Closed Task</span>
+                    @if(closedTasks.Count > 0)
+                    {
+                        <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">@closedTasks.Count</span>
+                    }
+                </div>
+            </li>
             <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
         </ul>
     </div>
@@ -1105,66 +1137,119 @@
 
         <div class="detail-content">
 
-            <!-- Quick Edit Section (Syncs to main form) -->
-            <div class="detail-section-card">
-                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Owner</div>
-                            <div class="col-8">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickAccountOwnerId" asp-items="ViewBag.UsersList" onchange="updateQuickField('AccountOwnerId', this.value)">
-                                    <option value="">- Select -</option>
-                                </select>
-                            </div>
+       <!-- Quick Edit Section (Syncs to main form) -->
+<div class="detail-section-card">
+    <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
+    <div class="row">
+        
+        <!-- Account Owner -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Owner</div>
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <div class="flex-grow-1">
+                            <select class="form-select form-select-sm border border-secondary quick-edit-input w-100" id="QuickAccountOwnerId" asp-items="ViewBag.UsersList" data-original="@Model.AccountOwnerId" onchange="showActionButtons('actions-owner')">
+                                <option value="">- Select -</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Email ID</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickEmail" value="@Model.Email" onchange="updateQuickField('Email', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Mobile Number</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickMobileNumber" value="@Model.MobileNumber" onchange="updateQuickField('MobileNumber', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Profile Status</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary bg-light" id="QuickProfileStatus" value="@Model.Profilestatus" readonly />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Alt Mobile</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickAlternateMobile" value="@Model.AlternateMobile" onchange="updateQuickField('AlternateMobile', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Current Status</div>
-                            <div class="col-8">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickCurrentStatus" onchange="updateQuickField('CurrentStatus', this.value)">
-                                    <option value="None">None</option>
-                                    <option value="User">User</option>
-                                    <option value="Non-User">Non-User</option>
-                                </select>
-                            </div>
+                        <div id="actions-owner" class="d-none inline-actions text-nowrap flex-shrink-0">
+                            <i class="fa-solid fa-circle-check text-success fs-5 me-1" style="cursor:pointer;" onclick="saveInlineField('QuickAccountOwnerId', 'actions-owner', 'AccountOwnerId')"></i>
+                            <i class="fa-regular fa-circle-xmark text-secondary fs-5" style="cursor:pointer;" onclick="cancelInlineField('QuickAccountOwnerId', 'actions-owner')"></i>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Email ID -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Email ID</div>
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <div class="flex-grow-1">
+                            <input type="text" class="form-control form-control-sm border border-secondary quick-edit-input w-100" id="QuickEmail" value="@Model.Email" data-original="@Model.Email" oninput="showActionButtons('actions-email')" />
+                        </div>
+                        <div id="actions-email" class="d-none inline-actions text-nowrap flex-shrink-0">
+                            <i class="fa-solid fa-circle-check text-success fs-5 me-1" style="cursor:pointer;" onclick="saveInlineField('QuickEmail', 'actions-email', 'Email')"></i>
+                            <i class="fa-regular fa-circle-xmark text-secondary fs-5" style="cursor:pointer;" onclick="cancelInlineField('QuickEmail', 'actions-email')"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Number -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Mobile Number</div>
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <div class="flex-grow-1">
+                            <input type="text" class="form-control form-control-sm border border-secondary quick-edit-input w-100" id="QuickMobileNumber" value="@Model.MobileNumber" data-original="@Model.MobileNumber" oninput="showActionButtons('actions-mobile')" />
+                        </div>
+                        <div id="actions-mobile" class="d-none inline-actions text-nowrap flex-shrink-0">
+                            <i class="fa-solid fa-circle-check text-success fs-5 me-1" style="cursor:pointer;" onclick="saveInlineField('QuickMobileNumber', 'actions-mobile', 'MobileNumber')"></i>
+                            <i class="fa-regular fa-circle-xmark text-secondary fs-5" style="cursor:pointer;" onclick="cancelInlineField('QuickMobileNumber', 'actions-mobile')"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Status (Read-Only) -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Profile Status</div>
+                <div class="col-8">
+                    <input type="text" class="form-control form-control-sm border border-secondary bg-light w-100" id="QuickProfileStatus" value="@Model.Profilestatus" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Alternate Mobile -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Alt Mobile</div>
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <div class="flex-grow-1">
+                            <input type="text" class="form-control form-control-sm border border-secondary quick-edit-input w-100" id="QuickAlternateMobile" value="@Model.AlternateMobile" data-original="@Model.AlternateMobile" oninput="showActionButtons('actions-altmobile')" />
+                        </div>
+                        <div id="actions-altmobile" class="d-none inline-actions text-nowrap flex-shrink-0">
+                            <i class="fa-solid fa-circle-check text-success fs-5 me-1" style="cursor:pointer;" onclick="saveInlineField('QuickAlternateMobile', 'actions-altmobile', 'AlternateMobile')"></i>
+                            <i class="fa-regular fa-circle-xmark text-secondary fs-5" style="cursor:pointer;" onclick="cancelInlineField('QuickAlternateMobile', 'actions-altmobile')"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Status -->
+        <div class="col-md-6 mb-3">
+            <div class="row align-items-center">
+                <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Current Status</div>
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <div class="flex-grow-1">
+                            <select class="form-select form-select-sm border border-secondary quick-edit-input w-100" id="QuickCurrentStatus" data-original="@Model.CurrentStatus" onchange="showActionButtons('actions-status')">
+                                <option value="None">None</option>
+                                <option value="User">User</option>
+                                <option value="Non-User">Non-User</option>
+                            </select>
+                        </div>
+                        <div id="actions-status" class="d-none inline-actions text-nowrap flex-shrink-0">
+                            <i class="fa-solid fa-circle-check text-success fs-5 me-1" style="cursor:pointer;" onclick="saveInlineField('QuickCurrentStatus', 'actions-status', 'CurrentStatus')"></i>
+                            <i class="fa-regular fa-circle-xmark text-secondary fs-5" style="cursor:pointer;" onclick="cancelInlineField('QuickCurrentStatus', 'actions-status')"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
 
             <!-- Next Action -->
             <div class="detail-section-card">
@@ -1184,66 +1269,95 @@
                 </div>
             </div>
 
-            <!-- 🚀 NEW: Related Leads Section -->
-           <div id="detailLeadsSection" class="detail-section-card">
-                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Leads</h6>
-                    <!-- 🚀 ADDED: Button to Create a New Lead linked to this Account -->
-                    <a href="@Url.Action("Create", "Leads", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
-                        <i class="fa-solid fa-plus"></i> Add Lead
-                    </a>
-                </div>
-                @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
+       <!-- 🚀 NEW: Related Leads Section -->
+<div id="detailLeadsSection" class="detail-section-card">
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Leads</h6>
+        <a href="@Url.Action("Create", "Leads", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
+            <i class="fa-solid fa-plus"></i> Add Lead
+        </a>
+    </div>
+    @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
+    {
+        <table class="zoho-task-table">
+            <thead>
+                <tr>
+                    <th>Lead Name</th>
+                    <th>Lead Owner</th>
+                    <th>Stage</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
                 {
-                    <table class="zoho-task-table">
-                        <thead><tr><th>Lead Name</th><th>Mobile Number</th><th>Status</th></tr></thead>
-                        <tbody>
-                            @foreach (var lead in (IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads)
-                            {
-                                <tr>
-                                    <td><a href="@Url.Action("Edit", "Leads", new { id = lead.Id })" class="text-primary fw-medium text-decoration-none">@(string.IsNullOrEmpty(lead.LeadName) ? "No Name Provided" : lead.LeadName)</a></td>
-                                    <td>@lead.MobileNumber</td>
-                                    <td><span class="badge bg-light text-dark border">@lead.LeadStatus</span></td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <tr>
+                        <td>
+                            <a href="@Url.Action("Edit", "Leads", new { id = lead.Id })" class="text-primary fw-medium text-decoration-none">
+                                @(string.IsNullOrEmpty(lead.LeadName) ? "Unnamed Lead" : lead.LeadName)
+                            </a>
+                        </td>
+                        <!-- 🛑 CHANGE .FirstName TO WHATEVER YOUR USER MODEL USES (e.g., .FullName, .Email) -->
+                        <td>
+                            <span class="text-muted fw-medium"><i class="fa-solid fa-circle-user me-1"></i>@(lead.LeadOwner?.FirstName ?? "System User")</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">@lead.Stage</span>
+                        </td>
+                    </tr>
                 }
-                else
-                {
-                    <div class="text-center text-muted py-4"><i class="fa-solid fa-users mb-2 fs-4"></i><br />No linked contacts</div>
-                }
-            </div>
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="text-center text-muted py-4"><i class="fa-solid fa-users mb-2 fs-4"></i><br />No linked leads</div>
+    }
+</div>
 
-            <!-- 🚀 NEW: Related Deals Section -->
-            <div id="detailDealsSection" class="detail-section-card">
-                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
-                    <!-- 🚀 ADDED: Button to Create a New Deal linked to this Account -->
-                    <a href="@Url.Action("Create", "Deals", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
-                        <i class="fa-solid fa-plus"></i> Add Deal
-                    </a>
-                </div>
-                @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
+<!-- 🚀 NEW: Related Deals Section -->
+<div id="detailDealsSection" class="detail-section-card">
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
+        <a href="@Url.Action("Create", "Deals", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
+            <i class="fa-solid fa-plus"></i> Add Deal
+        </a>
+    </div>
+    @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
+    {
+        <table class="zoho-task-table">
+            <thead>
+                <tr>
+                    <th>Deal Name</th>
+                    <th>Deal Owner</th>
+                    <th>Stage</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var deal in (IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals)
                 {
-                    <table class="zoho-task-table">
-                        <thead><tr><th>Deal Name</th><th>Stage</th></tr></thead>
-                        <tbody>
-                            @foreach (var deal in (IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals)
-                            {
-                                <tr>
-                                    <td><a href="@Url.Action("Edit", "Deals", new { id = deal.Id })" class="text-primary fw-medium text-decoration-none">@(string.IsNullOrEmpty(deal.DealName) ? "Unnamed Deal" : deal.DealName)</a></td>
-                                    <td><span class="badge bg-light text-dark border">@deal.Stage</span></td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <tr>
+                        <td>
+                            <a href="@Url.Action("Edit", "Deals", new { id = deal.Id })" class="text-primary fw-medium text-decoration-none">
+                                @(string.IsNullOrEmpty(deal.DealName) ? "Unnamed Deal" : deal.DealName)
+                            </a>
+                        </td>
+                        <!-- 🛑 CHANGE .FirstName TO WHATEVER YOUR USER MODEL USES (e.g., .FullName, .Email) -->
+                        <td>
+                            <span class="text-muted fw-medium"><i class="fa-solid fa-circle-user me-1"></i>@(deal.DealOwner?.FirstName ?? "System User")</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">@deal.Stage</span>
+                        </td>
+                    </tr>
                 }
-                else
-                {
-                    <div class="text-center text-muted py-4"><i class="fa-solid fa-briefcase mb-2 fs-4"></i><br />No linked deals</div>
-                }
-            </div>
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="text-center text-muted py-4"><i class="fa-solid fa-briefcase mb-2 fs-4"></i><br />No linked deals</div>
+    }
+</div>
             <!-- Notes Section -->
             <div id="detailNotesSection" class="detail-section-card">
                 <h6 class="fw-bold mb-3 d-flex justify-content-between align-items-center border-bottom pb-2" style="color: var(--theme-navy-primary);">Notes <span class="badge bg-light text-dark border fw-normal">Recent First</span></h6>
@@ -1300,74 +1414,93 @@
                 </div>
             </div>
 
-            <!-- Open Tasks -->
-            <div id="detailOpenTasksSection" class="detail-section-card overflow-hidden">
-                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-0">
-                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Activities</h6>
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Add Task</button>
-                </div>
+           <!-- Open Tasks -->
+<div id="detailOpenTasksSection" class="detail-section-card overflow-hidden">
+    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-0">
+        <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Task</h6>
+    </div>
 
-                <div class="table-responsive-wrapper">
-                    @if (openTasks.Any())
+    <div class="table-responsive-wrapper">
+        @if (openTasks.Any())
+        {
+            <table class="zoho-task-table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Task Owner</th>
+                        <th>Due Date</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="openTasksTbody">
+                    @foreach (var t in openTasks)
                     {
-                        <table class="zoho-task-table">
-                            <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
-                            <tbody id="openTasksTbody">
-                                @foreach (var t in openTasks)
-                                {
-                                    <tr data-task-id="@t.Id">
-                                        <td class="text-primary fw-semibold">@t.Subject</td>
-                                        <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                        <td>@t.Priority</td>
-                                        <td>
-                                            <select class="form-select form-select-sm border task-status-dropdown shadow-none" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #ffffff; color: #1e3a8a; font-weight: 600;">
-                                                <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
-                                                <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
-                                                <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
-                                                <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
-                                                <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                        <tr data-task-id="@t.Id">
+                            <td>
+                                <a href="@Url.Action("Edit", "Tasks", new { id = t.Id })" class="text-primary fw-semibold text-decoration-none">@t.Subject</a>
+                            </td>
+                            <td><span class="text-muted fw-medium"><i class="fa-solid fa-circle-user me-1"></i>@(t.TaskOwner ?? "System User")</span></td>
+                            <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                            <td>@t.Priority</td>
+                            <td>
+                                <select class="form-select form-select-sm border task-status-dropdown shadow-none" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #ffffff; color: #1e3a8a; font-weight: 600;">
+                                    <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
+                                    <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
+                                    <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
+                                    <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
+                                    <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
+                                </select>
+                            </td>
+                        </tr>
                     }
-                    else
-                    {
-                        <div class="text-center text-muted py-4 bg-white" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>
-                    }
-                </div>
-            </div>
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4 bg-white" id="emptyOpenTasksPlaceholder"><i class="fa-regular fa-folder-open mb-2 fs-4"></i><br />No open activities</div>
+        }
+    </div>
+</div>
 
-            <!-- Closed Tasks -->
-            <div id="detailClosedTasksSection" class="detail-section-card overflow-hidden">
-                <h6 class="fw-bold border-bottom pb-3 mb-0" style="color: var(--theme-navy-primary);">Closed Activities</h6>
+<!-- Closed Tasks -->
+<div id="detailClosedTasksSection" class="detail-section-card overflow-hidden">
+    <h6 class="fw-bold border-bottom pb-3 mb-0" style="color: var(--theme-navy-primary);">Closed Task</h6>
 
-                <div class="table-responsive-wrapper">
-                    @if (closedTasks.Any())
+    <div class="table-responsive-wrapper">
+        @if (closedTasks.Any())
+        {
+            <table class="zoho-task-table" id="closedTasksTable">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Task Owner</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in closedTasks)
                     {
-                        <table class="zoho-task-table" id="closedTasksTable">
-                            <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
-                            <tbody>
-                                @foreach (var t in closedTasks)
-                                {
-                                    <tr data-task-id="@t.Id">
-                                        <td class="text-secondary text-decoration-line-through">@t.Subject</td>
-                                        <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                        <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                        <tr data-task-id="@t.Id">
+                            <td>
+                                <a href="@Url.Action("Edit", "Tasks", new { id = t.Id })" class="text-secondary fw-semibold text-decoration-line-through">@t.Subject</a>
+                            </td>
+                            <td><span class="text-muted fw-medium"><i class="fa-solid fa-circle-user me-1"></i>@(t.TaskOwner ?? "System User")</span></td>
+                            <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+                            <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+                        </tr>
                     }
-                    else
-                    {
-                        <div class="text-center text-muted py-4 bg-white" id="emptyClosedTasksPlaceholder"><i class="fa-solid fa-box-archive mb-2 fs-4"></i><br />No closed activities</div>
-                    }
-                </div>
-            </div>
-
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center text-muted py-4 bg-white" id="emptyClosedTasksPlaceholder"><i class="fa-solid fa-box-archive mb-2 fs-4"></i><br />No closed activities</div>
+        }
+    </div>
+</div>
         </div> <!-- 🚀 MISSING TAG 1: Closes detail-content -->
     </div> <!-- 🚀 MISSING TAG 2: Closes detail-main -->
 </div>
@@ -1658,10 +1791,11 @@
                     <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
-                <!-- Body -->
-                <form asp-controller="Tasks" asp-action="Create" method="post">
-                    <div class="modal-body" style="padding: 24px; background-color: #ffffff;">
-                        <input type="hidden" name="AccountId" value="@Model.Id" />
+             <!-- 🚀 FIX: Added asp-action back so ASP.NET generates the security token -->
+<form asp-controller="Tasks" asp-action="Create" method="post" id="quickTaskForm" onsubmit="submitQuickTask(event, this)">
+    <div class="modal-body" style="padding: 24px; background-color: #ffffff;">
+        <input type="hidden" name="AccountId" value="@Model.Id" />
+        <input type="hidden" name="Status" value="Not Started" /> <!-- 🚀 FIX: Provide default status -->
 
                         <div class="row">
                             <div class="col-md-12 form-group mb-4">
@@ -1669,10 +1803,14 @@
                                 <input name="Subject" class="sf-input w-100 bg-light" placeholder="E.g., Follow up call..." required />
                             </div>
 
-                            <div class="col-md-6 form-group mb-4">
-                                <label class="sf-label w-100 mb-2 fw-bold" style="color: #4c1d95;">Due Date</label>
-                                <input name="DueDate" type="date" class="sf-input w-100 bg-light" />
-                            </div>
+                          <div class="col-md-3 form-group mb-4">
+    <label class="sf-label w-100 mb-2 fw-bold" style="color: #4c1d95;">Due In (Days)</label>
+    <input type="number" id="TaskDueDays" class="sf-input w-100 bg-light" placeholder="e.g. 8" />
+</div>
+<div class="col-md-3 form-group mb-4">
+    <label class="sf-label w-100 mb-2 fw-bold" style="color: #4c1d95;">Due Date</label>
+    <input name="DueDate" id="TaskDueDate" type="date" class="sf-input w-100 bg-light" />
+</div>
 
                             <div class="col-md-6 form-group mb-4">
                                 <label class="sf-label w-100 mb-2 fw-bold" style="color: #4c1d95;">Priority</label>
@@ -2393,22 +2531,63 @@ function updateChevronBars() {
 
 // Ensure the chevron updates on page load
                             // Ensure the chevron and default owners update on page load
-                            document.addEventListener("DOMContentLoaded", function() {
-                                const quickOwner = document.getElementById('QuickAccountOwnerId');
-                                if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
+                  document.addEventListener("DOMContentLoaded", function() {
+        const quickOwner = document.getElementById('QuickAccountOwnerId');
+        if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
 
-                                const quickStatus = document.getElementById('QuickCurrentStatus');
-                                if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
+        const quickStatus = document.getElementById('QuickCurrentStatus');
+        if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
 
-                                // 🚀 CRITICAL FIX: Automatically set Note Owners to the Logged-In User instead of leaving it blank
-                                const loggedInUser = '@currentUserId';
+        // 🚀 CRITICAL FIX: Automatically set Note Owners to the Logged-In User instead of leaving it blank
+        const loggedInUser = '@currentUserId';
 
-                                const inlineNoteOwner = document.getElementById('inlineNoteOwner');
-                                if (inlineNoteOwner) inlineNoteOwner.value = loggedInUser;
+        const inlineNoteOwner = document.getElementById('inlineNoteOwner');
+        if (inlineNoteOwner) inlineNoteOwner.value = loggedInUser;
 
-                                const modalNoteOwner = document.getElementById('modalNoteOwner');
-                                if (modalNoteOwner) modalNoteOwner.value = loggedInUser;
-                            });
+        const modalNoteOwner = document.getElementById('modalNoteOwner');
+        if (modalNoteOwner) modalNoteOwner.value = loggedInUser;
+
+        // ==========================================
+        // 🚀 TASK DUE DATE CALCULATION LOGIC
+        // ==========================================
+        const dueDaysInput = document.getElementById('TaskDueDays');
+        const dueDateInput = document.getElementById('TaskDueDate');
+        
+        if (dueDaysInput && dueDateInput) {
+            // Calculate Date from Days
+            dueDaysInput.addEventListener('input', function () {
+                if (this.value) {
+                    let d = new Date();
+                    d.setDate(d.getDate() + parseInt(this.value));
+                    
+                    // Format YYYY-MM-DD for the date input
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    dueDateInput.value = `${year}-${month}-${day}`;
+                } else {
+                    dueDateInput.value = '';
+                }
+            });
+            
+            // Calculate Days from Date
+            dueDateInput.addEventListener('change', function () {
+                if (this.value) {
+                    let d = new Date(this.value);
+                    let today = new Date();
+                    d.setHours(0, 0, 0, 0);
+                    today.setHours(0, 0, 0, 0);
+                    
+                    let diffTime = d.getTime() - today.getTime();
+                    let diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    dueDaysInput.value = diffDays;
+                } else {
+                    dueDaysInput.value = '';
+                }
+            });
+        }
+    });
+
     function toggleExtraNotes() {
         const extra = document.getElementById('extraNotesContainer');
         const btn = document.getElementById('viewPreviousNotesBtn');
@@ -2549,19 +2728,19 @@ function updateQuickField(fieldName, fieldValue) {
     // =====================================
     // AJAX: UPDATE TASK STATUS & MOVE ROW
     // =====================================
-    function updateTaskStatus(selectElement, taskId) {
+   function updateTaskStatus(selectElement, taskId) {
         const newStatus = selectElement.value;
         const row = selectElement.closest('tr');
 
-        // Optional: Disable dropdown while processing
+        // Disable dropdown while processing
         selectElement.disabled = true;
 
         const formData = new URLSearchParams();
         formData.append('id', taskId);
         formData.append('status', newStatus);
 
-        // Call your Tasks controller to update the database
-        fetch('/Tasks/UpdateStatus', { 
+        // 🚀 Call the new Accounts controller endpoint
+        fetch('/Accounts/UpdateTaskStatus', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString()
@@ -2570,19 +2749,124 @@ function updateQuickField(fieldName, fieldValue) {
         .then(data => {
             selectElement.disabled = false;
             
-            // Move it visually to the "Closed" table if completed
-            if (newStatus === "Completed") {
-                moveTaskToClosed(row);
+            if (data.success) {
+                // 🚀 Only move it visually to the "Closed" table if the DB successfully saved it
+                if (newStatus === "Completed") {
+                    moveTaskToClosed(row);
+                }
+            } else {
+                alert("Database Error: " + data.message);
+                selectElement.value = "Not Started"; // Revert to old value if it fails
             }
         })
         .catch(err => {
             selectElement.disabled = false;
             console.error('Task update error:', err);
-            
-            // Fallback: If you don't have a backend endpoint yet but want the UI to work anyway
-            if (newStatus === "Completed") {
-                 moveTaskToClosed(row);
+            alert("Network connection error. Status was not saved.");
+            selectElement.value = "Not Started"; // Revert to old value if network fails
+        });
+    }
+
+   // =====================================
+    // INLINE QUICK INFO UI (TICK & CROSS)
+    // =====================================
+    function showActionButtons(actionDivId) {
+        // Remove the d-none class to display the tick and cross
+        document.getElementById(actionDivId).classList.remove('d-none');
+    }
+
+    function cancelInlineField(inputId, actionDivId) {
+        // Revert to original value and hide buttons
+        const inputEl = document.getElementById(inputId);
+        inputEl.value = inputEl.getAttribute('data-original');
+        document.getElementById(actionDivId).classList.add('d-none');
+    }
+
+    function saveInlineField(inputId, actionDivId, dbFieldName) {
+        const inputEl = document.getElementById(inputId);
+        const newValue = inputEl.value;
+        
+        // Update the original data tracker and hide the buttons
+        inputEl.setAttribute('data-original', newValue);
+        document.getElementById(actionDivId).classList.add('d-none');
+        
+        // Route to your existing AJAX save function
+        updateQuickField(dbFieldName, newValue);
+    }
+
+    function showActionButtons(actionDivId) {
+    document.getElementById(actionDivId).style.setProperty('display', 'flex', 'important');
+}
+
+function cancelInlineField(inputId, actionDivId) {
+    const inputEl = document.getElementById(inputId);
+    inputEl.value = inputEl.getAttribute('data-original');
+    document.getElementById(actionDivId).style.setProperty('display', 'none', 'important');
+}
+
+function saveInlineField(inputId, actionDivId, dbFieldName) {
+    const inputEl = document.getElementById(inputId);
+    const newValue = inputEl.value;
+    
+    // Update the original data tracker and hide the buttons
+    inputEl.setAttribute('data-original', newValue);
+    document.getElementById(actionDivId).style.setProperty('display', 'none', 'important');
+    
+    // Route to your existing AJAX save function
+    updateQuickField(dbFieldName, newValue);
+}
+
+// =====================================
+    // AJAX QUICK TASK SUBMISSION (NO REDIRECT)
+    // =====================================
+    function submitQuickTask(event, form) {
+        event.preventDefault(); // Stop the form from redirecting
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const origText = submitBtn.innerHTML;
+
+        // Show loading state
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch('@Url.Action("Create", "Tasks")', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async response => {
+            if (response.ok) {
+                // It might be a 200 OK but returning HTML if ModelState is invalid.
+                // Let's ensure it's either a JSON success or a redirect.
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("text/html")) {
+                    console.warn("Server returned HTML. This usually means a required field was missing and ModelState is invalid.");
+                    // Still reload to show whatever the server did, or let the user know.
+                }
+
+                // Task created successfully: close modal and refresh
+                const modalEl = document.getElementById('quickTaskModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if(modal) modal.hide();
+                
+                form.reset(); 
+                window.location.reload(); 
+            } else {
+                // 🚀 FIX: Log the exact server error text to the F12 console
+                const errorText = await response.text();
+                console.error("Task Creation Server Error:", errorText);
+                alert("Failed to create the task. Check the console (F12) for the exact error.");
+                
+                submitBtn.innerHTML = origText;
+                submitBtn.disabled = false;
             }
+        })
+        .catch(error => {
+            console.error("Error creating task:", error);
+            alert("A server error occurred while saving the task.");
+            submitBtn.innerHTML = origText;
+            submitBtn.disabled = false;
         });
     }
     </script>

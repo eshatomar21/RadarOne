@@ -601,13 +601,11 @@ namespace Radar_CRM.Controllers
                 _context.Add(account);
                 await _context.SaveChangesAsync();
 
-                // 🚀 UPDATED CALL: Passing 6 parameters including "Account" and SavedNoteFiles
                 await SaveNotesAsync(account.Id, "Account", SavedNoteOwner, SavedNoteDateTime, SavedNoteDesc, SavedNoteFiles);
-
-                // TRIGGER AUTO-CONTACT CREATION CHECK
                 await CheckAndCreateContactFromAccountAsync(account);
 
-                return RedirectToAction(nameof(Index));
+                // 🚀 FIX: This ensures the JavaScript automatically redirects to the Edit Page!
+                return RedirectToAction("Edit", new { id = account.Id });
             }
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
@@ -1237,6 +1235,39 @@ namespace Radar_CRM.Controllers
             catch (Exception ex)
             {
                 return Json(new { isDuplicate = false, error = true, message = ex.Message });
+            }
+        }
+
+
+        // ==========================================
+        // UPDATE TASK STATUS VIA AJAX
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        [Route("Accounts/UpdateTaskStatus")]
+        public async Task<IActionResult> UpdateTaskStatus(int id, string status)
+        {
+            try
+            {
+                var task = await _context.Set<Radar_CRM.Models.Task>().FindAsync(id);
+                if (task == null) return Json(new { success = false, message = "Task not found" });
+
+                task.Status = status;
+
+                // Optionally log who modified it
+                string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                    ? User.Identity.Name : "System User";
+                task.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
+                task.ModifiedTime = DateTime.Now;
+
+                _context.Set<Radar_CRM.Models.Task>().Update(task);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
             }
         }
 

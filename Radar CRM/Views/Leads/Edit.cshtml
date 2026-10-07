@@ -400,18 +400,23 @@
             <small style="color: #bfdbfe;">Lead</small>
         </div>
         <h6>Related List</h6>
-        <ul class="related-list-menu">
-            <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
-            
-            <!-- 🚀 ADDED: Links to Related Accounts and Deals -->
-            <li onclick="document.getElementById('detailAccountsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-building"></i> Accounts</li>
-            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
-            
-            <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
-            <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-check"></i> Open Activities</li>
-            <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-check-double"></i> Closed Activities</li>
-            <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
-        </ul>
+       <ul class="related-list-menu">
+    <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+    <li onclick="document.getElementById('detailAccountsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-building"></i> Accounts</li>
+    <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+    <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
+    <li onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Create Task</li>
+    
+    <!-- 🚀 ADDED IDs for live updating -->
+    <li onclick="document.getElementById('detailOpenTasksSection').scrollIntoView({behavior:'smooth'})">
+        <i class="fa-solid fa-list-check"></i> Open Task <span id="sidebarOpenTaskCount">(@openTasks.Count())</span>
+    </li>
+    <li onclick="document.getElementById('detailClosedTasksSection').scrollIntoView({behavior:'smooth'})">
+        <i class="fa-solid fa-check-double"></i> Closed Task <span id="sidebarClosedTaskCount">(@closedTasks.Count())</span>
+    </li>
+    
+    <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
+</ul>
     </div>
 
     <!-- Main Detail Content -->
@@ -440,117 +445,151 @@
                     <li data-val="Lost">Lost</li>
                 </ul>
             </div>
+<div class="row">
+    <!-- Account Name (Read-Only) -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Name</div>
+            <div class="col-8">
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control border border-secondary bg-light"
+                           value="@(((SelectList)ViewBag.AccountsList)?.FirstOrDefault(a => a.Value == Model.AccountId?.ToString())?.Text ?? "No Account Linked")"
+                           readonly
+                           style="cursor: not-allowed; color: #475569; font-weight: 600;" />
+                    @if (Model.AccountId != null && Model.AccountId.ToString() != "0" && Model.AccountId.ToString() != "")
+                    {
+                        <a href="@Url.Action("Edit", "Accounts", new { id = Model.AccountId })"
+                           class="btn border border-secondary"
+                           style="background-color: #f8fafc; color: var(--theme-navy-primary);"
+                           title="Open Linked Account">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 
-           <!-- Quick Edit Section (Syncs to main form) -->
-            <div class="detail-section-card">
-                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
-                <div class="row">
-                    
-                   <!-- 🚀 ADDED: Clickable Account Link (Read-Only) -->
-<div class="col-md-6 mb-3">
-    <div class="row align-items-center">
-        <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Account Name</div>
-        <div class="col-8">
-            <div class="input-group input-group-sm">
-                
-                <!-- 🚀 FIX: Replaced Dropdown with a Read-Only Input -->
-                <!-- It automatically finds the Account Name from your existing ViewBag.AccountsList -->
-                <input type="text" class="form-control border border-secondary bg-light" 
-                       value="@(((SelectList)ViewBag.AccountsList)?.FirstOrDefault(a => a.Value == Model.AccountId?.ToString())?.Text ?? "No Account Linked")" 
-                       readonly 
-                       style="cursor: not-allowed; color: #475569; font-weight: 600;" />
-                
-                @if (Model.AccountId != null && Model.AccountId.ToString() != "0" && Model.AccountId.ToString() != "")
-                {
-                    <a href="@Url.Action("Edit", "Accounts", new { id = Model.AccountId })" 
-                       class="btn border border-secondary" 
-                       style="background-color: #f8fafc; color: var(--theme-navy-primary);" 
-                       title="Open Linked Account">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
-                }
-                
+    <!-- Lead Owner -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Lead Owner</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm border border-secondary" id="QuickLeadOwnerId" asp-items="ViewBag.UsersList" data-original="@Model.LeadOwnerId" onchange="showQuickActions('LeadOwnerId')">
+                        <option value="">- Select -</option>
+                    </select>
+                    <div id="actions-LeadOwnerId" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('LeadOwnerId')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('LeadOwnerId')"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email ID -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Email ID</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm border border-secondary" id="QuickEmailID" value="@Model.EmailID" data-original="@Model.EmailID" oninput="showQuickActions('EmailID')" />
+                    <div id="actions-EmailID" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('EmailID')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('EmailID')"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Number -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Mobile Number</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm border border-secondary" id="QuickMobileNumber" value="@Model.MobileNumber" data-original="@Model.MobileNumber" oninput="showQuickActions('MobileNumber')" />
+                    <div id="actions-MobileNumber" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('MobileNumber')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('MobileNumber')"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Sources -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Data Sources</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm border border-secondary" id="QuickDataSources" data-original="@Model.DataSources" onchange="showQuickActions('DataSources')">
+                        <option value="">- None -</option>
+                        <option value="InboundCall">InboundCall</option>
+                        <option value="Referral/Dealer">Referral/Dealer</option>
+                        <option value="Meta Ads">Meta Ads</option>
+                        <option value="Google AdWords">Google AdWords</option>
+                        <option value="Outreach">Outreach</option>
+                        <option value="Group Lead">Group Lead</option>
+                        <option value="Institutiona">Institutional</option>
+                        <option value="Webinar">Webinar</option>
+                        <option value="KOMMO">KOMMO</option>
+                        <option value="Google Organic SEO">Google Organic SEO</option>
+                        <option value="Website Direct">Website Direct</option>
+                    </select>
+                    <div id="actions-DataSources" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('DataSources')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('DataSources')"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alt Mobile -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Alt Mobile</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm border border-secondary" id="QuickAlternateMobile" value="@Model.AlternateMobile" data-original="@Model.AlternateMobile" oninput="showQuickActions('AlternateMobile')" />
+                    <div id="actions-AlternateMobile" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('AlternateMobile')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('AlternateMobile')"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lead Status -->
+    <div class="col-md-6 mb-3">
+        <div class="row align-items-center">
+            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Lead Status</div>
+            <div class="col-8">
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm border border-secondary" id="QuickLeadStatus" data-original="@Model.LeadStatus" onchange="showQuickActions('LeadStatus')">
+                        <option value="">- None -</option>
+                        <option value="Cold">Cold</option>
+                        <option value="Not interested">Not interested</option>
+                        <option value="Warm">Warm</option>
+                        <option value="Hot">Hot</option>
+                        <option value="ImportantContact">ImportantContact</option>
+                        <option value="Not Answering">Not Answering</option>
+                        <option value="InterestedCold">InterestedCold</option>
+                    </select>
+                    <div id="actions-LeadStatus" style="display: none; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('LeadStatus')"></i>
+                        <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('LeadStatus')"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-                   
-
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Lead Owner</div>
-                            <div class="col-8">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickLeadOwnerId" asp-items="ViewBag.UsersList" onchange="updateQuickField('LeadOwnerId', this.value)">
-                                    <option value="">- Select -</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Email ID</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickEmailID" value="@Model.EmailID" onchange="updateQuickField('EmailID', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Mobile Number</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickMobileNumber" value="@Model.MobileNumber" onchange="updateQuickField('MobileNumber', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Data Sources</div>
-                            <div class="col-8">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickDataSources" onchange="updateQuickField('DataSources', this.value)">
-                                    <option value="">- None -</option>
-                                    <option value="InboundCall">InboundCall</option>
-                                    <option value="Referral/Dealer">Referral/Dealer</option>
-                                    <option value="Meta Ads">Meta Ads</option>
-                                    <option value="Google AdWords">Google AdWords</option>
-                                    <option value="Outreach">Outreach</option>
-                                    <option value="Group Lead">Group Lead</option>
-                                    <option value="Institutiona">Institutional</option>
-                                    <option value="Webinar">Webinar</option>
-                                    <option value="KOMMO">KOMMO</option>
-                                    <option value="Google Organic SEO">Google Organic SEO</option>
-                                    <option value="Website Direct">Website Direct</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Alt Mobile</div>
-                            <div class="col-8">
-                                <input type="text" class="form-control form-control-sm border border-secondary" id="QuickAlternateMobile" value="@Model.AlternateMobile" onchange="updateQuickField('AlternateMobile', this.value)" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Lead Status</div>
-                            <div class="col-8">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickLeadStatus" onchange="updateQuickField('LeadStatus', this.value)">
-                                    <option value="">- None -</option>
-                                    <option value="Cold">Cold</option>
-                                    <option value="Not interested">Not interested</option>
-                                    <option value="Warm">Warm</option>
-                                    <option value="Hot">Hot</option>
-                                    <option value="ImportantContact">ImportantContact</option>
-                                    <option value="Not Answering">Not Answering</option>
-                                    <option value="InterestedCold">InterestedCold</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Next Action -->
             <div class="detail-section-card">
@@ -698,32 +737,38 @@
             <!-- Open Tasks -->
             <div id="detailOpenTasksSection" class="detail-section-card">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Activities</h6>
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Add Task</button>
+                    <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Open Task</h6>
+              
                 </div>
                 @if (openTasks.Any())
                 {
                     <table class="zoho-task-table">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
-                        <tbody id="openTasksTbody">
-                            @foreach (var t in openTasks)
-                            {
-                                <tr data-task-id="@t.Id">
-                                    <td class="text-primary fw-medium">@t.Subject</td>
-                                    <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                    <td>@t.Priority</td>
-                                    <td>
-                                        <select class="form-select form-select-sm border task-status-dropdown" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #f8fafc; color: #1e3a8a; font-weight: 600;">
-                                            <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
-                                            <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
-                                            <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
-                                            <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
-                                            <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
-                                        </select>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
+                        <thead><tr><th>Subject</th><th>Due Date</th><th>Priority</th><th>Status</th><th>Task Owner</th></tr></thead>
+                      <tbody id="openTasksTbody">
+    @foreach (var t in openTasks)
+    {
+        <tr data-task-id="@t.Id">
+            <td>
+                <a href="@Url.Action("Edit", "Tasks", new { id = t.Id })" class="text-primary fw-medium text-decoration-none">
+                    @t.Subject
+                </a>
+            </td>
+            <td>@(t.DueDate != null ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+            <td>@t.Priority</td>
+            <td>
+                <select class="form-select form-select-sm border task-status-dropdown" onchange="updateTaskStatus(this, '@t.Id')" style="width: 130px; font-size: 0.8rem; background-color: #f8fafc; color: #1e3a8a; font-weight: 600;">
+                    <option value="Not Started" selected="@(t.Status == "Not Started" ? "selected" : null)">Not Started</option>
+                    <option value="In Progress" selected="@(t.Status == "In Progress" ? "selected" : null)">In Progress</option>
+                    <option value="Waiting" selected="@(t.Status == "Waiting" ? "selected" : null)">Waiting</option>
+                    <option value="Deferred" selected="@(t.Status == "Deferred" ? "selected" : null)">Deferred</option>
+                    <option value="Completed" selected="@(t.Status == "Completed" ? "selected" : null)">Completed</option>
+                </select>
+            </td>
+            <!-- 🚀 ADDED: Task Owner Display -->
+            <td>@(string.IsNullOrWhiteSpace(t.TaskOwner) ? "Unassigned" : t.TaskOwner)</td>
+        </tr>
+    }
+</tbody>
                     </table>
                 }
                 else
@@ -734,21 +779,27 @@
 
             <!-- Closed Tasks -->
             <div id="detailClosedTasksSection" class="detail-section-card">
-                <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
+                <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Task</h6>
                 @if (closedTasks.Any())
                 {
                     <table class="zoho-task-table" id="closedTasksTable">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
-                        <tbody>
-                            @foreach (var t in closedTasks)
-                            {
-                                <tr data-task-id="@t.Id">
-                                    <td class="text-secondary text-decoration-line-through">@t.Subject</td>
-                                    <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
-                                    <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
-                                </tr>
-                            }
-                        </tbody>
+                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th><th>Task Owner</th></tr></thead>
+                    <tbody>
+    @foreach (var t in closedTasks)
+    {
+        <tr data-task-id="@t.Id">
+            <td>
+                <a href="@Url.Action("Edit", "Tasks", new { id = t.Id })" class="text-secondary text-decoration-line-through">
+                    @t.Subject
+                </a>
+            </td>
+            <td>@(t.DueDate.HasValue ? t.DueDate.Value.ToString("dd MMM yyyy") : "-")</td>
+            <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+            <!-- 🚀 ADDED: Task Owner Display -->
+            <td>@(string.IsNullOrWhiteSpace(t.TaskOwner) ? "Unassigned" : t.TaskOwner)</td>
+        </tr>
+    }
+</tbody>
                     </table>
                 }
                 else
@@ -1433,84 +1484,71 @@
     });
 
     // 🚀 NEW: Function to Update Task Status via AJAX
- function updateTaskStatus(selectElem, taskId) {
-        const newStatus = selectElem.value;
-        const row = selectElem.closest('tr');
+function updateTaskStatus(selectElem, taskId) {
+    const newStatus = selectElem.value;
+    const row = selectElem.closest('tr');
+    selectElem.disabled = true;
 
-        selectElem.disabled = true; // Lock dropdown while saving
+    const formData = new URLSearchParams();
+    formData.append('id', taskId);
+    formData.append('status', newStatus);
 
-        const formData = new URLSearchParams();
-        formData.append('id', taskId);
-        formData.append('status', newStatus);
-
-        // 🚀 FIX: Hardcode the exact route to match your Controller's [Route("Tasks/UpdateStatus")]
-        const targetUrl = '/Tasks/UpdateStatus';
-
-        fetch(targetUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-        })
-            .then(response => {
-                selectElem.disabled = false;
-                if (response.ok) {
-                    if (newStatus === 'Completed') {
-                        moveTaskToClosed(row);
-                    }
-                } else {
-                    alert('Failed to update task status in DB.');
-                    selectElem.value = 'Not Started';
-                }
-            })
-            .catch(err => {
-                selectElem.disabled = false;
-                console.error('Error updating task:', err);
-            });
-    }
+    // Matches the C# route we just fixed
+    fetch('/Leads/UpdateTaskStatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    })
+    .then(response => {
+        selectElem.disabled = false;
+        if (response.ok) {
+            if (newStatus === 'Completed') {
+                moveTaskToClosed(row);
+            }
+        } else {
+            alert('Failed to update task status in DB.');
+            selectElem.value = 'Not Started';
+        }
+    })
+    .catch(err => {
+        selectElem.disabled = false;
+        console.error('Error:', err);
+    });
+}
 
     // Move row from Open Activities to Closed Activities visually without refreshing page
    function moveTaskToClosed(row) {
-        const subject = row.cells[0].innerText;
-        const dueDate = row.cells[1].innerText;
+    const subjectHtml = row.cells[0].innerHTML; // Keeps the clickable link intact
+    const dueDate = row.cells[1].innerText;
+    const ownerName = row.cells[4] ? row.cells[4].innerText : "Unassigned"; // Grabs Owner Name
 
-        const newRow = document.createElement('tr');
-        
-        // 🚀 FIX: Replaced the injected date with the correct green "Completed" status badge HTML
-        newRow.innerHTML = `
-                <td class="text-secondary text-decoration-line-through">${subject}</td>
-                <td>${dueDate}</td>
-                <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
-            `;
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td class="text-secondary text-decoration-line-through">${subjectHtml}</td>
+        <td>${dueDate}</td>
+        <td class="text-success fw-bold"><i class="fa-solid fa-check me-1"></i> Completed</td>
+        <td>${ownerName}</td>
+    `;
 
-        let closedSection = document.getElementById('detailClosedTasksSection');
-        let closedTbody = closedSection.querySelector('tbody');
+    let closedSection = document.getElementById('detailClosedTasksSection');
+    let closedTbody = closedSection.querySelector('tbody');
 
-        // If table doesn't exist yet, create it
-        if (!closedTbody) {
-            closedSection.innerHTML = `
-                    <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Activities</h6>
-                    <table class="zoho-task-table" id="closedTasksTable">
-                        <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                `;
-            closedTbody = closedSection.querySelector('tbody');
-        }
-
-        // Inject into top of closed list
-        closedTbody.insertBefore(newRow, closedTbody.firstChild);
-        row.remove(); // Remove from open list
-
-        // Update Next action if table becomes empty
-        const openTbody = document.getElementById('openTasksTbody');
-        if (openTbody && openTbody.children.length === 0) {
-            document.getElementById('nextActionDisplay').innerText = "No upcoming actions scheduled.";
-        } else if (openTbody && openTbody.children.length > 0) {
-            const nextRow = openTbody.children[0];
-            document.getElementById('nextActionDisplay').innerText = `${nextRow.cells[0].innerText} - Due: ${nextRow.cells[1].innerText}`;
-        }
+    if (!closedTbody) {
+        closedSection.innerHTML = `
+            <h6 class="fw-bold mb-3 border-bottom pb-2" style="color: var(--theme-navy-primary);">Closed Task</h6>
+            <table class="zoho-task-table" id="closedTasksTable">
+                <thead><tr><th>Subject</th><th>Due Date</th><th>Status</th><th>Task Owner</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        `;
+        closedTbody = closedSection.querySelector('tbody');
     }
 
+    closedTbody.insertBefore(newRow, closedTbody.firstChild);
+    row.remove(); // Removes from Open Activities
+
+    updateTaskCounts(); // Recalculate numbers
+}
     document.addEventListener("DOMContentLoaded", function () {
         // 1. Set Lead Owner
         const quickOwner = document.getElementById('QuickLeadOwnerId');
@@ -1665,38 +1703,40 @@
     // =====================================
     // QUICK INFO AUTO-SAVE JAVASCRIPT
     // =====================================
-   function updateQuickField(fieldName, fieldValue) {
-        // 1. Keep the main Edit Form in sync
-        const editFormInput = document.getElementById(fieldName);
-        if (editFormInput) {
-            editFormInput.value = fieldValue;
-            editFormInput.dispatchEvent(new Event('change')); // Triggers cascading logic (e.g. Meta Ads display)
-        }
-
-        // 2. Fire the AJAX call to save instantly
-        const formData = new URLSearchParams();
-        
-        // 🚀 FIX: Parameter names MUST match the C# Controller exactly (id, field, value)
-        formData.append('id', '@Model.Id');
-        formData.append('field', fieldName);
-        formData.append('value', fieldValue);
-
-        fetch('/Leads/UpdateQuickInfo', { // 🚀 FIX: Use absolute path to prevent 404 routing errors
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-        })
-            .then(response => {
-                if (!response.ok) {
-                    alert("Failed to automatically update " + fieldName + " in the database.");
-                } else {
-                    console.log("Successfully saved " + fieldName);
-                }
-            })
-            .catch(err => {
-                console.error('Error updating quick info:', err);
-            });
+ function updateQuickField(fieldName, fieldValue) {
+    // 1. Keep the main Edit Form in sync
+    const editFormInput = document.getElementById(fieldName);
+    if (editFormInput) {
+        editFormInput.value = fieldValue;
+        editFormInput.dispatchEvent(new Event('change')); // Triggers cascading logic
     }
+
+    // 2. Fire the AJAX call to save instantly
+    const formData = new URLSearchParams();
+    
+    // 🚀 FIX: These keys ('id', 'field', 'value') now perfectly match the C# parameters
+    formData.append('id', '@Model.Id');
+    formData.append('field', fieldName);
+    formData.append('value', fieldValue);
+
+    fetch('/Leads/UpdateQuickInfo', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    })
+    .then(response => {
+        if (!response.ok) {
+            alert("Failed to automatically update " + fieldName + " in the database.");
+        } else {
+            console.log("Successfully saved " + fieldName);
+            // Optional: You could show a small toast notification here instead of an alert
+        }
+    })
+    .catch(err => {
+        console.error('Error updating quick info:', err);
+        alert("Network Error: Could not update " + fieldName);
+    });
+}
 
     function openTaskModal() {
         const ownerDropdown = document.getElementById('taskOwnerDropdown');
@@ -2074,4 +2114,78 @@
             });
         }
     }
+
+    // Shows the tick/cross buttons when a user types or changes a dropdown
+function showQuickActions(fieldName) {
+    const actionsDiv = document.getElementById('actions-' + fieldName);
+    const input = document.getElementById('Quick' + fieldName);
+    
+    if (actionsDiv) {
+        actionsDiv.style.display = 'block';
+        input.style.borderColor = '#16a34a'; // Optionally highlight border in green to show it's unsaved
+    }
+}
+
+// Cancels the change and reverts to the original value
+function cancelQuickField(fieldName) {
+    const input = document.getElementById('Quick' + fieldName);
+    const actionsDiv = document.getElementById('actions-' + fieldName);
+    
+    if (input) {
+        input.value = input.getAttribute('data-original'); // Revert value
+        input.style.borderColor = '#6c757d'; // Reset border back to secondary
+    }
+    
+    if (actionsDiv) {
+        actionsDiv.style.display = 'none'; // Hide icons
+    }
+}
+
+// Saves the new value by calling your existing update function
+function saveQuickField(fieldName) {
+    const input = document.getElementById('Quick' + fieldName);
+    const actionsDiv = document.getElementById('actions-' + fieldName);
+    
+    if (input) {
+        const newValue = input.value;
+        input.setAttribute('data-original', newValue); // Set new value as original so cancel works moving forward
+        input.style.borderColor = '#6c757d'; // Reset border 
+        
+        // Trigger your existing AJAX update function
+        updateQuickField(fieldName, newValue);
+    }
+    
+    if (actionsDiv) {
+        actionsDiv.style.display = 'none'; // Hide icons after save
+    }
+}
+
+// 🚀 3. NEW: RECALCULATES & UPDATES ALL COUNTERS LIVE
+function updateTaskCounts() {
+    const openTbody = document.getElementById('openTasksTbody');
+    const closedTbody = document.querySelector('#detailClosedTasksSection tbody');
+    
+    const openCount = openTbody ? openTbody.children.length : 0;
+    const closedCount = closedTbody ? closedTbody.children.length : 0;
+
+    // Update Section Headers
+    const openHeader = document.querySelector('#detailOpenTasksSection h6');
+    if (openHeader) openHeader.innerHTML = `Open Task (${openCount})`;
+
+    const closedHeader = document.querySelector('#detailClosedTasksSection h6');
+    if (closedHeader) closedHeader.innerHTML = `Closed Task (${closedCount})`;
+
+    // Update Left Sidebar
+    const sidebarOpen = document.getElementById('sidebarOpenTaskCount');
+    if (sidebarOpen) sidebarOpen.innerText = `(${openCount})`;
+
+    const sidebarClosed = document.getElementById('sidebarClosedTaskCount');
+    if (sidebarClosed) sidebarClosed.innerText = `(${closedCount})`;
+    
+    // Update Next Action placeholder if empty
+    if (openCount === 0) {
+        const nextAction = document.getElementById('nextActionDisplay');
+        if(nextAction) nextAction.innerText = "No upcoming actions scheduled.";
+    }
+}
 </script>

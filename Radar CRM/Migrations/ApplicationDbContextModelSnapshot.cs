@@ -2041,7 +2041,7 @@ namespace Radar_CRM.Migrations
 
             modelBuilder.Entity("Radar_CRM.Models.Task", b =>
                 {
-                    b.HasOne("Radar_CRM.Models.Account", null)
+                    b.HasOne("Radar_CRM.Models.Account", "Account")
                         .WithMany("Tasks")
                         .HasForeignKey("AccountId");
 
@@ -2049,13 +2049,17 @@ namespace Radar_CRM.Migrations
                         .WithMany("Tasks")
                         .HasForeignKey("DealId");
 
-                    b.HasOne("Radar_CRM.Models.Lead", null)
+                    b.HasOne("Radar_CRM.Models.Lead", "Lead")
                         .WithMany("Tasks")
                         .HasForeignKey("LeadId");
 
                     b.HasOne("Radar_CRM.Models.User", null)
                         .WithMany("OwnedContacts")
                         .HasForeignKey("UserId");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Lead");
                 });
 
             modelBuilder.Entity("Radar_CRM.Models.User", b =>
