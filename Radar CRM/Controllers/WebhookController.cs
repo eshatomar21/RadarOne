@@ -103,7 +103,7 @@ namespace Radar_CRM.Controllers
                     // This now strictly matches your HTML dropdown values ("Google AdWords" or "Website Direct")
                     DataSource = leadSource,
 
-                    CurrentStatus = "Non-User",
+                    CurrentStatus = "Non User",
                     DateOfEntry = DateTime.Now,
 
                     // 🚀 THIS links the record to the dynamically found user in the CRM UI

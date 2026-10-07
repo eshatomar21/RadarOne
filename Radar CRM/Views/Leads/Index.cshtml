@@ -421,7 +421,7 @@
                     {
                         { "LeadStatus", new[] { "Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made" } },
                         { "Stage", new[] { "Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost" } },
-                        { "CurrentStatus", new[] { "User", "Non-User" } },
+                        { "CurrentStatus", new[] { "User", "Non User" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
                         { "DataSources", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "Website Direct", "YouTube", "LinkedIn", "Cold Calling", "WhatsApp Campaign" } },
                         { "CampaignSource", new[] { "Meta Ads", "Google AdWords", "Webinar", "Outreach", "Direct" } },
@@ -639,7 +639,7 @@
                                             else if (prop.Name == "LeadStatus" || prop.Name == "Stage" || prop.Name == "CurrentStatus")
                                             {
                                                 @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active" || value.ToLower() == "won") { <span class="badge-soft-success">@value</span> }
-                                                else if (value.ToLower() == "lost" || value.ToLower() == "not interested" || value.ToLower() == "non-user") { <span class="badge-soft-danger">@value</span> }
+                                                else if (value.ToLower() == "lost" || value.ToLower() == "not interested" || value.ToLower() == "non user") { <span class="badge-soft-danger">@value</span> }
                                                 else if (!string.IsNullOrEmpty(value)) { <span class="badge-soft-warning">@value</span> }
                                             }
                                             else { @value }
@@ -1093,7 +1093,7 @@
         "GroupName": vendorOptionsList,
         "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made"],
         "Stage": ["Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost"],
-        "CurrentStatus": ["User", "Non-User"],
+        "CurrentStatus": ["User", "Non User"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
         "DataSources": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "Website Direct", "YouTube", "LinkedIn", "Cold Calling", "WhatsApp Campaign"],
         "CampaignSource": ["Meta Ads", "Google AdWords", "Webinar", "Outreach", "Direct"],

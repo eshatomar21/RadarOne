@@ -1236,7 +1236,7 @@
                             <select class="form-select form-select-sm border border-secondary quick-edit-input w-100" id="QuickCurrentStatus" data-original="@Model.CurrentStatus" onchange="showActionButtons('actions-status')">
                                 <option value="None">None</option>
                                 <option value="User">User</option>
-                                <option value="Non-User">Non-User</option>
+                                <option value="Non User">Non User</option>
                             </select>
                         </div>
                         <div id="actions-status" class="d-none inline-actions text-nowrap flex-shrink-0">
@@ -1528,7 +1528,7 @@
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person Name</div><div class="z-input-wrapper"><input asp-for="ContactPersonName" class="z-input" placeholder="Enter full name" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Account Type</div><div class="z-input-wrapper"><select asp-for="AccountType" class="z-input" id="AccountType"><option value="None">None</option><option value="Individual">Individual</option><option value="Group">Group</option><option value="Institution">Institution</option><option value="Government Organisation">Government Organisation</option></select></div></div></div>
                
-                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Status</div><div class="z-input-wrapper"><select asp-for="CurrentStatus" class="z-input"><option value="None">None</option><option value="User">User</option><option value="Non-User">Non-User</option></select></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Current Status</div><div class="z-input-wrapper"><select asp-for="CurrentStatus" class="z-input"><option value="None">None</option><option value="User">User</option><option value="Non User">Non User</option></select></div></div></div>
                 <div class="col-md-6" id="divGroupName" style="display:none;"><div class="z-field-row"><div class="z-label">Group Name</div><div class="z-input-wrapper"><select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="z-input" id="GroupName"><option value="">-Select Group Name-</option></select></div></div></div>
 
                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Mobile Phone <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="MobileNumber" class="z-input" id="MobileNumber" placeholder="+1 202-555-0117" required /><button type="button" class="verify-btn" onclick="verifyPhone('MobileNumber')">Verify</button></div></div></div>

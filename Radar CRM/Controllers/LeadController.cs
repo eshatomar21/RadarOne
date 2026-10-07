@@ -481,7 +481,7 @@ namespace Radar_CRM.Controllers
                 {
                     lead.Pipeline = "Upgrade Software";
                 }
-                else if (lead.CurrentStatus == "Non-User")
+                else if (lead.CurrentStatus == "Non User")
                 {
                     lead.Pipeline = "New Software";
                 }
@@ -794,7 +794,7 @@ namespace Radar_CRM.Controllers
                 {
                     lead.Pipeline = "Upgrade Software";
                 }
-                else if (lead.CurrentStatus == "Non-User")
+                else if (lead.CurrentStatus == "Non User")
                 {
                     lead.Pipeline = "New Software";
                 }
