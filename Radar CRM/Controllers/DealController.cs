@@ -415,7 +415,7 @@ namespace Radar_CRM.Controllers
 
                 _context.Add(deal);
                 await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Edit), new { id = deal.Id });
             }
 
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");

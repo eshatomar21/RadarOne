@@ -461,7 +461,7 @@ namespace Radar_CRM.Controllers
 
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
 
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Edit), new { id = taskModel.Id });
                 }
                 catch (Exception ex)
                 {
@@ -610,9 +610,6 @@ namespace Radar_CRM.Controllers
             return View(taskModel);
         }
 
-        // ==========================================
-        // EDIT: POST
-        // ==========================================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, CrmTaskModel taskModel, string[] SavedNoteDesc, string[] SavedNoteDateTime)
@@ -644,7 +641,7 @@ namespace Radar_CRM.Controllers
                         if (user != null) taskModel.TaskOwner = user.fullName;
                     }
 
-                    // 🚀 NEW: Auto-Populate RelatedTo and RelatedToId based on attached Account or Lead
+                    // Auto-Populate RelatedTo and RelatedToId based on attached Account or Lead
                     if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
                     {
                         var account = await _context.Accounts.FindAsync(taskModel.AccountId.Value);
@@ -669,7 +666,8 @@ namespace Radar_CRM.Controllers
 
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
 
-                    return RedirectToAction(nameof(Index));
+                    // FIX: Stay on the Edit page instead of redirecting to Index
+                    return RedirectToAction(nameof(Edit), new { id = taskModel.Id });
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -683,8 +681,56 @@ namespace Radar_CRM.Controllers
                 }
             }
 
+            // FIX: Repopulate ViewBags if validation fails so the page doesn't crash on reload
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+
+            // Default Fallbacks
+            ViewBag.RelatedEntityName = "No Related Record";
+            ViewBag.RelatedEntityId = null;
+            ViewBag.RelatedEntityUrl = "#";
+            ViewBag.RelatedEntityType = "Record";
+            ViewBag.Budget = "-";
+            ViewBag.LeadOwnerName = "-";
+            ViewBag.LeadMobile = "-";
+            ViewBag.LeadEmail = "-";
+            ViewBag.LeadSource = "-";
+            ViewBag.LeadStatusValue = "-";
+
+            // Re-fetch sidebar data for fallback
+            if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
+            {
+                var account = await _context.Accounts.Include(a => a.AccountOwner).FirstOrDefaultAsync(a => a.Id == taskModel.AccountId.Value);
+                if (account != null)
+                {
+                    ViewBag.RelatedEntityName = account.AccountName;
+                    ViewBag.RelatedEntityId = account.Id;
+                    ViewBag.RelatedEntityUrl = Url.Action("Edit", "Accounts", new { id = account.Id });
+                    ViewBag.RelatedEntityType = "Account";
+                    ViewBag.LeadOwnerName = account.AccountOwner?.fullName ?? "System User";
+                    ViewBag.LeadMobile = !string.IsNullOrWhiteSpace(account.MobileNumber) ? account.MobileNumber : "-";
+                    ViewBag.LeadEmail = !string.IsNullOrWhiteSpace(account.Email) ? account.Email : "-";
+                    ViewBag.LeadSource = !string.IsNullOrWhiteSpace(account.DataSource) ? account.DataSource : "-";
+                    ViewBag.LeadStatusValue = !string.IsNullOrWhiteSpace(account.CurrentStatus) ? account.CurrentStatus : "-";
+                }
+            }
+            else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
+            {
+                var lead = await _context.Leads.Include(l => l.LeadOwner).FirstOrDefaultAsync(l => l.Id == taskModel.LeadId.Value);
+                if (lead != null)
+                {
+                    ViewBag.RelatedEntityName = string.IsNullOrWhiteSpace(lead.LeadName) ? "Unnamed Lead" : lead.LeadName;
+                    ViewBag.RelatedEntityId = lead.Id;
+                    ViewBag.RelatedEntityUrl = Url.Action("Edit", "Leads", new { id = lead.Id });
+                    ViewBag.RelatedEntityType = "Lead";
+                    ViewBag.Budget = lead.Budget?.ToString() ?? "-";
+                    ViewBag.LeadOwnerName = lead.LeadOwner?.fullName ?? "System User";
+                    ViewBag.LeadMobile = !string.IsNullOrWhiteSpace(lead.MobileNumber) ? lead.MobileNumber : "-";
+                    ViewBag.LeadEmail = !string.IsNullOrWhiteSpace(lead.EmailID) ? lead.EmailID : "-";
+                    ViewBag.LeadSource = !string.IsNullOrWhiteSpace(lead.DataSources) ? lead.DataSources : "-";
+                    ViewBag.LeadStatusValue = !string.IsNullOrWhiteSpace(lead.LeadStatus) ? lead.LeadStatus : "-";
+                }
+            }
 
             return View(taskModel);
         }

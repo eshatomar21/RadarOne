@@ -505,6 +505,8 @@
     <!-- Hidden IDs -->
     <input type="hidden" asp-for="Id" />
     <input type="hidden" asp-for="CreatedTime" />
+    <input type="hidden" asp-for="AccountId" /> <!-- ADD THIS -->
+    <input type="hidden" asp-for="LeadId" />
 
     <div class="sf-container">
 
@@ -765,7 +767,9 @@
                                     <input type="file" id="inlineNoteFile" style="display: none;" />
                                     
                                     <select id="inlineNoteOwner" class="form-select form-select-sm border-0 shadow-none fw-bold" asp-items="ViewBag.UsersList" style="width: 160px; background: transparent; color: var(--theme-primary); cursor: pointer; font-size: 1rem;">
-                                        <option value="">- System User -</option>
+                                        <option value="@(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)">
+                                            - @(User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Current User") -
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="d-flex align-items-center gap-3">
@@ -1060,7 +1064,9 @@
             
             const ownerDropdown = document.getElementById('inlineNoteOwner');
             const ownerId = ownerDropdown ? ownerDropdown.value : '';
-            const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1 ? ownerDropdown.options[ownerDropdown.selectedIndex].text : 'System User';
+               const ownerName = ownerDropdown && ownerDropdown.selectedIndex > -1
+        ? ownerDropdown.options[ownerDropdown.selectedIndex].text
+        : '@Html.Raw(User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Current User")';
             const dateTime = new Date().toLocaleString();
 
             if (!desc && !fileName && !title) {

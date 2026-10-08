@@ -419,17 +419,30 @@
         </ul>
     </div>
 
-    <!-- Main Detail Content -->
-    <div class="detail-main">
-        <div class="detail-header shadow-sm">
-            <div class="d-flex align-items-center gap-3">
-                <button type="button" class="btn btn-light rounded-circle border" onclick="window.history.back();" style="width: 36px; height: 36px; padding: 0;"><i class="fa-solid fa-arrow-left"></i></button>
-                <h4 class="m-0 fw-bold" style="color: var(--theme-navy-primary);">@Model.LeadName</h4>
-            </div>
-            <div>
-                <button type="button" class="btn btn-light border fw-bold px-4" onclick="toggleView('edit')"><i class="fa-solid fa-pencil me-2"></i> Edit</button>
-            </div>
+   <!-- Main Detail Content -->
+<div class="detail-main">
+    <div class="detail-header shadow-sm">
+        <div class="d-flex align-items-center gap-3">
+            <button type="button" class="btn btn-light rounded-circle border shadow-sm" onclick="window.history.back();" style="width: 38px; height: 38px; padding: 0;">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h3 class="m-0 fw-bold d-flex align-items-center" style="color: var(--theme-navy-primary); font-size: 1.75rem;">
+                @Model.LeadName
+            </h3>
         </div>
+        <div class="d-flex align-items-center gap-3">
+            
+            <!-- 🚀 Lead Heading & Icon next to the Edit Button -->
+            <div class="d-flex align-items-center px-3 py-1 rounded" style="background-color: var(--theme-navy-light); color: var(--theme-navy-primary); border: 1px solid #bfdbfe;">
+                <i class="fa-solid fa-user-tie me-2"></i>
+                <span class="fw-bold" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;">Lead</span>
+            </div>
+
+            <button type="button" class="btn btn-light border fw-bold px-4 shadow-sm" onclick="toggleView('edit')">
+                <i class="fa-solid fa-pencil me-2"></i> Edit
+            </button>
+        </div>
+    </div>
 
         <div class="detail-content">
             <!-- Stage Bar -->
@@ -565,6 +578,31 @@
                     </div>
                 </div>
 
+                <!-- Stage (Quick Info) -->
+<!-- Stage (Quick Info) -->
+<div class="col-md-6 mb-3">
+    <div class="row align-items-center">
+        <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Stage</div>
+        <div class="col-8">
+            <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-sm border border-secondary fw-bold text-primary" id="QuickStage" data-original="@Model.Stage" onchange="showQuickActions('Stage')">
+                    <option value="">-None-</option>
+                    <option value="Open" selected="@(Model.Stage == "Open" ? "selected" : null)">Open</option>
+                    <option value="Demo Scheduled" selected="@(Model.Stage == "Demo Scheduled" ? "selected" : null)">Demo Scheduled</option>
+                    <option value="Demo Done" selected="@(Model.Stage == "Demo Done" ? "selected" : null)">Demo Done</option>
+                    <option value="Trial Offered" selected="@(Model.Stage == "Trial Offered" ? "selected" : null)">Trial Offered</option>
+                    <option value="Direct Deal" selected="@(Model.Stage == "Direct Deal" ? "selected" : null)">Direct Deal</option>
+                    <option value="Won" selected="@(Model.Stage == "Won" ? "selected" : null)">Won</option>
+                    <option value="Lost" selected="@(Model.Stage == "Lost" ? "selected" : null)">Lost</option>
+                </select>
+                <div id="actions-Stage" style="display: none; white-space: nowrap;">
+                    <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('Stage')"></i>
+                    <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('Stage')"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
                 <!-- Lead Status -->
                 <div class="col-md-6 mb-3">
                     <div class="row align-items-center">
@@ -1325,7 +1363,7 @@
                 editView.style.display = 'none';
                 detailView.style.display = 'flex';
 
-                // Sync Quick Edit fields back from form
+                // Sync standard Quick Edit fields back from form
                 const syncField = (quickId, realId) => {
                     const q = document.getElementById(quickId);
                     const r = document.getElementById(realId);
@@ -1338,6 +1376,16 @@
                 syncField('QuickDataSources', 'DataSources');
                 syncField('QuickAlternateMobile', 'AlternateMobile');
                 syncField('QuickLeadStatus', 'LeadStatus');
+
+                // 🚀 EXPLICITLY SYNC STAGE TO QUICK INFO
+                const actualStage = document.getElementById('actualStageSelect');
+                const quickStage = document.getElementById('QuickStage');
+                if (actualStage && quickStage) {
+                    quickStage.value = actualStage.value;
+                }
+
+                // Force Chevron bar visual update
+                updateChevronBars();
             }
         }
 
@@ -1583,10 +1631,31 @@
             if (noteOwner) noteOwner.value = '@currentUserId';
 
             // 4. Update Chevron Stage Bar
-            const stgSelect = document.getElementById("actualStageSelect");
+         const stgSelect = document.getElementById("actualStageSelect");
+            const quickStage = document.getElementById("QuickStage");
+
             if (stgSelect) {
-                stgSelect.addEventListener('change', updateChevronBars);
+                // A. On page load, force Quick Info to perfectly match the Edit Form (DB Value)
+                if (quickStage && stgSelect.value) {
+                    quickStage.value = stgSelect.value;
+                }
+
+                // B. Initialize the Chevron Bar colors
                 updateChevronBars();
+
+                // C. When user changes Stage in the Edit Form -> Sync everything instantly
+                stgSelect.addEventListener('change', function () {
+                    const newStage = this.value;
+
+                    // 1. Update Quick Info dropdown visually
+                    if (quickStage) quickStage.value = newStage;
+
+                    // 2. Update Chevron Bar colors visually
+                    updateChevronBars();
+
+                    // 3. Instantly save to database via AJAX (same as clicking green checkmark)
+                    updateQuickField('Stage', newStage);
+                });
             }
 
             // TASK DUE DATE CALCULATION LOGIC
@@ -1865,7 +1934,7 @@
                 });
         }
 
-        let isDirectDealConfirmed = false;
+      let isDirectDealConfirmed = false;
         const leadForm = document.getElementById('leadForm');
 
         if (leadForm) {
@@ -1873,11 +1942,12 @@
                 const stageSelect = document.getElementById('actualStageSelect');
                 if (stageSelect) {
                     const stageValue = stageSelect.value;
-                    if (stageValue === 'Direct Deal' && !isDirectDealConfirmed) {
+                    
+                    // 🚀 FIX: Trigger Deal Modal ONLY when stage is "Won"
+                    if (stageValue === 'Won' && !isDirectDealConfirmed) {
                         e.preventDefault();
                         const confirmModalEl = document.getElementById('directDealConfirmModal');
                         if (confirmModalEl) {
-                            // 🚀 FIX: Move confirm modal to body
                             if (confirmModalEl.parentNode !== document.body) {
                                 document.body.appendChild(confirmModalEl);
                             }
@@ -2209,16 +2279,25 @@
     }
 
     // Saves the new value by calling your existing update function
-    function saveQuickField(fieldName) {
+function saveQuickField(fieldName) {
         const input = document.getElementById('Quick' + fieldName);
         const actionsDiv = document.getElementById('actions-' + fieldName);
 
         if (input) {
             const newValue = input.value;
-            input.setAttribute('data-original', newValue); // Set new value as original so cancel works moving forward
-            input.style.borderColor = '#6c757d'; // Reset border
+            input.setAttribute('data-original', newValue);
+            input.style.borderColor = '#6c757d';
 
-            // Trigger your existing AJAX update function
+            // 🚀 FIX: Sync Quick Info back to Edit Form & Update Chevron Bar
+            if (fieldName === 'Stage') {
+                const actualStage = document.getElementById('actualStageSelect');
+                if (actualStage) {
+                    actualStage.value = newValue;
+                }
+                updateChevronBars();
+            }
+
+            // Trigger your existing AJAX update function to save to DB
             updateQuickField(fieldName, newValue);
         }
 

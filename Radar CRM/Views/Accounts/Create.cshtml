@@ -319,7 +319,7 @@
             <div class="col-md-6 pe-4">
                 <h6 class="mb-3 text-muted fw-bold border-bottom pb-2">Primary Address</h6>
                 <div class="z-field-row"><div class="z-label">Country</div><div class="z-input-wrapper"><select asp-for="Addr1_Country" class="z-input" id="Addr1_Country"></select></div></div>
-                <div class="z-field-row"><div class="z-label">State <span class="text-danger">*</span></div><div class="z-input-wrapper"><select asp-for="Addr1_State" class="z-input" id="Addr1_State"></select></div></div>
+                <div class="z-field-row"><div class="z-label">State <span class="text-danger"></span></div><div class="z-input-wrapper"><select asp-for="Addr1_State" class="z-input" id="Addr1_State"></select></div></div>
                 <div class="z-field-row"><div class="z-label">City</div><div class="z-input-wrapper"><select asp-for="Addr1_City" class="z-input" id="Addr1_City"></select></div></div>
                 <div class="z-field-row"><div class="z-label">Zip / Postal Code</div><div class="z-input-wrapper"><select asp-for="Addr1_Zip" class="z-input" id="Addr1_Zip"></select></div></div>
                 <div class="z-field-row"><div class="z-label">Flat / House No.</div><div class="z-input-wrapper"><input asp-for="Addr1_FlatHouse" class="z-input" placeholder="Apt, Suite, etc." /></div></div>
@@ -486,127 +486,142 @@
     // ==========================================
     // 1. NOTES POP-UP LOGIC
     // ==========================================
-
     function openNoteModal() {
-    // Automatically fetch the current system date and time
-    const now = new Date();
-    document.getElementById('modalNoteDateTime').value = now.toLocaleString();
+        const now = new Date();
+        document.getElementById('modalNoteDateTime').value = now.toLocaleString();
 
-    // Clear old inputs out of the pop-up
-    document.getElementById('modalNoteFile').value = '';
-    document.getElementById('modalNoteDesc').value = '';
+        document.getElementById('modalNoteFile').value = '';
+        document.getElementById('modalNoteDesc').value = '';
 
-    // Open the pop-up modal
-    const modal = new bootstrap.Modal(document.getElementById('noteModal'));
-    modal.show();
+        const modal = new bootstrap.Modal(document.getElementById('noteModal'));
+        modal.show();
     }
+
     function saveNote() {
-    // Grab the Dropdown element
-    const ownerDropdown = document.getElementById('modalNoteOwner');
+        const ownerDropdown = document.getElementById('modalNoteOwner');
+        const ownerId = ownerDropdown.value;
+        const ownerName = ownerDropdown.options[ownerDropdown.selectedIndex].text;
+        const dateTime = document.getElementById('modalNoteDateTime').value;
+        const desc = document.getElementById('modalNoteDesc').value;
+        const fileInput = document.getElementById('modalNoteFile');
+        const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : '';
 
-    // The database ID (e.g., "1234-abcd...") goes to the server
-    const ownerId = ownerDropdown.value;
+        if (!desc.trim() && !fileName) {
+            alert('Please enter a description or attach a file.');
+            return;
+        }
 
-    // The readable name (e.g., "Aman") displays on the screen right away
-    const ownerName = ownerDropdown.options[ownerDropdown.selectedIndex].text;
+        let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
 
-    const dateTime = document.getElementById('modalNoteDateTime').value;
-    const desc = document.getElementById('modalNoteDesc').value;
+        const noteHtml = `
+        <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid #e5e7eb; border-left: 4px solid #1a56db; border-radius: 8px; background: #fff;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bold" style="font-size: 0.9rem; color: #111827;">
+        <i class="fa-solid fa-circle-user text-muted me-2"></i>${ownerName}
+        </span>
+        <span class="text-muted" style="font-size: 0.8rem;">
+        <i class="fa-regular fa-clock me-1"></i> ${dateTime}
+        </span>
+        </div>
+        <div style="font-size: 0.9rem; color: #374151; white-space: pre-wrap;">${desc}</div>
+        ${fileHtml}
 
-    const fileInput = document.getElementById('modalNoteFile');
-    const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : '';
+        <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" />
+        <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
+        <input type="hidden" name="SavedNoteDesc[]" value="${desc}" />
+        </div>
+        `;
 
-    if (!desc.trim() && !fileName) {
-    alert('Please enter a description or attach a file.');
-    return;
+        document.getElementById('savedNotesContainer').insertAdjacentHTML('beforeend', noteHtml);
+
+        const modalEl = document.getElementById('noteModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
     }
-
-    let fileHtml = fileName ? `<div class="mt-2 text-primary" style="font-size: 0.85rem;"><i class="fa-solid fa-paperclip me-2"></i>${fileName}</div>` : '';
-
-    const noteHtml = `
-    <div class="saved-note-card p-3 mb-3 shadow-sm" style="border: 1px solid #e5e7eb; border-left: 4px solid #1a56db; border-radius: 8px; background: #fff;">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-    <span class="fw-bold" style="font-size: 0.9rem; color: #111827;">
-    <i class="fa-solid fa-circle-user text-muted me-2"></i>${ownerName} <!-- DISPLAY NAME -->
-    </span>
-    <span class="text-muted" style="font-size: 0.8rem;">
-    <i class="fa-regular fa-clock me-1"></i> ${dateTime}
-    </span>
-    </div>
-    <div style="font-size: 0.9rem; color: #374151; white-space: pre-wrap;">${desc}</div>
-    ${fileHtml}
-
-    <!-- Hidden inputs so the data is sent to the server on Form Submit -->
-    <input type="hidden" name="SavedNoteOwner[]" value="${ownerId}" /> <!-- SUBMIT ID -->
-    <input type="hidden" name="SavedNoteDateTime[]" value="${dateTime}" />
-    <input type="hidden" name="SavedNoteDesc[]" value="${desc}" />
-    </div>
-    `;
-
-    document.getElementById('savedNotesContainer').insertAdjacentHTML('beforeend', noteHtml);
-
-    const modalEl = document.getElementById('noteModal');
-    const modalInstance = bootstrap.Modal.getInstance(modalEl);
-    modalInstance.hide();
-    }
-
 
     // ==========================================
     // 2. EXISTING PAGE LOGIC (Untouched)
     // ==========================================
-
-    // Show/Hide Conditional Fields based on DataSource
     document.getElementById('DataSource').addEventListener('change', function () {
-    const val = this.value;
-    document.getElementById('divMetaCampaign').style.display = (val === 'Meta Ads') ? 'block' : 'none';
-    document.getElementById('divSeminarName').style.display = (val === 'Seminar Conference') ? 'block' : 'none';
+        const val = this.value;
+        document.getElementById('divMetaCampaign').style.display = (val === 'Meta Ads') ? 'block' : 'none';
+        document.getElementById('divSeminarName').style.display = (val === 'Seminar Conference') ? 'block' : 'none';
     });
 
-    // Cross-record and Same-record Phone Verification
- function verifyPhone(fieldId) {
-        const phone = document.getElementById(fieldId).value.trim();
-        const mainMobile = document.getElementById('MobileNumber').value.trim();
-        const altMobile = document.getElementById('AlternateMobile').value.trim();
+    // ==========================================
+    // 3. PHONE VERIFICATION & FORMATTING
+    // ==========================================
+   window.verifyPhone = function(fieldId) {
+    const phoneInput = document.getElementById(fieldId);
+    if (!phoneInput) { alert("Error: Input field not found."); return; }
 
-        if (!phone) {
-            alert('Please enter a phone number first before verifying.');
-            return;
-        }
+    let phone = phoneInput.value.trim();
+    if (!phone) { Swal.fire("Wait", "Please enter a phone number first before verifying.", "warning"); return; }
 
-        if (fieldId === 'AlternateMobile' && mainMobile && altMobile && mainMobile === altMobile) {
-            alert('❌ Mobile Number and Alternate Mobile cannot be the exact same!');
-            return;
-        }
-
-        // 🚀 FIX: Using Url.Action for safe server routing
-        fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(phone))
-        .then(async response => {
-            if (!response.ok) throw new Error("HTTP Status " + response.status);
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                alert('⚠️ Database Error: ' + data.message);
-            } else if (data.isDuplicate) {
-                alert('⚠️ WARNING: This phone number already exists in another account record!');
-            } else {
-                alert('✅ This number is valid and unique in the system.');
-            }
-        })
-        .catch(error => {
-            console.error("Error verifying phone:", error);
-            alert("Could not connect to the server. Check your browser console (F12) for details.");
-        });
+    // 🚀 AUTO-FORMAT: Extract exactly the last 10 digits
+    let digitsOnly = phone.replace(/\D/g, ''); 
+    if (digitsOnly.length >= 10) {
+        let last10 = digitsOnly.slice(-10);
+        phone = '+91' + last10;
+        phoneInput.value = phone; // Format in UI instantly
+    } else {
+        Swal.fire("Invalid!", "Phone number must have at least 10 digits.", "error"); 
+        return;
     }
 
-   // 1. Global variable to store the API data
-    let globalRegionData = [];
+    // 🚀 CROSS-CHECK WITHIN THE FORM (Main vs Alternate)
+    const mainMobileEl = document.getElementById('MobileNumber');
+    const altMobileEl = document.getElementById('AlternateMobile');
+    
+    let main10 = mainMobileEl && mainMobileEl.value ? mainMobileEl.value.replace(/\D/g, '').slice(-10) : '';
+    let alt10 = altMobileEl && altMobileEl.value ? altMobileEl.value.replace(/\D/g, '').slice(-10) : '';
+
+    if (fieldId === 'AlternateMobile' && main10 === alt10 && alt10 !== '') {
+        Swal.fire("Error", "Alternate Mobile cannot be the exact same as the main Mobile Number!", "error"); 
+        phoneInput.value = ''; // clear it
+        return;
+    }
+    if (fieldId === 'MobileNumber' && main10 === alt10 && main10 !== '') {
+        Swal.fire("Error", "Main Mobile cannot be the exact same as the Alternate Mobile!", "error"); 
+        return;
+    }
+
+    // UI Loading state
+    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
+    let originalBtnText = 'Verify';
+    if (btn) { originalBtnText = btn.innerText; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; }
+
+    // 🚀 SEND ONLY LAST 10 DIGITS TO BACKEND FOR FOOLPROOF DB CHECK
+    let searchPhone = digitsOnly.slice(-10);
+
+    fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(searchPhone))
+    .then(async response => {
+        if (!response.ok) throw new Error("HTTP Status " + response.status);
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            Swal.fire('Error', 'Database Error: ' + data.message, 'error');
+        } else if (data.isDuplicate) {
+            Swal.fire('Warning', 'This phone number already exists in another account record in the database!', 'warning');
+        } else {
+            Swal.fire('Success', 'This number is valid and unique in the system.', 'success');
+        }
+    })
+    .catch(error => {
+        console.error("Error verifying phone:", error);
+        Swal.fire("Error", "Could not connect to the server.", "error");
+    })
+    .finally(() => {
+        if (btn) { btn.innerText = originalBtnText; btn.disabled = false; }
+    });
+};
 
     // ==========================================
-    // 2. ADDRESS CASCADING DROPDOWNS FIX
+    // 4. ADDRESS CASCADING DROPDOWNS FIX
     // ==========================================
+    let globalRegionData = [];
     document.addEventListener("DOMContentLoaded", function () {
-        // 1. Fetch Countries on page load
         fetch('@Url.Action("GetCountries", "Postcode")')
         .then(res => {
             if (!res.ok) throw new Error("HTTP Status " + res.status);
@@ -622,19 +637,15 @@
         })
         .catch(err => console.error("Error loading countries:", err));
 
-        // 2. Initialize Cascading Logic for both addresses
         setupCascadingDropdowns('Addr1_Country', 'Addr1_State', 'Addr1_City', 'Addr1_Zip');
         setupCascadingDropdowns('Addr2_Country', 'Addr2_State', 'Addr2_City', 'Addr2_Zip');
     });
 
-    // Helper function to build dropdown options safely
     function populateDropdown(dropdownId, dataList, defaultText) {
         const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
 
         dropdown.innerHTML = '<option value="">- ' + defaultText + ' -</option>';
-        
-        // Prevent crashes if dataList is wrapped in another object property
         if (!Array.isArray(dataList)) {
             dataList = dataList.data || dataList.results || [];
         }
@@ -647,14 +658,12 @@
         });
     }
 
-    // Master function to handle the Country -> State -> City -> Zip flow
     function setupCascadingDropdowns(countryId, stateId, cityId, zipId) {
         const countryEl = document.getElementById(countryId);
         const stateEl = document.getElementById(stateId);
         const cityEl = document.getElementById(cityId);
         const zipEl = document.getElementById(zipId);
 
-        // Country Change -> Load States
         if (countryEl) {
             countryEl.addEventListener('change', function () {
                 const country = this.value;
@@ -671,7 +680,6 @@
             });
         }
 
-        // State Change -> Load Cities
         if (stateEl) {
             stateEl.addEventListener('change', function () {
                 const state = this.value;
@@ -687,7 +695,6 @@
             });
         }
 
-        // City Change -> Fetch and Populate Zip Code Dropdown
         if (cityEl) {
             cityEl.addEventListener('change', function () {
                 const city = this.value;
@@ -705,269 +712,155 @@
         }
     }
 
-        // ==========================================
-    // 3. AUTO-CALCULATE AGE FROM DOB
+    // ==========================================
+    // 5. AUTO-CALCULATE AGE FROM DOB
     // ==========================================
     document.getElementById('DateOfBirth').addEventListener('change', function () {
-    const dobVal = this.value;
-    if (dobVal) {
-    const dob = new Date(dobVal);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    age--; // Subtract a year if birthday hasn't happened yet this year
-    }
-    document.getElementById('Age').value = age > 0 ? age : 0;
-    } else {
-    document.getElementById('Age').value = '';
-    }
+        const dobVal = this.value;
+        if (dobVal) {
+            const dob = new Date(dobVal);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                age--; 
+            }
+            document.getElementById('Age').value = age > 0 ? age : 0;
+        } else {
+            document.getElementById('Age').value = '';
+        }
     });
 
     // ==========================================
-    // AUTO-CALCULATE PROFILE RATE & STATUS
+    // 6. AUTO-CALCULATE PROFILE RATE & STATUS
     // ==========================================
-    // The 14 exact fields from your Deluge script
     const profileFields = [
-    'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
-    'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
-    'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
-    'DateOfBirth', 'Age', 'PatientsPerDay'
+        'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
+        'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
+        'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
+        'DateOfBirth', 'Age', 'PatientsPerDay'
     ];
 
     function calculateProfileMetrics() {
-    let filledFieldsCount = 0;
-
-    // 1. Calculate Rate: Count how many of the 14 fields actually have a value
-    profileFields.forEach(id => {
-    const el = document.getElementById(id);
-    if (el && el.value.trim() !== '') {
-    filledFieldsCount++;
-    }
-    });
-
-    // 2. Fetch Field 1 and Field 3 for Status Logic
-    const isHomeopath = document.getElementById('IsHomeopathicDoctor')?.value || '';
-    const hasComputer = document.getElementById('HasComputer')?.value || '';
-
-    // Adjusting for the specific "No" values in your dropdown
-    const isHomeopathNo = (isHomeopath === 'No' || isHomeopath === 'नहीं' || isHomeopath === 'Not a Homeopath Doctor' || isHomeopath === 'Not a Homeopathy Doctor');
-    const hasComputerNo = (hasComputer === 'No');
-
-    // 3. Determine Profile Status matching the Deluge logic
-    let calculatedStatus = "Not Completed";
-
-    if (filledFieldsCount > 4 && !hasComputerNo && !isHomeopathNo) {
-    calculatedStatus = "Strongly Completed";
-    }
-    else if (filledFieldsCount === 4 && !hasComputerNo && !isHomeopathNo) {
-    calculatedStatus = "Completed";
-    }
-    else if (filledFieldsCount >= 4 && (hasComputerNo || isHomeopathNo)) {
-    calculatedStatus = "Not-Qualified";
-    }
-
-    // 4. Inject the calculated Rate and Status automatically into the UI
-    const statusField = document.getElementById('Profilestatus');
-    const rateField = document.getElementById('ProfileRate');
-
-    if (statusField) statusField.value = calculatedStatus;
-    if (rateField) rateField.value = filledFieldsCount;
-    }
-
-    // 5. Attach listeners to trigger automatically on user input
-    profileFields.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-    el.addEventListener('change', calculateProfileMetrics);
-    if (el.tagName === 'INPUT') {
-    el.addEventListener('input', calculateProfileMetrics); // Captures typing in real-time
-    }
-    }
-    });
-
-    // ==========================================
-    // 4. STAGE FIELD LOGIC & DIRECT DEAL POPUP
-    // ==========================================
-    const stageSelect = document.getElementById('Stage');
-    let previousStage = "";
-
-    // SAFELY check if Stage exists before trying to read its value!
-    if (stageSelect) {
-    previousStage = stageSelect.value;
-    const dealModal = new bootstrap.Modal(document.getElementById('directDealModal'));
-
-    stageSelect.addEventListener('change', function () {
-    const val = this.value;
-    document.querySelectorAll('.dynamic-stage-field').forEach(el => el.style.display = 'none');
-
-    if (val === 'Demo Scheduled') {
-    document.querySelectorAll('.demo-fields').forEach(el => el.style.display = 'block');
-    } else if (val === 'Trial Offered') {
-    document.querySelectorAll('.trial-fields').forEach(el => el.style.display = 'block');
-    } else if (val === 'Direct Deal') {
-    dealModal.show();
-    }
-
-    if (val !== 'Direct Deal') {
-    previousStage = val;
-    }
-    });
-
-    const btnCancelDeal = document.getElementById('btnCancelDeal');
-    if(btnCancelDeal) {
-    btnCancelDeal.addEventListener('click', function () {
-    stageSelect.value = previousStage;
-    dealModal.hide();
-    });
-    }
-    }
-
-    // ==========================================
-    // TOGGLE GROUP NAME BASED ON ACCOUNT TYPE
-    // ==========================================
-    function toggleAccountTypeFields() {
-    const accountTypeSelect = document.getElementById('AccountType');
-    const divGroupName = document.getElementById('divGroupName');
-
-    if (accountTypeSelect && divGroupName) {
-    // Show only if 'Group' is selected, otherwise hide
-    if (accountTypeSelect.value === 'Group') {
-    divGroupName.style.display = 'block';
-    } else {
-    divGroupName.style.display = 'none';
-
-    // Optional: Automatically clear the Group Name selection if they change the type away from Group
-    const groupNameInput = document.getElementById('GroupName');
-    if(groupNameInput) groupNameInput.value = '';
-    }
-    }
-    }
-
-    // Attach the event listener to the dropdown
-    const accountTypeEl = document.getElementById('AccountType');
-    if (accountTypeEl) {
-    accountTypeEl.addEventListener('change', toggleAccountTypeFields);
-
-    // Run once on page load to ensure the correct visibility when editing an existing record
-    document.addEventListener("DOMContentLoaded", toggleAccountTypeFields);
-    }
-
- 
- // ==========================================
-    // 5. FORM SUBMISSION & VALIDATION POPUPS
-    // ==========================================
-    document.getElementById('accountForm').addEventListener('submit', function (e) {
-        e.preventDefault(); // Stop default submission
-
-        // --- STEP 1: CHECK MANDATORY FIELDS ---
-        let isMandatoryValid = true;
-        const requiredFields = this.querySelectorAll('[required]');
-        
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                isMandatoryValid = false;
-                field.style.boxShadow = "0 0 0 3px #ef4444";
-                setTimeout(() => field.style.boxShadow = "none", 3500);
-            }
-        });
-
-        if (!isMandatoryValid) {
-            const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
-            if (mandatoryModalEl) new bootstrap.Modal(mandatoryModalEl).show();
-            else alert("Please fill in all mandatory fields marked with an asterisk (*).");
-            return;
-        }
-
-        // --- STEP 2: ADDRESS VALIDATION ---
-        const addrCountry = document.getElementById('Addr1_Country')?.value.trim() || "";
-        const addrState = document.getElementById('Addr1_State')?.value.trim() || "";
-        
-        if (addrCountry === "" || addrState === "") {
-            const addressModalEl = document.getElementById('addressValidationModal');
-            if (addressModalEl) new bootstrap.Modal(addressModalEl).show();
-            else alert("You forgot to complete the Primary Address! Please select both a Country and a State.");
-            
-            const stateField = document.getElementById('Addr1_State');
-            if (stateField) {
-                stateField.focus();
-                stateField.style.boxShadow = "0 0 0 3px #ef4444";
-                setTimeout(() => stateField.style.boxShadow = "none", 3500);
-            }
-            return;
-        }
-
-        // --- STEP 3: PROFESSIONAL PROFILE CHECK (< 4 Fields) ---
-        const profileFieldsList = [
-            'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
-            'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
-            'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
-            'DateOfBirth', 'Age', 'PatientsPerDay'
-        ];
-
         let filledFieldsCount = 0;
-        profileFieldsList.forEach(id => {
+        profileFields.forEach(id => {
             const el = document.getElementById(id);
-            if (el && el.value.trim() !== '' && el.value.trim() !== '-None-') {
+            if (el && el.value.trim() !== '') {
                 filledFieldsCount++;
             }
         });
 
-        const reasonValue = document.getElementById('ProfilePendingReason')?.value.trim() || "";
+        const isHomeopath = document.getElementById('IsHomeopathicDoctor')?.value || '';
+        const hasComputer = document.getElementById('HasComputer')?.value || '';
 
-        // If less than 4 fields are filled AND no reason is provided
-        if (filledFieldsCount < 4 && (reasonValue === "" || reasonValue === "-None-")) {
-            const pendingModalEl = document.getElementById('pendingReasonModal');
-            if (pendingModalEl) new bootstrap.Modal(pendingModalEl).show();
-            else alert("Your professional profile has fewer than 4 fields filled! Please select a Profile Pending Reason.");
-            
-            const reasonField = document.getElementById('ProfilePendingReason');
-            if (reasonField) {
-                reasonField.focus();
-                reasonField.style.boxShadow = "0 0 0 3px #ef4444";
-                setTimeout(() => reasonField.style.boxShadow = "none", 3500);
-            }
-            return;
+        const isHomeopathNo = (isHomeopath === 'No' || isHomeopath === 'नहीं' || isHomeopath === 'Not a Homeopath Doctor' || isHomeopath === 'Not a Homeopathy Doctor');
+        const hasComputerNo = (hasComputer === 'No');
+
+        let calculatedStatus = "Not Completed";
+
+        if (filledFieldsCount > 4 && !hasComputerNo && !isHomeopathNo) {
+            calculatedStatus = "Strongly Completed";
+        }
+        else if (filledFieldsCount === 4 && !hasComputerNo && !isHomeopathNo) {
+            calculatedStatus = "Completed";
+        }
+        else if (filledFieldsCount >= 4 && (hasComputerNo || isHomeopathNo)) {
+            calculatedStatus = "Not-Qualified";
         }
 
-        // --- STEP 4: QUALIFIED STATUS CONFIRMATION ---
-        const qualStatus = document.getElementById('QualificationStatus')?.value;
-        const formToSubmit = this;
+        const statusField = document.getElementById('Profilestatus');
+        const rateField = document.getElementById('ProfileRate');
 
-        if (qualStatus === 'Qualified') {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    title: 'Are you sure?',
-                    text: 'Are you sure you want to make this account a Lead?',
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonColor: '#2563eb',
-                    cancelButtonColor: '#ef4444',
-                    confirmButtonText: 'Yes, make it!',
-                    cancelButtonText: 'No, cancel'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        submitFormAjax(formToSubmit);
-                    }
-                });
-                return; // Wait for user's click
-            } else {
-                if(!confirm('Are you sure you want to make this account a Lead?')) return;
+        if (statusField) statusField.value = calculatedStatus;
+        if (rateField) rateField.value = filledFieldsCount;
+    }
+
+    profileFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', calculateProfileMetrics);
+            if (el.tagName === 'INPUT') {
+                el.addEventListener('input', calculateProfileMetrics);
             }
         }
-
-        // If not 'Qualified', submit normally
-        submitFormAjax(formToSubmit);
     });
 
-    // Helper function to handle AJAX submission and Redirects
-    function submitFormAjax(formElement) {
+    // ==========================================
+    // 7. STAGE FIELD LOGIC & DIRECT DEAL POPUP
+    // ==========================================
+    const stageSelect = document.getElementById('Stage');
+    let previousStage = "";
+
+    if (stageSelect) {
+        previousStage = stageSelect.value;
+        const dealModal = new bootstrap.Modal(document.getElementById('directDealModal'));
+
+        stageSelect.addEventListener('change', function () {
+            const val = this.value;
+            document.querySelectorAll('.dynamic-stage-field').forEach(el => el.style.display = 'none');
+
+            if (val === 'Demo Scheduled') {
+                document.querySelectorAll('.demo-fields').forEach(el => el.style.display = 'block');
+            } else if (val === 'Trial Offered') {
+                document.querySelectorAll('.trial-fields').forEach(el => el.style.display = 'block');
+            } else if (val === 'Direct Deal') {
+                dealModal.show();
+            }
+
+            if (val !== 'Direct Deal') {
+                previousStage = val;
+            }
+        });
+
+        const btnCancelDeal = document.getElementById('btnCancelDeal');
+        if(btnCancelDeal) {
+            btnCancelDeal.addEventListener('click', function () {
+                stageSelect.value = previousStage;
+                dealModal.hide();
+            });
+        }
+    }
+
+    // ==========================================
+    // 8. TOGGLE GROUP NAME BASED ON ACCOUNT TYPE
+    // ==========================================
+    function toggleAccountTypeFields() {
+        const accountTypeSelect = document.getElementById('AccountType');
+        const divGroupName = document.getElementById('divGroupName');
+
+        if (accountTypeSelect && divGroupName) {
+            if (accountTypeSelect.value === 'Group') {
+                divGroupName.style.display = 'block';
+            } else {
+                divGroupName.style.display = 'none';
+                const groupNameInput = document.getElementById('GroupName');
+                if(groupNameInput) groupNameInput.value = '';
+            }
+        }
+    }
+
+    const accountTypeEl = document.getElementById('AccountType');
+    if (accountTypeEl) {
+        accountTypeEl.addEventListener('change', toggleAccountTypeFields);
+        document.addEventListener("DOMContentLoaded", toggleAccountTypeFields);
+    }
+
+    // ==========================================
+    // 9. HELPER FUNCTIONS FOR FORM SUBMISSION
+    // ==========================================
+    window.getFieldValue = function(fieldName) {
+        const el = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+        return el ? el.value.trim() : "";
+    };
+
+    window.submitFormAjax = function(formElement) {
         const submitBtn = document.getElementById('saveAccountBtn') || formElement.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Saving...';
         submitBtn.disabled = true;
 
         const formData = new FormData(formElement);
+        const isQualified = formData.get('QualificationStatus') === 'Qualified';
 
         fetch(formElement.action, {
             method: 'POST',
@@ -979,13 +872,13 @@
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         title: 'Awesome!',
-                        text: 'Account saved successfully.',
+                        text: isQualified ? 'Account saved and Lead created successfully!' : 'Account saved successfully.',
                         icon: 'success',
                         showConfirmButton: false,
-                        timer: 2000, 
+                        timer: 2500, 
                         timerProgressBar: true
                     }).then(() => {
-                        window.location.href = response.url; // Auto-redirects to Edit Page
+                        window.location.href = response.url; 
                     });
                 } else {
                     window.location.href = response.url;
@@ -1006,12 +899,171 @@
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
         });
-    }
+    };
 
     // ==========================================
-    // 🚀 NEW: MISSING EMAIL VERIFICATION LOGIC
+    // 10. MAIN FORM SUBMISSION & LOGIC
     // ==========================================
-    function verifyEmail(fieldId) {
+    document.addEventListener("DOMContentLoaded", function () {
+        const accountForm = document.getElementById('accountForm');
+        if (accountForm) {
+            accountForm.addEventListener('submit', function (e) {
+                e.preventDefault(); // Stop default submission
+
+                // --- STEP 1: MOBILE NUMBER FORMATTING ---
+                let mobileNumber = window.getFieldValue('MobileNumber');
+                if (mobileNumber !== "") {
+                    let digitsOnly = mobileNumber.replace(/\D/g, ''); 
+                    if (digitsOnly.length >= 10) {
+                        let last10 = digitsOnly.slice(-10);
+                        mobileNumber = '+91' + last10;
+                        const mobileInput = document.getElementById('MobileNumber') || document.querySelector(`[name="MobileNumber"]`);
+                        if(mobileInput) mobileInput.value = mobileNumber;
+                    }
+
+                    const mobileRegex = new RegExp("^\\+91\\d{10}$");
+                    if (!mobileRegex.test(mobileNumber)) {
+                        Swal.fire("Invalid!", "Mobile Number must contain a valid 10-digit number.", "error");
+                        document.getElementById('MobileNumber')?.focus();
+                        return;
+                    }
+                }
+
+                let altMobile = window.getFieldValue('AlternateMobile');
+                if (altMobile !== "") {
+                    let altDigitsOnly = altMobile.replace(/\D/g, ''); 
+                    if (altDigitsOnly.length >= 10) {
+                        let altLast10 = altDigitsOnly.slice(-10);
+                        const altInput = document.getElementById('AlternateMobile');
+                        if (altInput) altInput.value = '+91' + altLast10;
+                    }
+                }
+
+                // --- STEP 2: STATE OR PROFILE PENDING REASON LOGIC ---
+                // Only ONE of them is required. If BOTH are empty, block the save.
+              const stateValue = window.getFieldValue('Addr1_State');
+                const pendingReason = window.getFieldValue('ProfilePendingReason');
+                
+                const hasState = stateValue !== "" && stateValue !== "-None-";
+                const hasReason = pendingReason !== "" && pendingReason !== "-None-";
+
+                // If State is filled, automatically clear the pending reason (it's not needed)
+                if (hasState) {
+                    const reasonField = document.getElementById('ProfilePendingReason');
+                    if (reasonField) reasonField.value = ""; 
+                } 
+                // If BOTH are empty, block the save
+                else if (!hasState && !hasReason) {
+                    Swal.fire("Required", "You must provide either a State OR a Profile Pending Reason.", "warning");
+                    const reasonField = document.getElementById('ProfilePendingReason');
+                    if (reasonField) {
+                        reasonField.focus();
+                        reasonField.style.boxShadow = "0 0 0 3px #ef4444";
+                        setTimeout(() => reasonField.style.boxShadow = "none", 3500);
+                    }
+                    return;
+                }
+
+                // --- STEP 3: CHECK OTHER MANDATORY FIELDS ---
+               let isMandatoryValid = true;
+                const requiredFields = this.querySelectorAll('[required]');
+                
+                requiredFields.forEach(field => {
+                    if (field.id === 'MobileNumber') return;
+                    // Skip checking State dynamically here because we handled it above
+                    if (field.id === 'Addr1_State') return; 
+
+                    if (!field.value.trim()) {
+                        isMandatoryValid = false;
+                        field.style.boxShadow = "0 0 0 3px #ef4444";
+                        setTimeout(() => field.style.boxShadow = "none", 3500);
+                    }
+                });
+
+                if (!isMandatoryValid) {
+                    const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
+                    if (mandatoryModalEl) new bootstrap.Modal(mandatoryModalEl).show();
+                    else Swal.fire("Required", "Please fill in all mandatory fields marked with an asterisk (*).", "warning");
+                    return;
+                }
+
+                // --- STEP 4: PROFESSIONAL PROFILE CHECK (< 4 Fields) ---
+               const profileFieldsList = [
+                    'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
+                    'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
+                    'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
+                    'DateOfBirth', 'Age', 'PatientsPerDay'
+                ];
+
+                let filledFieldsCount = 0;
+                profileFieldsList.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.value.trim() !== '' && el.value.trim() !== '-None-') {
+                        filledFieldsCount++;
+                    }
+                });
+
+                // 🚀 FIX IS HERE: Only show the popup if they have < 4 fields AND they DID NOT fill the State AND they DID NOT fill the reason
+                if (filledFieldsCount < 4 && !hasReason && !hasState) {
+                    const pendingModalEl = document.getElementById('pendingReasonModal');
+                    if (pendingModalEl) new bootstrap.Modal(pendingModalEl).show();
+                    else Swal.fire("Incomplete Profile", "Your professional profile has fewer than 4 fields filled! Please select a Profile Pending Reason.", "warning");
+                    
+                    const reasonField = document.getElementById('ProfilePendingReason');
+                    if (reasonField) {
+                        reasonField.focus();
+                        reasonField.style.boxShadow = "0 0 0 3px #ef4444";
+                        setTimeout(() => reasonField.style.boxShadow = "none", 3500);
+                    }
+                    return;
+                }
+
+                // --- STEP 5: QUALIFIED STATUS CONFIRMATION ---
+                const qualStatus = document.getElementById('QualificationStatus')?.value;
+                const formToSubmit = this;
+
+                if (qualStatus === 'Qualified') {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: 'Are you sure?',
+                            text: 'Are you sure you want to make this account a Lead?',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonColor: '#2563eb',
+                            cancelButtonColor: '#ef4444',
+                            confirmButtonText: 'Yes, make it!',
+                            cancelButtonText: 'No, cancel'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.submitFormAjax(formToSubmit);
+                            } else {
+                                // 🛑 REVERT TO NONE IF CANCEL IS CLICKED
+                                const dropDown = document.getElementById('QualificationStatus');
+                                if (dropDown) dropDown.value = "-None-";
+                            }
+                        });
+                        return; 
+                    } else {
+                        if(confirm('Are you sure you want to make this account a Lead?')) {
+                            window.submitFormAjax(formToSubmit);
+                        } else {
+                            const dropDown = document.getElementById('QualificationStatus');
+                            if (dropDown) dropDown.value = "-None-";
+                        }
+                        return;
+                    }
+                }
+
+                // If not 'Qualified', submit normally
+                window.submitFormAjax(formToSubmit);
+            });
+        }
+    });
+
+    // ==========================================
+    // 11. EMAIL VERIFICATION LOGIC
+    // ==========================================
+    window.verifyEmail = function(fieldId) {
         const emailInput = document.getElementById(fieldId);
 
         if (!emailInput) {
@@ -1024,22 +1076,20 @@
         const altEmail = document.getElementById('AlternateEmailID')?.value.trim() || '';
 
         if (!email) {
-            alert('Please enter an email address first before verifying.');
+            Swal.fire("Wait", "Please enter an email address first before verifying.", "warning");
             return;
         }
 
-        // Prevent Main Email and Alternate Email from being identical
         if (fieldId === 'AlternateEmailID' && mainEmail && altEmail && mainEmail.toLowerCase() === altEmail.toLowerCase()) {
-            alert('❌ Email and Alternate Email cannot be the exact same!');
+            Swal.fire("Error", "Email and Alternate Email cannot be the exact same!", "error");
             return;
         }
 
-        // Add a small loading indicator to the button
         const btn = window.event ? (window.event.target || window.event.srcElement) : null;
         let originalBtnText = 'Verify';
         if (btn) {
             originalBtnText = btn.innerText;
-            btn.innerText = '...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             btn.disabled = true;
         }
 
@@ -1050,16 +1100,16 @@
         })
         .then(data => {
             if (data.error) {
-                alert('⚠️ Database Error: ' + data.message);
+                Swal.fire("Error", 'Database Error: ' + data.message, "error");
             } else if (data.isDuplicate) {
-                alert('⚠️ WARNING: This email exists in the database!\n\n(Note: If this is the current email for this account, you can ignore this warning).');
+                Swal.fire("Warning", 'This email exists in the database!\n\n(Note: If this is the current email for this account, you can ignore this warning).', "warning");
             } else {
-                alert('✅ This email is valid and unique in the system.');
+                Swal.fire("Success", 'This email is valid and unique in the system.', "success");
             }
         })
         .catch(error => {
             console.error("Error verifying email:", error);
-            alert("Could not connect to the server. Check your browser console (F12) for details.");
+            Swal.fire("Error", "Could not connect to the server. Check your browser console (F12) for details.", "error");
         })
         .finally(() => {
             if (btn) {

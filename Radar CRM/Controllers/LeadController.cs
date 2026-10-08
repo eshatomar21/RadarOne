@@ -529,15 +529,25 @@ namespace Radar_CRM.Controllers
         [HttpGet]
         public async Task<IActionResult> GetNotes(int leadId)
         {
+            // 1. Fetch the AccountId linked to this Lead
+            var accountId = await _context.Leads
+                .Where(l => l.Id == leadId)
+                .Select(l => l.AccountId)
+                .FirstOrDefaultAsync();
+
+            // 2. Fetch notes belonging to the Lead OR its linked Account
             var notes = await _context.Note
-                .Where(n => n.LeadId == leadId)
+                .Where(n => n.LeadId == leadId || (accountId != null && n.AccountId == accountId))
                 .OrderByDescending(n => n.CreatedDateTime)
                 .Select(n => new {
                     ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
                     createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
                     noteTitle = n.NoteTitle,
                     description = n.Description,
-                    attachmentFileName = n.AttachmentFileName
+                    attachmentFileName = n.AttachmentFileName,
+
+                    // Optional: Adds a flag so your frontend knows where the note came from
+                    source = n.LeadId == leadId ? "Lead Note" : "Account Note"
                 }).ToListAsync();
 
             return Json(notes);
@@ -688,6 +698,12 @@ namespace Radar_CRM.Controllers
 
             if (lead == null) return NotFound();
 
+            // 🚀 FIX: If the lead was saved without a stage, default it to Open in the Edit view
+            if (string.IsNullOrEmpty(lead.Stage))
+            {
+                lead.Stage = "Open";
+            }
+
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.ProductsList = new SelectList(_context.Products, "Id", "ProductName");
@@ -707,12 +723,12 @@ namespace Radar_CRM.Controllers
                     .ToListAsync();
             }
 
-            // 🚀 FIX: Changed DealId to LeadId so it successfully finds the Lead's notes!
+            // 🚀 FIX: Fetch notes for both this Lead AND its associated Account
             ViewBag.ExistingNotes = await _context.Note
-    .Include(n => n.NoteOwner)
-    .Where(n => n.LeadId == id)
-    .OrderByDescending(n => n.CreatedDateTime)
-    .ToListAsync();
+                .Include(n => n.NoteOwner)
+                .Where(n => n.LeadId == id || (lead.AccountId != null && n.AccountId == lead.AccountId))
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
 
             // 🚀 ADDED: Fetch all tasks belonging to this Lead
             ViewBag.Tasks = await _context.Tasks
@@ -759,6 +775,7 @@ namespace Radar_CRM.Controllers
 
             return View(lead);
         }
+
         // POST: Leads/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -770,6 +787,10 @@ namespace Radar_CRM.Controllers
             }
 
             ModelState.Remove("PaymentRow");
+            ModelState.Remove("LeadOwner");
+            ModelState.Remove("AccountOwner");
+            ModelState.Remove("DemoOwner");
+            ModelState.Remove("CoOwner");
             var paymentKeys = ModelState.Keys.Where(k => k.StartsWith("PaymentRow")).ToList();
             foreach (var key in paymentKeys)
             {
@@ -987,7 +1008,7 @@ namespace Radar_CRM.Controllers
                     // =========================================================
                     // 🚀 DIRECT DEAL CREATION WITH NOTE & PAYMENT TRANSFER
                     // =========================================================
-                    if (lead.Stage == "Direct Deal")
+                    if (lead.Stage == "Won")
                     {
                         System.Diagnostics.Debug.WriteLine($"[DEBUG-NOTES] Checking if Deal exists for LeadName: '{lead.LeadName}'...");
                         bool dealExists = _context.Deals.Any(d => d.LeadName == lead.LeadName);
@@ -1004,7 +1025,7 @@ namespace Radar_CRM.Controllers
                             var newDeal = new Deal
                             {
                                 LeadId = lead.Id,
-                                DealName = lead.LeadName + " - Direct Deal",
+                                DealName = lead.LeadName,
                                 AccountId = lead.AccountId,
 
                                 // 🚀 Passed the safely declared variable here
@@ -1133,7 +1154,7 @@ namespace Radar_CRM.Controllers
                     if (!LeadExists(lead.Id)) return NotFound();
                     else throw;
                 }
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Edit), new { id = lead.Id });
             }
 
             // Fallback if model state fails

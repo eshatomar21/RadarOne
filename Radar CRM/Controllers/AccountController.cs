@@ -946,8 +946,11 @@ namespace Radar_CRM.Controllers
                     LeadName = acc.AccountName ?? "Unknown Lead", // Required in UI
                     AccountId = acc.Id,
 
+                    Stage = "Open",
+
                     // 🚀 FIX: Apply the live captured user string instead of acc.CreatedBy
                     CreatedBy = createdByString,
+
 
                     // --- Ownership Mapping ---
                     LeadOwnerId = assignedOwnerId,
@@ -1016,7 +1019,7 @@ namespace Radar_CRM.Controllers
 
                     Description = acc.Description,
                     // --- System Logic Default Fields ---
-                    Stage = "Open",
+                  
                     CreatedDateAndTime = DateTime.Now,
                     LeadCreatedTime = DateTime.Now,
                     Pipeline = acc.CurrentStatus == "User" ? "Upgrade Software" : "New Software"
@@ -1224,18 +1227,13 @@ namespace Radar_CRM.Controllers
         [HttpGet]
         public async Task<IActionResult> CheckDuplicatePhone(string phone)
         {
-            if (string.IsNullOrEmpty(phone)) return Json(new { isDuplicate = false });
+            // Check MobileNumber AND AlternateMobile across ALL records
+            bool isDuplicate = await _context.Accounts.AnyAsync(a =>
+                (a.MobileNumber != null && a.MobileNumber.Contains(phone)) ||
+                (a.AlternateMobile != null && a.AlternateMobile.Contains(phone))
+            );
 
-            try
-            {
-                string cleanPhone = phone.Trim();
-                bool exists = await _context.Accounts.AnyAsync(a => a.MobileNumber == cleanPhone || a.AlternateMobile == cleanPhone);
-                return Json(new { isDuplicate = exists });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { isDuplicate = false, error = true, message = ex.Message });
-            }
+            return Json(new { isDuplicate = isDuplicate });
         }
 
 

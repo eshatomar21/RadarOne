@@ -150,15 +150,17 @@
                 align-items: center;
             }
 
-            .nav-item-link:hover:not(.active) {
-                background-color: var(--sidebar-hover-bg);
-                color: var(--sidebar-hover-text);
+           .nav-item-link:hover:not(.active) {
+                background-color: #e2e8f0; /* Noticeable light-gray background */
+                color: #0f172a; /* High contrast dark text */
+                transform: translateX(4px); /* Slight bump to right on hover */
             }
 
-            .nav-item-link.active {
-                background-color: var(--sidebar-active-bg);
-                color: var(--sidebar-active-text);
-                font-weight: 600;
+           .nav-item-link.active {
+                background-color: #1e3a8a; /* Deep dark navy blue */
+                color: #ffffff !important; /* Crisp white text */
+                font-weight: 700;
+                box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.3);
             }
 
             .icon-3d {
@@ -168,8 +170,9 @@
                 filter: none;
             }
 
-            .nav-item-link.active .icon-3d {
-                color: var(--sidebar-active-text) !important;
+           .nav-item-link.active .icon-3d,
+            .nav-item-link.active .nav-item-link-text {
+                color: #ffffff !important; 
             }
 
             .toggle-arrow {
@@ -1225,7 +1228,7 @@
         document.addEventListener("DOMContentLoaded", function() {
 
             // --- Dynamic Active State Logic based on URL ---
-            const currentPath = window.location.pathname.toLowerCase();
+           const currentPath = window.location.pathname.toLowerCase();
             const navLinks = document.querySelectorAll('.sidebar-nav .nav-item-link');
 
             navLinks.forEach(l => l.classList.remove('active'));
@@ -1236,9 +1239,13 @@
                 const href = link.getAttribute('href');
                 if (!href || href === '#' || link.hasAttribute('data-bs-toggle')) return;
 
-                const linkPath = href.toLowerCase();
+                let linkPath = href.toLowerCase();
 
-                if (currentPath.includes(linkPath) && linkPath !== '/') {
+                // 🚀 FIX: Strip "/index" from the href so we only compare the base module (e.g. "/leads")
+                let baseLink = linkPath.replace(/\/index\/?$/, '').replace(/\/$/, '');
+
+                // 🚀 FIX: Check if the current URL starts with the base module name (covers Edit, Create, Details)
+                if (baseLink !== '' && currentPath.startsWith(baseLink)) {
                     link.classList.add('active');
                     matched = true;
 
@@ -1247,12 +1254,11 @@
                         parentCollapse.classList.add('show');
                         const trigger = document.querySelector(`[aria-controls="${parentCollapse.id}"]`);
                         if(trigger) trigger.setAttribute('aria-expanded', 'true');
-
                     }
                 }
             });
 
-            if (!matched && (currentPath === '/' || currentPath === '')) {
+            if (!matched && (currentPath === '/' || currentPath === '' || currentPath.includes('/home'))) {
                 const homeLink = document.querySelector('a[href="/"]');
                 if (homeLink) homeLink.classList.add('active');
             }
@@ -1318,31 +1324,34 @@
                 }, 300);
             });
 
-            function renderSearchResults(data) {
-                if (!data || data.length === 0) {
-                    resultsDropdown.innerHTML = '<div class="p-3 text-center text-muted fw-medium">No records found.</div>';
-                    return;
-                }
+                function renderSearchResults(data) {
+                    if (!data || data.length === 0) {
+                        resultsDropdown.innerHTML = '<div class="p-3 text-center text-muted fw-medium">No records found.</div>';
+                        return;
+                    }
 
-                let html = '';
-                data.forEach(item => {
-                    // Render Zoho style: Title on left, Module Name on right
-                    html += `
-                    <a href="${searchBasePath}${item.url.replace(/^\//, '')}" class="search-result-item">
-                        <div class="search-result-left">
-                            <div class="search-result-icon"><i class="bi ${item.icon}"></i></div>
-                            <div class="search-result-details">
-                                <h6>${item.title}</h6>
-                                ${item.subtitle ? `<p>${item.subtitle}</p>` : ''}
+                    let html = '';
+                    data.forEach(item => {
+                        // 🚀 NEW: Check if URL is empty (User is not an admin)
+                        const itemUrl = item.url ? `${searchBasePath}${item.url.replace(/^\//, '')}` : '#';
+                        const clickEvent = item.url ? '' : `onclick="alert('Access Denied: Only Admins can open records directly from search.'); return false;"`;
+
+                        html += `
+                        <a href="${itemUrl}" ${clickEvent} class="search-result-item">
+                            <div class="search-result-left">
+                                <div class="search-result-icon"><i class="bi ${item.icon}"></i></div>
+                                <div class="search-result-details">
+                                    <h6>${item.title}</h6>
+                                    ${item.subtitle ? `<p>${item.subtitle}</p>` : ''}
+                                </div>
                             </div>
-                        </div>
-                        <div class="search-result-module">${item.module}</div>
-                    </a>
-                    `;
-                });
+                            <div class="search-result-module">${item.module}</div>
+                        </a>
+                        `;
+                    });
 
-                resultsDropdown.innerHTML = html;
-            }
+                    resultsDropdown.innerHTML = html;
+                }
         });
     </script>
 

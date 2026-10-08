@@ -4,6 +4,7 @@ using Radar_CRM.Data; // Replace with your actual DbContext namespace
 using Radar_CRM.Models;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Radar_CRM.Controllers
@@ -25,11 +26,17 @@ namespace Radar_CRM.Controllers
                 return Json(new List<GlobalSearchResult>());
             }
 
+            // 🚀 1. CHECK IF CURRENT USER IS ADMIN
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+
+            bool isAdmin = currentUser != null && !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                           (currentUser.Profile.Contains("Admin", System.StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", System.StringComparison.OrdinalIgnoreCase));
+
             var results = new List<GlobalSearchResult>();
 
-            // Note: EF Core requires sequential execution on a single DbContext instance.
-
-            // 1. Search Accounts
+            // 🚀 2. APPLY TO ALL SEARCH QUERIES (Example for Accounts)
             var accounts = await _context.Accounts
                 .Where(a => a.AccountName.Contains(query) || a.Email.Contains(query) || a.MobileNumber.Contains(query))
                 .Take(5)
@@ -40,7 +47,8 @@ namespace Radar_CRM.Controllers
                     Subtitle = a.Email ?? a.MobileNumber,
                     Module = "Accounts",
                     Icon = "bi-buildings",
-                    Url = $"/Accounts/Edit/{a.Id}"
+                    // 🚀 3. SET EMPTY URL IF NOT ADMIN
+                    Url = isAdmin ? $"/Accounts/Edit/{a.Id}" : ""
                 }).ToListAsync();
             results.AddRange(accounts);
 

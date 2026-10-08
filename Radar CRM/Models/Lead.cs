@@ -47,7 +47,7 @@ namespace Radar_CRM.Models
 
         // --- Lead Information ---
 
-        [NotMapped]
+        
         public string? Stage { get; set; }
         public decimal? Budget { get; set; }
         public decimal? ExpectedRevenue { get; set; }
