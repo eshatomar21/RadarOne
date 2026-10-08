@@ -9,9 +9,8 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Text.Json;
-// 2. Force your database model to use the alias 'CrmTaskModel'
+
 using CrmTaskModel = Radar_CRM.Models.Task;
-// 1. Force the word 'Task' to always mean the System's async Task
 using Task = System.Threading.Tasks.Task;
 
 namespace Radar_CRM.Controllers
@@ -73,6 +72,7 @@ namespace Radar_CRM.Controllers
             }
 
             // 2. FIX: Parse and Apply Advanced Filters dynamically
+            // 2. FIX: Parse and Apply Advanced Filters dynamically
             string advancedFilters = Request.Query["advancedFilters"];
             if (!string.IsNullOrEmpty(advancedFilters))
             {
@@ -83,11 +83,11 @@ namespace Radar_CRM.Controllers
 
                     // 🚀 FIX: Do not drop these filters even if the user didn't type a value
                     var noValueConditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "is_empty", "is_not_empty", "today", "tomorrow", "yesterday",
-                "till yesterday", "starting tomorrow", "this week", "this month",
-                "this year", "previous week", "previous month", "previous year"
-            };
+                    {
+                        "is_empty", "is_not_empty", "today", "tomorrow", "yesterday",
+                        "till yesterday", "starting tomorrow", "this week", "this month",
+                        "this year", "previous week", "previous month", "previous year"
+                    };
 
                     if (filters != null && filters.Any())
                     {
@@ -95,7 +95,7 @@ namespace Radar_CRM.Controllers
                         {
                             string cond = filter.Condition?.ToLower().Trim() ?? "";
 
-                            // 🚀 FIX: Allow predefined dates through the null check
+                            // Allow predefined dates through the null check
                             if (string.IsNullOrWhiteSpace(filter.Value) && !noValueConditions.Contains(cond)) continue;
 
                             string col = filter.ColumnName;
@@ -110,7 +110,7 @@ namespace Radar_CRM.Controllers
                             {
                                 DateTime today = DateTime.Today;
 
-                                // 🚀 DYNAMIC EF CORE DATE QUERIES
+                                // DYNAMIC EF CORE DATE QUERIES
                                 if (cond == "today")
                                 {
                                     var next = today.AddDays(1);
@@ -182,12 +182,55 @@ namespace Radar_CRM.Controllers
                             }
                             else
                             {
-                                // Apply String / ID Filters
-                                if (col == "Subject") query = query.Where(t => t.Subject != null && t.Subject.ToLower().Contains(lowerVal));
-                                else if (col == "Status") query = query.Where(t => t.Status == val);
-                                else if (col == "Priority") query = query.Where(t => t.Priority == val);
-                                else if (col == "TaskOwnerId") query = query.Where(t => t.TaskOwnerId == val);
-                                else if (col == "CreatedById") query = query.Where(t => t.CreatedById == val);
+                                // 🚀 FIX: Apply String / ID Filters, including "is_not" and robust Name-to-ID matching
+                                if (col == "Subject")
+                                {
+                                    if (cond == "is_not" || cond == "does_not_contain")
+                                        query = query.Where(t => t.Subject == null || !t.Subject.ToLower().Contains(lowerVal));
+                                    else
+                                        query = query.Where(t => t.Subject != null && t.Subject.ToLower().Contains(lowerVal));
+                                }
+                                else if (col == "Status")
+                                {
+                                    if (cond == "is_not") query = query.Where(t => t.Status != val);
+                                    else query = query.Where(t => t.Status == val);
+                                }
+                                else if (col == "Priority")
+                                {
+                                    if (cond == "is_not") query = query.Where(t => t.Priority != val);
+                                    else query = query.Where(t => t.Priority == val);
+                                }
+                                else if (col == "TaskOwnerId" || col == "TaskOwner" || col == "Owner")
+                                {
+                                    // 🚀 CRITICAL FIX: Find the User ID in case the filter sent a Text Name ("Sitara Khan")
+                                    var matchedUserIds = _context.Users
+                                        .Where(u => u.fullName == val || u.FirstName == val || u.Id == val)
+                                        .Select(u => u.Id)
+                                        .ToList();
+
+                                    if (cond == "is_not")
+                                        query = query.Where(t => !matchedUserIds.Contains(t.TaskOwnerId) && t.TaskOwner != val);
+                                    else
+                                        query = query.Where(t => matchedUserIds.Contains(t.TaskOwnerId) || t.TaskOwner == val);
+                                }
+                                else if (col == "CreatedById" || col == "CreatedBy")
+                                {
+                                    var matchedUserIds = _context.Users.Where(u => u.fullName == val || u.FirstName == val || u.Id == val).Select(u => u.Id).ToList();
+
+                                    if (cond == "is_not")
+                                        query = query.Where(t => !matchedUserIds.Contains(t.CreatedById) && t.CreatedBy != val);
+                                    else
+                                        query = query.Where(t => matchedUserIds.Contains(t.CreatedById) || t.CreatedBy == val);
+                                }
+                                else if (col == "ModifiedById" || col == "ModifiedBy")
+                                {
+                                    var matchedUserIds = _context.Users.Where(u => u.fullName == val || u.FirstName == val || u.Id == val).Select(u => u.Id).ToList();
+
+                                    if (cond == "is_not")
+                                        query = query.Where(t => !matchedUserIds.Contains(t.ModifiedById) && t.ModifiedBy != val);
+                                    else
+                                        query = query.Where(t => matchedUserIds.Contains(t.ModifiedById) || t.ModifiedBy == val);
+                                }
                             }
                         }
                     }
@@ -246,6 +289,7 @@ namespace Radar_CRM.Controllers
 
             return View(tasks);
         }
+
 
 
         // ==========================================
@@ -904,6 +948,31 @@ namespace Radar_CRM.Controllers
                 await _context.SaveChangesAsync();
             }
             return Json(new { success = true });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTodaysTasks()
+        {
+            string currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
+
+            var today = DateTime.Today;
+
+            var todaysTasks = await _context.Tasks
+                .Where(t => t.TaskOwnerId == currentUserId
+                         && t.Status != "Completed"
+                         && t.DueDate.HasValue
+                         && t.DueDate.Value.Date == today)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.Subject,
+                    t.Priority,
+                    Module = t.LeadId != null ? "Lead" : (t.AccountId != null ? "Account" : "General")
+                })
+                .ToListAsync();
+
+            return Json(new { success = true, data = todaysTasks });
         }
 
         // ==========================================

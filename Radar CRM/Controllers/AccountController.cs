@@ -10,6 +10,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using CrmTaskModel = Radar_CRM.Models.Task;
 using Task = System.Threading.Tasks.Task;
 
 namespace Radar_CRM.Controllers
@@ -86,6 +87,15 @@ namespace Radar_CRM.Controllers
 
                     if (filters != null && filters.Any())
                     {
+                        // 1. 🚀 INTERCEPT RELATED TASK FILTERS
+                        var taskFilters = filters.Where(f => f.ColumnName == "RelatedTasksPresence" || f.ColumnName.StartsWith("Task.")).ToList();
+
+                        // Remove them from the main list so the Account-reflection engine ignores them
+                        filters.RemoveAll(f => taskFilters.Contains(f));
+
+                        // =======================================================
+                        // 2. PROCESS STANDARD ACCOUNT FILTERS
+                        // =======================================================
                         var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
                         System.Linq.Expressions.Expression combinedPredicate = null;
 
@@ -95,7 +105,6 @@ namespace Radar_CRM.Controllers
 
                             string dbColName = f.ColumnName;
 
-                            // 🚀 1. FOREIGN KEY TRANSLATION (e.g. "AccountOwner" -> "AccountOwnerId")
                             var propertyInfo = typeof(Account).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                             if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
                             {
@@ -113,7 +122,7 @@ namespace Radar_CRM.Controllers
                             System.Linq.Expressions.Expression conditionExpr = null;
                             string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
 
-                            // 🚀 2. DATES (Strict boundary checking prevents EF Core crashes on Nullable Dates)
+                            // DATES
                             if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
                             {
                                 string[] dates = safeValue.Split('|');
@@ -135,14 +144,8 @@ namespace Radar_CRM.Controllers
                                         var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd);
                                         conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
                                     }
-                                    else if (f.Condition == "before")
-                                    {
-                                        conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
-                                    }
-                                    else if (f.Condition == "after")
-                                    {
-                                        conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
-                                    }
+                                    else if (f.Condition == "before") conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
+                                    else if (f.Condition == "after") conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
                                     else if (f.Condition == "between")
                                     {
                                         var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
@@ -151,15 +154,14 @@ namespace Radar_CRM.Controllers
                                     }
                                 }
                             }
-                            // 🚀 3. OWNER / USER MAPPING (Translates names to IDs)
+                            // OWNER / USER MAPPING
                             else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
                             {
                                 var searchValue = safeValue.ToLower();
                                 var matchingUserIds = _context.Users
                                     .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
                                                 (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
-                                    .Select(u => u.Id)
-                                    .ToList();
+                                    .Select(u => u.Id).ToList();
 
                                 var listExpr = System.Linq.Expressions.Expression.Constant(matchingUserIds);
                                 var containsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
@@ -169,7 +171,7 @@ namespace Radar_CRM.Controllers
                                 else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
                                     conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr));
                             }
-                            // 🚀 4. REGULAR STRINGS
+                            // REGULAR STRINGS
                             else if (propertyInfo.PropertyType == typeof(string))
                             {
                                 var valConst = System.Linq.Expressions.Expression.Constant(safeValue);
@@ -191,7 +193,7 @@ namespace Radar_CRM.Controllers
                                 else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
                                 else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
                             }
-                            // 🚀 5. NUMBERS
+                            // NUMBERS
                             else
                             {
                                 if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
@@ -222,7 +224,6 @@ namespace Radar_CRM.Controllers
                                 }
                                 else
                                 {
-                                    // 🚀 Dynamically branch on AND vs OR
                                     if (string.Equals(f.LogicalOperator, "OR", StringComparison.OrdinalIgnoreCase))
                                     {
                                         combinedPredicate = System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr);
@@ -240,11 +241,137 @@ namespace Radar_CRM.Controllers
                             var lambda = System.Linq.Expressions.Expression.Lambda<Func<Account, bool>>(combinedPredicate, parameter);
                             query = query.Where(lambda);
                         }
+
+                        // =======================================================
+                        // 3. 🚀 PROCESS ZOHO-STYLE RELATED TASKS FILTERS 
+                        // =======================================================
+                        if (taskFilters.Any())
+                        {
+                            var presenceFilter = taskFilters.FirstOrDefault(f => f.ColumnName == "RelatedTasksPresence");
+                            bool isWithout = presenceFilter != null && presenceFilter.Value.Equals("without", StringComparison.OrdinalIgnoreCase);
+
+                            var taskDetailFilters = taskFilters.Where(f => f.ColumnName.StartsWith("Task.")).ToList();
+
+                            if (isWithout)
+                            {
+                                query = query.Where(a => !a.Tasks.Any());
+                            }
+                            else
+                            {
+                                if (!taskDetailFilters.Any())
+                                {
+                                    query = query.Where(a => a.Tasks.Any());
+                                }
+                                else
+                                {
+                                    var aParam = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
+                                    var tasksProp = System.Linq.Expressions.Expression.Property(aParam, "Tasks");
+
+                                    var tParam = System.Linq.Expressions.Expression.Parameter(typeof(CrmTaskModel), "t");
+                                    System.Linq.Expressions.Expression tCombined = null;
+
+                                    foreach (var f in taskDetailFilters)
+                                    {
+                                        string tCol = f.ColumnName.Replace("Task.", "");
+                                        string tVal = f.Value?.Trim() ?? "";
+                                        string lowerVal = tVal.ToLower();
+                                        string cond = f.Condition?.ToLower().Trim() ?? "";
+
+                                        if (string.IsNullOrWhiteSpace(tVal) && cond != "is_empty" && cond != "is_not_empty") continue;
+
+                                        System.Linq.Expressions.Expression tCondExpr = null;
+                                        var tPropExpr = System.Linq.Expressions.Expression.Property(tParam, tCol);
+
+                                        if (tCol == "Status" || tCol == "Priority")
+                                        {
+                                            var valConst = System.Linq.Expressions.Expression.Constant(tVal);
+                                            if (cond == "is_not") tCondExpr = System.Linq.Expressions.Expression.NotEqual(tPropExpr, valConst);
+                                            else tCondExpr = System.Linq.Expressions.Expression.Equal(tPropExpr, valConst);
+                                        }
+                                        else if (tCol == "Subject")
+                                        {
+                                            var toLower = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                            var contains = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                            var notNullProp = System.Linq.Expressions.Expression.Coalesce(tPropExpr, System.Linq.Expressions.Expression.Constant(""));
+                                            var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLower);
+                                            var valConst = System.Linq.Expressions.Expression.Constant(lowerVal);
+
+                                            if (cond == "is_not" || cond == "does_not_contain")
+                                                tCondExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, contains, valConst));
+                                            else
+                                                tCondExpr = System.Linq.Expressions.Expression.Call(lowerProp, contains, valConst);
+                                        }
+                                        else if (tCol == "DueDate")
+                                        {
+                                            DateTime d1 = DateTime.Today, d2 = DateTime.Today; // Safe defaults
+                                            bool validDate = false;
+
+                                            if (tVal.Contains("|"))
+                                            {
+                                                var dates = tVal.Split('|');
+                                                if (DateTime.TryParse(dates[0], out DateTime parsedD1) && DateTime.TryParse(dates[1], out DateTime parsedD2))
+                                                {
+                                                    d1 = parsedD1;
+                                                    d2 = parsedD2;
+                                                    validDate = true;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                if (DateTime.TryParse(tVal, out DateTime parsedD1))
+                                                {
+                                                    d1 = parsedD1;
+                                                    validDate = true;
+                                                }
+                                            }
+
+                                            if (!validDate) continue;
+
+                                            var efMethod = typeof(EF).GetMethod("Property").MakeGenericMethod(typeof(DateTime?));
+                                            var efCall = System.Linq.Expressions.Expression.Call(null, efMethod, tParam, System.Linq.Expressions.Expression.Constant(tCol));
+
+                                            var d1Const = System.Linq.Expressions.Expression.Constant((DateTime?)d1.Date, typeof(DateTime?));
+                                            var d1EndConst = System.Linq.Expressions.Expression.Constant((DateTime?)d1.Date.AddDays(1).AddTicks(-1), typeof(DateTime?));
+                                            var d2EndConst = System.Linq.Expressions.Expression.Constant((DateTime?)d2.Date.AddDays(1).AddTicks(-1), typeof(DateTime?));
+                                            var d1NextConst = System.Linq.Expressions.Expression.Constant((DateTime?)d1.Date.AddDays(1), typeof(DateTime?));
+
+                                            if (cond == "before") tCondExpr = System.Linq.Expressions.Expression.LessThan(efCall, d1Const);
+                                            else if (cond == "after") tCondExpr = System.Linq.Expressions.Expression.GreaterThan(efCall, d1EndConst);
+                                            else if (cond == "between") tCondExpr = System.Linq.Expressions.Expression.AndAlso(System.Linq.Expressions.Expression.GreaterThanOrEqual(efCall, d1Const), System.Linq.Expressions.Expression.LessThanOrEqual(efCall, d2EndConst));
+                                            else if (cond == "not between") tCondExpr = System.Linq.Expressions.Expression.OrElse(System.Linq.Expressions.Expression.LessThan(efCall, d1Const), System.Linq.Expressions.Expression.GreaterThan(efCall, d2EndConst));
+                                            else tCondExpr = System.Linq.Expressions.Expression.AndAlso(System.Linq.Expressions.Expression.GreaterThanOrEqual(efCall, d1Const), System.Linq.Expressions.Expression.LessThan(efCall, d1NextConst));
+                                        }
+
+                                        if (tCondExpr != null)
+                                        {
+                                            tCombined = tCombined == null ? tCondExpr : System.Linq.Expressions.Expression.AndAlso(tCombined, tCondExpr);
+                                        }
+                                    }
+
+                                    if (tCombined != null)
+                                    {
+                                        var taskLambda = System.Linq.Expressions.Expression.Lambda<Func<CrmTaskModel, bool>>(tCombined, tParam);
+                                        var anyMethod = typeof(Enumerable).GetMethods().First(m => m.Name == "Any" && m.GetParameters().Length == 2).MakeGenericMethod(typeof(CrmTaskModel));
+                                        var anyCall = System.Linq.Expressions.Expression.Call(anyMethod, tasksProp, taskLambda);
+                                        var accountLambda = System.Linq.Expressions.Expression.Lambda<Func<Account, bool>>(anyCall, aParam);
+
+                                        query = query.Where(accountLambda);
+                                    }
+                                    else
+                                    {
+                                        query = query.Where(a => a.Tasks.Any());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("FILTER ENGINE ERROR: " + ex.Message);
+                    Console.WriteLine("\n=========================================");
+                    Console.WriteLine("FILTER ENGINE CRASH LOG:");
+                    Console.WriteLine(ex.Message);
+                    Console.WriteLine("=========================================\n");
                 }
             }
 

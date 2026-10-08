@@ -1213,6 +1213,28 @@
         </div>
     </div>
 
+    <!-- Today's Tasks Modal -->
+<div class="modal fade" id="todaysTasksModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+            <div class="modal-header" style="background-color: #eff6ff; border-bottom: 2px solid #bfdbfe;">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="fa-regular fa-calendar-check me-2"></i> Your Agenda for Today
+                </h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush" id="todaysTasksList">
+                    <!-- Tasks will be injected here via JS -->
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- JavaScript Files -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
@@ -1540,6 +1562,50 @@
                     });
                 }
             });
+
+            document.addEventListener("DOMContentLoaded", function () {
+    // 1. Check if we already showed the popup during this browser session
+    if (!sessionStorage.getItem('todaysTasksShown')) {
+        checkTodaysTasks();
+    }
+});
+
+function checkTodaysTasks() {
+    fetch(basePath + 'Tasks/GetTodaysTasks')
+        .then(response => response.json())
+        .then(res => {
+            if (res.success && res.data.length > 0) {
+                const listContainer = document.getElementById('todaysTasksList');
+                let html = '';
+
+               res.data.forEach(task => {
+                    let badgeColor = task.priority === 'High' || task.priority === 'Highest' ? 'bg-danger' : 'bg-primary';
+                    let icon = task.module === 'Lead' ? 'fa-user-tie' : (task.module === 'Account' ? 'fa-building' : 'fa-list-check');
+
+                    html += `
+                    <a href="${basePath}Tasks/Edit/${task.id}" class="list-group-item list-group-item-action p-3" style="border-left: 4px solid var(--theme-navy-primary);">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <h6 class="mb-1 fw-bold" style="color: #1e293b;">${task.subject}</h6>
+                            <span class="badge ${badgeColor} rounded-pill">${task.priority}</span>
+                        </div>
+                        <p class="mb-0 text-muted" style="font-size: 0.85rem;">
+                            <i class="fa-solid ${icon} me-1"></i> Attached to: <span class="fw-bold">${task.module}</span>
+                        </p>
+                    </a>`;
+                });
+
+                listContainer.innerHTML = html;
+
+                // 2. Show the Modal
+                const taskModal = new bootstrap.Modal(document.getElementById('todaysTasksModal'));
+                taskModal.show();
+
+                // 3. Mark as shown so it doesn't pop up on the next page click
+                sessionStorage.setItem('todaysTasksShown', 'true');
+            }
+        })
+        .catch(err => console.error("Error fetching today's tasks:", err));
+}
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

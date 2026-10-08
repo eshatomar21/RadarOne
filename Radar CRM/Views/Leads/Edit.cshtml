@@ -1852,13 +1852,21 @@
             const taskForm = document.querySelector('#quickTaskModal form');
 
             if (taskForm) {
-                taskForm.addEventListener('submit', function (e) {
+                // Remove any inline handlers that might conflict
+                taskForm.removeAttribute('onsubmit');
+
+                // Using .onsubmit guarantees this event can only be bound ONCE per page load
+                taskForm.onsubmit = function (e) {
                     e.preventDefault();
 
                     const submitBtn = taskForm.querySelector('button[type="submit"]');
+                    
+                    // 🚀 CRITICAL BLOCK: If button is already disabled, stop immediately to prevent double-clicks
+                    if (submitBtn.disabled) return false; 
+
                     const originalText = submitBtn.innerHTML;
 
-                    // Show loading state
+                    // Show loading state and lock the button
                     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
                     submitBtn.disabled = true;
 
@@ -1868,40 +1876,46 @@
                         method: 'POST',
                         body: formData
                     })
-                        .then(response => {
-                            if (response.ok || response.redirected) {
-                                // 🚀 FIX: Reload the page instantly to get the real Database ID for the task!
-                                // This guarantees the "Invalid Task ID" error will never happen.
-                                window.location.reload();
-                            } else {
-                                alert("There was an issue saving the task to the database.");
-                                submitBtn.innerHTML = originalText;
-                                submitBtn.disabled = false;
-                            }
-                        })
-                        .catch(err => {
-                            console.error("Fetch error: ", err);
-                            alert("Network connection error occurred.");
+                    .then(response => {
+                        if (response.ok || response.redirected) {
+                            // 🚀 Reload instantly to safely load the single new task from the database
+                            window.location.reload();
+                        } else {
+                            alert("There was an issue saving the task to the database.");
                             submitBtn.innerHTML = originalText;
                             submitBtn.disabled = false;
-                        });
-                });
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Fetch error: ", err);
+                        alert("Network connection error occurred.");
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    });
+                    
+                    return false; // Prevent traditional form submission
+                };
             }
         });
 
         // =====================================
         // FORM BEHAVIORS (Payments, Verification)
         // =====================================
-        const dataSourcesEl = document.getElementById('DataSources');
-        if (dataSourcesEl) {
-            dataSourcesEl.addEventListener('change', function () {
-                const val = this.value;
+               function toggleDataSourceFields() {
+                const dsElement = document.getElementById('DataSources');
+                if (!dsElement) return;
+                const val = dsElement.value;
                 const divMeta = document.getElementById('divMetaCampaign');
                 const divSeminar = document.getElementById('divSeminarName');
                 if (divMeta) divMeta.style.display = (val === 'Meta Ads') ? 'block' : 'none';
                 if (divSeminar) divSeminar.style.display = (val === 'Seminar Conference') ? 'block' : 'none';
-            });
-        }
+            }
+
+            const dataSourcesEl = document.getElementById('DataSources');
+            if (dataSourcesEl) {
+                dataSourcesEl.addEventListener('change', toggleDataSourceFields);
+                toggleDataSourceFields(); // <-- This line runs it immediately on page load to show existing data
+            }
 
         function verifyPhone(fieldId) {
             const phoneEl = document.getElementById(fieldId);

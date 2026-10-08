@@ -894,7 +894,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        $(document).ready(function() {
+     $(document).ready(function() {
             // Apply 'Type and Search' to User Dropdown using AJAX
             $('#TaskOwnerId').select2({
                 placeholder: "-- Select Owner --",
@@ -910,35 +910,9 @@
                 }
             });
 
-            // Initialize Hidden Dropdowns
-            $('#AccountId').select2({
-                placeholder: "-- Search Accounts --",
-                allowClear: true,
-                width: '100%',
-                ajax: {
-                    url: '/Tasks/SearchAccounts',
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) { return { q: params.term }; },
-                    processResults: function (data) { return { results: data.results }; },
-                    cache: true
-                }
-            });
+         
 
-            $('#LeadId').select2({
-                placeholder: "-- Search Leads --",
-                allowClear: true,
-                width: '100%',
-                ajax: {
-                    url: '/Tasks/SearchLeads',
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) { return { q: params.term }; },
-                    processResults: function (data) { return { results: data.results }; },
-                    cache: true
-                }
-            });
-        });
+        
 
         // Panel Elements   
         const repeatPanel = document.getElementById('repeatPanel');

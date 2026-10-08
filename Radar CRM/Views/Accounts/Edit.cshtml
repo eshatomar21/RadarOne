@@ -1588,8 +1588,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6" id="divMetaCampaign" style="display:none;"><div class="z-field-row"><div class="z-label">Meta Campaign Name</div><div class="z-input-wrapper"><input name="MetaCampaignName" class="z-input" placeholder="Enter campaign name..." /></div></div></div>
-                <div class="col-md-6" id="divSeminarName" style="display:none;"><div class="z-field-row"><div class="z-label">Seminar Name</div><div class="z-input-wrapper"><input name="SeminarName" class="z-input" placeholder="Enter seminar name..." /></div></div></div>
+                <div class="col-md-6" id="divMetaCampaign" style="display:none;"><div class="z-field-row"><div class="z-label">Meta Campaign Name</div><div class="z-input-wrapper"><input asp-for="MetaCampaignName" class="z-input" placeholder="Enter campaign name..." /></div></div></div>
+                <div class="col-md-6" id="divSeminarName" style="display:none;"><div class="z-field-row"><div class="z-label">Seminar Name</div><div class="z-input-wrapper"><input asp-for="SeminarName" class="z-input" placeholder="Enter seminar name..." /></div></div></div>
 
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Qualification Status</div><div class="z-input-wrapper"><select asp-for="QualificationStatus" class="z-input"><option value="">-None-</option><option value="Qualified">Qualified</option><option value="Notqualified">Notqualified</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Pending Reason</div><div class="z-input-wrapper"><select asp-for="ProfilePendingReason" class="z-input"><option value="">-None-</option><option value="Connected">Connected</option><option value="Wrong Number/Invalid Number">Wrong Number/Invalid Number</option><option value="Ringing">Ringing</option><option value="Switched Off">Switched Off</option><option value="Busy-Call Back Later">Busy-Call Back Later</option><option value="Not-Interested">Not-Interested</option><option value="Not a Doctor">Not a Doctor</option><option value="Student">Student</option><option value="Still Ringing Tried 3 times">Still Ringing Tried 3 times</option></select></div></div></div>
@@ -2392,31 +2392,75 @@
     });
 }
 
-    // =====================================
-    // 3. INITIALIZATION & EVENT LISTENERS
-    // =====================================
-    document.addEventListener("DOMContentLoaded", function () {
-        
-        // 1. Initial Quick Status Setups
-        const quickOwner = document.getElementById('QuickAccountOwnerId');
-        if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
+     // =====================================
+       // 3. INITIALIZATION & EVENT LISTENERS
+       // =====================================
+       document.addEventListener("DOMContentLoaded", function () {
 
-        const quickStatus = document.getElementById('QuickCurrentStatus');
-        if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
+           // 1. Initial Quick Status Setups
+           const quickOwner = document.getElementById('QuickAccountOwnerId');
+           if (quickOwner) quickOwner.value = '@Model.AccountOwnerId';
 
-        const loggedInUser = '@currentUserId';
-        const inlineNoteOwner = document.getElementById('inlineNoteOwner');
-        if (inlineNoteOwner) inlineNoteOwner.value = loggedInUser;
-        const modalNoteOwner = document.getElementById('modalNoteOwner');
-        if (modalNoteOwner) modalNoteOwner.value = loggedInUser;
+           const quickStatus = document.getElementById('QuickCurrentStatus');
+           if (quickStatus) quickStatus.value = '@Model.CurrentStatus';
 
-        // 2. Profile Rating Calculation
-        const profileFields = [
-            'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
-            'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
-            'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
-            'DateOfBirth', 'Age', 'PatientsPerDay'
-        ];
+           const loggedInUser = '@currentUserId';
+           const inlineNoteOwner = document.getElementById('inlineNoteOwner');
+           if (inlineNoteOwner) inlineNoteOwner.value = loggedInUser;
+           const modalNoteOwner = document.getElementById('modalNoteOwner');
+           if (modalNoteOwner) modalNoteOwner.value = loggedInUser;
+
+           // ==========================================
+           // 🚀 NEW: TASK DUE DATE <-> DUE DAYS SYNC
+           // ==========================================
+           const dueDaysInput = document.getElementById('TaskDueDays');
+           const dueDateInput = document.getElementById('TaskDueDate');
+
+           if (dueDaysInput && dueDateInput) {
+               // User types number of days -> Auto-fill the Date
+               dueDaysInput.addEventListener('input', function () {
+                   const days = parseInt(this.value);
+                   if (!isNaN(days)) {
+                       const targetDate = new Date();
+                       targetDate.setDate(targetDate.getDate() + days);
+
+                       const yyyy = targetDate.getFullYear();
+                       const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+                       const dd = String(targetDate.getDate()).padStart(2, '0');
+
+                       dueDateInput.value = `${yyyy}-${mm}-${dd}`;
+                   } else {
+                       dueDateInput.value = '';
+                   }
+               });
+
+               // User picks a date -> Auto-fill the number of Days
+               dueDateInput.addEventListener('change', function () {
+                   if (this.value) {
+                       const selectedDate = new Date(this.value);
+                       const today = new Date();
+
+                       // Set both to midnight to avoid timezone shifting issues
+                       today.setHours(0, 0, 0, 0);
+                       selectedDate.setHours(0, 0, 0, 0);
+
+                       const diffTime = selectedDate - today;
+                       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                       dueDaysInput.value = diffDays;
+                   } else {
+                       dueDaysInput.value = '';
+                   }
+               });
+           }
+
+           // 2. Profile Rating Calculation
+           const profileFields = [
+               'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
+               'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
+               'YearsOfPractice', 'AveragePatientFee', 'NumberOfClinics',
+               'DateOfBirth', 'Age', 'PatientsPerDay'
+           ];
 
         function calculateProfileMetrics() {
             let filledFieldsCount = 0;
@@ -2472,17 +2516,20 @@
         if (accountTypeEl) accountTypeEl.addEventListener('change', toggleAccountTypeFields);
         toggleAccountTypeFields();
 
-        function toggleDataSourceFields() {
-            const dsElement = document.getElementById('DataSource');
-            if (!dsElement) return;
-            const val = dsElement.value;
-            const divMeta = document.getElementById('divMetaCampaign');
-            const divSeminar = document.getElementById('divSeminarName');
-            if (divMeta) divMeta.style.display = (val === 'Meta Ads') ? 'block' : 'none';
-            if (divSeminar) divSeminar.style.display = (val === 'Seminar Conference') ? 'block' : 'none';
-        }
-        const dataSourceEl = document.getElementById('DataSource');
-        if (dataSourceEl) dataSourceEl.addEventListener('change', toggleDataSourceFields);
+           function toggleDataSourceFields() {
+        const dsElement = document.getElementById('DataSource');
+        if (!dsElement) return;
+        const val = dsElement.value;
+        const divMeta = document.getElementById('divMetaCampaign');
+        const divSeminar = document.getElementById('divSeminarName');
+        if (divMeta) divMeta.style.display = (val === 'Meta Ads') ? 'block' : 'none';
+        if (divSeminar) divSeminar.style.display = (val === 'Seminar Conference') ? 'block' : 'none';
+    }
+    const dataSourceEl = document.getElementById('DataSource');
+    if (dataSourceEl) {
+        dataSourceEl.addEventListener('change', toggleDataSourceFields);
+        toggleDataSourceFields(); // <-- ADD THIS LINE to run it on initial page load
+    }
 
         // 4. Cascading Addresses
         function populateDropdown(dropdownId, dataList, defaultText, selectedValue = "") {

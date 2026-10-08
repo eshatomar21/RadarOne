@@ -1429,5 +1429,46 @@
                 modal.show();
             }
         }
+
+        // =================================================================
+        // 🚀 NEW: AJAX FORM SUBMISSION TO STAY ON EDIT PAGE
+        // =================================================================
+        document.addEventListener("DOMContentLoaded", function () {
+            const dealForm = document.getElementById('dealForm');
+            
+            if (dealForm) {
+                dealForm.addEventListener('submit', function (e) {
+                    e.preventDefault(); // Stop the default C# redirect to Index
+                    
+                    const submitBtn = dealForm.querySelector('button[type="submit"]');
+                    const origText = submitBtn.innerHTML;
+                    
+                    // Show loading state
+                    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
+                    submitBtn.disabled = true;
+
+                    const formData = new FormData(dealForm);
+
+                    // Send the data to the backend silently
+                    fetch(dealForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(response => {
+                        // Once the backend saves successfully, simply refresh this exact page
+                        window.location.reload(); 
+                    })
+                    .catch(error => {
+                        console.error('Error saving deal:', error);
+                        alert("Something went wrong while saving.");
+                        
+                        // Restore button if it fails
+                        submitBtn.innerHTML = origText;
+                        submitBtn.disabled = false;
+                    });
+                });
+            }
+        });
     </script>
 }
