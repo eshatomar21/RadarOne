@@ -447,6 +447,8 @@ namespace Radar_CRM.Controllers
                 .Where(n => n.DealId == id) // NOTE: Use n.LeadId == id if you are doing this in LeadsController
                 .OrderByDescending(n => n.CreatedDateTime)
                 .ToListAsync();
+
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
             return View(deal);
         }
 
@@ -1030,6 +1032,8 @@ namespace Radar_CRM.Controllers
             }
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
+
             return View(deal);
         }
     }

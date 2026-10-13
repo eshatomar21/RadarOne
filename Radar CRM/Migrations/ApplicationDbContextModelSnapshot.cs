@@ -172,6 +172,9 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("CreatedDateAndTime")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("CurrentSoftwareName")
                         .HasColumnType("nvarchar(max)");
 
@@ -241,6 +244,9 @@ namespace Radar_CRM.Migrations
 
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedDateAndTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<int?>("NumberOfClinics")
                         .HasColumnType("int");
@@ -501,6 +507,9 @@ namespace Radar_CRM.Migrations
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("GroupName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal?>("GstAmount")
                         .HasColumnType("decimal(18,2)");
 
@@ -544,6 +553,9 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SeminarName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Stage")
@@ -1557,6 +1569,9 @@ namespace Radar_CRM.Migrations
                     b.Property<DateTime?>("Reminder")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ReminderNotifyType")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Repeat")
                         .HasColumnType("nvarchar(max)");
 
@@ -1593,6 +1608,57 @@ namespace Radar_CRM.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Tasks");
+                });
+
+            modelBuilder.Entity("Radar_CRM.Models.TimelineEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionDescription")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedById")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NewValue")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValue")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TimelineEvents");
                 });
 
             modelBuilder.Entity("Radar_CRM.Models.User", b =>

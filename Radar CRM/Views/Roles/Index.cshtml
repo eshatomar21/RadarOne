@@ -231,6 +231,15 @@
             background-color: #1e40af;
             color: #ffffff;
         }
+
+    /* Fix Bootstrap backdrop z-index collision */
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+
+    .modal {
+        z-index: 1055 !important;
+    }
 </style>
 
 <div class="container-fluid">
@@ -241,7 +250,7 @@
                 <h3>Organization Roles</h3>
                 <p>Click on a role to view its assigned users.</p>
             </div>
-            <button type="button" class="btn-new-role" data-bs-toggle="modal" data-bs-target="#roleModal" onclick="openCreateModal()">
+            <button type="button" class="btn-new-role" onclick="openCreateModal()">
                 + New Role
             </button>
         </div>
@@ -398,40 +407,47 @@
     <script>
         let isEditMode = false;
 
+        // Move modal elements to body to prevent stacking context traps from _Layout.cshtml
+        document.addEventListener('DOMContentLoaded', function () {
+            const roleModal = document.getElementById('roleModal');
+            const viewUsersModal = document.getElementById('viewUsersModal');
+
+            if (roleModal) document.body.appendChild(roleModal);
+            if (viewUsersModal) document.body.appendChild(viewUsersModal);
+        });
+
         function openCreateModal(parentRoleId = '') {
-             isEditMode = false;
-             document.getElementById('roleModalLabel').innerText = 'Create New Role';
-             document.getElementById('roleForm').reset();
-             document.getElementById('RoleId').value = "0";
+            isEditMode = false;
+            document.getElementById('roleModalLabel').innerText = 'Create New Role';
+            document.getElementById('roleForm').reset();
+            document.getElementById('RoleId').value = "0";
 
-             if (parentRoleId) {
-                 document.getElementById('ParentRoleId').value = parentRoleId;
-             }
+            if (parentRoleId) {
+                document.getElementById('ParentRoleId').value = parentRoleId;
+            }
 
-             const modalEl = document.getElementById('roleModal');
-             bootstrap.Modal.getOrCreateInstance(modalEl).show();
-         }
+            const modalEl = document.getElementById('roleModal');
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
 
-         function openEditModal(id, name, parentId) {
-             isEditMode = true;
-             document.getElementById('roleModalLabel').innerText = 'Edit Role';
-             document.getElementById('roleForm').reset();
+        function openEditModal(id, name, parentId) {
+            isEditMode = true;
+            document.getElementById('roleModalLabel').innerText = 'Edit Role';
+            document.getElementById('roleForm').reset();
 
-             document.getElementById('RoleId').value = id;
-             document.getElementById('RoleName').value = name;
+            document.getElementById('RoleId').value = id;
+            document.getElementById('RoleName').value = name;
+            document.getElementById('ParentRoleId').value = (parentId && parentId !== "null") ? parentId : '';
 
-             // Handle null parent IDs correctly
-             document.getElementById('ParentRoleId').value = (parentId && parentId !== "null") ? parentId : '';
-
-             const modalEl = document.getElementById('roleModal');
-             bootstrap.Modal.getOrCreateInstance(modalEl).show();
-         }
+            const modalEl = document.getElementById('roleModal');
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
 
         document.getElementById('btnSaveRole').addEventListener('click', function () {
             const form = document.getElementById('roleForm');
             const formData = new FormData(form);
 
-            if (!document.getElementById('RoleName').value) {
+            if (!document.getElementById('RoleName').value.trim()) {
                 alert("Role Name is required.");
                 return;
             }
@@ -442,15 +458,15 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.reload();
-                } else {
-                    alert(data.message || "An error occurred while saving.");
-                }
-            })
-            .catch(error => console.error('Error:', error));
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || "An error occurred while saving.");
+                    }
+                })
+                .catch(error => console.error('Error:', error));
         });
 
         function deleteRole(roleId) {
@@ -458,15 +474,15 @@
                 fetch(`@Url.Action("DeleteAjax", "Roles")?id=${roleId}`, {
                     method: 'POST'
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert(data.message || "Cannot delete. Please reassign subordinates first.");
-                    }
-                })
-                .catch(error => console.error('Error:', error));
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            alert(data.message || "Cannot delete. Please reassign subordinates first.");
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
             }
         }
 
@@ -475,30 +491,32 @@
             const listContainer = document.getElementById('usersListContainer');
             listContainer.innerHTML = '<li class="list-group-item text-center text-muted fw-medium py-4 bg-transparent"><div class="spinner-border spinner-border-sm me-2"></div>Loading users...</li>';
 
-            new bootstrap.Modal(document.getElementById('viewUsersModal')).show();
+            const viewModalEl = document.getElementById('viewUsersModal');
+            bootstrap.Modal.getOrCreateInstance(viewModalEl).show();
 
             fetch(`@Url.Action("GetUsersByRole", "Roles")?roleName=${encodeURIComponent(roleName)}`)
                 .then(response => response.json())
                 .then(users => {
                     listContainer.innerHTML = '';
 
-                    if (users.length === 0) {
+                    if (!users || users.length === 0) {
                         listContainer.innerHTML = '<li class="list-group-item text-center text-muted fw-medium py-4 bg-transparent">No users are assigned to this role yet.</li>';
                         return;
                     }
 
                     users.forEach(user => {
                         listContainer.innerHTML += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent border-bottom px-4 py-3">
-                                <div>
-                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">${user.fullName}</div>
-                                    <div class="text-muted" style="font-size: 0.85rem;">${user.email || 'No email provided'}</div>
-                                </div>
-                            </li>
-                        `;
+                                    <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent border-bottom px-4 py-3">
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 0.95rem;">${user.fullName}</div>
+                                            <div class="text-muted" style="font-size: 0.85rem;">${user.email || 'No email provided'}</div>
+                                        </div>
+                                    </li>
+                                `;
                     });
                 })
                 .catch(error => {
+                    console.error(error);
                     listContainer.innerHTML = '<li class="list-group-item text-danger text-center fw-medium py-4 bg-transparent">Error loading users.</li>';
                 });
         }

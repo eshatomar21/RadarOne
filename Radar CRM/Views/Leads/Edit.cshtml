@@ -32,8 +32,8 @@
     :root {
         --theme-bg-cream: #Fdfbf7;
         --theme-surface: #ffffff;
-        --theme-navy-primary: #1e3a8a;
-        --theme-navy-hover: #1e40af;
+        --theme-navy-primary: #ea580c;
+        --theme-navy-hover: #ea580c;
         --theme-navy-light: #eff6ff;
         --theme-text-main: #1f2937;
         --theme-text-muted: #64748b;
@@ -102,6 +102,8 @@
                 width: 20px;
                 margin-right: 8px;
             }
+
+
 
     /* Main Detail Content */
     .detail-main {
@@ -279,6 +281,23 @@
         gap: 8px;
     }
 
+    /* 🚀 NEW: Adjust Select2 size specifically for the table */
+    .table-payments .select2-container--default .select2-selection--single {
+        height: 38px !important;
+        padding: 4px 12px;
+        border: 1px solid #94a3b8 !important;
+        border-radius: 4px !important;
+        background-color: #fff !important;
+    }
+    .table-payments .select2-container--default .select2-selection--single .select2-selection__rendered {
+        font-size: 0.9rem;
+        color: #1f2937;
+        line-height: 28px;
+    }
+    .table-payments .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px;
+    }
+
     /* Darker boundaries requested */
     .z-input {
         width: 100%;
@@ -332,7 +351,7 @@
         border-spacing: 0;
         border: 1px solid #94a3b8;
         border-radius: 4px;
-        overflow: hidden;
+        overflow: visible !important; /* 🚀 FIX: Allows the search dropdown to overflow the table */
         background: #fff;
     }
 
@@ -401,9 +420,10 @@
         </div>
         <h6>Related List</h6>
         <ul class="related-list-menu">
-            <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+            <!-- Change this line in your menu -->
+            <li onclick="document.getElementById('overviewSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
             <li onclick="document.getElementById('detailAccountsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-building"></i> Accounts</li>
-            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+           
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
             <li onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Create Task</li>
 
@@ -415,7 +435,13 @@
                 <i class="fa-solid fa-check-double"></i> Closed Task <span id="sidebarClosedTaskCount">(@closedTasks.Count())</span>
             </li>
 
+            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+
             <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
+
+            <li onclick="openUniversalTimeline('Lead', @Model.Id, '@Model.LeadName')">
+                <i class="fa-solid fa-clock-rotate-left"></i> Timeline
+            </li>
         </ul>
     </div>
 
@@ -446,7 +472,7 @@
 
         <div class="detail-content">
             <!-- Stage Bar -->
-            <div class="mb-4">
+            <div id="overviewSection" class="mb-4">
                 <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 6px;">START &bull; @DateTime.Now.ToString("dd/MM/yyyy")</div>
                 <ul class="sf-chevron-bar shadow-sm" id="detailChevronStageBar" style="pointer-events: none;">
                     <li data-val="Open">Open</li>
@@ -651,9 +677,7 @@
             <div id="detailAccountsSection" class="detail-section-card">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                     <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Accounts</h6>
-                    <a href="@Url.Action("Create", "Accounts", new { leadId = Model.Id })" class="btn btn-sm text-white fw-bold" style="background-color: var(--theme-navy-primary);">
-                        <i class="fa-solid fa-plus me-1"></i> Add Account
-                    </a>
+                   
                 </div>
                 @if (ViewBag.RelatedAccounts != null && ((IEnumerable<Radar_CRM.Models.Account>)ViewBag.RelatedAccounts).Any())
                 {
@@ -686,9 +710,7 @@
             <div id="detailDealsSection" class="detail-section-card">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                     <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
-                    <a href="@Url.Action("Create", "Deals", new { leadId = Model.Id })" class="btn btn-sm text-white fw-bold" style="background-color: var(--theme-navy-primary);">
-                        <i class="fa-solid fa-plus me-1"></i> Add Deal
-                    </a>
+                   
                 </div>
                 @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
                 {
@@ -744,7 +766,23 @@
                     @foreach (var note in topNotes)
                     {
                         <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                            <div class="d-flex align-items-center mb-1"><span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span><span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span></div>
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span>
+                                <span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span>
+
+                                <!-- 🚀 NEW: Edit Button safely using data- attributes -->
+                                <!-- 🚀 ADDED ID: id="edit-note-btn-@note.Id" -->
+                                <button type="button" class="btn btn-sm btn-light border-0 text-primary ms-2 p-1 rounded" title="Edit Note"
+                                        id="edit-note-btn-@note.Id"
+                                        data-note-id="@note.Id"
+                                        data-note-title="@note.NoteTitle"
+                                        data-note-desc="@note.Description"
+                                        onclick="openEditNoteModal(this)">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </button>
+                            </div>
+                            <!-- 🚀 ADDED ID: id="note-content-@note.Id" -->
+                            <div id="note-content-@note.Id" class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
                             <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
                             @if (!string.IsNullOrEmpty(note.AttachmentFileName))
                             {
@@ -769,6 +807,39 @@
                     {
                         <div class="text-center mt-3"><button id="viewPreviousNotesBtn" class="btn btn-light border text-primary text-sm w-100 fw-bold" onclick="toggleExtraNotes()">View Previous Notes</button></div>
                     }
+                </div>
+            </div>
+
+            <!-- ========================================================
+     EDIT NOTE MODAL (LEADS)
+     ======================================================== -->
+            <div class="modal fade" id="editNoteModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content shadow-lg border-0" style="border-radius: 12px; overflow: hidden;">
+                        <div class="modal-header py-3" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                            <h6 class="modal-title fw-bold" style="color: var(--theme-navy-primary);">
+                                <i class="fa-solid fa-pen-to-square me-2 text-warning"></i> Edit Note
+                            </h6>
+                            <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="editNoteId" />
+
+                            <div class="form-group mb-3">
+                                <label class="form-label text-muted fw-bold mb-1" style="font-size: 0.85rem;">Note Title</label>
+                                <input type="text" id="editNoteTitle" class="form-control fw-bold border-secondary shadow-none" placeholder="Title..." />
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label class="form-label text-muted fw-bold mb-1" style="font-size: 0.85rem;">Note Content</label>
+                                <textarea id="editNoteDesc" class="form-control border-secondary shadow-none" rows="4" placeholder="Content..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2" style="border-top: 1px solid #e2e8f0;">
+                            <button type="button" class="btn btn-sm btn-light border fw-bold" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm text-white fw-bold px-4" id="btnSaveEditedNote" style="background-color: var(--theme-navy-primary);" onclick="saveEditedNote()">Save Changes</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1142,7 +1213,7 @@
             <div class="modal-body p-4 text-center">
                 <i class="fa-solid fa-triangle-exclamation mb-3" style="font-size: 2.5rem; color: #ef4444;"></i>
                 <h6 class="fw-bold text-dark">Please fill the form.</h6>
-                <p class="text-muted mb-4">Product Payments Section cannot be empty for a Direct Deal.</p>
+                <p class="text-muted mb-4">Product Payments Section cannot be empty for a Won.</p>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -1344,10 +1415,95 @@
         </div>
     </div>
 </div>
-<!-- Bootstrap JS bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ==========================================
+     GLOBAL TIMELINE OFFCANVAS PANEL
+     ========================================== -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="globalTimelinePanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.05);">
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a;">
+            <i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i> <span id="timelineEntityTitle">Timeline History</span>
+        </h5>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas"></button>
+    </div>
+
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+        <!-- Timeline Stream Container -->
+        <div class="position-relative ms-2 ps-4" id="universalTimelineList" style="border-left: 2px solid #cbd5e1;">
+            <!-- Dynamically populated via JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- 1. Put CSS outside the scripts section so it loads immediately -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<!-- 2. Wrap all JS inside the Scripts section so it loads AFTER the Layout's jQuery -->
+@section Scripts {
+    <!-- Do NOT include jquery-3.6.0.min.js here. Let the Layout handle it. -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    async function openUniversalTimeline(entityType, entityId, entityName) {
+        const titleEl = document.getElementById('timelineEntityTitle');
+        const list = document.getElementById('universalTimelineList');
+
+        if (titleEl) titleEl.innerText = `${entityType} Timeline: ${entityName}`;
+        if (list) list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading history...</div>';
+
+        // Show the offcanvas panel
+        const panelEl = document.getElementById('globalTimelinePanel');
+        if (panelEl.parentNode !== document.body) document.body.appendChild(panelEl);
+
+        let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl) || new bootstrap.Offcanvas(panelEl);
+        bsOffcanvas.show();
+
+        try {
+            // 🚀 CRITICAL FIX: Use Url.Content to safely resolve IIS virtual directories on the live server
+            const baseUrl = '@Url.Content("~/api/timeline/")';
+            const response = await fetch(`${baseUrl}${entityType}/${entityId}`);
+
+            if (!response.ok) throw new Error("Failed to fetch timeline");
+
+            const events = await response.json();
+
+            if (events && events.length > 0) {
+                let html = '';
+                events.forEach(ev => {
+                    html += `
+                        <div class="position-relative mb-4">
+                            <!-- Timeline Dot Icon -->
+                            <div class="position-absolute d-flex align-items-center justify-content-center bg-white shadow-sm" style="left: -33px; top: 0px; width: 18px; height: 18px; border: 2px solid #2563eb; border-radius: 50%; z-index: 2; font-size: 0.55rem; color: #2563eb;">
+                                <i class="fa-solid fa-pen"></i>
+                            </div>
+
+                            <!-- Timeline Card -->
+                            <div class="bg-white p-3 rounded-3 shadow-sm" style="border: 1px solid #e2e8f0;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">${ev.actionDescription}</span>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                                    <span>By <strong class="text-secondary">${ev.createdByName}</strong></span>
+                                    <span><i class="fa-regular fa-clock me-1"></i>${ev.createdDate}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                list.innerHTML = html;
+            } else {
+                list.innerHTML = `
+                    <div class="position-relative mb-4">
+                        <div class="position-absolute" style="left: -25px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #cbd5e1; border-radius: 50%;"></div>
+                        <p class="text-muted m-0" style="font-size: 0.85rem;">No timeline activity recorded yet.</p>
+                    </div>`;
+            }
+        } catch (e) {
+            console.error("Timeline Load Error:", e);
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading timeline history.</p>';
+        }
+    }
+
         // =====================================
         // VIEW TOGGLE & SYNC LOGIC
         // =====================================
@@ -2041,29 +2197,46 @@
 
          let rowCount = @(Model?.PaymentRow != null ? Model.PaymentRow.Count : 0);
 
-        function addRow() {
-            const tbody = document.getElementById('paymentTbody');
-            if (!tbody) return;
-            const tr = document.createElement('tr');
-            tr.className = 'payment-row';
+    $(document).ready(function () {
+        $('.product-select').select2({
+            placeholder: "-Search & Select Product-",
+            allowClear: true,
+            width: '100%',
+            minimumResultsForSearch: 0 // Forces the search bar to show
+        });
+    });
 
-            // 🚀 FIX 2: Use the current rowCount dynamically
-            tr.innerHTML = `
-                <td><select name="PaymentRow[${rowCount}].DealType" class="z-input"><option value="">-None-</option><option value="New Sale">New Sale</option><option value="Upgrade">Upgrade</option><option value="Add On">Add On</option><option value="Stock Key">Stock Key</option><option value="Existing">Existing</option></select></td>
-                <td>
-                <select name="PaymentRow[${rowCount}].ProductId" class="z-input product-select" onchange="productSelected(this)">${productOptionsHtml}</select>
-                <input type="hidden" name="PaymentRow[${rowCount}].ProductName" class="product-name-hidden" value="" />
-                </td>
-                <td><input type="number" name="PaymentRow[${rowCount}].Quantity" class="z-input qty" value="1" onchange="calcRow(this)" /></td>
-                <td><input type="number" name="PaymentRow[${rowCount}].ProductPrice" class="z-input price" value="0" onchange="calcRow(this)" /></td>
-                <td><input type="number" name="PaymentRow[${rowCount}].Total" class="z-input total bg-light" readonly /></td>
-                <td><input type="number" name="PaymentRow[${rowCount}].DiscountPercent" class="z-input disc" value="0" onchange="calcRow(this)" /></td>
-                <td><input type="number" name="PaymentRow[${rowCount}].FinalAmount" class="z-input final bg-light" readonly /></td>
-                <td><button type="button" class="btn text-danger btn-sm" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
-            `;
-            tbody.appendChild(tr);
-            rowCount++;
-        }
+    function addRow() {
+        const tbody = document.getElementById('paymentTbody');
+        if (!tbody) return;
+        const tr = document.createElement('tr');
+        tr.className = 'payment-row';
+
+        tr.innerHTML = `
+                    <td><select name="PaymentRow[${rowCount}].DealType" class="z-input"><option value="">-None-</option><option value="New Sale">New Sale</option><option value="Upgrade">Upgrade</option><option value="Add On">Add On</option><option value="Stock Key">Stock Key</option><option value="Existing">Existing</option></select></td>
+                    <td>
+                    <select name="PaymentRow[${rowCount}].ProductId" class="z-input product-select" onchange="productSelected(this)">${productOptionsHtml}</select>
+                    <input type="hidden" name="PaymentRow[${rowCount}].ProductName" class="product-name-hidden" value="" />
+                    </td>
+                    <td><input type="number" name="PaymentRow[${rowCount}].Quantity" class="z-input qty" value="1" onchange="calcRow(this)" /></td>
+                    <td><input type="number" name="PaymentRow[${rowCount}].ProductPrice" class="z-input price" value="0" onchange="calcRow(this)" /></td>
+                    <td><input type="number" name="PaymentRow[${rowCount}].Total" class="z-input total bg-light" readonly /></td>
+                    <td><input type="number" name="PaymentRow[${rowCount}].DiscountPercent" class="z-input disc" value="0" onchange="calcRow(this)" /></td>
+                    <td><input type="number" name="PaymentRow[${rowCount}].FinalAmount" class="z-input final bg-light" readonly /></td>
+                    <td><button type="button" class="btn text-danger btn-sm" onclick="removeRow(this)"><i class="fa-solid fa-xmark"></i></button></td>
+                `;
+        tbody.appendChild(tr);
+
+        // Re-initialize Select2 safely on the new row
+        $(tr).find('.product-select').select2({
+            placeholder: "-Search & Select Product-",
+            allowClear: true,
+            width: '100%',
+            minimumResultsForSearch: 0
+        });
+
+        rowCount++;
+    }
 
 
         function productSelected(selectElem) {
@@ -2293,16 +2466,62 @@
     }
 
     // Saves the new value by calling your existing update function
-function saveQuickField(fieldName) {
+    // Saves the new value by calling your existing update function
+    function saveQuickField(fieldName) {
         const input = document.getElementById('Quick' + fieldName);
         const actionsDiv = document.getElementById('actions-' + fieldName);
 
         if (input) {
             const newValue = input.value;
+
+            // =========================================================
+            // 🚀 DEAL WON VALIDATION FOR QUICK EDIT MODE
+            // =========================================================
+            if (fieldName === 'Stage' && newValue === 'Won') {
+                const paymentRows = document.querySelectorAll('#paymentTbody .payment-row');
+                let hasValidPayment = false;
+
+                paymentRows.forEach(row => {
+                    const productNameInput = row.querySelector('input[name*="ProductName"]');
+                    const totalInput = row.querySelector('.total');
+                    const productName = productNameInput ? productNameInput.value.trim() : '';
+                    const total = totalInput ? parseFloat(totalInput.value) : 0;
+                    if (productName !== '' && total > 0) hasValidPayment = true;
+                });
+
+                if (!hasValidPayment) {
+                    // Revert the Quick Info dropdown
+                    input.value = input.getAttribute('data-original');
+                    input.style.borderColor = '#6c757d';
+                    if (actionsDiv) actionsDiv.style.display = 'none';
+
+                    // Show Error Modal
+                    const errorModalEl = document.getElementById('directDealErrorModal');
+                    if (errorModalEl) {
+                        if (errorModalEl.parentNode !== document.body) document.body.appendChild(errorModalEl);
+                        bootstrap.Modal.getOrCreateInstance(errorModalEl).show();
+                    }
+                    return; // Stop execution
+                } else {
+                    // Sync it back to the hidden edit form so it submits correctly
+                    const actualStage = document.getElementById('actualStageSelect');
+                    if (actualStage) actualStage.value = newValue;
+                    updateChevronBars();
+
+                    // Show Confirmation Modal (Clicking OK here automatically submits the form & creates the deal!)
+                    const confirmModalEl = document.getElementById('directDealConfirmModal');
+                    if (confirmModalEl) {
+                        if (confirmModalEl.parentNode !== document.body) document.body.appendChild(confirmModalEl);
+                        bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
+                    }
+                    return; // Stop AJAX execution, let the full form submit handle Deal Creation
+                }
+            }
+
+            // Normal Quick Field Save
             input.setAttribute('data-original', newValue);
             input.style.borderColor = '#6c757d';
 
-            // 🚀 FIX: Sync Quick Info back to Edit Form & Update Chevron Bar
             if (fieldName === 'Stage') {
                 const actualStage = document.getElementById('actualStageSelect');
                 if (actualStage) {
@@ -2348,4 +2567,101 @@ function saveQuickField(fieldName) {
             if(nextAction) nextAction.innerText = "No upcoming actions scheduled.";
         }
     }
+
+    function openEditNoteModal(btnElement) {
+        // 1. Extract data safely from the button's attributes
+        const noteId = btnElement.getAttribute('data-note-id');
+        const title = btnElement.getAttribute('data-note-title') || "";
+        const desc = btnElement.getAttribute('data-note-desc') || "";
+
+        // 2. Populate the modal fields
+        document.getElementById('editNoteId').value = noteId;
+        document.getElementById('editNoteTitle').value = title;
+        document.getElementById('editNoteDesc').value = desc;
+
+        // 3. 🚀 CRITICAL FIX: Move the modal to the document body to prevent freezing/blurring
+        const modalEl = document.getElementById('editNoteModal');
+        if (modalEl && modalEl.parentNode !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+
+        // 4. Show modal safely
+        const editModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        editModal.show();
+    }
+
+    function saveEditedNote() {
+        const noteId = document.getElementById('editNoteId').value;
+        const title = document.getElementById('editNoteTitle').value.trim();
+        const desc = document.getElementById('editNoteDesc').value.trim();
+
+        if (!desc && !title) {
+            Swal.fire("Wait!", "Note cannot be empty.", "warning");
+            return;
+        }
+
+        const saveBtn = document.getElementById('btnSaveEditedNote');
+        const origText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        saveBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('noteId', noteId);
+        formData.append('noteTitle', title);
+        formData.append('description', desc);
+
+        fetch('@Url.Action("EditNoteAjax", "Leads")', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // 1. Hide Modal Safely
+                    const modalEl = document.getElementById('editNoteModal');
+                    const editModal = bootstrap.Modal.getInstance(modalEl);
+                    if (editModal) editModal.hide();
+
+                    // 2. INSTANT UI UPDATE (Changes text without reloading)
+                    const contentDiv = document.getElementById('note-content-' + noteId);
+                    const editBtn = document.getElementById('edit-note-btn-' + noteId);
+
+                    if (contentDiv) {
+                        let newHtml = "";
+                        if (title !== "") newHtml += `<b>${title}</b><br>`;
+                        newHtml += desc;
+                        contentDiv.innerHTML = newHtml;
+              }
+                         if (editBtn) {
+                        editBtn.setAttribute('data-note-title', title);
+                        editBtn.setAttribute('data-note-desc', desc);
+                    }
+
+                    // 3. 🚀 SHOW SUCCESS POPUP
+                    Swal.fire({
+                        title: "Success!",
+                        text: "Note has been successfully updated.",
+                        icon: "success",
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    // 4. Reset Button State
+                    saveBtn.innerHTML = origText;
+                    saveBtn.disabled = false;
+                } else {
+                    Swal.fire("Error", "Failed to update note: " + data.message, "error");
+                    saveBtn.innerHTML = origText;
+                    saveBtn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('Edit Note Error:', err);
+                Swal.fire("Error", "Server error while updating the note.", "error");
+                saveBtn.innerHTML = origText;
+                saveBtn.disabled = false;
+            });
+    }
+   
 </script>
+}

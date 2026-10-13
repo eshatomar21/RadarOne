@@ -1086,11 +1086,13 @@
                 <a asp-controller="Leads" asp-action="Index" class="nav-item-link">
                     <div class="nav-item-link-content"><i class="fa-solid fa-user-tie icon-3d" style="color: #10b981;"></i> <span class="nav-item-link-text">Leads</span></div>
                 </a>
-                <a asp-controller="Deals" asp-action="Index" class="nav-item-link">
-                    <div class="nav-item-link-content"><i class="fa-solid fa-briefcase icon-3d" style="color: #f59e0b;"></i> <span class="nav-item-link-text">Deals</span></div>
-                </a>
+               
                 <a asp-controller="Tasks" asp-action="Index" class="nav-item-link">
                     <div class="nav-item-link-content"><i class="fa-solid fa-list-check icon-3d" style="color: #ef4444;"></i> <span class="nav-item-link-text">Tasks</span></div>
+                </a>
+
+                <a asp-controller="Deals" asp-action="Index" class="nav-item-link">
+                    <div class="nav-item-link-content"><i class="fa-solid fa-briefcase icon-3d" style="color: #f59e0b;"></i> <span class="nav-item-link-text">Deals</span></div>
                 </a>
 
                 <a asp-controller="CallRecordings" asp-action="Index" class="nav-item-link">
@@ -1605,6 +1607,69 @@ function checkTodaysTasks() {
             }
         })
         .catch(err => console.error("Error fetching today's tasks:", err));
+
+                document.addEventListener("DOMContentLoaded", function () {
+                    // Track notified tasks in LocalStorage
+                    let notifiedTasks = JSON.parse(localStorage.getItem('crm_notified_reminders')) || {};
+
+                    function checkReminders() {
+                        // Ensure correct path regardless of folder structure
+                        const fetchUrl = typeof basePath !== 'undefined' ? basePath + 'Tasks/GetUpcomingReminders' : '/Tasks/GetUpcomingReminders';
+
+                        fetch(fetchUrl)
+                            .then(res => res.json())
+                            .then(res => {
+                                if (res.success && res.data) {
+                                    const now = new Date(); // 🚀 Uses your local PC clock!
+
+                                    res.data.forEach(task => {
+                                        // "2026-10-09T15:18:00" parses cleanly into local time
+                                        const remTime = new Date(task.reminderTime);
+
+                                        // Calculate exact difference in minutes
+                                        const diffMins = Math.round((remTime - now) / 60000);
+
+                                        // (Optional: Press F12 to see this counting down in your console)
+                                        // console.log(`Task: ${task.subject} | Due in: ${diffMins} mins`);
+
+                                        // 1. EXACTLY 15 MINUTES BEFORE (Warning)
+                                        if (diffMins > 0 && diffMins <= 15 && !notifiedTasks[task.id + '_15']) {
+                                            Swal.fire({
+                                                title: 'Upcoming Task!',
+                                                text: `"${task.subject}" starts in ${diffMins} minutes!`,
+                                                icon: 'info',
+                                                toast: true,
+                                                position: 'top-end',
+                                                showConfirmButton: false,
+                                                timer: 6000,
+                                                timerProgressBar: true
+                                            });
+                                            notifiedTasks[task.id + '_15'] = true;
+                                        }
+
+                                        // 2. EXACTLY ON TIME (Due Now or up to 5 mins late)
+                                        else if (diffMins <= 0 && diffMins >= -5 && !notifiedTasks[task.id + '_0']) {
+                                            Swal.fire({
+                                                title: 'Task Due Now!',
+                                                text: `It is time for: "${task.subject}"`,
+                                                icon: 'warning',
+                                                confirmButtonText: 'Got it',
+                                                confirmButtonColor: '#2563eb'
+                                            });
+                                            notifiedTasks[task.id + '_0'] = true;
+                                        }
+                                    });
+
+                                    localStorage.setItem('crm_notified_reminders', JSON.stringify(notifiedTasks));
+                                }
+                            })
+                            .catch(err => console.error("Reminder polling failed silently", err));
+                    }
+
+                    // Run 2 seconds after page load, then every 60 seconds
+                    setTimeout(checkReminders, 2000);
+                    setInterval(checkReminders, 60000);
+                });
 }
     </script>
 

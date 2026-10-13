@@ -13,6 +13,8 @@ namespace Radar_CRM.Data
 
         }
 
+        public DbSet<TimelineEvent> TimelineEvents { get; set; }
+
         public DbSet<Account> Accounts { get; set; }
 
         public DbSet<Lead> Leads { get; set; }

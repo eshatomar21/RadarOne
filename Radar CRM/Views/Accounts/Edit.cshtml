@@ -1093,11 +1093,12 @@
         </div>
         <h6>Related List</h6>
         <ul class="related-list-menu">
-            <li onclick="window.scrollTo({top:0, behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
+            <!-- Change this line in your menu -->
+            <li onclick="document.getElementById('overviewSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-list-ul"></i> Overview</li>
            
             <!-- 🚀 ADDED: Links to Related Leads and Deals in Detail View -->
             <li onclick="document.getElementById('detailLeadsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-users"></i> Leads</li>
-            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
+          
            
             <li onclick="document.getElementById('detailNotesSection').scrollIntoView({behavior:'smooth'})"><i class="fa-regular fa-note-sticky"></i> Notes (@allNotes.Count())</li>
             <li onclick="openTaskModal()"><i class="fa-solid fa-plus"></i> Create Task</li>
@@ -1119,7 +1120,12 @@
                     }
                 </div>
             </li>
+
+            <li onclick="document.getElementById('detailDealsSection').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-briefcase"></i> Deals</li>
             <li><i class="fa-solid fa-paperclip"></i> Attachments</li>
+            <li onclick="openUniversalTimeline('Account', @Model.Id, '@Model.AccountName')">
+                <i class="fa-solid fa-clock-rotate-left"></i> Timeline
+            </li>
         </ul>
     </div>
 
@@ -1156,7 +1162,7 @@
 
        <!-- Quick Edit Section (Syncs to main form) -->
 <div class="detail-section-card">
-    <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
+    <h6 id="overviewSection" class="fw-bold border-bottom pb-2 mb-3" style="color: var(--theme-navy-primary);">Quick Info</h6>
     <div class="row">
        
         <!-- Account Owner -->
@@ -1290,9 +1296,7 @@
 <div id="detailLeadsSection" class="detail-section-card">
     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
         <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Leads</h6>
-        <a href="@Url.Action("Create", "Leads", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
-            <i class="fa-solid fa-plus"></i> Add Lead
-        </a>
+        
     </div>
     @if (ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any())
     {
@@ -1335,9 +1339,7 @@
 <div id="detailDealsSection" class="detail-section-card">
     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
         <h6 class="fw-bold m-0" style="color: var(--theme-navy-primary);">Related Deals</h6>
-        <a href="@Url.Action("Create", "Deals", new { accountId = Model.Id })" class="btn btn-sm btn-outline-primary fw-bold">
-            <i class="fa-solid fa-plus"></i> Add Deal
-        </a>
+       
     </div>
     @if (ViewBag.RelatedDeals != null && ((IEnumerable<Radar_CRM.Models.Deal>)ViewBag.RelatedDeals).Any())
     {
@@ -1403,7 +1405,19 @@
                     @foreach (var note in topNotes)
                     {
                         <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                            <div class="d-flex align-items-center mb-1"><span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span><span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span></div>
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span>
+                                <span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span>
+
+                                <!-- 🚀 NEW: Edit Button -->
+                                <button type="button" class="btn btn-sm btn-light border-0 text-primary ms-2 p-1 rounded" title="Edit Note"
+                                        data-note-id="@note.Id"
+                                        data-note-title="@note.NoteTitle"
+                                        data-note-desc="@note.Description"
+                                        onclick="openEditNoteModal(this)">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </button>
+                            </div>
                             <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
                             @if (!string.IsNullOrEmpty(note.AttachmentFileName))
                             {
@@ -1428,6 +1442,39 @@
                     {
                         <div class="text-center mt-3"><button id="viewPreviousNotesBtn" class="btn btn-light border text-primary text-sm w-100 fw-bold" onclick="toggleExtraNotes()">View Previous Notes</button></div>
                     }
+                </div>
+            </div>
+
+            <!-- ========================================================
+     EDIT NOTE MODAL
+     ======================================================== -->
+            <div class="modal fade" id="editNoteModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content task-modal-content">
+                        <div class="modal-header task-modal-header py-3">
+                            <h6 class="modal-title fw-bold" style="color: var(--theme-navy-primary);">
+                                <i class="fa-solid fa-pen-to-square me-2 text-warning"></i> Edit Note
+                            </h6>
+                            <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="editNoteId" />
+
+                            <div class="form-group mb-3">
+                                <label class="task-label text-muted mb-1">Note Title</label>
+                                <input type="text" id="editNoteTitle" class="form-control fw-bold border-secondary shadow-none" placeholder="Title..." />
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label class="task-label text-muted mb-1">Note Content</label>
+                                <textarea id="editNoteDesc" class="form-control border-secondary shadow-none" rows="4" placeholder="Content..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2">
+                            <button type="button" class="btn btn-sm btn-light border fw-bold" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm text-white fw-bold px-4" id="btnSaveEditedNote" style="background-color: #ea580c;" onclick="saveEditedNote()">Save Changes</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1551,7 +1598,7 @@
                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Mobile Phone <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="MobileNumber" class="z-input" id="MobileNumber" placeholder="+1 202-555-0117" required /><button type="button" class="verify-btn" onclick="verifyPhone('MobileNumber')">Verify</button></div></div></div>
                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Mobile</div><div class="z-input-wrapper"><input asp-for="AlternateMobile" class="z-input" id="AlternateMobile" placeholder="Optional..." /><button type="button" class="verify-btn" onclick="verifyPhone('AlternateMobile')">Verify</button></div></div></div>
 
-                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input" id="Email" placeholder="email@example.com" required style="color: #1a56db;" /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
+                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger"></span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input" id="Email" placeholder="email@example.com" required style="color: #1a56db;" /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
                <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Email</div><div class="z-input-wrapper"><input asp-for="AlternateEmailID" class="z-input" id="AlternateEmailID" placeholder="Alternate email..." /><button type="button" class="verify-btn" onclick="verifyEmail('AlternateEmailID')">Verify</button></div></div></div>
 
                 <div class="col-md-6">
@@ -1600,6 +1647,11 @@
                 @if (!string.IsNullOrEmpty(Model?.LeadStatus))
                 {
                     <div class="col-md-6"><div class="z-field-row"><div class="z-label">Lead Status</div><div class="z-input-wrapper"><input asp-for="LeadStatus" class="z-input" readonly /></div></div></div>
+                }
+
+                @if (!string.IsNullOrEmpty(Model?.LeadStage))
+                {
+                    <div class="col-md-6"><div class="z-field-row"><div class="z-label">Lead Stage</div><div class="z-input-wrapper"><input asp-for="LeadStage" class="z-input" readonly /></div></div></div>
                 }
             </div>
 
@@ -1665,35 +1717,57 @@
             <div class="z-form-section row">
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Product Purchased</div><div class="z-input-wrapper"><input asp-for="ProductPurchased" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Date</div><div class="z-input-wrapper"><input asp-for="PurchaseDate" type="date" class="z-input" /></div></div></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Purchase Value (₹)</div><div class="z-input-wrapper"><input asp-for="PurchaseValue" type="number" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Type</div><div class="z-input-wrapper"><select asp-for="PaymentType" class="z-input"><option value="">-None-</option><option value="Upfront">Upfront</option><option value="EMI - 3Months">EMI - 3Months</option><option value="EMI - 6Months">EMI - 6Months</option></select></div></div></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Payment Status</div><div class="z-input-wrapper"><select asp-for="PaymentStatus" class="z-input"><option value="">-None-</option><option value="Paid">Paid</option><option value="Pending">Pending</option><option value="Partial">Partial</option><option value="Refunded">Refunded</option></select></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Profile Completion (%)</div><div class="z-input-wrapper"><input asp-for="ProfileCompletionPercentage" type="number" min="0" max="100" class="z-input" /></div></div></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Referral Source</div><div class="z-input-wrapper"><input asp-for="ReferralSource" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Invoice Number</div><div class="z-input-wrapper"><input asp-for="InvoiceNumber" class="z-input" /></div></div></div>
 
                 <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">Additional Contacts</h6></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 1</div><div class="z-input-wrapper"><input asp-for="ContactPerson1" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 1 Phone</div><div class="z-input-wrapper"><input asp-for="Contact1Phone" class="z-input" /></div></div></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 2</div><div class="z-input-wrapper"><input asp-for="ContactPerson2" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 2 Phone</div><div class="z-input-wrapper"><input asp-for="Contact2Phone" class="z-input" /></div></div></div>
-               
+
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person 3</div><div class="z-input-wrapper"><input asp-for="ContactPerson3" class="z-input" /></div></div></div>
                 <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact 3 Phone</div><div class="z-input-wrapper"><input asp-for="Contact3Phone" class="z-input" /></div></div></div>
 
-                <div class="col-md-12 mt-3">
+                <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">System & Tracking</h6></div>
+
+                <!-- 🚀 NEW: Is Duplicated & Description on a single row -->
+                <div class="col-md-6">
                     <div class="z-field-row">
-                        <div class="z-label" style="width: 17.5%;">Duplication Check</div>
-                        <div class="z-input-wrapper" style="width: 82.5%;">
-                            <div class="form-check d-flex align-items-center gap-2">
-                                <input asp-for="IsDuplicated" class="form-check-input m-0" type="checkbox" id="duplicateCheck" style="width: 16px; height: 16px;">
-                                <label class="form-check-label m-0" for="duplicateCheck" style="font-size: 0.85rem; color: #b91c1c; font-weight: 600;">Mark as Duplicated Account</label>
-                            </div>
+                        <div class="z-label">Is Duplicated?</div>
+                        <div class="z-input-wrapper d-flex align-items-center">
+                            @if (Model.IsDuplicated)
+                            {
+                                <span class="badge px-3 py-2 shadow-sm" style="background-color: #fef2f2; color: #dc2626; border: 1px solid #f87171; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-check me-1"></i> Yes, Duplicate
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge px-3 py-2 shadow-sm" style="background-color: #f0fdf4; color: #16a34a; border: 1px solid #4ade80; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-xmark me-1"></i> No
+                                </span>
+                            }
+                            <!-- Hidden input ensures the database value isn't lost on save -->
+                            <input type="hidden" asp-for="IsDuplicated" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="z-field-row" style="align-items: flex-start;">
+                        <div class="z-label" style="padding-top: 8px;">Description</div>
+                        <div class="z-input-wrapper">
+                            <textarea asp-for="Description" rows="3" class="z-input" placeholder="Enter notes or description here..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -1722,6 +1796,8 @@
                 <button type="button" class="btn btn-light border px-4 fw-bold" onclick="toggleView('detail')">Cancel</button>
                 <button type="submit" class="btn text-white px-5 fw-bold" style="background:var(--theme-navy-primary);">Save Account</button>
             </div>
+                   
+
         </div>
     </form>
 </div>
@@ -1865,12 +1941,12 @@
                                 <div class="row align-items-center mb-3">
                                     <div class="col-4 fw-bold" style="color: #854d0e; font-size: 0.9rem;">Repeat type</div>
                                     <div class="col-8">
-                                        <select class="sf-select w-100 bg-white mb-2" style="border-color: #fde047;">
-                                            <option>Daily</option>
-                                            <option>Weekly</option>
-                                            <option>Monthly</option>
-                                            <option>Yearly</option>
-                                        </select>
+                                    <select id="repeatTypeSelect" class="sf-select w-100 bg-white mb-2" style="border-color: #fde047;">
+                                        <option value="Daily">Daily</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Yearly">Yearly</option>
+                                    </select>
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="modalExcludeWeekends">
                                             <label class="form-check-label text-muted" for="modalExcludeWeekends" style="font-size: 0.85rem;">Except weekends and holidays.</label>
@@ -1901,13 +1977,15 @@
 
                             <!-- 🚀 Pastel Teal Reminder Panel -->
                             <div class="col-md-12 expandable-panel" id="modalReminderPanel" style="display: none; background-color: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                                <div class="form-check mb-3 d-flex align-items-center gap-2">
-                                    <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindOnDate" checked>
-                                    <label class="form-check-label" for="modalRemindOnDate" style="font-size: 0.85rem; font-weight: 600; color: #0f766e;">On</label>
-                                    <input type="date" class="form-control form-control-sm w-auto" style="border-color: #5eead4;">
-                                    <span style="font-size: 0.85rem; color: #0f766e; font-weight: 600;">at</span>
-                                    <input type="time" class="form-control form-control-sm w-auto" style="border-color: #5eead4;">
-                                </div>
+                            <div class="form-check mb-3 d-flex align-items-center gap-2">
+                                <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindOnDate" checked>
+                                <label class="form-check-label" for="modalRemindOnDate" style="font-size: 0.85rem; font-weight: 600; color: #0f766e;">On</label>
+                                <!-- 🚀 FIX: Added id="reminderDateInput" -->
+                                <input type="date" id="reminderDateInput" class="form-control form-control-sm w-auto" style="border-color: #5eead4;">
+                                <span style="font-size: 0.85rem; color: #0f766e; font-weight: 600;">at</span>
+                                <!-- 🚀 FIX: Added id="reminderTimeInput" -->
+                                <input type="time" id="reminderTimeInput" class="form-control form-control-sm w-auto" style="border-color: #5eead4;">
+                            </div>
                                 <div class="form-check mb-4 d-flex align-items-center gap-2">
                                     <input class="form-check-input" type="radio" name="modalRemindRadio" id="modalRemindDays">
                                     <label class="form-check-label" for="modalRemindDays" style="font-size: 0.85rem; font-weight: 600; color: #0f766e;">On</label>
@@ -1930,10 +2008,10 @@
                                 <div class="row align-items-center">
                                     <div class="col-4 fw-bold" style="color: #0f766e; font-size: 0.9rem;">Notify</div>
                                     <div class="col-8">
-                                        <select class="sf-select w-100 bg-white" style="border-color: #5eead4; padding: 4px 8px; height: 32px;">
-                                            <option>Email</option>
-                                            <option>Popup</option>
-                                        </select>
+                                    <select class="sf-select w-100 bg-white" id="modalNotifyType" name="ReminderNotifyType" style="border-color: #5eead4; padding: 4px 8px; height: 32px;">
+                                        <option value="Popup" selected>Popup</option>
+                                        <option value="Email">Email</option>
+                                    </select>
                                     </div>
                                 </div>
                             </div>
@@ -1954,11 +2032,90 @@
         </div>
     </div>
 
+<!-- ==========================================
+     GLOBAL TIMELINE OFFCANVAS PANEL
+     ========================================== -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="globalTimelinePanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.05);">
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a;">
+            <i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i> <span id="timelineEntityTitle">Timeline History</span>
+        </h5>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas"></button>
+    </div>
+
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+        <!-- Timeline Stream Container -->
+        <div class="position-relative ms-2 ps-4" id="universalTimelineList" style="border-left: 2px solid #cbd5e1;">
+            <!-- Dynamically populated via JavaScript -->
+        </div>
+    </div>
+</div>
+
 <!-- MUST INCLUDE SWEETALERT -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+
+    async function openUniversalTimeline(entityType, entityId, entityName) {
+        const titleEl = document.getElementById('timelineEntityTitle');
+        const list = document.getElementById('universalTimelineList');
+
+        if (titleEl) titleEl.innerText = `${entityType} Timeline: ${entityName}`;
+        if (list) list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading history...</div>';
+
+        // Show the offcanvas panel
+        const panelEl = document.getElementById('globalTimelinePanel');
+        if (panelEl.parentNode !== document.body) document.body.appendChild(panelEl);
+
+        let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl) || new bootstrap.Offcanvas(panelEl);
+        bsOffcanvas.show();
+
+        try {
+            // 🚀 CRITICAL FIX: Use Url.Content to safely resolve IIS virtual directories on the live server
+            const baseUrl = '@Url.Content("~/api/timeline/")';
+            const response = await fetch(`${baseUrl}${entityType}/${entityId}`);
+
+            if (!response.ok) throw new Error("Failed to fetch timeline");
+
+            const events = await response.json();
+
+            if (events && events.length > 0) {
+                let html = '';
+                events.forEach(ev => {
+                    html += `
+                        <div class="position-relative mb-4">
+                            <!-- Timeline Dot Icon -->
+                            <div class="position-absolute d-flex align-items-center justify-content-center bg-white shadow-sm" style="left: -33px; top: 0px; width: 18px; height: 18px; border: 2px solid #2563eb; border-radius: 50%; z-index: 2; font-size: 0.55rem; color: #2563eb;">
+                                <i class="fa-solid fa-pen"></i>
+                            </div>
+
+                            <!-- Timeline Card -->
+                            <div class="bg-white p-3 rounded-3 shadow-sm" style="border: 1px solid #e2e8f0;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">${ev.actionDescription}</span>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                                    <span>By <strong class="text-secondary">${ev.createdByName}</strong></span>
+                                    <span><i class="fa-regular fa-clock me-1"></i>${ev.createdDate}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                list.innerHTML = html;
+            } else {
+                list.innerHTML = `
+                    <div class="position-relative mb-4">
+                        <div class="position-absolute" style="left: -25px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #cbd5e1; border-radius: 50%;"></div>
+                        <p class="text-muted m-0" style="font-size: 0.85rem;">No timeline activity recorded yet.</p>
+                    </div>`;
+            }
+        } catch (e) {
+            console.error("Timeline Load Error:", e);
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading timeline history.</p>';
+        }
+    }
+
     // =====================================
     // 1. GLOBAL UI FUNCTIONS 
     // =====================================
@@ -2237,6 +2394,27 @@
         }
     }
 
+    // 🚀 FIX: Missing helper function required by the form submission script
+    window.getFieldValue = function (elementIdOrName) {
+        // Find the element by ID or by Name attribute
+        const el = document.getElementById(elementIdOrName) || document.querySelector(`[name="${elementIdOrName}"]`);
+        if (!el) return "";
+
+        // Handle Checkboxes safely
+        if (el.type === "checkbox") {
+            return el.checked ? (el.value === "on" ? "true" : el.value) : "false";
+        }
+
+        // Handle Radio buttons
+        if (el.type === "radio") {
+            const checkedRadio = document.querySelector(`input[name="${el.name}"]:checked`);
+            return checkedRadio ? checkedRadio.value : "";
+        }
+
+        // Return standard values for text, dates, and selects
+        return el.value || "";
+    };
+
  window.verifyPhone = function(fieldId) {
         const phoneInput = document.getElementById(fieldId);
         if (!phoneInput) { alert("Error: Input field not found."); return; }
@@ -2331,7 +2509,53 @@
     }
 
     function submitQuickTask(event, form) {
-        event.preventDefault(); 
+        event.preventDefault();
+
+        // =======================================================
+        // 🚀 CRITICAL FIX: COMPILE REMINDER & REPEAT FOR ASP.NET
+        // =======================================================
+        // 1. Process Reminder Date/Time Safely
+        const reminderToggle = document.getElementById('modalReminderToggle');
+        if (reminderToggle && reminderToggle.checked) {
+            const dateEl = document.getElementById('reminderDateInput');
+            const timeEl = document.getElementById('reminderTimeInput');
+            const notifyEl = document.getElementById('modalNotifyType');
+
+            if (dateEl && timeEl) {
+                const rDate = dateEl.value;
+                const rTime = timeEl.value;
+                if (rDate && rTime) {
+                    let hiddenRem = document.createElement('input');
+                    hiddenRem.type = 'hidden';
+                    hiddenRem.name = 'Reminder';
+                    hiddenRem.value = `${rDate}T${rTime}`;
+                    form.appendChild(hiddenRem);
+                }
+            }
+
+            if (notifyEl) {
+                let hiddenNotify = document.createElement('input');
+                hiddenNotify.type = 'hidden';
+                hiddenNotify.name = 'ReminderNotifyType';
+                hiddenNotify.value = notifyEl.value;
+                form.appendChild(hiddenNotify);
+            }
+        }
+
+        // 2. Process Repeat string Safely
+        const repeatToggle = document.getElementById('modalRepeatToggle');
+        if (repeatToggle && repeatToggle.checked) {
+            const repeatSelect = document.getElementById('repeatTypeSelect');
+            if (repeatSelect && repeatSelect.value !== "None") {
+                let hiddenRep = document.createElement('input');
+                hiddenRep.type = 'hidden';
+                hiddenRep.name = 'Repeat'; // Matches backend model
+                hiddenRep.value = repeatSelect.value;
+                form.appendChild(hiddenRep);
+            }
+        }
+
+        // Standard Submit Logic
         const submitBtn = form.querySelector('button[type="submit"]');
         const origText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
@@ -2342,61 +2566,86 @@
             method: 'POST',
             body: formData
         })
-        .then(async response => {
-            if (response.ok || response.redirected) {
-                window.location.reload();
-            } else {
-                Swal.fire("Error", "Failed to create the task.", "error");
+            .then(async response => {
+                if (response.ok || response.redirected) {
+                    window.location.reload();
+                } else {
+                    Swal.fire("Error", "Failed to create the task.", "error");
+                    submitBtn.innerHTML = origText;
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error("Error creating task:", error);
+                Swal.fire("Error", "A server error occurred while saving the task.", "error");
                 submitBtn.innerHTML = origText;
                 submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error("Error creating task:", error);
-            Swal.fire("Error", "A server error occurred while saving the task.", "error");
-            submitBtn.innerHTML = origText;
-            submitBtn.disabled = false;
-        });
+            });
     }
 
-   function submitEditFormAjax(formElement, isNewLead) {
-    const submitBtns = formElement.querySelectorAll('button[type="submit"]');
-    const originalTexts = [];
-    submitBtns.forEach((btn, idx) => {
-        originalTexts[idx] = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
-        btn.disabled = true;
-    });
-
-    const formData = new FormData(formElement);
-
-    fetch(formElement.action, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(response => {
-        Swal.fire({
-            title: 'Success!',
-            text: isNewLead ? 'Account updated and Lead created successfully!' : 'Account updated successfully.',
-            icon: 'success',
-            showConfirmButton: false,
-            timer: 2000,
-            timerProgressBar: true
-        }).then(() => {
-            // 🚀 FORCE RELOAD CURRENT EDIT PAGE INSTEAD OF REDIRECTING
-            window.location.reload(); 
-        });
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        Swal.fire('Oops!', 'Something went wrong while saving.', 'error');
+    function submitEditFormAjax(formElement, isNewLead) {
+        const submitBtns = formElement.querySelectorAll('button[type="submit"]');
+        const originalTexts = [];
         submitBtns.forEach((btn, idx) => {
-            btn.innerHTML = originalTexts[idx];
-            btn.disabled = false;
+            originalTexts[idx] = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
+            btn.disabled = true;
         });
-    });
-}
+
+        const formData = new FormData(formElement);
+
+        // 🚀 CRITICAL FIX: Explicitly force the ProfilePendingReason to '-None-' if State is selected
+        // This prevents ASP.NET from rejecting the form!
+        const stateVal = formData.get('Addr1_State');
+        if (stateVal && stateVal.trim() !== "" && stateVal !== "-None-" && stateVal !== "- Select State -") {
+            formData.set('ProfilePendingReason', '-None-');
+        }
+
+        // Clean up dummy dropdown text
+        if (formData.get('Addr1_Country') === '- Select Country -') formData.set('Addr1_Country', '');
+        if (formData.get('Addr1_State') === '- Select State -') formData.set('Addr1_State', '');
+        if (formData.get('Addr1_City') === '- Select City -') formData.set('Addr1_City', '');
+        if (formData.get('Addr1_Zip') === '- Select Zip Code -') formData.set('Addr1_Zip', '');
+
+        fetch(formElement.action, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(async response => {
+                // Detect if ASP.NET Core returned an HTML validation error view instead of a real success
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("text/html")) {
+                    const htmlText = await response.text();
+                    if (htmlText.includes("input-validation-error") || htmlText.includes("field-validation-error")) {
+                        throw new Error("Validation failed on the server. Please check required fields.");
+                    }
+                }
+
+                if (!response.ok && !response.redirected) {
+                    throw new Error("Server returned an error.");
+                }
+
+                Swal.fire({
+                    title: 'Success!',
+                    text: isNewLead ? 'Account updated and Lead created successfully!' : 'Account updated successfully.',
+                    icon: 'success',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true
+                }).then(() => {
+                    window.location.reload();
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire('Oops!', error.message || 'Something went wrong while saving.', 'error');
+                submitBtns.forEach((btn, idx) => {
+                    btn.innerHTML = originalTexts[idx];
+                    btn.disabled = false;
+                });
+            });
+    }
 
      // =====================================
        // 3. INITIALIZATION & EVENT LISTENERS
@@ -2646,20 +2895,20 @@
         setupCascadingDropdowns('Addr1_Country', 'Addr1_State', 'Addr1_City', 'Addr1_Zip', existingState1, existingCity1, existingZip1);
         setupCascadingDropdowns('Addr2_Country', 'Addr2_State', 'Addr2_City', 'Addr2_Zip', existingState2, existingCity2, existingZip2);
 
-       // 5. MAIN FORM EDIT SUBMISSION & YES/NO POPUPS
+        // 5. MAIN FORM EDIT SUBMISSION & YES/NO POPUPS
         const accountForm = document.getElementById('accountForm');
         if (accountForm) {
             accountForm.addEventListener('submit', function (e) {
-                e.preventDefault(); 
-                
+                e.preventDefault();
+
                 function getFieldValue(fieldName) {
                     const el = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
                     return el ? el.value.trim() : "";
                 }
 
-               let mobileNumber = window.getFieldValue('MobileNumber');
+                let mobileNumber = getFieldValue('MobileNumber');
                 if (mobileNumber !== "") {
-                    let digitsOnly = mobileNumber.replace(/\D/g, ''); 
+                    let digitsOnly = mobileNumber.replace(/\D/g, '');
                     if (digitsOnly.length < 10) {
                         Swal.fire("Invalid!", "Mobile Number must contain a valid 10-digit number.", "error");
                         document.getElementById('MobileNumber')?.focus();
@@ -2667,61 +2916,63 @@
                     }
                 }
 
-                let altMobile = window.getFieldValue('AlternateMobile');
+                let altMobile = getFieldValue('AlternateMobile');
                 if (altMobile !== "") {
-                    let altDigitsOnly = altMobile.replace(/\D/g, ''); 
+                    let altDigitsOnly = altMobile.replace(/\D/g, '');
                     if (altDigitsOnly.length > 0 && altDigitsOnly.length < 10) {
-                         Swal.fire("Invalid!", "Alternate Mobile Number must contain at least 10 digits.", "error");
-                         document.getElementById('AlternateMobile')?.focus();
-                         return;
+                        Swal.fire("Invalid!", "Alternate Mobile Number must contain at least 10 digits.", "error");
+                        document.getElementById('AlternateMobile')?.focus();
+                        return;
                     }
                 }
 
 
-                // 🚀 2. STATE OR PENDING REASON (Only ONE of them is required)
-              const stateValue = getFieldValue('Addr1_State');
-const pendingReason = getFieldValue('ProfilePendingReason');
+                //  2. STATE OR PENDING REASON LOGIC
+                const stateValue = getFieldValue('Addr1_State');
+                const pendingReason = getFieldValue('ProfilePendingReason');
 
-const hasState = stateValue !== "" && stateValue !== "-None-";
-const hasReason = pendingReason !== "" && pendingReason !== "-None-";
+                // Ensure dummy dropdown text isn't evaluated as a real state
+                const hasState = stateValue !== "" && stateValue !== "-None-" && stateValue !== "- Select State -";
+                const hasReason = pendingReason !== "" && pendingReason !== "-None-";
 
-// If person fills State, clear the pending reason so it doesn't trigger
-if (hasState) {
-    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
-    if (reasonField) reasonField.value = ""; 
-} 
-else if (!hasState && !hasReason) {
-    Swal.fire("Required", "You must provide either a State OR a Profile Pending Reason.", "warning");
-    document.getElementById('ProfilePendingReason')?.focus();
-    return;
-}
+                // 🚀 CRITICAL FIX: If person fills State, visually set the pending reason to '-None-' in UI
+                if (hasState) {
+                    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
+                    if (reasonField) {
+                        reasonField.value = "-None-";
+                    }
+                }
+                else if (!hasState && !hasReason) {
+                    Swal.fire("Required", "You must provide either a State OR a Profile Pending Reason.", "warning");
+                    document.getElementById('ProfilePendingReason')?.focus();
+                    return;
+                }
 
-// 🚀 3. PROFILE COMPLETION CHECK
-const q1 = getFieldValue('IsHomeopathicDoctor');
-const q2 = getFieldValue('WorkType');
-const q3 = getFieldValue('ClinicType');
-const q4 = getFieldValue('HasComputer');
+                //  3. PROFILE COMPLETION CHECK
+                const q1 = getFieldValue('IsHomeopathicDoctor');
+                const q2 = getFieldValue('WorkType');
+                const q3 = getFieldValue('ClinicType');
+                const q4 = getFieldValue('HasComputer');
 
-const isProfileIncomplete = (
-    q1 === "" || q1 === "-None-" || q1 === "false" ||
-    q2 === "" || q2 === "-None-" || q2 === "false" ||
-    q3 === "" || q3 === "-None-" || q3 === "false" ||
-    q4 === "" || q4 === "-None-" || q4 === "false"
-);
+                const isProfileIncomplete = (
+                    q1 === "" || q1 === "-None-" || q1 === "false" ||
+                    q2 === "" || q2 === "-None-" || q2 === "false" ||
+                    q3 === "" || q3 === "-None-" || q3 === "false" ||
+                    q4 === "" || q4 === "-None-" || q4 === "false"
+                );
 
-// If State is NOT filled, we demand the pending reason for an incomplete profile
-if (isProfileIncomplete && !hasState && !hasReason) {
-    Swal.fire("Incomplete Profile", "Your professional profile is incomplete! Please select a Profile Pending Reason.", "warning");
-    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
-    if (reasonField) {
-        reasonField.focus();
-        reasonField.style.boxShadow = "0 0 0 3px #ef4444";
-        setTimeout(() => reasonField.style.boxShadow = "none", 3500);
-    }
-    return;
-}
+                if (isProfileIncomplete && !hasState && !hasReason) {
+                    Swal.fire("Incomplete Profile", "Your professional profile is incomplete! Please select a Profile Pending Reason.", "warning");
+                    const reasonField = document.getElementById('ProfilePendingReason') || document.querySelector('[name="ProfilePendingReason"]');
+                    if (reasonField) {
+                        reasonField.focus();
+                        reasonField.style.boxShadow = "0 0 0 3px #ef4444";
+                        setTimeout(() => reasonField.style.boxShadow = "none", 3500);
+                    }
+                    return;
+                }
 
-                // 🚀 4. QUALIFIED CONFIRMATION POPUP (YES/NO -> Reverts to -None-)
+                //  4. QUALIFIED CONFIRMATION POPUP
                 const qualStatus = getFieldValue('QualificationStatus');
                 const origQualStatus = '@(Model?.QualificationStatus ?? "")';
 
@@ -2737,17 +2988,95 @@ if (isProfileIncomplete && !hasState && !hasReason) {
                         cancelButtonText: 'No, cancel'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            window.submitEditFormAjax(accountForm, true); 
+                            submitEditFormAjax(accountForm, true);
                         } else {
-                            // 🛑 USER CLICKED NO/CANCEL -> REVERT TO NONE
                             const dropDown = document.getElementById('QualificationStatus');
-                            if (dropDown) dropDown.value = "-None-"; 
+                            if (dropDown) dropDown.value = "-None-";
                         }
                     });
                 } else {
-                    window.submitEditFormAjax(accountForm, false);
+                    submitEditFormAjax(accountForm, false);
                 }
             });
         }
     });
+
+    function openEditNoteModal(btnElement) {
+        // 1. Extract data safely from the button's attributes
+        const noteId = btnElement.getAttribute('data-note-id');
+        const title = btnElement.getAttribute('data-note-title') || "";
+        const desc = btnElement.getAttribute('data-note-desc') || "";
+
+        // 2. Populate the modal fields
+        document.getElementById('editNoteId').value = noteId;
+        document.getElementById('editNoteTitle').value = title;
+        document.getElementById('editNoteDesc').value = desc;
+
+        // 3. 🚀 CRITICAL FIX: Move the modal to the document body!
+        // This prevents the screen from freezing or blurring by breaking the modal out of any parent containers.
+        const modalEl = document.getElementById('editNoteModal');
+        if (modalEl && modalEl.parentNode !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+
+        // 4. Show modal safely
+        const editModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        editModal.show();
+    }
+
+    function saveEditedNote() {
+        const noteId = document.getElementById('editNoteId').value;
+        const title = document.getElementById('editNoteTitle').value.trim();
+        const desc = document.getElementById('editNoteDesc').value.trim();
+
+        if (!desc && !title) {
+            Swal.fire("Wait!", "Note cannot be empty.", "warning");
+            return;
+        }
+
+        // Set button to loading state
+        const saveBtn = document.getElementById('btnSaveEditedNote');
+        const origText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        saveBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('noteId', noteId);
+        formData.append('noteTitle', title);
+        formData.append('description', desc);
+
+        fetch('@Url.Action("EditNoteAjax", "Accounts")', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Safely hide the modal and remove backdrop before reloading
+                    const modalEl = document.getElementById('editNoteModal');
+                    const editModal = bootstrap.Modal.getInstance(modalEl);
+                    if (editModal) editModal.hide();
+
+                    Swal.fire({
+                        title: "Updated!",
+                        text: "Note has been successfully edited.",
+                        icon: "success",
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire("Error", "Failed to update note: " + data.message, "error");
+                    saveBtn.innerHTML = origText;
+                    saveBtn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('Edit Note Error:', err);
+                Swal.fire("Error", "Server error while updating the note.", "error");
+                saveBtn.innerHTML = origText;
+                saveBtn.disabled = false;
+            });
+    }
 </script>

@@ -148,27 +148,96 @@ namespace Radar_CRM.Controllers
         {
             if (id != user.Id) return NotFound();
 
+            // Prevent validation errors on navigation properties
             ModelState.Remove("Roles");
             ModelState.Remove("ParentRole");
 
+            // If password was left blank, don't fail validation
+            if (string.IsNullOrWhiteSpace(user.Password))
+            {
+                ModelState.Remove("Password");
+            }
+
             if (ModelState.IsValid)
             {
+                // 1. Fetch the existing entity from the database
+                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+                if (existingUser == null)
+                {
+                    return NotFound();
+                }
+
                 try
                 {
-                    user.ModifiedTime = DateTime.Now;
-                    _context.Update(user);
+                    // 2. Update Core Fields
+                    existingUser.FirstName = user.FirstName;
+                    existingUser.LastName = user.LastName;
+                    existingUser.fullName = user.fullName;
+                    existingUser.Email = user.Email;
+                    existingUser.Mobile = user.Mobile;
+                    existingUser.Profile = user.Profile;
+                    existingUser.RoleId = user.RoleId;
+
+                    // 3. Only update Password if the user typed a new one
+                    if (!string.IsNullOrWhiteSpace(user.Password))
+                    {
+                        // If using password hashing, hash it here before saving:
+                        existingUser.Password = user.Password;
+                    }
+
+                    // 4. Update Master Details
+                    existingUser.DateOfBirth = user.DateOfBirth;
+                    existingUser.Phone = user.Phone;
+                    existingUser.Website = user.Website;
+                    existingUser.Fax = user.Fax;
+                    existingUser.Type = user.Type;
+                    existingUser.SalesCallAssign = user.SalesCallAssign;
+
+                    // 5. Update Status & Tracking
+                    existingUser.UserStatus = user.UserStatus;
+                    existingUser.StatusReason = user.StatusReason;
+                    existingUser.Source = user.Source;
+                    existingUser.ReportingToId = user.ReportingToId;
+
+                    // 6. Update Address Info
+                    existingUser.Street = user.Street;
+                    existingUser.City = user.City;
+                    existingUser.State = user.State;
+                    existingUser.ZipCode = user.ZipCode;
+                    existingUser.Country = user.Country;
+
+                    // 7. Update Preferences & Settings
+                    existingUser.Language = user.Language;
+                    existingUser.CountryLocale = user.CountryLocale;
+                    existingUser.TimeZone = user.TimeZone;
+                    existingUser.TimeFormat = user.TimeFormat;
+                    existingUser.DateFormat = user.DateFormat;
+                    existingUser.Currency = user.Currency;
+                    existingUser.Decimal = user.Decimal;
+                    existingUser.Grouping = user.Grouping;
+                    existingUser.NameFormat = user.NameFormat;
+                    existingUser.SortOrderPreference = user.SortOrderPreference;
+                    existingUser.PreferredUnitForDistance = user.PreferredUnitForDistance;
+
+                    // 8. Update Shift Info & Audit
+                    existingUser.CurrentShiftId = user.CurrentShiftId;
+                    existingUser.NextShiftId = user.NextShiftId;
+                    existingUser.ShiftEffectiveFrom = user.ShiftEffectiveFrom;
+                    existingUser.ModifiedTime = DateTime.Now;
+
                     await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index));
                 }
                 catch (DbUpdateConcurrencyException)
                 {
                     if (!UserExists(user.Id)) return NotFound();
                     else throw;
                 }
-                return RedirectToAction(nameof(Index));
             }
 
-            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name");
-            ViewBag.UsersList = new SelectList(_context.Users, "Id", "FirstName", user.ReportingToId);
+            // Repopulate dropdowns if validation fails
+            ViewBag.RolesList = new SelectList(_context.Roles, "Id", "Name", user.RoleId);
+            ViewBag.UsersList = new SelectList(_context.Users.Where(u => u.Id != id), "Id", "FirstName", user.ReportingToId);
 
             return View(user);
         }

@@ -108,6 +108,14 @@ namespace Radar_CRM.Models
         public string? CreatedBy { get; set; }
         public string? ModifiedBy { get; set; }
 
+
+        [DataType(DataType.DateTime)]
+        public DateTime? CreatedDateAndTime { get; set; }
+
+        [DataType(DataType.DateTime)]
+        public DateTime? ModifiedDateAndTime { get; set; }
+
+
         [NotMapped]
         public List<Notes> Notes { get; set; } = new List<Notes>();
 

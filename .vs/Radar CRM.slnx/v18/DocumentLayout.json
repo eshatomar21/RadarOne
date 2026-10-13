@@ -1,10 +1,54 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\",
+  "WorkspaceRootPath": "C:\\RadarOne\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\users\\admin\\source\\repos\\radar crm\\radar crm\\views\\accounts\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\leads\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\leads\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\controllers\\leadcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\controllers\\leadcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\controllers\\accountcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\controllers\\accountcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\leads\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\leads\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\accounts\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\accounts\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\accounts\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\accounts\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\models\\account.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\models\\account.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\leads\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\leads\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\radar crm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\radar crm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\views\\tasks\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\views\\tasks\\edit.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|c:\\radarone\\radar crm\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{93DE8FA1-6C07-488D-EFC2-6C23DC5216AA}|Radar CRM\\Radar CRM.csproj|solutionrelative:radar crm\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
     }
   ],
   "DocumentGroupContainers": [
@@ -14,24 +58,164 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 3,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "Edit.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Tasks\\Edit.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Tasks\\Edit.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Tasks\\Edit.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Tasks\\Edit.cshtml",
+              "ViewState": "AgIAAA8AAAAAAAAAAAAAAAsAAABpAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-12T07:16:40.871Z",
+              "IsPinned": true
+            },
             {
               "$type": "Bookmark",
               "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
             },
             {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Index.cshtml",
-              "DocumentMoniker": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Accounts\\Index.cshtml",
-              "RelativeDocumentMoniker": "Radar CRM\\Views\\Accounts\\Index.cshtml",
-              "ToolTip": "C:\\Users\\ADMIN\\source\\repos\\Radar CRM\\Radar CRM\\Views\\Accounts\\Index.cshtml",
-              "RelativeToolTip": "Radar CRM\\Views\\Accounts\\Index.cshtml",
-              "ViewState": "AgIAAJcFAAAAAAAAAAAAAJ4FAAALAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-08T12:22:28.714Z",
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\appsettings.json",
+              "RelativeDocumentMoniker": "Radar CRM\\appsettings.json",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\appsettings.json",
+              "RelativeToolTip": "Radar CRM\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAtAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-13T04:53:37.563Z",
               "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Index.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Leads\\Index.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Index.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Leads\\Index.cshtml",
+              "ViewState": "AgIAACgDAAAAAAAAAAApwDMDAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-13T04:12:42.429Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "LeadController.cs",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Controllers\\LeadController.cs",
+              "RelativeDocumentMoniker": "Radar CRM\\Controllers\\LeadController.cs",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Controllers\\LeadController.cs",
+              "RelativeToolTip": "Radar CRM\\Controllers\\LeadController.cs",
+              "ViewState": "AgIAAFkCAAAAAAAAAAAiwD4DAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-12T13:08:50.314Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AccountController.cs",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Controllers\\AccountController.cs",
+              "RelativeDocumentMoniker": "Radar CRM\\Controllers\\AccountController.cs",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Controllers\\AccountController.cs",
+              "RelativeToolTip": "Radar CRM\\Controllers\\AccountController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAOwEAAASAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-12T11:45:40.465Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Edit.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Accounts\\Edit.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Accounts\\Edit.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Accounts\\Edit.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Accounts\\Edit.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-12T11:40:11.539Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Account.cs",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Models\\Account.cs",
+              "RelativeDocumentMoniker": "Radar CRM\\Models\\Account.cs",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Models\\Account.cs",
+              "RelativeToolTip": "Radar CRM\\Models\\Account.cs",
+              "ViewState": "AgIAAKEAAAAAAAAAAAAgwKkAAAAoAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-12T11:38:58.269Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Accounts\\Index.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Accounts\\Index.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Accounts\\Index.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Accounts\\Index.cshtml",
+              "ViewState": "AgIAAJwLAAAAAAAAAAAkwLILAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-12T11:32:16.596Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "Radar CRM.csproj",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Radar CRM.csproj",
+              "RelativeDocumentMoniker": "Radar CRM\\Radar CRM.csproj",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Radar CRM.csproj",
+              "RelativeToolTip": "Radar CRM\\Radar CRM.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-10-12T11:14:51.59Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Create.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Create.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Leads\\Create.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Create.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Leads\\Create.cshtml",
+              "ViewState": "AgIAAAMEAAAAAAAAAAAkwA0EAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-12T11:08:57.161Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Edit.cshtml",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Edit.cshtml",
+              "RelativeDocumentMoniker": "Radar CRM\\Views\\Leads\\Edit.cshtml",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\Views\\Leads\\Edit.cshtml",
+              "RelativeToolTip": "Radar CRM\\Views\\Leads\\Edit.cshtml",
+              "ViewState": "AgIAAF0KAAAAAAAAAAAAAGoKAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-10-12T11:00:54.382Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "jquery.slim.js",
+              "DocumentMoniker": "C:\\RadarOne\\Radar CRM\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js",
+              "RelativeDocumentMoniker": "Radar CRM\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js",
+              "ToolTip": "C:\\RadarOne\\Radar CRM\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js",
+              "RelativeToolTip": "Radar CRM\\wwwroot\\lib\\jquery\\dist\\jquery.slim.js",
+              "ViewState": "AgIAABAPAAAAAAAAAAAAAB8PAAA2AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-10-12T11:00:08.455Z"
             }
           ]
         }

@@ -421,8 +421,8 @@
                 @{
                     var predefinedLists = new Dictionary<string, string[]>
                     {
-                        { "LeadStatus", new[] { "Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made" } },
-                        { "Stage", new[] { "Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost" } },
+                        { "LeadStatus", new[] { "Cold","Warm", "Hot", "Not Interested", "Not Answering", "InterestedCold" } },
+                        { "Stage", new[] { "Open", "Demo Scheduled", "Demo Done", "Trial Offered", "Direct Deal", "Won", "Lost" } },
                         { "CurrentStatus", new[] { "User", "Non User" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
                         { "DataSources", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "Website Direct", "YouTube", "LinkedIn", "Cold Calling", "WhatsApp Campaign" } },
@@ -767,7 +767,9 @@
                         <option value="" disabled selected>- Choose a field -</option>
                         @foreach (var prop in tableProps)
                         {
-                            <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
+                            // 🚀 FIX: Unwrap Nullable<DateTime> and Nullable<DateOnly> so JS recognizes them!
+                            var actualType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                            <option value="@prop.Name" data-type="@actualType.Name">@prop.Name</option>
                         }
                     </select>
                 </div>
@@ -808,8 +810,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <form asp-controller="Tasks" asp-action="Create" method="post">
+            <form id="bulkTaskForm" onsubmit="executeBulkTaskCreate(event)">
+                <input type="hidden" id="bulkTaskLeadIds" name="LeadIds" />
                 <div class="modal-body task-modal-body">
+
+                    <div id="bulkTaskAlert" class="alert alert-info py-2 px-3 mb-4" style="display: none; background-color: #eff6ff; border-color: #bfdbfe; font-size: 0.9rem;">
+                        <i class="fa-solid fa-layer-group me-2 text-primary"></i>
+                        Creating this task for <strong id="bulkTaskCount" class="text-primary fs-6">0</strong> selected lead(s).
+                    </div>
                     <div class="row">
                         <div class="col-md-12 form-group mb-4">
                             <label class="task-label">Subject <span class="text-danger">*</span></label>
@@ -1150,6 +1158,16 @@
     const ownerOptionsList = [
         @if (ViewBag.UsersList != null) { foreach (var user in (SelectList)ViewBag.UsersList) { <text>"@Html.Raw(user.Text)",</text> } }
     ];
+
+    const usersMapList = [
+        @if (ViewBag.UsersList != null)
+        {
+                    foreach (var user in (SelectList)ViewBag.UsersList)
+                    {
+                <text>{ id: "@Html.Raw(user.Value)", name: "@Html.Raw(user.Text)" }, </text>
+                    }
+        }
+        ];
     const vendorOptionsList = [
         @if (ViewBag.VendorsList != null) { foreach (var vendor in (SelectList)ViewBag.VendorsList) { <text>"@Html.Raw(vendor.Text)",</text> } }
     ];
@@ -1239,8 +1257,8 @@
     // Map of fields to selectable dropdown arrays
     const criteriaFilterOptionsMap = {
         "GroupName": vendorOptionsList,
-        "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested", "Rining", "Wrong Number/Invalid Number", "Already Using Another Software", "Price Concern", "Student", "Offer made"],
-        "Stage": ["Open", "Contacted", "Demo Scheduled", "Trial Initiated", "Proposal Sent", "Closed Won", "Closed Lost"],
+        "LeadStatus": ["Cold","Warm", "Hot", "Not Interested", "Not Answering", "InterestedCold"],
+        "Stage": ["Open", "Demo Scheduled", "Demo Done", "Trial Offered", "Direct Deal", "Won", "Lost"],
         "CurrentStatus": ["User", "Non User"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
         "DataSources": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "Website Direct", "YouTube", "LinkedIn", "Cold Calling", "WhatsApp Campaign"],
@@ -1298,34 +1316,41 @@
         }
     });
 
-    function refreshVisibleRows() {
-        currentVisibleRows = [];
-        allRows.forEach(r => {
-            const sidebarHidden = r.classList.contains('filtered-out');
-            let colHidden = false;
-            for (const key in r.dataset) {
-                if (key.startsWith('colFilter_') && r.dataset[key] === "hidden") {
-                    colHidden = true; break;
-                }
+function refreshVisibleRows() {
+    currentVisibleRows = [];
+    allRows.forEach(r => {
+        const sidebarHidden = r.classList.contains('filtered-out');
+        let colHidden = false;
+        for (const key in r.dataset) {
+            if (key.startsWith('colFilter_') && r.dataset[key] === "hidden") {
+                colHidden = true; break;
             }
-            if (!sidebarHidden && !colHidden) {
-                r.style.display = '';
-                currentVisibleRows.push(r);
-            } else {
-                r.style.display = 'none';
-            }
-        });
+        }
+        if (!sidebarHidden && !colHidden) {
+            r.style.display = '';
+            currentVisibleRows.push(r);
+        } else {
+            r.style.display = 'none';
+        }
+    });
 
-        const originalTotal = document.getElementById('pageInfo') ? document.getElementById('pageInfo').innerText.match(/\d+ total/)?.[0]?.replace(' total', '') : allRows.length;
-        const displayCount = (currentVisibleRows.length === allRows.length) ? (originalTotal || allRows.length) : currentVisibleRows.length + ' (Filtered)';
-       
-        const topCountBadge = document.getElementById('topTotalCount');
-        const bottomCountBadge = document.getElementById('bottomTotalCount');
-        if (topCountBadge) topCountBadge.innerText = displayCount;
-        if (bottomCountBadge) bottomCountBadge.innerText = displayCount;
+    // 🚀 CRITICAL FIX: Pull the true database total from C# Razor directly instead of counting the HTML rows on the current page
+    const actualTotalRecords = @totalRecords;
+    const displayCount = (currentVisibleRows.length === allRows.length)
+        ? actualTotalRecords
+        : currentVisibleRows.length + ` (Filtered from ${actualTotalRecords})`;
 
-        updateSelectedCount();
-    }
+    const topCountBadge = document.getElementById('topTotalCount');
+    const bottomCountBadge = document.getElementById('bottomTotalCount');
+
+    if (topCountBadge) topCountBadge.innerText = displayCount;
+    if (bottomCountBadge) bottomCountBadge.innerText = displayCount;
+
+    const selectAllCb = document.getElementById('selectAllCb');
+    if (selectAllCb) selectAllCb.checked = false;
+
+    updateSelectedCount();
+}
 
     // ==========================================
     // 3. FILTERING & SEARCHING
@@ -2788,68 +2813,180 @@ document.addEventListener('change', function (e) {
         }
     };
 
-    window.openTaskModal = function() {
-        // Destroy any stuck tooltips to prevent freezing
-        document.querySelectorAll('.tooltip').forEach(t => t.remove());
+window.openTaskModal = function () {
+    document.querySelectorAll('.tooltip').forEach(t => t.remove());
 
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        const leadDropdown = document.getElementById('taskModalLeadId');
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+    const selectedIds = Array.from(selectedCbs).map(cb => cb.value);
 
-        if (selectedCbs.length > 0 && leadDropdown) {
-            leadDropdown.value = selectedCbs[0].value;
-        } else if (leadDropdown) {
-            leadDropdown.value = "";
-        }
+    // Store all selected IDs in the hidden input
+    const bulkIdsInput = document.getElementById('bulkTaskLeadIds');
+    if (bulkIdsInput) bulkIdsInput.value = selectedIds.join(',');
 
-        const modalEl = document.getElementById('quickTaskModal');
-        if (modalEl) {
-            document.body.appendChild(modalEl); // Prevents the dark backdrop screen freeze
-            modalEl.style.zIndex = "1055";
-            try {
-                const taskModal = new bootstrap.Modal(modalEl);
-                taskModal.show();
-            } catch (error) {
-                if (typeof $!== 'undefined')$(modalEl).modal('show');
-            }
-        }
-    };
-
-    window.renderMassUpdateInput = function() {
-        const fieldSelect = document.getElementById('massUpdateField');
-        const inputArea = document.getElementById('dynamicInputArea');
-        const container = document.getElementById('massUpdateValueContainer');
-       
-        if (!fieldSelect || !inputArea) return;
-       
-        const selectedField = fieldSelect.value;
-        const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
-        const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
-
-        // Force container visibility so the modal doesn't collapse
-        if (container) container.style.display = 'block';
-
-        if (!selectedField) {
-            inputArea.innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
-            return;
-        }
-
-        // Generate inputs dynamically
-        if (criteriaFilterOptionsMap[selectedField]) {
-            let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>';
-            selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>';
-            criteriaFilterOptionsMap[selectedField].forEach(opt => {
-                selectHTML += `<option value="${opt}">${opt}</option>`;
-            });
-            selectHTML += '</select>';
-            inputArea.innerHTML = selectHTML;
-        } else if (fieldType && fieldType.includes('DateTime')) {
-            inputArea.innerHTML = '<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />';
-        } else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
-            inputArea.innerHTML = '<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />';
+    // Show banner indicating how many leads will get this task
+    const bulkAlert = document.getElementById('bulkTaskAlert');
+    const bulkCount = document.getElementById('bulkTaskCount');
+    if (bulkAlert && bulkCount) {
+        if (selectedIds.length > 0) {
+            bulkCount.innerText = selectedIds.length;
+            bulkAlert.style.display = 'block';
         } else {
-            inputArea.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />';
+            bulkAlert.style.display = 'none';
         }
+    }
+
+    // Handle the single Lead dropdown inside "More Fields"
+    const leadDropdown = document.getElementById('taskModalLeadId');
+    if (leadDropdown) {
+        if (selectedIds.length === 1) {
+            leadDropdown.value = selectedIds[0];
+            leadDropdown.disabled = false;
+        } else if (selectedIds.length > 1) {
+            leadDropdown.value = "";
+            leadDropdown.disabled = true; // Disabled because we are creating for multiple leads
+        } else {
+            leadDropdown.value = "";
+            leadDropdown.disabled = false;
+        }
+    }
+
+    const modalEl = document.getElementById('quickTaskModal');
+    if (modalEl) {
+        document.body.appendChild(modalEl);
+        modalEl.style.zIndex = "1055";
+        try {
+            const taskModal = new bootstrap.Modal(modalEl);
+            taskModal.show();
+        } catch (error) {
+            if (typeof $ !== 'undefined') $(modalEl).modal('show');
+        }
+    }
+};
+
+window.executeBulkTaskCreate = function (e) {
+    e.preventDefault();
+    const form = document.getElementById('bulkTaskForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+    let leadIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+    // Fallback if user selected a single lead from the dropdown instead of checkboxes
+    const singleLeadId = document.getElementById('taskModalLeadId')?.value;
+    if (leadIds.length === 0 && singleLeadId) {
+        leadIds.push(parseInt(singleLeadId));
+    }
+
+    if (leadIds.length === 0) {
+        alert("Please select at least one Lead from the table.");
+        return;
+    }
+
+    const payload = {
+        LeadIds: leadIds,
+        Subject: form.querySelector('[name="Subject"]').value,
+        AccountId: form.querySelector('[name="AccountId"]').value ? parseInt(form.querySelector('[name="AccountId"]').value) : null,
+        DueDate: form.querySelector('[name="DueDate"]').value || null,
+        Priority: form.querySelector('[name="Priority"]').value,
+        TaskOwnerId: form.querySelector('[name="TaskOwnerId"]').value || null,
+        Mobile: form.querySelector('[name="Mobile"]')?.value || null,
+        LeadStatus: form.querySelector('[name="LeadStatus"]')?.value || null,
+        Status: form.querySelector('[name="Status"]')?.value || "Not Started"
     };
+
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    submitBtn.disabled = true;
+
+    fetch('@Url.Action("BulkCreateTasks", "Leads")', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickTaskModal')).hide();
+                alert(`Successfully created ${data.count} task(s)!`);
+                window.location.reload();
+            } else {
+                alert("Error creating tasks: " + data.message);
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Network error occurred while creating tasks.");
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+};
+
+window.renderMassUpdateInput = function () {
+    const fieldSelect = document.getElementById('massUpdateField');
+    const inputArea = document.getElementById('dynamicInputArea');
+    const container = document.getElementById('massUpdateValueContainer');
+
+    if (!fieldSelect || !inputArea) return;
+
+    const selectedField = fieldSelect.value;
+    const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
+    const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+
+    if (container) container.style.display = 'block';
+
+    if (!selectedField) {
+        inputArea.innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
+        return;
+    }
+
+    const isOwnerField = selectedField.includes("Owner") || selectedField === "CreatedBy" || selectedField === "ModifiedBy";
+    const isDateField = (fieldType && (fieldType.includes('DateTime') || fieldType.includes('DateOnly'))) ||
+        selectedField.toLowerCase().includes('date') ||
+        selectedField.toLowerCase().includes('time');
+
+    // 1. 🚀 OWNER / USER DROPDOWN FIX
+    if (isOwnerField) {
+        let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select User -</option>';
+        selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Unassign ]</option>';
+        usersMapList.forEach(u => {
+            // If it's a Foreign Key Owner field (LeadOwner, AccountOwner, CoOwner, DemoOwner), pass the User ID.
+            // If it's CreatedBy/ModifiedBy string field, pass the User Name.
+            const valToUse = selectedField.includes("Owner") ? u.id : u.name;
+            selectHTML += `<option value="${valToUse}">${u.name}</option>`;
+        });
+        selectHTML += '</select>';
+        inputArea.innerHTML = selectHTML;
+    }
+    // 2. PREDEFINED DROPDOWN LISTS
+    else if (criteriaFilterOptionsMap[selectedField]) {
+        let selectHTML = '<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>';
+        selectHTML += '<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>';
+        criteriaFilterOptionsMap[selectedField].forEach(opt => {
+            selectHTML += `<option value="${opt}">${opt}</option>`;
+        });
+        selectHTML += '</select>';
+        inputArea.innerHTML = selectHTML;
+    }
+    // 3. 🚀 DATE & TIME CALENDAR PICKER FIX (CreatedDateAndTime, TrialEndDate, etc.)
+    else if (isDateField) {
+        // Use datetime-local if the field has "Time" in the name, otherwise standard date calendar
+        const inputType = selectedField.toLowerCase().includes('time') ? 'datetime-local' : 'date';
+        inputArea.innerHTML = `<input type="${inputType}" id="massUpdateValue" class="form-control border-secondary shadow-sm" onclick="if(this.showPicker) this.showPicker();" />`;
+    }
+    // 4. NUMERIC INPUTS
+    else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
+        inputArea.innerHTML = '<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />';
+    }
+    // 5. DEFAULT TEXT INPUT
+    else {
+        inputArea.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />';
+    }
+};
 
     window.executeMassUpdateAjax = function() {
          const field = document.getElementById('massUpdateField').value;

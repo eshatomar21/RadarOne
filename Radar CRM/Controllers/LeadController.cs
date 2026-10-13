@@ -474,7 +474,7 @@ namespace Radar_CRM.Controllers
         // BULK UPDATE FOR LEADS: AJAX POST
         // ==========================================
         [HttpPost]
-        [IgnoreAntiforgeryToken] // Prevents 405/400 Anti-forgery mismatch with fetch()
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
             if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrEmpty(request.FieldName))
@@ -486,14 +486,24 @@ namespace Radar_CRM.Controllers
             {
                 var leadsToUpdate = await _context.Leads.Where(l => request.Ids.Contains(l.Id)).ToListAsync();
 
-                // Locate the property dynamically via reflection
-                var propertyInfo = typeof(Lead).GetProperty(request.FieldName,
+                string targetFieldName = request.FieldName;
+
+                // 🚀 FIX: If user selects LeadOwner, CoOwner, AccountOwner, or DemoOwner, map it to the Foreign Key ID property!
+                if (targetFieldName.Equals("LeadOwner", StringComparison.OrdinalIgnoreCase) ||
+                    targetFieldName.Equals("CoOwner", StringComparison.OrdinalIgnoreCase) ||
+                    targetFieldName.Equals("AccountOwner", StringComparison.OrdinalIgnoreCase) ||
+                    targetFieldName.Equals("DemoOwner", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetFieldName += "Id";
+                }
+
+                var propertyInfo = typeof(Lead).GetProperty(targetFieldName,
                     System.Reflection.BindingFlags.IgnoreCase |
                     System.Reflection.BindingFlags.Public |
                     System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo == null)
-                    return Json(new { success = false, message = $"Field '{request.FieldName}' not found on Lead entity." });
+                    return Json(new { success = false, message = $"Field '{targetFieldName}' not found on Lead entity." });
 
                 foreach (var lead in leadsToUpdate)
                 {
@@ -509,6 +519,7 @@ namespace Radar_CRM.Controllers
                         else if (targetType == typeof(DateOnly))
                         {
                             if (DateOnly.TryParse(request.NewValue, out DateOnly parsedDateOnly)) safeValue = parsedDateOnly;
+                            else if (DateTime.TryParse(request.NewValue, out DateTime dt)) safeValue = DateOnly.FromDateTime(dt);
                         }
                         else if (targetType == typeof(bool))
                         {
@@ -745,6 +756,106 @@ namespace Radar_CRM.Controllers
             }
         }
 
+        // ==========================================
+        // 🚀 NEW: BULK CREATE TASKS FOR SELECTED LEADS
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> BulkCreateTasks([FromBody] BulkTaskCreateRequest request)
+        {
+            if (request == null || request.LeadIds == null || !request.LeadIds.Any() || string.IsNullOrWhiteSpace(request.Subject))
+            {
+                return Json(new { success = false, message = "Please provide a Subject and select at least one Lead." });
+            }
+
+            try
+            {
+                string currentUserName = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                    ? User.Identity.Name
+                    : "System User";
+
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Fetch selected leads to automatically link their AccountId or Mobile if not manually overridden
+                var selectedLeads = await _context.Leads
+                    .Where(l => request.LeadIds.Contains(l.Id))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var tasksToInsert = new List<CrmTaskModel>();
+
+                foreach (var lead in selectedLeads)
+                {
+                    var newTask = new CrmTaskModel
+                    {
+                        Subject = request.Subject.Trim(),
+                        LeadId = lead.Id,
+                        AccountId = request.AccountId ?? lead.AccountId,
+                        DueDate = request.DueDate,
+                        Priority = string.IsNullOrWhiteSpace(request.Priority) ? "High" : request.Priority,
+                        TaskOwnerId = !string.IsNullOrWhiteSpace(request.TaskOwnerId) ? request.TaskOwnerId : (lead.LeadOwnerId ?? currentUserId),
+                        Status = string.IsNullOrWhiteSpace(request.Status) ? "Not Started" : request.Status,
+                        CreatedBy = $"{currentUserName} on {DateTime.Now:dd/MM/yy HH:mm}",
+                        CreatedTime = DateTime.Now
+                    };
+
+                    tasksToInsert.Add(newTask);
+                }
+
+                if (tasksToInsert.Any())
+                {
+                    await _context.Tasks.AddRangeAsync(tasksToInsert);
+                    await _context.SaveChangesAsync();
+                }
+
+                return Json(new { success = true, count = tasksToInsert.Count });
+            }
+            catch (Exception ex)
+            {
+                string message = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = message });
+            }
+        }
+
+        public class BulkTaskCreateRequest
+        {
+            public List<int> LeadIds { get; set; }
+            public string Subject { get; set; }
+            public int? AccountId { get; set; }
+            public DateTime? DueDate { get; set; }
+            public string Priority { get; set; }
+            public string TaskOwnerId { get; set; }
+            public string Mobile { get; set; }
+            public string LeadStatus { get; set; }
+            public string Status { get; set; }
+        }
+
+        // ==========================================
+        // EDIT NOTE VIA AJAX (LEADS)
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> EditNoteAjax(int noteId, string noteTitle, string description)
+        {
+            try
+            {
+                var note = await _context.Note.FindAsync(noteId);
+                if (note == null) return Json(new { success = false, message = "Note not found in the database." });
+
+                note.NoteTitle = noteTitle ?? "";
+                note.Description = description ?? "";
+                note.NoteContent = description ?? "";
+
+                _context.Note.Update(note);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet]
         public IActionResult DownloadNoteAttachment(string fileName)
         {
@@ -938,6 +1049,55 @@ namespace Radar_CRM.Controllers
 
                 // 🚀 2. FETCH ORIGINAL RECORD TO PREVENT "CREATED BY" FROM BEING ERASED
                 var existingLead = await _context.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.Id == lead.Id);
+                // 🚀 FIX: Grab the User's ID to save in the Timeline Log
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+
+                // =========================================================
+                // 🚀 ZOHO-STYLE TIMELINE TRACKER ENGINE (LEADS)
+                // =========================================================
+                if (existingLead != null)
+                {
+                    var timelineEvents = new List<TimelineEvent>();
+                    var excludedAuditFields = new[] { "ModifiedBy", "ModifiedTime", "CreatedBy", "LeadCreatedTime", "CreatedDateAndTime" };
+
+                    // Dynamically compare every single property on the Lead
+                    var properties = typeof(Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                        .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
+
+                    foreach (var prop in properties)
+                    {
+                        var oldObj = prop.GetValue(existingLead);
+                        var newObj = prop.GetValue(lead);
+
+                        string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
+                        string newVal = newObj?.ToString()?.Trim() ?? "blank value";
+
+                        // If the field changed, log it!
+                        if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                        {
+                            timelineEvents.Add(new TimelineEvent
+                            {
+                                EntityType = "Lead",
+                                EntityId = lead.Id,
+                                EventType = "FieldUpdate",
+                                FieldName = prop.Name,
+                                OldValue = oldVal,
+                                NewValue = newVal,
+                                ActionDescription = $"{prop.Name} was updated from {oldVal} to {newVal}",
+                                CreatedById = currentUserId,
+                                CreatedByName = currentUser,
+                                CreatedDate = DateTime.Now
+                            });
+                        }
+                    }
+
+                    if (timelineEvents.Any())
+                    {
+                        await _context.TimelineEvents.AddRangeAsync(timelineEvents);
+                    }
+                }
+                // =========================================================
+
                 if (existingLead != null && string.IsNullOrEmpty(lead.CreatedBy))
                 {
                     lead.CreatedBy = existingLead.CreatedBy;
@@ -1170,6 +1330,8 @@ namespace Radar_CRM.Controllers
                                 DemoOwner = lead.DemoOwnerId,
                                 AccountType = lead.AccountType,
                                 CreatedBy = lead.CreatedBy,
+                                SeminarName =  lead.SeminarName,
+                                GroupName = lead.GroupName,
 
                                 DateOfEntry = DateTime.Now,
                                 MetaCampaignName = lead.MetaCampaignName,
@@ -1333,7 +1495,46 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
+                    // Apply the value to the model
                     propertyInfo.SetValue(lead, safeValue, null);
+
+                    // =========================================================
+                    // 🚀 HANDOVER LEAD AUTOMATION FOR QUICK EDIT
+                    // =========================================================
+                    if (field.Equals("LeadStatus", StringComparison.OrdinalIgnoreCase) || field.Equals("Stage", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool isHandoverConditionMet = (lead.Stage == "Demo Done" && lead.LeadStatus == "Hot") ||
+                                                      (lead.LeadStatus == "Warm");
+
+                        if (isHandoverConditionMet)
+                        {
+                            var exemptUsers = await _context.Users
+                                .Where(u => u.FirstName.Contains("Jaspal") ||
+                                            u.FirstName.Contains("Akash") ||
+                                            u.FirstName.Contains("Abhinav"))
+                                .ToListAsync();
+
+                            var exemptOwnerIds = exemptUsers.Select(u => u.Id).ToList();
+                            string currentOwnerId = lead.LeadOwnerId;
+
+                            // 1. Save original owner to DemoOwner
+                            if (string.IsNullOrWhiteSpace(lead.DemoOwnerId))
+                            {
+                                lead.DemoOwnerId = currentOwnerId;
+                            }
+
+                            // 2. Assign LeadOwner to Jaspal if not exempt
+                            if (currentOwnerId != null && !exemptOwnerIds.Contains(currentOwnerId))
+                            {
+                                var defaultNewOwner = exemptUsers.FirstOrDefault(u => u.FirstName.Contains("Jaspal"));
+                                if (defaultNewOwner != null)
+                                {
+                                    lead.LeadOwnerId = defaultNewOwner.Id;
+                                }
+                            }
+                        }
+                    }
+                    // =========================================================
                 }
                 else
                 {

@@ -607,6 +607,8 @@
                         <select asp-for="DemoOwner" asp-items="ViewBag.UsersList" class="sf-select"><option value="">- Select -</option></select>
                     </div>
 
+                    <!-- 🚀 NEW: Seminar & Group Name --> <div class="col-md-4 form-group"> <label class="sf-label">Seminar Name</label> <input asp-for="SeminarName" class="sf-input" placeholder="Enter Seminar Name..." /> </div> <div class="col-md-4 form-group"> <label class="sf-label">Group Name</label> <!-- 🚀 FIX: Changed from <input> to <select> to display the mapped Name instead of the ID --> <select asp-for="GroupName" asp-items="ViewBag.VendorsList" class="sf-select"> <option value="">- Select Group Name -</option> </select> </div>
+
                     <!-- System Auditing Section -->
                         <h3 class="pane-section-title mt-4">System Auditing</h3>
                         <div class="row">
@@ -1373,19 +1375,21 @@
     const mainContainer = document.getElementById('notesContainer');
     if (mainContainer) mainContainer.insertAdjacentHTML('afterbegin', mainNoteHtml);
 
-    // 🚀 FIX: Removed [] brackets from input names. ASP.NET Core binds sequential identical names to Lists automatically; brackets break the binding.
-    const hiddenFields = `
-        <input type="hidden" name="SavedNoteOwner" value="${ownerId}" />
-        <input type="hidden" name="SavedNoteDateTime" value="${dateTime}" />
-        <input type="hidden" name="SavedNoteDesc" value="${finalDescription}" />
-    `;
-    document.getElementById('leadForm').insertAdjacentHTML('beforeend', hiddenFields);
+            const hiddenFields = `
+                <input type="hidden" name="SavedNoteOwner" value="${ownerId}" />
+                <input type="hidden" name="SavedNoteDateTime" value="${dateTime}" />
+                <input type="hidden" name="SavedNoteDesc" value="${finalDescription}" />
+            `;
+            document.getElementById('dealForm').insertAdjacentHTML('beforeend', hiddenFields);
 
-    clearInlineNote();
-    
-    // Trigger auto-save immediately
-    triggerMainFormAutoSave();
-}
+            clearInlineNote();
+
+            // 🚀 FIX: Properly trigger the form submit to auto-save the note instead of using the missing function
+            const dealFormEl = document.getElementById('dealForm');
+            if (dealFormEl) {
+                dealFormEl.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+        }
 
         // =================================================================
         // 🚀 NEW: SAFE TASK MODAL LAUNCHER (Fixes Toggles & Freezes)

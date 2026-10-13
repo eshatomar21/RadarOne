@@ -31,7 +31,7 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // INDEX: GET (Hierarchical List View)
         // ==========================================
-        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "Id", string sortDir = "desc", string advancedFilters = "")
+        public async Task<IActionResult> Index(int page = 1, string search = "", string sortCol = "CreatedDateAndTime", string sortDir = "desc", string advancedFilters = "")
         {
             if (!User.Identity.IsAuthenticated) return RedirectToAction("Login", "Users");
 
@@ -392,7 +392,8 @@ namespace Radar_CRM.Controllers
                     "AccountName" => query.OrderByDescending(a => a.AccountName),
                     "MobileNumber" => query.OrderByDescending(a => a.MobileNumber),
                     "CurrentStatus" => query.OrderByDescending(a => a.CurrentStatus),
-                    _ => query.OrderByDescending(a => a.Id)
+                    "ModifiedDateAndTime" => query.OrderByDescending(a => a.ModifiedDateAndTime),
+                    _ => query.OrderByDescending(a => a.CreatedDateAndTime) // 🚀 Changed fallback to CreatedDateAndTime
                 };
             }
             else
@@ -402,7 +403,8 @@ namespace Radar_CRM.Controllers
                     "AccountName" => query.OrderBy(a => a.AccountName),
                     "MobileNumber" => query.OrderBy(a => a.MobileNumber),
                     "CurrentStatus" => query.OrderBy(a => a.CurrentStatus),
-                    _ => query.OrderBy(a => a.Id)
+                    "ModifiedDateAndTime" => query.OrderBy(a => a.ModifiedDateAndTime),
+                    _ => query.OrderBy(a => a.CreatedDateAndTime) // 🚀 Changed fallback to CreatedDateAndTime
                 };
             }
 
@@ -461,6 +463,7 @@ namespace Radar_CRM.Controllers
 
             // 4. Pass it to the ViewBag
             ViewBag.AccountTasks = accountTasksDict;
+            ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
 
             return View(accounts);
         }
@@ -567,6 +570,8 @@ namespace Radar_CRM.Controllers
                     }
 
                     propertyInfo.SetValue(account, safeValue, null);
+
+                    account.ModifiedDateAndTime = DateTime.Now;
 
                     // Add ID and Name to dictionary
                     updatedAccountsList[account.Id] = account.AccountName ?? "Unknown Account";
@@ -688,6 +693,33 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
+        // EDIT NOTE VIA AJAX
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> EditNoteAjax(int noteId, string noteTitle, string description)
+        {
+            try
+            {
+                var note = await _context.Note.FindAsync(noteId);
+                if (note == null) return Json(new { success = false, message = "Note not found in the database." });
+
+                // Update the note's text fields
+                note.NoteTitle = noteTitle ?? "";
+                note.Description = description ?? "";
+                note.NoteContent = description ?? ""; // Keeping in sync with your create logic
+
+                _context.Note.Update(note);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ==========================================
         // CREATE: GET (Opens the blank form)
         // ==========================================
         public IActionResult Create()
@@ -716,7 +748,12 @@ namespace Radar_CRM.Controllers
         public async Task<IActionResult> Create(Account account, string[] SavedNoteOwner, string[] SavedNoteDateTime, string[] SavedNoteDesc, List<IFormFile> SavedNoteFiles)
         {
             account.DateOfEntry = DateTime.Now;
+            account.CreatedDateAndTime = DateTime.Now;
+            account.ModifiedDateAndTime = DateTime.Now;
+
             ModelState.Remove("DateOfEntry");
+            ModelState.Remove("CreatedDateAndTime"); // NEW
+            ModelState.Remove("ModifiedDateAndTime"); // NEW
 
             // 🚀 SET "CREATED BY" WITH CURRENT LOGGED-IN USER & TIME
             string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
@@ -764,10 +801,19 @@ namespace Radar_CRM.Controllers
             ViewBag.RelatedLeads = relatedLeads;
 
             // 🚀 NEW: Safely pull the LeadStatus from the linked Lead into the Account
-            var linkedLeadWithStatus = relatedLeads.FirstOrDefault(l => !string.IsNullOrEmpty(l.LeadStatus));
+            var linkedLeadWithStatus = relatedLeads.FirstOrDefault(l => !string.IsNullOrEmpty(l.LeadStatus) || !string.IsNullOrEmpty(l.Stage));
             if (linkedLeadWithStatus != null)
             {
-                account.LeadStatus = linkedLeadWithStatus.LeadStatus;
+                if (!string.IsNullOrEmpty(linkedLeadWithStatus.LeadStatus))
+                {
+                    account.LeadStatus = linkedLeadWithStatus.LeadStatus;
+                }
+
+                // 🚀 ADDED: Pull Stage from Lead into Account's LeadStage property
+                if (!string.IsNullOrEmpty(linkedLeadWithStatus.Stage))
+                {
+                    account.LeadStage = linkedLeadWithStatus.Stage;
+                }
             }
 
             // 3. Fetch Automatically Linked Deals
@@ -794,35 +840,98 @@ namespace Radar_CRM.Controllers
         {
             if (id != account.Id) return NotFound();
 
-            // PROFILE COMPLETION CHECK
+            // 🚀 FIX 1: PROFILE COMPLETION & STATE CHECK
             bool isProfileIncomplete =
                 string.IsNullOrWhiteSpace(account.IsHomeopathicDoctor) || account.IsHomeopathicDoctor == "-None-" || account.IsHomeopathicDoctor == "false" ||
                 string.IsNullOrWhiteSpace(account.WorkType) || account.WorkType == "-None-" || account.WorkType == "false" ||
                 string.IsNullOrWhiteSpace(account.ClinicType) || account.ClinicType == "-None-" || account.ClinicType == "false" ||
                 string.IsNullOrWhiteSpace(account.HasComputer) || account.HasComputer == "-None-" || account.HasComputer == "false";
 
-            if (isProfileIncomplete && (string.IsNullOrWhiteSpace(account.ProfilePendingReason) || account.ProfilePendingReason == "-None-"))
+            bool hasState = !string.IsNullOrWhiteSpace(account.Addr1_State) && account.Addr1_State != "-None-" && account.Addr1_State != "- Select State -";
+
+            // If profile is incomplete AND they haven't provided a State, they MUST provide a Pending Reason
+            if (isProfileIncomplete && !hasState && (string.IsNullOrWhiteSpace(account.ProfilePendingReason) || account.ProfilePendingReason == "-None-"))
             {
-                // Attaches the error to the field so the view blocks the save
-                ModelState.AddModelError("ProfilePendingReason", "Your profile is incomplete. If you still want to save, you must provide a Profile Pending Reason.");
-
-                // Use TempData to trigger an alert popup on the frontend
-                TempData["ErrorMessage"] = "Your profile is incomplete. If you still want to save, you must provide a Profile Pending Reason.";
+                ModelState.AddModelError("ProfilePendingReason", "Your profile is incomplete. You must provide a Profile Pending Reason or a State.");
+                TempData["ErrorMessage"] = "Your profile is incomplete. You must provide a Profile Pending Reason or a State.";
             }
-
-            // Keep your existing if (ModelState.IsValid) block below this...
 
             if (ModelState.IsValid)
             {
                 try
                 {
-                    // 🚀 SET "MODIFIED BY" WITH CURRENT LOGGED-IN USER & TIME
+                    // Get Current User Info for Logging
+                    string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
                     string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
-                    account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
-                    ModelState.Remove("ModifiedBy");
 
-                    // 🚀 Fetch the original record from the database to check the old owner
+                    // 🚀 SET "MODIFIED BY" WITH CURRENT LOGGED-IN USER & TIME
+                    account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                    account.ModifiedDateAndTime = DateTime.Now; // NEW
+
+                    ModelState.Remove("ModifiedBy");
+                    ModelState.Remove("ModifiedDateAndTime"); // NEW
+
+                    // Fetch the original record from the database to check the old owner & track timeline changes
                     var existingAccount = await _context.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == account.Id);
+
+
+                    // 🚀 NEW: Preserve CreatedDateAndTime so it isn't accidentally erased during edit
+                    if (existingAccount != null && account.CreatedDateAndTime == null)
+                    {
+                        account.CreatedDateAndTime = existingAccount.CreatedDateAndTime;
+                    }
+
+                    // Ensure CreatedBy is not accidentally erased during an edit
+                    if (existingAccount != null && string.IsNullOrEmpty(account.CreatedBy))
+                    {
+                        account.CreatedBy = existingAccount.CreatedBy;
+                    }
+
+                    // =========================================================
+                    // 🚀 FIX 2: ZOHO-STYLE TIMELINE TRACKER ENGINE
+                    // =========================================================
+                    if (existingAccount != null)
+                    {
+                        var timelineEvents = new List<TimelineEvent>();
+                        var excludedAuditFields = new[] { "ModifiedBy", "ModifiedTime", "CreatedBy", "DateOfEntry" };
+
+                        // Dynamically compare every single property on the Account
+                        var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                            .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
+
+                        foreach (var prop in properties)
+                        {
+                            var oldObj = prop.GetValue(existingAccount);
+                            var newObj = prop.GetValue(account);
+
+                            string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
+                            string newVal = newObj?.ToString()?.Trim() ?? "blank value";
+
+                            // If the field changed, log it!
+                            if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                            {
+                                timelineEvents.Add(new TimelineEvent
+                                {
+                                    EntityType = "Account",
+                                    EntityId = account.Id,
+                                    EventType = "FieldUpdate",
+                                    FieldName = prop.Name,
+                                    OldValue = oldVal,
+                                    NewValue = newVal,
+                                    ActionDescription = $"{prop.Name} was updated from {oldVal} to {newVal}",
+                                    CreatedById = currentUserId,
+                                    CreatedByName = currentUser,
+                                    CreatedDate = DateTime.Now
+                                });
+                            }
+                        }
+
+                        if (timelineEvents.Any())
+                        {
+                            await _context.TimelineEvents.AddRangeAsync(timelineEvents);
+                        }
+                    }
+                    // =========================================================
 
                     // Ensure CreatedBy is not accidentally erased during an edit
                     if (existingAccount != null && string.IsNullOrEmpty(account.CreatedBy))
@@ -854,13 +963,16 @@ namespace Radar_CRM.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
+
+            // Fallback if ModelState is invalid
             ViewBag.ExistingNotes = await _context.Note
-     .Where(n => n.AccountId == id)
-     .OrderByDescending(n => n.CreatedDateTime)
-     .ToListAsync();
+                .Where(n => n.AccountId == id)
+                .OrderByDescending(n => n.CreatedDateTime)
+                .ToListAsync();
 
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
+
             return View(account);
         }
 
@@ -1152,6 +1264,7 @@ namespace Radar_CRM.Controllers
                     Pipeline = acc.CurrentStatus == "User" ? "Upgrade Software" : "New Software"
                 };
 
+
                 // 1. SAVE THE NEW CONTACT FIRST
                 _context.Leads.Add(newContact);
                 await _context.SaveChangesAsync(); // This generates the newContact.Id
@@ -1159,40 +1272,69 @@ namespace Radar_CRM.Controllers
                 // ==========================================
                 // 2. 🚀 NEW: COPY/TRANSFER NOTES TO THE NEW CONTACT
                 // ==========================================
-                var accountNotes = await _context.Note
-                     .Where(n => n.AccountId == acc.Id)
-                     .AsNoTracking() // Ensures we create new copies
+
+                //var accountNotes = await _context.Note
+                //     .Where(n => n.AccountId == acc.Id)
+                //     .AsNoTracking() // Ensures we create new copies
+                //     .ToListAsync();
+
+                //if (accountNotes.Any())
+                //{
+                //    // Fetch valid user IDs to prevent Foreign Key crashes if NoteOwnerId is invalid
+                //    var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
+
+                //    // Declaring contactNotes so Entity Framework can save it
+                //    var contactNotes = new List<Notes>();
+
+                //    foreach (var note in accountNotes)
+                //    {
+                //        contactNotes.Add(new Notes
+                //        {
+                //            LeadId = newContact.Id,
+                //            AccountId = null, // Set to null so it uniquely maps to the new Lead/Contact record
+
+                //            // EXACT COPY: Safely transfer Owner, Date, Time, and Text
+                //            NoteOwnerId = (!string.IsNullOrEmpty(note.NoteOwnerId) && validUserIds.Contains(note.NoteOwnerId)) ? note.NoteOwnerId : null,
+                //            CreatedDateTime = note.CreatedDateTime,
+                //            Description = note.Description,
+
+                //            AttachmentFileName = note.AttachmentFileName,
+                //            AttachmentFilePath = note.AttachmentFilePath
+                //        });
+                //    }
+                //    await _context.Note.AddRangeAsync(contactNotes);
+                //    await _context.SaveChangesAsync();
+                //}
+
+
+                // ==========================================
+                // 3. 🚀 TRANSFER INCOMPLETE TASKS TO THE NEW LEAD
+                // ==========================================
+                // Fetch tasks linked to the Account that are NOT Completed
+                var incompleteTasks = await _context.Set<Radar_CRM.Models.Task>()
+                     .Where(t => t.AccountId == acc.Id && t.Status != "Completed")
                      .ToListAsync();
 
-                if (accountNotes.Any())
+                if (incompleteTasks.Any())
                 {
-                    // Fetch valid user IDs to prevent Foreign Key crashes if NoteOwnerId is invalid
-                    var validUserIds = await _context.Users.Select(u => u.Id).ToListAsync();
-
-                    // Declaring contactNotes so Entity Framework can save it
-                    var contactNotes = new List<Notes>();
-
-                    foreach (var note in accountNotes)
+                    foreach (var task in incompleteTasks)
                     {
-                        contactNotes.Add(new Notes
-                        {
-                            LeadId = newContact.Id,
-                            AccountId = null, // Set to null so it uniquely maps to the new Lead/Contact record
+                        // Disconnect from the Account and attach to the newly created Lead
+                        task.AccountId = null;
+                        task.LeadId = newContact.Id;
 
-                            // EXACT COPY: Safely transfer Owner, Date, Time, and Text
-                            NoteOwnerId = (!string.IsNullOrEmpty(note.NoteOwnerId) && validUserIds.Contains(note.NoteOwnerId)) ? note.NoteOwnerId : null,
-                            CreatedDateTime = note.CreatedDateTime,
-                            Description = note.Description,
-
-                            AttachmentFileName = note.AttachmentFileName,
-                            AttachmentFilePath = note.AttachmentFilePath
-                        });
+                        // Optionally log that the system moved it
+                        task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                        task.ModifiedTime = DateTime.Now;
                     }
-                    await _context.Note.AddRangeAsync(contactNotes);
+
+                    _context.Set<Radar_CRM.Models.Task>().UpdateRange(incompleteTasks);
                     await _context.SaveChangesAsync();
                 }
             }
         }
+
+
         // ==========================================
         // DELETE: GET (Fetches record for confirmation)
         // ==========================================
@@ -1265,9 +1407,28 @@ namespace Radar_CRM.Controllers
             try
             {
                 string cleanEmail = email.Trim().ToLower();
-                // 🚀 FIX: Checking the Accounts table instead of Users
-                bool exists = await _context.Accounts.AnyAsync(a => a.Email != null && a.Email.ToLower() == cleanEmail);
-                return Json(new { isDuplicate = exists });
+
+                // 1. Check Accounts
+                var dupAccount = await _context.Accounts
+                    .FirstOrDefaultAsync(a => (a.Email != null && a.Email.ToLower() == cleanEmail) ||
+                                              (a.AlternateEmailID != null && a.AlternateEmailID.ToLower() == cleanEmail));
+                if (dupAccount != null)
+                {
+                    var ownerName = await _context.Users.Where(u => u.Id == dupAccount.AccountOwnerId).Select(u => u.fullName ?? u.FirstName).FirstOrDefaultAsync() ?? "Unassigned";
+                    return Json(new { isDuplicate = true, recordType = "Account", recordName = dupAccount.AccountName, ownerName = ownerName });
+                }
+
+                // 2. Check Leads
+                var dupLead = await _context.Leads
+                    .FirstOrDefaultAsync(l => (l.EmailID != null && l.EmailID.ToLower() == cleanEmail) ||
+                                              (l.AlternateEmailID != null && l.AlternateEmailID.ToLower() == cleanEmail));
+                if (dupLead != null)
+                {
+                    var ownerName = await _context.Users.Where(u => u.Id == dupLead.LeadOwnerId).Select(u => u.fullName ?? u.FirstName).FirstOrDefaultAsync() ?? "Unassigned";
+                    return Json(new { isDuplicate = true, recordType = "Lead", recordName = dupLead.LeadName, ownerName = ownerName });
+                }
+
+                return Json(new { isDuplicate = false });
             }
             catch (Exception ex)
             {
@@ -1354,13 +1515,36 @@ namespace Radar_CRM.Controllers
         [HttpGet]
         public async Task<IActionResult> CheckDuplicatePhone(string phone)
         {
-            // Check MobileNumber AND AlternateMobile across ALL records
-            bool isDuplicate = await _context.Accounts.AnyAsync(a =>
-                (a.MobileNumber != null && a.MobileNumber.Contains(phone)) ||
-                (a.AlternateMobile != null && a.AlternateMobile.Contains(phone))
-            );
+            if (string.IsNullOrWhiteSpace(phone)) return Json(new { isDuplicate = false });
 
-            return Json(new { isDuplicate = isDuplicate });
+            try
+            {
+                // 1. Check Accounts
+                var dupAccount = await _context.Accounts
+                    .FirstOrDefaultAsync(a => (a.MobileNumber != null && a.MobileNumber.Contains(phone)) ||
+                                              (a.AlternateMobile != null && a.AlternateMobile.Contains(phone)));
+                if (dupAccount != null)
+                {
+                    var ownerName = await _context.Users.Where(u => u.Id == dupAccount.AccountOwnerId).Select(u => u.fullName ?? u.FirstName).FirstOrDefaultAsync() ?? "Unassigned";
+                    return Json(new { isDuplicate = true, recordType = "Account", recordName = dupAccount.AccountName, ownerName = ownerName });
+                }
+
+                // 2. Check Leads
+                var dupLead = await _context.Leads
+                    .FirstOrDefaultAsync(l => (l.MobileNumber != null && l.MobileNumber.Contains(phone)) ||
+                                              (l.AlternateMobile != null && l.AlternateMobile.Contains(phone)));
+                if (dupLead != null)
+                {
+                    var ownerName = await _context.Users.Where(u => u.Id == dupLead.LeadOwnerId).Select(u => u.fullName ?? u.FirstName).FirstOrDefaultAsync() ?? "Unassigned";
+                    return Json(new { isDuplicate = true, recordType = "Lead", recordName = dupLead.LeadName, ownerName = ownerName });
+                }
+
+                return Json(new { isDuplicate = false });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { isDuplicate = false, error = true, message = ex.Message });
+            }
         }
 
 
@@ -1525,24 +1709,24 @@ namespace Radar_CRM.Controllers
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var accountsToInsert = new List<Account>();
-            var accountsToUpdate = new List<Account>();
             var skippedRecords = new List<string>();
             int currentRow = 1;
 
-            // Load existing data for ultra-fast checking and updating
-            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
+            // 🚀 NEW: Ultra-fast Name-to-ID Resolver for Users (Fixes the "Sitara Khan" issue)
+            var usersDb = await _context.Users.AsNoTracking().ToListAsync();
+            var userDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var u in usersDb)
+            {
+                userDict[u.Id] = u.Id; // Map ID to ID
+                if (!string.IsNullOrWhiteSpace(u.fullName)) userDict[u.fullName.Trim()] = u.Id; // Map Full Name to ID
+                if (!string.IsNullOrWhiteSpace(u.FirstName)) userDict[u.FirstName.Trim()] = u.Id; // Map First Name to ID
+            }
 
-            // 🚀 NEW: Load existing accounts by Zoho ID for the Update check
-            var existingAccountsDb = await _context.Accounts
-                .Where(a => !string.IsNullOrEmpty(a.ZohoRecordId))
-                .AsNoTracking()
-                .GroupBy(a => a.ZohoRecordId)
-                .ToDictionaryAsync(g => g.Key, g => g.First());
-
+            // Load existing unique constraints to prevent duplicates
+            var existingZohoIds = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.ZohoRecordId)).Select(a => a.ZohoRecordId).ToListAsync());
             var existingMobiles = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.MobileNumber)).Select(a => a.MobileNumber).ToListAsync());
             var existingEmails = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.Email)).Select(a => a.Email.ToLower()).ToListAsync());
 
-            // Helper to Standardize Country to INDIA
             string NormalizeCountry(string input)
             {
                 if (string.IsNullOrWhiteSpace(input)) return null;
@@ -1558,18 +1742,25 @@ namespace Radar_CRM.Controllers
                     var headerLine = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
 
-                    // Standardize headers
                     var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
 
-                    string GetValSafe(string[] vals, string colName)
+                    // 🚀 NEW: Smart Helper that accepts multiple fallback header names
+                    string GetValSafe(string[] vals, params string[] colNames)
                     {
-                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
-                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
+                        foreach (var colName in colNames)
+                        {
+                            var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                            if (idx >= 0 && idx < vals.Length && !string.IsNullOrWhiteSpace(vals[idx]))
+                            {
+                                return vals[idx].Trim();
+                            }
+                        }
+                        return "";
                     }
 
-                    decimal? GetDecimalSafe(string[] vals, string colName)
+                    decimal? GetDecimalSafe(string[] vals, params string[] colNames)
                     {
-                        string raw = GetValSafe(vals, colName);
+                        string raw = GetValSafe(vals, colNames);
                         if (string.IsNullOrWhiteSpace(raw)) return null;
                         string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
                         return decimal.TryParse(clean, out decimal result) ? result : null;
@@ -1582,43 +1773,36 @@ namespace Radar_CRM.Controllers
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         var values = ParseCsvLine(line);
-                        string zohoRecordId = GetValSafe(values, "RecordId");
+
+                        string zohoRecordId = GetValSafe(values, "RecordId", "ZohoRecordId");
                         string mobile = GetValSafe(values, "MobileNumber");
                         string email = GetValSafe(values, "Email")?.ToLower();
 
-                        bool isUpdate = false;
-                        Account acc;
+                        // 🚀 INSERT-ONLY LOGIC: If it exists ANYWHERE, skip it entirely!
+                        bool isZohoDup = !string.IsNullOrEmpty(zohoRecordId) && existingZohoIds.Contains(zohoRecordId);
+                        bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
+                        bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
 
-                        // 🚀 UPSERT LOGIC: Check if it exists
-                        if (!string.IsNullOrEmpty(zohoRecordId) && existingAccountsDb.TryGetValue(zohoRecordId, out var existingAccount))
+                        if (isZohoDup || isMobileDup || isEmailDup)
                         {
-                            acc = existingAccount; // We found it, let's update it!
-                            isUpdate = true;
-                        }
-                        else
-                        {
-                            // It doesn't exist, check if it's a duplicate by Email/Mobile before inserting
-                            bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
-                            bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
-
-                            if (isMobileDup || isEmailDup)
-                            {
-                                skippedRecords.Add($"Row {currentRow}: Skipped (Mobile or Email exists without matching Zoho ID)");
-                                continue;
-                            }
-
-                            acc = new Account(); // Create a new one
-                            if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
-                            if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+                            skippedRecords.Add($"Row {currentRow}: Skipped (Duplicate Record found)");
+                            continue; // Immediately jump to the next row in the Excel file
                         }
 
-                        // 🚀 MAP ALL FIELDS (This applies to BOTH new and updated records)
-                        string rawOwnerId = GetValSafe(values, "AccountsOwner.id");
-                        string rawCoOwnerId = GetValSafe(values, "Co-Owner.id");
+                        // If we reach here, it is a brand new record. Register it in memory so we don't duplicate it in the same file.
+                        Account acc = new Account();
+                        if (!string.IsNullOrEmpty(zohoRecordId)) existingZohoIds.Add(zohoRecordId);
+                        if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
+                        if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+
+                        // 🚀 FIX: Map Owner Name to System ID
+                        string rawOwnerStr = GetValSafe(values, "AccountsOwner", "AccountsOwner.id");
+                        acc.AccountOwnerId = userDict.ContainsKey(rawOwnerStr) ? userDict[rawOwnerStr] : null;
+
+                        string rawCoOwnerStr = GetValSafe(values, "Co-Owner", "Co-Owner.id");
+                        acc.CoOwnerId = userDict.ContainsKey(rawCoOwnerStr) ? userDict[rawCoOwnerStr] : null;
 
                         acc.ZohoRecordId = zohoRecordId;
-                        acc.AccountOwnerId = validUserIds.Contains(rawOwnerId) ? rawOwnerId : null;
-                        acc.CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null;
                         acc.AccountName = GetValSafe(values, "AccountName");
                         acc.Email = GetValSafe(values, "Email");
                         acc.AlternateEmailID = GetValSafe(values, "AlternateEmailID");
@@ -1628,55 +1812,26 @@ namespace Radar_CRM.Controllers
                         acc.Description = GetValSafe(values, "Description");
                         acc.CurrentStatus = GetValSafe(values, "CurrentStatus");
                         acc.AccountType = GetValSafe(values, "AccountType");
-                        acc.DateOfEntry = DateTime.TryParse(GetValSafe(values, "DateofEntry"), out DateTime doe) ? doe : DateTime.Now;
+                        acc.DateOfEntry = DateTime.TryParse(GetValSafe(values, "DateofEntry", "Date of Entry"), out DateTime doe) ? doe : DateTime.Now;
                         acc.CreatedBy = GetValSafe(values, "CreatedBy");
                         acc.ModifiedBy = GetValSafe(values, "ModifiedBy");
                         acc.IsDuplicated = bool.TryParse(GetValSafe(values, "IsDuplicated"), out bool isDup) ? isDup : false;
 
-                        // --- Address 1 ---
-                        acc.Addr1_Country = NormalizeCountry(GetValSafe(values, "Address1-Country/Region"));
-                        acc.Addr1_FlatHouse = GetValSafe(values, "Address1-Flat/HouseNo./Building/ApartmentName");
-                        acc.Addr1_Street = GetValSafe(values, "Address1-StreetAddress");
-                        acc.Addr1_City = GetValSafe(values, "Address1-City");
-                        acc.Addr1_State = GetValSafe(values, "Address1-State/Province");
-                        acc.Addr1_Zip = GetValSafe(values, "Address1-Zip/PostalCode");
-                        acc.Addr1_Latitude = GetValSafe(values, "Address1-Latitude");
-                        acc.Addr1_Longitude = GetValSafe(values, "Address1-Longitude");
-
-                        // --- Address 2 ---
-                        acc.Addr2_Country = NormalizeCountry(GetValSafe(values, "Address2-Country/Region"));
-                        acc.Addr2_FlatHouse = GetValSafe(values, "Address2-Flat/HouseNo./Building/ApartmentName");
-                        acc.Addr2_Street = GetValSafe(values, "Address2-StreetAddress");
-                        acc.Addr2_City = GetValSafe(values, "Address2-City");
-                        acc.Addr2_State = GetValSafe(values, "Address2-State/Province");
-                        acc.Addr2_Zip = GetValSafe(values, "Address2-Zip/PostalCode");
-                        acc.Addr2_Latitude = GetValSafe(values, "Address2-Latitude");
-                        acc.Addr2_Longitude = GetValSafe(values, "Address2-Longitude");
-
-                        // --- Contact Persons ---
-                        acc.ContactPersonName = GetValSafe(values, "ContactPersonName");
-                        acc.ContactPerson1 = GetValSafe(values, "ContactPersonName1");
-                        acc.ContactPerson2 = GetValSafe(values, "ContactPersonName2");
-                        acc.ContactPerson3 = GetValSafe(values, "ContactPersonName3");
-                        acc.Contact1Phone = GetValSafe(values, "Contact1PhoneNumber");
-                        acc.Contact2Phone = GetValSafe(values, "Contact2PhoneNumber");
-                        acc.Contact3Phone = GetValSafe(values, "Contact3PhoneNumber");
-
-                        // --- Professional Details ---
-                        acc.GroupName = GetValSafe(values, "GroupsName");
+                        // --- Professional Details --- (Notice the multiple fallback headers)
+                        acc.GroupName = GetValSafe(values, "GroupsName", "GroupName");
                         acc.SeminarName = GetValSafe(values, "SeminarName");
                         acc.LeadStatus = GetValSafe(values, "LeadStatus");
                         acc.ProfilePendingReason = GetValSafe(values, "ProfilePendingReason");
-                        acc.QualificationStatus = GetValSafe(values, "QualifiactionStatus");
-                        acc.IsHomeopathicDoctor = GetValSafe(values, "AreYouaHomeopathicDoctor");
+                        acc.QualificationStatus = GetValSafe(values, "QualifiactionStatus", "QualificationStatus");
+                        acc.IsHomeopathicDoctor = GetValSafe(values, "IsHomeopathicDoctor", "AreYouaHomeopathicDoctor");
                         acc.ClinicType = GetValSafe(values, "ClinicType");
-                        acc.YearsOfPractice = int.TryParse(GetValSafe(values, "YearsofParctice"), out int yop) ? yop : null;
+                        acc.YearsOfPractice = int.TryParse(GetValSafe(values, "YearsofParctice", "YearsOfPractice"), out int yop) ? yop : null;
                         acc.Qualification = GetValSafe(values, "Qualification");
                         acc.YearOfPassing = GetValSafe(values, "Yearofpassing");
                         acc.AveragePatientFee = GetDecimalSafe(values, "AveragePatientFee");
                         acc.DateOfBirth = DateTime.TryParse(GetValSafe(values, "DateofBirth"), out DateTime dob) ? dob : null;
                         acc.WorkType = GetValSafe(values, "WorkType");
-                        acc.HasComputer = GetValSafe(values, "HavingComputer/Laptop");
+                        acc.HasComputer = GetValSafe(values, "HasComputer", "HavingComputer/Laptop");
                         acc.PatientsPerDay = int.TryParse(GetValSafe(values, "PatientsperDay"), out int ppd) ? ppd : null;
                         acc.CollegeName = GetValSafe(values, "CollegeName");
                         acc.TotalExperience = int.TryParse(GetValSafe(values, "Totalexperience"), out int te) ? te : null;
@@ -1687,19 +1842,7 @@ namespace Radar_CRM.Controllers
                         acc.ProfileRate = int.TryParse(GetValSafe(values, "ProfileRate"), out int pr) ? pr : null;
                         acc.ReferralSource = GetValSafe(values, "ReferralSource");
 
-                        // --- Software & Purchases ---
-                        acc.CurrentlyUsingSoftware = GetValSafe(values, "CurrentlyUsingSoftware");
-                        acc.CurrentSoftwareName = GetValSafe(values, "CurrentsoftwareName");
-                        acc.RadarOpusLicenseNo = GetValSafe(values, "RadarOpusLicenseno");
-                        acc.RadarOpusVersion = GetValSafe(values, "RadarOpusversion");
-                        acc.ProductPurchased = GetValSafe(values, "Product/PackagePurchased");
-                        acc.PurchaseDate = DateTime.TryParse(GetValSafe(values, "PurchaseDate"), out DateTime pd) ? pd : null;
-                        acc.PurchaseValue = GetDecimalSafe(values, "PurchaseValue(â‚¹)");
-                        acc.PaymentType = GetValSafe(values, "PaymentType");
-                        acc.PaymentStatus = GetValSafe(values, "PaymentStatus");
-                        acc.InvoiceNumber = GetValSafe(values, "InvoiceNumber");
-
-                        // 🚀 --- NEW: AD & CAMPAIGN TRACKING --- 🚀
+                        // --- Ad & Campaign Tracking ---
                         acc.MetaCampaignName = GetValSafe(values, "MetaCampaignName");
                         acc.SocialLeadId = GetValSafe(values, "SocialLeadID");
                         acc.LeadStage = GetValSafe(values, "LeadStage");
@@ -1712,36 +1855,28 @@ namespace Radar_CRM.Controllers
                         acc.Keyword = GetValSafe(values, "Keyword");
                         acc.ClickType = GetValSafe(values, "ClickType");
                         acc.DeviceType = GetValSafe(values, "DeviceType");
-                        acc.AdNetwork = GetValSafe(values, "AdNetwork");
-                        acc.SearchPartnerNetwork = GetValSafe(values, "SearchPartnerNetwork");
-                        acc.AdCampaignName = GetValSafe(values, "AdCampaignName");
-                        acc.AdGroupName = GetValSafe(values, "AdGroupName");
-                        acc.Ad = GetValSafe(values, "Ad");
-                        acc.Gadconfigid = GetValSafe(values, "GADCONFIGID");
-                        acc.AdClickDate = DateTime.TryParse(GetValSafe(values, "AdClickDate"), out DateTime acd) ? acd : null;
-                        acc.CostPerClick = GetDecimalSafe(values, "CostperClick");
-                        acc.CostPerConversion = GetDecimalSafe(values, "CostperConversion");
-                        acc.ConversionExportedOn = DateTime.TryParse(GetValSafe(values, "ConversionExportedOn"), out DateTime ceo) ? ceo : null;
-                        acc.ConversionExportStatus = GetValSafe(values, "ConversionExportStatus");
-                        acc.ReasonForConversionFailure = GetValSafe(values, "ReasonforConversionFailure");
 
-                        // Route to correct list
-                        if (isUpdate)
+                        // --- Timestamps ---
+                        string csvCreatedDate = GetValSafe(values, "Created Time", "DateofEntry");
+                        if (!string.IsNullOrWhiteSpace(csvCreatedDate) && DateTime.TryParse(csvCreatedDate, out DateTime cdt))
                         {
-                            accountsToUpdate.Add(acc);
+                            acc.CreatedDateAndTime = cdt;
+                            acc.ModifiedDateAndTime = cdt;
                         }
                         else
                         {
-                            accountsToInsert.Add(acc);
+                            acc.CreatedDateAndTime = DateTime.Now;
+                            acc.ModifiedDateAndTime = DateTime.Now;
                         }
+
+                        accountsToInsert.Add(acc);
                     }
                 }
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                // 🚀 Execute both Inserts and Updates
+                // 🚀 ONLY INSERTS NEW DATA
                 if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert);
-                if (accountsToUpdate.Any()) _context.Accounts.UpdateRange(accountsToUpdate);
 
                 await _context.SaveChangesAsync();
             }
@@ -1755,8 +1890,9 @@ namespace Radar_CRM.Controllers
             {
                 success = true,
                 insertedCount = accountsToInsert.Count,
-                updatedCount = accountsToUpdate.Count,
-                skippedCount = skippedRecords.Count
+                updatedCount = 0,
+                skippedCount = skippedRecords.Count,
+                message = $"Successfully inserted {accountsToInsert.Count} new records. Skipped {skippedRecords.Count} duplicate records."
             });
         }
 
@@ -1850,6 +1986,8 @@ namespace Radar_CRM.Controllers
 
                 account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
 
+                account.ModifiedDateAndTime = DateTime.Now;
+
                 // Explicitly tell Entity Framework to update the record
                 _context.Update(account);
                 await _context.SaveChangesAsync();
@@ -1863,5 +2001,26 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = trueError });
             }
         }
+
+        [HttpGet]
+        [Route("api/timeline/{entityType}/{entityId}")]
+        public async Task<IActionResult> GetUniversalTimeline(string entityType, int entityId)
+        {
+            var events = await _context.TimelineEvents
+                .Where(t => t.EntityType == entityType && t.EntityId == entityId)
+                .OrderByDescending(t => t.CreatedDate)
+                .Select(t => new
+                {
+                    id = t.Id,
+                    eventType = t.EventType,
+                    actionDescription = t.ActionDescription,
+                    createdByName = t.CreatedByName ?? "System User",
+                    createdDate = t.CreatedDate.ToString("MMM dd, yyyy - h:mm tt")
+                })
+                .ToListAsync();
+
+            return Json(events);
+        }
+
     }
 }

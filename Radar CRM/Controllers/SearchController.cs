@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Radar_CRM.Data; // Replace with your actual DbContext namespace
+using Radar_CRM.Data;
 using Radar_CRM.Models;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +11,7 @@ namespace Radar_CRM.Controllers
 {
     public class SearchController : Controller
     {
-        private readonly ApplicationDbContext _context; // Adjust to your DbContext name
+        private readonly ApplicationDbContext _context;
 
         public SearchController(ApplicationDbContext context)
         {
@@ -26,7 +26,12 @@ namespace Radar_CRM.Controllers
                 return Json(new List<GlobalSearchResult>());
             }
 
-            // 🚀 1. CHECK IF CURRENT USER IS ADMIN
+            // Clean the query for robust SQL searching
+            query = query.Trim();
+
+            // ==========================================
+            // 🚀 1. GET CURRENT USER & ADMIN STATUS
+            // ==========================================
             string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var currentUser = await _context.Users.FindAsync(currentUserId);
 
@@ -34,100 +39,178 @@ namespace Radar_CRM.Controllers
                            (currentUser.Profile.Contains("Admin", System.StringComparison.OrdinalIgnoreCase) ||
                             currentUser.Profile.Equals("Administrator", System.StringComparison.OrdinalIgnoreCase));
 
+            // ==========================================
+            // 🚀 2. BUILD VISIBLE USER IDs (Security Wall)
+            // ==========================================
+            var visibleUserIds = new List<string>();
+            if (currentUserId != null) visibleUserIds.Add(currentUserId); // Always see own records
+
+            if (!isAdmin && currentUser?.RoleId != null)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+
+                // Add all subordinate roles dynamically from the tree
+                visibleRoleIds.AddRange(GetSubordinateRoleIds(allRoles, currentUser.RoleId));
+
+                // Add peer visibility if enabled for this role
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                // Fetch the actual User IDs belonging to these visible roles
+                var subordinateUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                visibleUserIds.AddRange(subordinateUserIds);
+            }
+
             var results = new List<GlobalSearchResult>();
 
-            // 🚀 2. APPLY TO ALL SEARCH QUERIES (Example for Accounts)
+            // ==========================================
+            // 🚀 3. SMART ACCOUNTS SEARCH
+            // ==========================================
             var accounts = await _context.Accounts
-                .Where(a => a.AccountName.Contains(query) || a.Email.Contains(query) || a.MobileNumber.Contains(query))
+                .Where(a => a.AccountName.Contains(query) ||
+                            a.Email.Contains(query) ||
+                            a.AlternateEmailID.Contains(query) ||
+                            a.MobileNumber.Contains(query) ||
+                            a.AlternateMobile.Contains(query) ||
+                            a.Phone.Contains(query) ||
+                            a.Contact1Phone.Contains(query) ||
+                            a.ContactPersonName.Contains(query))
                 .Take(5)
-                .Select(a => new GlobalSearchResult
-                {
-                    Id = a.Id.ToString(),
-                    Title = a.AccountName,
-                    Subtitle = a.Email ?? a.MobileNumber,
-                    Module = "Accounts",
-                    Icon = "bi-buildings",
-                    // 🚀 3. SET EMPTY URL IF NOT ADMIN
-                    Url = isAdmin ? $"/Accounts/Edit/{a.Id}" : ""
-                }).ToListAsync();
+               .Select(a => new GlobalSearchResult
+               {
+                   Id = a.Id.ToString(),
+                   Title = a.AccountName,
+                   // 🚀 ADDED: Appending Owner Name via inline subquery
+                   Subtitle = (a.Email ?? a.MobileNumber ?? "Account") + " | Owner: " + (_context.Users.Where(u => u.Id == a.AccountOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
+                   Module = "Accounts",
+                   Icon = "bi-buildings",
+                   Url = (isAdmin || visibleUserIds.Contains(a.AccountOwnerId)) ? $"/Accounts/Edit/{a.Id}" : ""
+               }).ToListAsync();
             results.AddRange(accounts);
 
-            // 2. Search Leads
+            // ==========================================
+            // 🚀 4. SMART LEADS SEARCH
+            // ==========================================
             var leads = await _context.Leads
-                .Where(l => l.LeadName.Contains(query) || l.EmailID.Contains(query) || l.MobileNumber.Contains(query))
+                .Where(l => l.LeadName.Contains(query) ||
+                            l.EmailID.Contains(query) ||
+                            l.AlternateEmailID.Contains(query) ||
+                            l.MobileNumber.Contains(query) ||
+                            l.AlternateMobile.Contains(query) ||
+                            l.Phone.Contains(query) ||
+                            l.Contact1Phone.Contains(query) ||
+                            l.ContactName.Contains(query))
                 .Take(5)
                 .Select(l => new GlobalSearchResult
                 {
                     Id = l.Id.ToString(),
                     Title = l.LeadName,
-                    Subtitle = l.EmailID ?? l.MobileNumber,
+                    // 🚀 ADDED: Appending Owner Name
+                    Subtitle = (l.EmailID ?? l.MobileNumber ?? "Lead") + " | Owner: " + (_context.Users.Where(u => u.Id == l.LeadOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
                     Module = "Leads",
                     Icon = "bi-person-lines-fill",
-                    Url = $"/Leads/Edit/{l.Id}"
+                    Url = (isAdmin || visibleUserIds.Contains(l.LeadOwnerId)) ? $"/Leads/Edit/{l.Id}" : ""
                 }).ToListAsync();
             results.AddRange(leads);
 
-            // 3. Search Deals
+            // ==========================================
+            // 🚀 5. SMART DEALS SEARCH
+            // ==========================================
             var deals = await _context.Deals
-                .Where(d => d.DealName.Contains(query))
+                .Where(d => d.DealName.Contains(query) ||
+                            d.AccountName.Contains(query) ||
+                            d.LeadName.Contains(query))
                 .Take(5)
-                .Select(d => new GlobalSearchResult
-                {
-                    Id = d.Id.ToString(),
-                    Title = d.DealName,
-                    Subtitle = $"Value: {d.GrandTotal}",
-                    Module = "Deals",
-                    Icon = "bi-briefcase",
-                    Url = $"/Deals/Edit/{d.Id}"
-                }).ToListAsync();
+               .Select(d => new GlobalSearchResult
+               {
+                   Id = d.Id.ToString(),
+                   Title = d.DealName,
+                   // 🚀 ADDED: Appending Owner Name
+                   Subtitle = (d.AccountName ?? $"Value: {d.GrandTotal}") + " | Owner: " + (_context.Users.Where(u => u.Id == d.DealOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
+                   Module = "Deals",
+                   Icon = "bi-briefcase",
+                   Url = (isAdmin || visibleUserIds.Contains(d.DealOwnerId)) ? $"/Deals/Edit/{d.Id}" : ""
+               }).ToListAsync();
             results.AddRange(deals);
 
-            // 4. Search Tasks
+            // ==========================================
+            // 🚀 6. SMART TASKS SEARCH
+            // ==========================================
             var tasks = await _context.Tasks
-                .Where(t => t.Subject.Contains(query))
+                .Where(t => t.Subject.Contains(query) ||
+                            t.Mobile.Contains(query))
                 .Take(5)
-                .Select(t => new GlobalSearchResult
-                {
-                    Id = t.Id.ToString(),
-                    Title = t.Subject,
-                    Subtitle = $"Status: {t.Status}",
-                    Module = "Tasks",
-                    Icon = "bi-check2-square",
-                    Url = $"/Tasks/Edit/{t.Id}"
-                }).ToListAsync();
+               .Select(t => new GlobalSearchResult
+               {
+                   Id = t.Id.ToString(),
+                   Title = t.Subject,
+                   // 🚀 ADDED: Appending Owner Name
+                   Subtitle = $"Status: {t.Status} | Owner: " + (_context.Users.Where(u => u.Id == t.TaskOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
+                   Module = "Tasks",
+                   Icon = "bi-check2-square",
+                   Url = (isAdmin || visibleUserIds.Contains(t.TaskOwnerId)) ? $"/Tasks/Edit/{t.Id}" : ""
+               }).ToListAsync();
             results.AddRange(tasks);
 
-            // 5. Search Products
-            var products = await _context.Products
-                .Where(p => p.ProductName.Contains(query) || p.ProductCode.Contains(query))
-                .Take(5)
-                .Select(p => new GlobalSearchResult
-                {
-                    Id = p.Id.ToString(),
-                    Title = p.ProductName,
-                    Subtitle = $"Code: {p.ProductCode}",
-                    Module = "Products",
-                    Icon = "bi-box",
-                    Url = $"/Products/Edit/{p.Id}"
-                }).ToListAsync();
-            results.AddRange(products);
-
-            // 6. Search Vendors
+            // ==========================================
+            // 🚀 7. SMART VENDORS SEARCH
+            // ==========================================
             var vendors = await _context.Vendors
-                .Where(v => v.VendorName.Contains(query) || v.Email.Contains(query))
+                .Where(v => v.VendorName.Contains(query) ||
+                            v.Email.Contains(query) ||
+                            v.Phone.Contains(query))
                 .Take(5)
                 .Select(v => new GlobalSearchResult
                 {
                     Id = v.Id.ToString(),
                     Title = v.VendorName,
-                    Subtitle = v.Email,
+                    Subtitle = v.Email ?? v.Phone ?? "Vendor",
                     Module = "Vendors",
                     Icon = "bi-shop",
-                    Url = $"/Vendors/Edit/{v.Id}"
+                    // Vendors are usually public catalogs, but if restricted, apply rule:
+                    Url = (isAdmin || visibleUserIds.Contains(v.VendorOwnerId)) ? $"/Vendors/Edit/{v.Id}" : ""
                 }).ToListAsync();
             results.AddRange(vendors);
 
             return Json(results);
         }
+
+        // ==========================================
+        // HELPER: ROLE HIERARCHY RESOLVER
+        // ==========================================
+        private List<int> GetSubordinateRoleIds(List<Role> allRoles, int? currentRoleId)
+        {
+            var subordinateIds = new List<int>();
+            if (currentRoleId == null) return subordinateIds;
+
+            var directChildren = allRoles.Where(r => r.ParentRoleId == currentRoleId).Select(r => r.Id).ToList();
+            subordinateIds.AddRange(directChildren);
+
+            foreach (var childId in directChildren)
+            {
+                subordinateIds.AddRange(GetSubordinateRoleIds(allRoles, childId));
+            }
+
+            return subordinateIds;
+        }
+    }
+
+    // Required struct for the JSON return
+    public class GlobalSearchResult
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public string Subtitle { get; set; }
+        public string Module { get; set; }
+        public string Icon { get; set; }
+        public string Url { get; set; }
     }
 }

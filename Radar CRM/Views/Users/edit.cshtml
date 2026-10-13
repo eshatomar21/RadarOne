@@ -347,7 +347,7 @@
                     </div>
                     <div class="form-group">
                         <label class="sf-label" asp-for="ReportingToId">Reporting To</label>
-                        <select class="sf-select" asp-for="ReportingToId">
+                        <select class="sf-select" asp-for="ReportingToId" asp-items="ViewBag.UsersList">
                             <option value="">- Select Manager -</option>
                         </select>
                     </div>

@@ -533,7 +533,8 @@
                     <!-- Task Owner -->
                     <div class="form-group">
                         <label class="sf-label">Task Owner</label>
-                        <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId">
+                        <!-- 🚀 FIX: Added asp-items to bind the full list of users -->
+                        <select asp-for="TaskOwnerId" class="sf-select" id="TaskOwnerId" asp-items="ViewBag.UsersList">
                             @if (!string.IsNullOrEmpty(Model?.TaskOwnerId))
                             {
                                 <option value="@Model.TaskOwnerId" selected>@(Model.TaskOwner ?? "Current Owner")</option>
@@ -623,10 +624,10 @@
                     <div class="form-group mb-2 mt-4">
                         <label class="sf-label">Repeat</label>
                         <div class="form-check form-switch m-0 d-flex align-items-center">
-                            <input class="form-check-input mt-0" type="checkbox" id="repeatToggle" style="width: 45px; height: 24px;" @(Model.DueDate.HasValue ? "" : "disabled")>
+                            <input class="form-check-input mt-0" type="checkbox" id="repeatToggle" style="width: 45px; height: 24px;" @(!Model.DueDate.HasValue ? "disabled" : "") @(!string.IsNullOrEmpty(Model.Repeat) ? "checked" : "")>
                             <span class="text-muted ms-3" style="font-size:0.95rem; font-weight:600; display: @(Model.DueDate.HasValue ? "none" : "inline");" id="repeatHelpText">(Select Due Date first)</span>
-                            <span id="repeatSummaryText" class="ms-3 fw-bold" style="display:none; font-size: 1rem; color: var(--theme-primary);">
-                                Daily, Ends Never
+                            <span id="repeatSummaryText" class="ms-3 fw-bold" style="display: @(!string.IsNullOrEmpty(Model.Repeat) ? "inline" : "none"); font-size: 1rem; color: var(--theme-primary);">
+                                @(string.IsNullOrEmpty(Model.Repeat) ? "Repeat Set" : Model.Repeat)
                                 <a href="javascript:void(0)" class="ms-3 text-decoration-underline" style="color: var(--theme-text-muted);" onclick="openRepeatPanel()">Edit</a>
                             </span>
                         </div>
@@ -690,9 +691,9 @@
                     <div class="form-group mt-4 mb-2">
                         <label class="sf-label">Reminder</label>
                         <div class="form-check form-switch m-0 d-flex align-items-center">
-                            <input class="form-check-input mt-0" type="checkbox" id="reminderToggle" style="width: 45px; height: 24px;" @(Model.DueDate.HasValue ? "" : "disabled")>
-                            <span id="reminderSummaryText" class="ms-3 fw-bold" style="display:none; font-size: 1rem; color: var(--theme-primary);">
-                                Reminder Set
+                            <input class="form-check-input mt-0" type="checkbox" id="reminderToggle" style="width: 45px; height: 24px;" @(!Model.DueDate.HasValue ? "disabled" : "") @(Model.Reminder.HasValue ? "checked" : "")>
+                            <span id="reminderSummaryText" class="ms-3 fw-bold" style="display:@(Model.Reminder.HasValue ? "inline" : "none"); font-size: 1rem; color: var(--theme-primary);">
+                                @(Model.Reminder.HasValue ? Model.Reminder.Value.ToString("MMM dd, yyyy - hh:mm tt") : "Reminder Set")
                                 <a href="javascript:void(0)" class="ms-3 text-decoration-underline" style="color: var(--theme-text-muted);" onclick="openReminderPanel()">Edit</a>
                             </span>
                         </div>
@@ -701,14 +702,15 @@
                     <div class="expandable-panel" id="reminderPanel">
                         <div class="d-flex align-items-center gap-3 mb-4 fw-bold" style="font-size:1rem; color: var(--theme-text-main);">
                             <span class="text-muted">On</span>
-                            <input type="date" class="inline-date-control" id="reminderDateInput" name="ReminderDatePart">
+                            <!-- 🚀 FIX: Removed the 'name' attribute here, added 'value' bindings -->
+                            <input type="date" class="inline-date-control" id="reminderDateInput" value="@(Model.Reminder.HasValue ? Model.Reminder.Value.ToString("yyyy-MM-dd") : "")">
                             <span class="text-muted">at</span>
-                            <input type="time" class="inline-date-control" id="reminderTimeInput" name="ReminderTimePart">
+                            <input type="time" class="inline-date-control" id="reminderTimeInput" value="@(Model.Reminder.HasValue ? Model.Reminder.Value.ToString("HH:mm") : "")">
                         </div>
                         <div class="row align-items-center mt-4">
                             <div class="col-3 text-muted fw-bold" style="font-size:1rem;">Notify</div>
                             <div class="col-9">
-                                <select class="sf-select w-50" name="ReminderNotifyType">
+                                <select class="sf-select w-50" asp-for="ReminderNotifyType">
                                     <option value="Email">Email</option>
                                     <option value="Popup">Popup</option>
                                 </select>
@@ -861,12 +863,19 @@
                         <div class="info-value">@(ViewBag.LeadStatusValue ?? "-")</div>
                     </div>
                     
-                    <a href="#" class="more-info-link">More Info</a>
+                    <a href="javascript:void(0);" class="more-info-link" onclick="openUniversalTimeline('Task', @Model.Id, '@Html.Raw(Model.Subject?.Replace("'", "\\'"))')">
+    <i class="fa-solid fa-clock-rotate-left me-1"></i> View Timeline History
+</a>
                     
-                    <div class="activities-header">
-                        Open Activities
-                        <a href="#" class="activities-add">+ New</a>
-                    </div>
+<div class="activities-header d-flex align-items-center">
+    Open Activities
+    <div class="ms-auto d-flex gap-3">
+        <a href="javascript:void(0);" class="activities-add text-primary" onclick="openUniversalTimeline('Task', @Model.Id, '@Html.Raw(Model.Subject?.Replace("'", "\\'"))')" title="View Timeline">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+        </a>
+        <a href="#" class="activities-add">+ New</a>
+    </div>
+</div>
                     
                     <div class="activity-accordion">
                         <div>Tasks <span class="activity-count">1</span></div>
@@ -886,10 +895,30 @@
     </div>
 </form>
 
+<!-- ==========================================
+     GLOBAL TIMELINE OFFCANVAS PANEL
+     ========================================== -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="globalTimelinePanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.05);">
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a;">
+            <i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i> <span id="timelineEntityTitle">Timeline History</span>
+        </h5>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas"></button>
+    </div>
+
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+        <!-- Timeline Stream Container -->
+        <div class="position-relative ms-2 ps-4" id="universalTimelineList" style="border-left: 2px solid #cbd5e1;">
+            <!-- Dynamically populated via JavaScript -->
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- jQuery and Select2 JS -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
      $(document).ready(function() {
@@ -1011,9 +1040,98 @@
         // 🚀 INLINE NOTES JAVASCRIPT (FIXED)
         // =================================================================
         document.addEventListener("DOMContentLoaded", function () {
+
+            // 1. Auto select current logged in user for Notes
             const noteOwner = document.getElementById('inlineNoteOwner');
-            // Auto select current logged in user
             if (noteOwner) noteOwner.value = '@Html.Raw(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "")';
+
+            // 2. Task Form AJAX Submission
+            const taskForm = document.getElementById('taskForm');
+            if (taskForm) {
+                taskForm.addEventListener('submit', function (e) {
+                    e.preventDefault(); // Stop normal form submission
+
+                    // 1. Compile Reminder
+                    const reminderToggle = document.getElementById('reminderToggle');
+                    if (reminderToggle && reminderToggle.checked) {
+                        const rDate = document.getElementById('reminderDateInput').value;
+                        const rTime = document.getElementById('reminderTimeInput').value;
+                        if (rDate && rTime) {
+                            let hiddenRem = document.createElement('input');
+                            hiddenRem.type = 'hidden';
+                            hiddenRem.name = 'Reminder';
+                            hiddenRem.value = `${rDate}T${rTime}`;
+                            this.appendChild(hiddenRem);
+                        }
+                    } else {
+                        let hiddenRem = document.createElement('input');
+                        hiddenRem.type = 'hidden';
+                        hiddenRem.name = 'Reminder';
+                        hiddenRem.value = '';
+                        this.appendChild(hiddenRem);
+                    }
+
+                    // 2. Compile Repeat
+                    const repeatToggle = document.getElementById('repeatToggle');
+                    if (repeatToggle && !repeatToggle.checked) {
+                        const repSelect = document.querySelector('[name="Repeat"]');
+                        if (repSelect) repSelect.value = '';
+                    }
+
+                    // 3. UI Loading State
+                    const submitBtns = taskForm.querySelectorAll('button[type="submit"]');
+                    const originalTexts = [];
+                    submitBtns.forEach((btn, index) => {
+                        originalTexts[index] = btn.innerHTML;
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Updating...';
+                        btn.disabled = true;
+                    });
+
+                    // 4. Submit via AJAX
+                    const formData = new FormData(taskForm);
+
+                    fetch(taskForm.action, {
+                        method: 'POST',
+                        body: formData
+                    })
+                        .then(response => {
+                            if (response.ok || response.redirected) {
+                                // Show Success Popup
+                                Swal.fire({
+                                    title: "Updated!",
+                                    text: "Task has been successfully updated.",
+                                    icon: "success",
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                }).then(() => {
+                                    // Smart Redirect Logic
+                                    const leadId = document.querySelector('input[name="LeadId"]')?.value;
+                                    const accountId = document.querySelector('input[name="AccountId"]')?.value;
+
+                                    if (leadId && leadId !== '0' && leadId !== '') {
+                                        window.location.href = '@Url.Action("Edit", "Leads")/' + leadId;
+                                    } else if (accountId && accountId !== '0' && accountId !== '') {
+                                        window.location.href = '@Url.Action("Edit", "Accounts")/' + accountId;
+                                    } else {
+                                        window.location.href = '@Url.Action("Index", "Tasks")'; // Fallback
+                                    }
+                                });
+                            } else {
+                                throw new Error("Failed to update task.");
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Task Update Error:", err);
+                            Swal.fire("Error", "An error occurred while updating the task.", "error");
+
+                            // Reset buttons on failure
+                            submitBtns.forEach((btn, index) => {
+                                btn.innerHTML = originalTexts[index];
+                                btn.disabled = false;
+                            });
+                        });
+                });
+            }
         });
 
         function clearInlineNote() {
@@ -1115,5 +1233,65 @@
 
             clearInlineNote();
         }
+
+        async function openUniversalTimeline(entityType, entityId, entityName) {
+            const titleEl = document.getElementById('timelineEntityTitle');
+            const list = document.getElementById('universalTimelineList');
+
+            if (titleEl) titleEl.innerText = `${entityType} Timeline: ${entityName}`;
+            if (list) list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading history...</div>';
+
+            // Show the offcanvas panel
+            const panelEl = document.getElementById('globalTimelinePanel');
+            if (panelEl.parentNode !== document.body) document.body.appendChild(panelEl);
+
+            let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl) || new bootstrap.Offcanvas(panelEl);
+            bsOffcanvas.show();
+
+            try {
+                // 🚀 CRITICAL FIX: Use Url.Content to safely resolve IIS virtual directories on the live server
+                const baseUrl = '@Url.Content("~/api/timeline/")';
+                const response = await fetch(`${baseUrl}${entityType}/${entityId}`);
+
+                if (!response.ok) throw new Error("Failed to fetch timeline");
+
+                const events = await response.json();
+
+                if (events && events.length > 0) {
+                    let html = '';
+                    events.forEach(ev => {
+                        html += `
+                            <div class="position-relative mb-4">
+                                <!-- Timeline Dot Icon -->
+                                <div class="position-absolute d-flex align-items-center justify-content-center bg-white shadow-sm" style="left: -33px; top: 0px; width: 18px; height: 18px; border: 2px solid #2563eb; border-radius: 50%; z-index: 2; font-size: 0.55rem; color: #2563eb;">
+                                    <i class="fa-solid fa-pen"></i>
+                                </div>
+
+                                <!-- Timeline Card -->
+                                <div class="bg-white p-3 rounded-3 shadow-sm" style="border: 1px solid #e2e8f0;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="fw-bold text-dark" style="font-size: 0.85rem;">${ev.actionDescription}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
+                                        <span>By <strong class="text-secondary">${ev.createdByName}</strong></span>
+                                        <span><i class="fa-regular fa-clock me-1"></i>${ev.createdDate}</span>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                    list.innerHTML = html;
+                } else {
+                    list.innerHTML = `
+                        <div class="position-relative mb-4">
+                            <div class="position-absolute" style="left: -25px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #cbd5e1; border-radius: 50%;"></div>
+                            <p class="text-muted m-0" style="font-size: 0.85rem;">No timeline activity recorded yet.</p>
+                        </div>`;
+                }
+            } catch (e) {
+                console.error("Timeline Load Error:", e);
+                list.innerHTML = '<p class="text-danger text-center mt-3">Error loading timeline history.</p>';
+            }
+        }
+
     </script>
 }

@@ -880,6 +880,47 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     </div>
 </div>
 
+<!-- Notes Offcanvas Panel -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="notesPanel" style="width: 450px; border-left: 1px solid #e2e8f0; box-shadow: -10px 0 30px rgba(0,0,0,0.03);">
+    <div class="offcanvas-header bg-white border-bottom" style="padding: 20px 24px;">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center m-0" style="font-size: 1.15rem; color: #0f172a; letter-spacing: -0.01em;">
+            <i class="fa-regular fa-message me-2 text-muted"></i> <span id="noteAccountName">Account Name</span>
+        </h5>
+        <button type="button" class="btn-close text-reset shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body" style="background-color: #f8fafc; padding: 24px;">
+        <div class="compose-box bg-white rounded-3 mb-4" style="border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s; overflow: hidden;">
+            <input type="text" id="newNoteTitle" class="form-control border-0 shadow-none p-3 pb-0 fw-bold" placeholder="Note Title..." style="font-size: 1rem; color: #0f172a; background: transparent;">
+            <textarea id="newNoteText" class="form-control border-0 shadow-none p-3" rows="3" placeholder="Write a note..." style="font-size: 0.95rem; color: #1e293b; resize: none; background: transparent;"></textarea>
+            <div class="compose-footer d-flex justify-content-between align-items-center p-2" style="background-color: #f1f5f9; border-top: 1px solid #e2e8f0;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="position-relative overflow-hidden btn btn-sm bg-white border shadow-sm" style="color: #475569; font-weight: 500;">
+                        <i class="fa-solid fa-paperclip"></i>
+                        <input type="file" id="noteAttachment" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" style="cursor: pointer;" title="Attach file" />
+                    </div>
+                    <select id="noteOwnerId" class="form-select form-select-sm border-0 shadow-none fw-semibold" asp-items="ViewBag.UsersList" style="background-color: transparent; color: #475569; cursor: pointer; max-width: 130px;">
+                        <option value="">System</option>
+                    </select>
+                </div>
+                <button id="btnSaveNote" class="btn btn-sm shadow-sm" onclick="saveNoteAjax()" style="background-color: #0f172a; color: #ffffff; font-weight: 600; border-radius: 6px; padding: 6px 16px; transition: all 0.2s;">
+                    Save Note
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center mb-3">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em; text-transform: uppercase;">Timeline Log</span>
+            <div class="ms-3 flex-grow-1" style="height: 1px; background-color: #e2e8f0;"></div>
+        </div>
+
+        <div class="position-relative ms-2 ps-4" id="notesTimelineList" style="border-left: 2px solid #e2e8f0;">
+            <!-- Notes dynamically appended here via JS -->
+        </div>
+    </div>
+</div>
+
+
 <!-- Create Custom View Modal (Mounted at page root) -->
 <div class="modal fade" id="createCustomViewModal" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
     <div class="modal-dialog modal-dialog-centered modal-xl">
@@ -1402,6 +1443,239 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
             item.style.display = text.includes(q) ? 'flex' : 'none';
         });
     };
+
+    window.openNotesPanel = async function (taskId, taskSubject) {
+        window.currentNoteTaskId = taskId;
+        document.getElementById('noteAccountName').innerText = taskSubject || 'Task';
+        document.getElementById('newNoteText').value = '';
+        if (document.getElementById('newNoteTitle')) document.getElementById('newNoteTitle').value = '';
+        document.getElementById('noteAttachment').value = '';
+
+        const ownerDropdown = document.getElementById('noteOwnerId');
+        if (ownerDropdown) {
+            ownerDropdown.value = '@currentUserId';
+        }
+
+        const list = document.getElementById('notesTimelineList');
+        list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading notes...</div>';
+
+        const panelEl = document.getElementById('notesPanel');
+        document.body.appendChild(panelEl);
+        panelEl.style.zIndex = "1055";
+
+        let bsOffcanvas = bootstrap.Offcanvas.getInstance(panelEl);
+        if (!bsOffcanvas) bsOffcanvas = new bootstrap.Offcanvas(panelEl);
+        bsOffcanvas.show();
+
+        try {
+            const response = await fetch('@Url.Action("GetNotes", "Tasks")?taskId=' + taskId);
+            if (!response.ok) throw new Error("Failed to fetch");
+
+            const responseData = await response.json();
+            const notesArray = Array.isArray(responseData) ? responseData : (responseData.data || []);
+
+            if (notesArray && notesArray.length > 0) {
+                let allNotesHtml = '';
+
+                notesArray.forEach(n => {
+                    const owner = n.ownerName || n.OwnerName || 'System';
+                    const time = n.createdDateTime || n.CreatedDateTime || 'Unknown Date';
+                    const desc = n.description || n.Description || '';
+                    const file = n.attachmentFileName || n.AttachmentFileName || null;
+                    const title = n.noteTitle || n.NoteTitle || '';
+
+                    // 🚀 FIX: Built outside the main template string to prevent \${title} bug
+                    let titleHtml = '';
+                    if (title) {
+                        titleHtml = `<div class="fw-bold mb-1" style="color: #0f172a; font-size: 1rem;">${title}</div>`;
+                    }
+
+                    let attachmentHtml = '';
+                    if (file) {
+                        attachmentHtml = `
+                                <a href="@Url.Action("DownloadNoteFile", "Tasks")?fileName=${encodeURIComponent(file)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.8rem; color: #0f172a; cursor: pointer;">
+                                    <i class="fa-solid fa-download text-primary"></i>
+                                    <span class="fw-semibold text-truncate" style="max-width: 200px;">${file}</span>
+                                </a>`;
+                    }
+
+                    allNotesHtml += `
+                        <div class="position-relative mb-4">
+                            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                            <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                                        <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                            <i class="fa-solid fa-user"></i>
+                                        </div>
+                                        ${owner}
+                                    </div>
+                                    <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                                        <i class="fa-regular fa-clock me-1"></i>${time}
+                                    </span>
+                                </div>
+                                ${titleHtml}
+                                <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${desc}</div>
+                                ${attachmentHtml}
+                            </div>
+                        </div>`;
+                });
+
+                list.innerHTML = allNotesHtml;
+            } else {
+                list.innerHTML = `
+                        <div class="position-relative mb-4">
+                            <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #f8fafc; border: 3px solid #e2e8f0; border-radius: 50%;"></div>
+                            <p class="text-muted m-0" style="font-size:0.85rem; padding-top: -2px;">No historical notes found.</p>
+                        </div>`;
+            }
+        } catch (e) {
+            console.error("Notes rendering error:", e);
+            list.innerHTML = '<p class="text-danger text-center mt-3">Error loading notes. Check console for details.</p>';
+        }
+    };
+
+    window.appendNoteToUI = function (ownerName, timeString, title, text, fileName) {
+
+        // 🚀 FIX: Built outside the main template string to prevent \${title} bug
+        let titleHtml = '';
+        if (title) {
+            titleHtml = `<div class="fw-bold mb-2 pb-1 border-bottom" style="color: #0f172a; font-size: 1rem;">${title}</div>`;
+        }
+
+        let attachmentHtml = '';
+        if (fileName) {
+            attachmentHtml = `
+                    <a href="/Tasks/DownloadNoteAttachment?fileName=${encodeURIComponent(fileName)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.85rem; color: #0f172a; transition: 0.2s;" onmouseover="this.style.background='#eff6ff'; this.style.borderColor='#93c5fd';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';">
+                        <i class="fa-solid fa-download text-primary"></i>
+                        <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+                    </a>`;
+        }
+
+        const noteHtml = `
+                <div class="position-relative mb-4">
+                    <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                    <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                                <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                    <i class="fa-solid fa-user"></i>
+                                </div>
+                                ${ownerName}
+                            </div>
+                            <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                                <i class="fa-regular fa-clock me-1"></i>${timeString}
+                            </span>
+                        </div>
+                        ${titleHtml}
+                        <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+                        ${attachmentHtml}
+                    </div>
+                </div>`;
+
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+    };
+
+    window.saveNoteAjax = async function () {
+        const title = document.getElementById('newNoteTitle') ? document.getElementById('newNoteTitle').value : '';
+        const text = document.getElementById('newNoteText') ? document.getElementById('newNoteText').value : '';
+        const attachment = document.getElementById('noteAttachment') && document.getElementById('noteAttachment').files.length > 0 ? document.getElementById('noteAttachment').files[0] : null;
+        const ownerId = document.getElementById('noteOwnerId') ? document.getElementById('noteOwnerId').value : '';
+        const btn = document.getElementById('btnSaveNote');
+
+        if (!text.trim() && !attachment && !title.trim()) return;
+
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('taskId', window.currentNoteTaskId);
+        formData.append('noteTitle', title);
+        formData.append('description', text);
+        formData.append('ownerId', ownerId);
+        if (attachment) formData.append('attachment', attachment);
+
+        try {
+            const response = await fetch('@Url.Action("SaveNoteAjax", "Tasks")', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success && data.note) {
+                const fallbackMsg = document.querySelector('#notesTimelineList p.text-muted');
+                if (fallbackMsg && fallbackMsg.innerText.includes('No historical notes')) {
+                    fallbackMsg.closest('.position-relative').remove();
+                }
+
+                const owner = data.note.ownerName || data.note.OwnerName || 'System';
+                const time = data.note.createdDateTime || data.note.CreatedDateTime || data.note.createdDate || data.note.CreatedDate || 'Just now';
+                const desc = data.note.description || data.note.Description || text;
+                const file = data.note.attachmentFileName || data.note.AttachmentFileName || null;
+                const noteTitle = data.note.noteTitle || data.note.NoteTitle || title;
+
+                window.appendNoteToUI(owner, time, noteTitle, desc, file);
+
+                if (document.getElementById('newNoteTitle')) document.getElementById('newNoteTitle').value = '';
+                if (document.getElementById('newNoteText')) document.getElementById('newNoteText').value = '';
+                if (document.getElementById('noteAttachment')) document.getElementById('noteAttachment').value = '';
+
+                // Automatically update the badge count in the table without reloading!
+                const taskRow = document.querySelector(`tr[data-id="${window.currentNoteTaskId}"]`);
+                if (taskRow) {
+                    const badge = taskRow.querySelector('.badge.rounded-pill');
+                    if (badge) {
+                        let currentCount = parseInt(badge.innerText) || 0;
+                        badge.innerText = currentCount + 1;
+                        badge.classList.remove('bg-secondary');
+                        badge.classList.add('bg-primary');
+                    }
+                }
+
+            } else {
+                alert("Failed to save note: " + (data.message || "Unknown error"));
+            }
+        } catch (e) {
+            console.error("Notes save error:", e);
+            alert("Network error while saving note.");
+        } finally {
+            btn.innerHTML = 'Save Note';
+            btn.disabled = false;
+        }
+    };
+
+    
+    function appendNoteToUI(ownerName, timeString, title, text, fileName) {
+        let attachmentHtml = fileName ? `
+            <a href="/Accounts/DownloadNoteAttachment?fileName=${encodeURIComponent(fileName)}" target="_blank" class="mt-3 p-2 rounded d-inline-flex align-items-center gap-2 text-decoration-none shadow-sm" style="background: #f8fafc; border: 1px solid #cbd5e1; font-size:0.85rem; color: #0f172a; transition: 0.2s;" onmouseover="this.style.background='#eff6ff'; this.style.borderColor='#93c5fd';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1';">
+                <i class="fa-solid fa-download text-primary"></i>
+                <span class="fw-semibold text-truncate" style="max-width: 200px;">${fileName}</span>
+            </a>` : '';
+
+        const noteHtml = `
+            <div class="position-relative mb-4">
+                <div class="position-absolute" style="left: -33px; top: 0px; width: 14px; height: 14px; background: #ffffff; border: 3px solid #cbd5e1; border-radius: 50%; z-index: 2;"></div>
+                <div class="bg-white p-3 rounded-3" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="fw-bold d-flex align-items-center gap-2" style="font-size:0.9rem; color: #0f172a;">
+                            <div style="width: 24px; height: 24px; background: #f1f5f9; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            ${ownerName}
+                        </div>
+                        <span style="font-size:0.75rem; color:#94a3b8; font-weight: 500;">
+                            <i class="fa-regular fa-clock me-1"></i>${timeString}
+                        </span>
+                    </div>
+                    ${title ? `<div class="fw-bold mb-2 pb-1 border-bottom" style="color: #0f172a; font-size: 1rem;">${title}</div>` : ''}
+                    <div style="font-size:0.9rem; color:#334155; line-height: 1.6; white-space: pre-wrap;">${text}</div>
+                    ${attachmentHtml}
+                </div>
+            </div>`;
+
+        document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
+    }
+
 
     // ==========================================
     // 3. EXCEL RESIZING & FILE UPLOADS
@@ -1983,17 +2257,27 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         const container = document.getElementById('customViewsTabsContainer');
         const savedViews = JSON.parse(localStorage.getItem('crm_user_views_tasks')) || [];
         const urlParams = new URLSearchParams(window.location.search);
-        const activeViewName = urlParams.get('activeView') || 'All Tasks';
 
         const isAdmin = @((
-                                                                        User.IsInRole("Administrator") ||
-                                                                        User.IsInRole("Admin") ||
-                                                                        User.IsInRole("SuperAdmin") ||
-                                                                        User.Claims.Any(c => c.Type == "Profile" && (c.Value == "Administrator" || c.Value == "Admin" || c.Value == "SuperAdmin"))
-                                                        ).ToString().ToLower());
+                        User.IsInRole("Administrator") ||
+                        User.IsInRole("Admin") ||
+                        User.IsInRole("SuperAdmin") ||
+                        User.Claims.Any(c => c.Type == "Profile" && (c.Value == "Administrator" || c.Value == "Admin" || c.Value == "SuperAdmin"))
+                ).ToString().ToLower());
 
-        // 🚀 FIX: Revert to using the Logged-In User's ID for the Task queries
+        // 🚀 FIX 1: Set default active view tab based on Role
+        const activeViewName = urlParams.get('activeView') || (isAdmin ? 'All Tasks' : 'My Tasks');
+
         const currentUserId = '@currentUserId';
+        // Escape single quotes just in case a user's name is O'Connor etc.
+        const currentUserName = '@Html.Raw(currentUserName?.Replace("'", "\\'"))';
+
+        // 🚀 FIX 2: Auto-redirect Standard Users to "My Tasks" if they land on the base URL
+        if (!isAdmin && !urlParams.has('activeView') && !urlParams.has('advancedFilters')) {
+            const myTasksFilter = [{ LogicalOperator: "", ColumnName: "TaskOwner", Condition: "is", Value: currentUserName, IsDate: false }];
+            window.applyCustomView('My Tasks', myTasksFilter);
+            return; // Stop rendering and wait for reload
+        }
 
         const formatDate = (date) => {
             const d = new Date(date);
@@ -2014,16 +2298,17 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
             systemViews.push({ name: 'All Tasks', filters: [] });
         }
 
-        // 🚀 FIX: Notice we now send "TaskOwnerId" and the currentUserId
+        // 🚀 FIX 3: Change "TaskOwnerId" to "TaskOwner" and pass 'currentUserName'.
+        // This bypasses the excludedFields limitation and matches the UI Datlist logic perfectly.
         systemViews.push({
             name: 'My Tasks',
-            filters: [{ LogicalOperator: "", ColumnName: "TaskOwnerId", Condition: "is", Value: currentUserId, IsDate: false }]
+            filters: [{ LogicalOperator: "", ColumnName: "TaskOwner", Condition: "is", Value: currentUserName, IsDate: false }]
         });
 
         systemViews.push({
             name: 'My Today + Overdue Tasks',
             filters: [
-                { LogicalOperator: "", ColumnName: "TaskOwnerId", Condition: "is", Value: currentUserId, IsDate: false },
+                { LogicalOperator: "", ColumnName: "TaskOwner", Condition: "is", Value: currentUserName, IsDate: false },
                 { LogicalOperator: "AND", ColumnName: "DueDate", Condition: "before", Value: formatDate(tomorrow), IsDate: true },
                 { LogicalOperator: "AND", ColumnName: "Status", Condition: "is_not", Value: "Completed", IsDate: false }
             ]
@@ -2032,7 +2317,7 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         systemViews.push({
             name: 'My Next 7 Day + Overdue Tasks',
             filters: [
-                { LogicalOperator: "", ColumnName: "TaskOwnerId", Condition: "is", Value: currentUserId, IsDate: false },
+                { LogicalOperator: "", ColumnName: "TaskOwner", Condition: "is", Value: currentUserName, IsDate: false },
                 { LogicalOperator: "AND", ColumnName: "DueDate", Condition: "before", Value: formatDate(next7Days), IsDate: true },
                 { LogicalOperator: "AND", ColumnName: "Status", Condition: "is_not", Value: "Completed", IsDate: false }
             ]
@@ -2041,7 +2326,7 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         systemViews.push({
             name: 'Overdue Task',
             filters: [
-                { LogicalOperator: "", ColumnName: "TaskOwnerId", Condition: "is", Value: currentUserId, IsDate: false },
+                { LogicalOperator: "", ColumnName: "TaskOwner", Condition: "is", Value: currentUserName, IsDate: false },
                 { LogicalOperator: "AND", ColumnName: "DueDate", Condition: "before", Value: formatDate(today), IsDate: true },
                 { LogicalOperator: "AND", ColumnName: "Status", Condition: "is_not", Value: "Completed", IsDate: false }
             ]

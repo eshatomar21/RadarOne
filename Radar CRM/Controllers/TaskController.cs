@@ -68,7 +68,8 @@ namespace Radar_CRM.Controllers
                     .ToListAsync();
                 visibleUserIds.Add(currentUserId);
 
-                query = query.Where(t => visibleUserIds.Contains(t.TaskOwner));
+                // 🚀 FIX: Must compare against TaskOwnerId, not TaskOwner
+                query = query.Where(t => visibleUserIds.Contains(t.TaskOwnerId));
             }
 
             // 2. FIX: Parse and Apply Advanced Filters dynamically
@@ -349,7 +350,8 @@ namespace Radar_CRM.Controllers
                 .Where(n => n.TaskId == taskId)
                 .OrderByDescending(n => n.CreatedDateTime)
                 .Select(n => new {
-                    ownerName = n.NoteOwner != null ? n.NoteOwner.fullName : "System",
+                    // 🚀 Added fallback to FirstName to match your SaveNoteAjax logic perfectly
+                    ownerName = n.NoteOwner != null ? (n.NoteOwner.fullName ?? n.NoteOwner.FirstName) : "System User",
                     createdDateTime = n.CreatedDateTime.ToString("MMM dd, yyyy h:mm tt"),
                     noteTitle = n.NoteTitle,
                     description = n.Description,
@@ -522,6 +524,7 @@ namespace Radar_CRM.Controllers
 
             ViewBag.AccountsList = new SelectList(_context.Accounts, "Id", "AccountName");
             ViewBag.LeadsList = new SelectList(_context.Leads, "Id", "LeadName");
+            ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
 
             return View(taskModel);
         }
@@ -675,6 +678,9 @@ namespace Radar_CRM.Controllers
                     string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                     string currentUserName = User.FindFirstValue(ClaimTypes.Name);
 
+                    // =========================================================
+                    // 1. REPOPULATE MISSING FIELDS *BEFORE* RUNNING THE TRACKER
+                    // =========================================================
                     taskModel.ModifiedTime = DateTime.Now;
                     taskModel.ModifiedById = currentUserId;
                     taskModel.ModifiedBy = currentUserName ?? "System";
@@ -705,12 +711,76 @@ namespace Radar_CRM.Controllers
                         }
                     }
 
+                    // =========================================================
+                    // 2. FETCH ORIGINAL DB RECORD FOR COMPARISON
+                    // =========================================================
+                    var existingTask = await _context.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskModel.Id);
+
+                    // Preserve creation dates that aren't in the UI
+                    if (existingTask != null)
+                    {
+                        if (string.IsNullOrEmpty(taskModel.CreatedBy)) taskModel.CreatedBy = existingTask.CreatedBy;
+                        if (taskModel.CreatedDateAndTime == null || taskModel.CreatedDateAndTime == DateTime.MinValue) taskModel.CreatedDateAndTime = existingTask.CreatedDateAndTime;
+                        if (taskModel.CreatedTime == null || taskModel.CreatedTime == DateTime.MinValue) taskModel.CreatedTime = existingTask.CreatedTime;
+                    }
+
+                    // =========================================================
+                    // 3. 🚀 ZOHO-STYLE TIMELINE TRACKER ENGINE
+                    // =========================================================
+                    if (existingTask != null)
+                    {
+                        var timelineEvents = new List<TimelineEvent>();
+
+                        // 🚀 CRITICAL FIX: Exclude system IDs and string-cache fields from spamming the timeline
+                        var excludedAuditFields = new[] {
+                        "ModifiedBy", "ModifiedById", "ModifiedTime", "CreatedBy", "CreatedTime", "CreatedDateAndTime",
+                        "TaskOwner", "RelatedTo", "RelatedToId"
+                    };
+
+                        var properties = typeof(CrmTaskModel).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                            .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
+
+                        foreach (var prop in properties)
+                        {
+                            var oldObj = prop.GetValue(existingTask);
+                            var newObj = prop.GetValue(taskModel);
+
+                            string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
+                            string newVal = newObj?.ToString()?.Trim() ?? "blank value";
+
+                            // If the field changed, log it!
+                            if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                            {
+                                timelineEvents.Add(new TimelineEvent
+                                {
+                                    EntityType = "Task",
+                                    EntityId = taskModel.Id,
+                                    EventType = "FieldUpdate",
+                                    FieldName = prop.Name,
+                                    OldValue = oldVal,
+                                    NewValue = newVal,
+                                    ActionDescription = $"{prop.Name} was updated from {oldVal} to {newVal}",
+                                    CreatedById = currentUserId,
+                                    CreatedByName = currentUserName,
+                                    CreatedDate = DateTime.Now
+                                });
+                            }
+                        }
+
+                        if (timelineEvents.Any())
+                        {
+                            await _context.TimelineEvents.AddRangeAsync(timelineEvents);
+                        }
+                    }
+                    // =========================================================
+
+                    // 4. SAVE TO DATABASE
                     _context.Update(taskModel);
                     await _context.SaveChangesAsync();
 
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
 
-                    // FIX: Stay on the Edit page instead of redirecting to Index
+                    // Stay on the Edit page instead of redirecting to Index
                     return RedirectToAction(nameof(Edit), new { id = taskModel.Id });
                 }
                 catch (DbUpdateConcurrencyException)
@@ -949,6 +1019,37 @@ namespace Radar_CRM.Controllers
             }
             return Json(new { success = true });
         }
+
+
+        // ==========================================
+        // 🚀 GLOBAL REMINDER POLLING API
+        // ==========================================
+        // ==========================================
+        // 🚀 GLOBAL REMINDER POLLING API (TIMEZONE PROOF)
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> GetUpcomingReminders()
+        {
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(currentUserId)) return Json(new { success = false });
+
+            // We let the frontend Javascript handle the time math to avoid server TimeZone bugs
+            var reminders = await _context.Tasks
+                .Where(t => t.TaskOwnerId == currentUserId
+                         && t.Status != "Completed"
+                         && t.Reminder.HasValue
+                         && t.ReminderNotifyType == "Popup") // 🚀 Only pull Popup reminders
+                .Select(t => new {
+                    id = t.Id,
+                    subject = t.Subject,
+                    // Send strictly as Local ISO string so JS reads it perfectly
+                    reminderTime = t.Reminder.Value.ToString("yyyy-MM-ddTHH:mm:ss")
+                })
+                .ToListAsync();
+
+            return Json(new { success = true, data = reminders });
+        }
+
 
         [HttpGet]
         public async Task<IActionResult> GetTodaysTasks()

@@ -45,6 +45,8 @@ namespace Radar_CRM.Models
         public string? Repeat { get; set; }
         public DateTime? Reminder { get; set; }
 
+        public string? ReminderNotifyType { get; set; }
+
         // Audit Fields
         public string? CreatedById { get; set; }
         public string? CreatedBy { get; set; }

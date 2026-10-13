@@ -185,9 +185,15 @@
                 <a asp-controller="Accounts" asp-action="Index" class="text-white text-decoration-none d-flex align-items-center pe-4 border-end" style="border-color: rgba(255,255,255,0.2) !important; font-size: 0.95rem; font-weight: 500; transition: 0.2s;" onmouseover="this.style.opacity='0.8';" onmouseout="this.style.opacity='1';">
                     <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
                 </a>
+
+
                 <a asp-controller="Accounts" asp-action="Index" class="btn px-4 fw-bold shadow-sm" style="background-color: #f1f3f5; border: 1px solid #e2e8f0; color: #1e293b; transition: 0.2s; font-size: 0.95rem;" onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='#f1f3f5'; this.style.color='#1e293b';">
                     Cancel
                 </a>
+
+                <button type="submit" id="saveAccountBtn" class="btn-save-modern">
+                    <i class="fa-solid fa-check"></i> Save Account
+                </button>
             </div>
         </div>
 
@@ -298,7 +304,7 @@
             <div class="col-md-6"><div class="z-field-row"><div class="z-label">Contact Person Name</div><div class="z-input-wrapper"><input asp-for="ContactPersonName" class="z-input" placeholder="Enter full name" /></div></div></div>
             
             <div class="col-md-6"><div class="z-field-row"><div class="z-label">Mobile Phone <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="MobileNumber" class="z-input" id="MobileNumber" placeholder="+1 202-555-0117" required /><button type="button" class="verify-btn" onclick="verifyPhone('MobileNumber')">Verify</button></div></div></div>
-            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger">*</span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input text-primary" id="Email" placeholder="email@example.com" required /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
+            <div class="col-md-6"><div class="z-field-row"><div class="z-label">Email <span class="text-danger"></span></div><div class="z-input-wrapper"><input asp-for="Email" class="z-input text-primary" id="Email" placeholder="email@example.com"  /><button type="button" class="verify-btn" onclick="verifyEmail('Email')">Verify</button></div></div></div>
             
             <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Mobile</div><div class="z-input-wrapper"><input asp-for="AlternateMobile" class="z-input" id="AlternateMobile" placeholder="Optional..." /><button type="button" class="verify-btn" onclick="verifyPhone('AlternateMobile')">Verify</button></div></div></div>
             <div class="col-md-6"><div class="z-field-row"><div class="z-label">Alternate Email</div><div class="z-input-wrapper"><input asp-for="AlternateEmailID" class="z-input" id="AlternateEmailID" placeholder="Alternate email..." /><button type="button" class="verify-btn" onclick="verifyEmail('AlternateEmailID')">Verify</button></div></div></div>
@@ -548,66 +554,70 @@
         document.getElementById('divSeminarName').style.display = (val === 'Seminar Conference') ? 'block' : 'none';
     });
 
-    window.verifyPhone = function(fieldId) {
+    window.verifyPhone = function (fieldId) {
         const phoneInput = document.getElementById(fieldId);
         if (!phoneInput) { alert("Error: Input field not found."); return; }
 
         let phone = phoneInput.value.trim();
         if (!phone) { Swal.fire("Wait", "Please enter a phone number first before verifying.", "warning"); return; }
 
-        // Extract digits for validation checking (No UI mutation)
         let digitsOnly = phone.replace(/\D/g, '');
         if (digitsOnly.length < 10) {
-            Swal.fire("Invalid!", "Phone number must have at least 10 digits.", "error"); 
+            Swal.fire("Invalid!", "Phone number must have at least 10 digits.", "error");
             return;
         }
 
-        // 🚀 CROSS-CHECK WITHIN THE FORM (Main vs Alternate)
         const mainMobileEl = document.getElementById('MobileNumber');
         const altMobileEl = document.getElementById('AlternateMobile');
-        
+
         let main10 = mainMobileEl && mainMobileEl.value ? mainMobileEl.value.replace(/\D/g, '').slice(-10) : '';
         let alt10 = altMobileEl && altMobileEl.value ? altMobileEl.value.replace(/\D/g, '').slice(-10) : '';
 
         if (fieldId === 'AlternateMobile' && main10 === alt10 && alt10 !== '') {
-            Swal.fire("Error", "Alternate Mobile cannot be the exact same as the main Mobile Number!", "error"); 
-            phoneInput.value = ''; // clear it
+            Swal.fire("Error", "Alternate Mobile cannot be the exact same as the main Mobile Number!", "error");
+            phoneInput.value = '';
             return;
         }
         if (fieldId === 'MobileNumber' && main10 === alt10 && main10 !== '') {
-            Swal.fire("Error", "Main Mobile cannot be the exact same as the Alternate Mobile!", "error"); 
+            Swal.fire("Error", "Main Mobile cannot be the exact same as the Alternate Mobile!", "error");
             return;
         }
 
-        // UI Loading state
         const btn = window.event ? (window.event.target || window.event.srcElement) : null;
         let originalBtnText = 'Verify';
         if (btn) { originalBtnText = btn.innerText; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; }
 
-        // 🚀 SEND ONLY LAST 10 DIGITS TO BACKEND FOR FOOLPROOF DB CHECK
         let searchPhone = digitsOnly.slice(-10);
 
         fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(searchPhone))
-        .then(async response => {
-            if (!response.ok) throw new Error("HTTP Status " + response.status);
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                Swal.fire('Error', 'Database Error: ' + data.message, 'error');
-            } else if (data.isDuplicate) {
-                Swal.fire('Warning', 'This phone number already exists in another account record in the database!', 'warning');
-            } else {
-                Swal.fire('Success', 'This number is valid and unique in the system.', 'success');
-            }
-        })
-        .catch(error => {
-            console.error("Error verifying phone:", error);
-            Swal.fire("Error", "Could not connect to the server.", "error");
-        })
-        .finally(() => {
-            if (btn) { btn.innerText = originalBtnText; btn.disabled = false; }
-        });
+            .then(async response => {
+                if (!response.ok) throw new Error("HTTP Status " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    Swal.fire('Error', 'Database Error: ' + data.message, 'error');
+                } else if (data.isDuplicate) {
+                    // 🚀 NEW: Shows exact Record Type, Name, and Owner
+                    Swal.fire({
+                        title: 'Duplicate Found!',
+                        html: `This phone number already exists in the database.<br><br>
+                           <b>Record Type:</b> ${data.recordType}<br>
+                           <b>Name:</b> <span class="text-primary">${data.recordName}</span><br>
+                           <b>Owner:</b> <span class="text-danger">${data.ownerName}</span>`,
+                        icon: 'warning'
+                    });
+                } else {
+                    Swal.fire('Success', 'This number is valid and unique in the system.', 'success');
+                }
+            })
+            .catch(error => {
+                console.error("Error verifying phone:", error);
+                Swal.fire("Error", "Could not connect to the server.", "error");
+            })
+            .finally(() => {
+                if (btn) { btn.innerText = originalBtnText; btn.disabled = false; }
+            });
     };
 
 
@@ -1049,7 +1059,7 @@
     // ==========================================
     // 11. EMAIL VERIFICATION LOGIC
     // ==========================================
-    window.verifyEmail = function(fieldId) {
+    window.verifyEmail = function (fieldId) {
         const emailInput = document.getElementById(fieldId);
 
         if (!emailInput) {
@@ -1080,28 +1090,36 @@
         }
 
         fetch('@Url.Action("CheckEmailDuplicate", "Accounts")?email=' + encodeURIComponent(email))
-        .then(async response => {
-            if (!response.ok) throw new Error("HTTP Status " + response.status);
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                Swal.fire("Error", 'Database Error: ' + data.message, "error");
-            } else if (data.isDuplicate) {
-                Swal.fire("Warning", 'This email exists in the database!\n\n(Note: If this is the current email for this account, you can ignore this warning).', "warning");
-            } else {
-                Swal.fire("Success", 'This email is valid and unique in the system.', "success");
-            }
-        })
-        .catch(error => {
-            console.error("Error verifying email:", error);
-            Swal.fire("Error", "Could not connect to the server. Check your browser console (F12) for details.", "error");
-        })
-        .finally(() => {
-            if (btn) {
-                btn.innerText = originalBtnText;
-                btn.disabled = false;
-            }
-        });
+            .then(async response => {
+                if (!response.ok) throw new Error("HTTP Status " + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    Swal.fire("Error", 'Database Error: ' + data.message, "error");
+                } else if (data.isDuplicate) {
+                    // 🚀 NEW: Shows exact Record Type, Name, and Owner
+                    Swal.fire({
+                        title: 'Duplicate Found!',
+                        html: `This email already exists in the database.<br><br>
+                           <b>Record Type:</b> ${data.recordType}<br>
+                           <b>Name:</b> <span class="text-primary">${data.recordName}</span><br>
+                           <b>Owner:</b> <span class="text-danger">${data.ownerName}</span>`,
+                        icon: 'warning'
+                    });
+                } else {
+                    Swal.fire("Success", 'This email is valid and unique in the system.', "success");
+                }
+            })
+            .catch(error => {
+                console.error("Error verifying email:", error);
+                Swal.fire("Error", "Could not connect to the server. Check your browser console (F12) for details.", "error");
+            })
+            .finally(() => {
+                if (btn) {
+                    btn.innerText = originalBtnText;
+                    btn.disabled = false;
+                }
+            });
     }
 </script>

@@ -13,7 +13,7 @@
     string advancedFilters = Context.Request.Query["advancedFilters"];
 
     // 🚀 FIX: Explicitly exclude relational tables from rendering as columns
-    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals" };
+    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
 
     // Using FindFirst instead of FindFirstValue to prevent extension method errors
     string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
@@ -22,12 +22,11 @@
     string currentUserName = User.Identity?.Name ?? "";
     bool isAdmin = User.IsInRole("Administrator") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
 
-    // 🚀 FIX: Add filters to block IsGenericType and ICollection`1
-    var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-         .Where(p => !excludedFields.Contains(p.Name) &&
-                     !p.PropertyType.IsGenericType &&
-                     p.PropertyType.Name != "ICollection`1")
-         .ToArray();
+    // 🚀 FIX: Safely allow Nullable fields (like DateTime?) but block lists/collections
+var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+     .Where(p => !excludedFields.Contains(p.Name) &&
+                 (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+     .ToArray();
 
     // Cache Reflection for User objects to prevent thousands of slow lookups
     var userPropCache = new System.Collections.Generic.Dictionary<Type, System.Reflection.PropertyInfo>();
@@ -1526,19 +1525,21 @@
                         </div>
 
                         <!-- Dropdown to select Account from the Index List -->
-                        <div class="col-md-6 form-group mb-4">
-                            <label class="task-label">Related Account</label>
-                            <select name="AccountId" id="taskModalAccountId" class="task-input">
-                                <option value="">- Select Account -</option>
-                                @if (Model != null)
-                                {
-                                    foreach (var acc in Model)
-                                    {
-                                        <option value="@acc.Id">@acc.AccountName</option>
-                                    }
-                                }
-                            </select>
-                        </div>
+                      <div class="col-md-6 form-group mb-4">
+    <label class="task-label">Related Account(s)</label>
+    <select name="AccountId" id="taskModalAccountId" class="task-input">
+        <option value="">- Select Account -</option>
+        <!-- 🚀 NEW: Hidden option to display when multiple records are selected -->
+        <option value="MULTIPLE" id="multipleAccountsOption" style="display:none; font-weight:bold; color:var(--primary-blue);"></option>
+        @if (Model != null)
+        {
+            foreach (var acc in Model)
+            {
+                <option value="@acc.Id">@acc.AccountName</option>
+            }
+        }
+    </select>
+</div>
 
                         <div class="col-md-6 form-group mb-4">
                             <label class="task-label">Due Date</label>
@@ -2105,16 +2106,35 @@
     };
 
         // ==========================================
-        // 1. GLOBAL VARIABLES & INITIALIZATION
-        // ==========================================
-        const defaultVisibleColumns = ["AccountName", "MobileNumber", "Email", "CurrentStatus", "DateOfEntry"];
-        let currentNoteAccountId = null;
+// 1. GLOBAL VARIABLES & INITIALIZATION
+// ==========================================
+// 🚀 NEW: Updated default columns in the exact requested order
 
-        let allRows = [];
-        let currentVisibleRows = [];
-        let hiddenCols = new Set();
-        let sortStates = {};
-        let isFilterSortedAsc = true;
+const defaultVisibleColumns = [
+    "CurrentStatus",
+    "AccountName",
+    "AccountOwner", 
+    "Profilestatus",
+    "ProfilePendingReason",
+    "QualificationStatus",
+    "MobileNumber",
+    "DataSource",
+    "CreatedDateAndTime",
+    "LeadStage",
+    "LeadStatus",
+    "ModifiedDateAndTime"
+];
+
+// 🚀 FIX: Bumped to _v3 to forcefully apply this new layout for everyone
+const STORAGE_KEY_HIDDEN = 'crm_hidden_cols_accounts_v3';
+const STORAGE_KEY_ORDER = 'crm_col_order_accounts_v3';
+
+let currentNoteAccountId = null;
+let allRows = [];
+let currentVisibleRows = [];
+let hiddenCols = new Set();
+let sortStates = {};
+let isFilterSortedAsc = true;
 
         // Cache the options globally so `addCriteriaRow` can access them dynamically
         const criteriaFieldOptions = `@foreach (var prop in tableProps) {
@@ -2139,46 +2159,53 @@ function initializeTooltips() {
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        // Captures all data rows dynamically regardless of the module name
-        allRows = Array.from(document.querySelectorAll('#tableBody tr:not(#noRecordsRow)'));
-        currentVisibleRows = [...allRows];
+    allRows = Array.from(document.querySelectorAll('#tableBody tr:not(#noRecordsRow)'));
+    currentVisibleRows = [...allRows];
 
+    const style = document.createElement('style');
+    style.id = 'dynamic-col-styles';
+    document.head.appendChild(style);
 
-        const style = document.createElement('style');
-        style.id = 'dynamic-col-styles';
-        document.head.appendChild(style);
+    allRows.forEach(r => r.style.display = 'none');
 
-        allRows.forEach(r => r.style.display = 'none');
-
-        restoreColumnOrder();
-
-        const savedHidden = JSON.parse(localStorage.getItem('crm_hidden_cols') || '[]');
-        hiddenCols = new Set(savedHidden);
-
-        setupColumnToggles();
-        setupFilterInteractions();
-        setupLazyDatalists();
-        refreshVisibleRows();
-        setupFileUpload();
-        restorePinnedFilters();
-
-        renderCustomViews();
-        renderSavedSidebarFilters();
-        restoreSidebarFiltersFromUrl();
-
-        // 🚀 FIX: Prevent dropdowns from being clipped by the table header's boundaries
-        document.querySelectorAll('.header-menu-btn').forEach(btn => {
-            btn.setAttribute('data-bs-boundary', 'window');
-            btn.setAttribute('data-bs-reference', 'parent');
-
-            initializeTooltips(); // <--- ADD THIS LI
+    // 🚀 NEW: Safe initialization of hidden columns
+    const savedHidden = JSON.parse(localStorage.getItem(STORAGE_KEY_HIDDEN));
+    if (!savedHidden) {
+        // First-time load (or forced reset): Hide everything NOT in defaultVisibleColumns
+        hiddenCols = new Set();
+        document.querySelectorAll("thead th[data-col-name]").forEach(th => {
+            if (!defaultVisibleColumns.includes(th.dataset.colName)) {
+                hiddenCols.add(th.dataset.colIndex.toString());
+            }
         });
+        localStorage.setItem(STORAGE_KEY_HIDDEN, JSON.stringify(Array.from(hiddenCols)));
+    } else {
+        hiddenCols = new Set(savedHidden);
+    }
 
-       
-        if (localStorage.getItem('crm_filter_hidden') === 'true') {
-            document.getElementById('filterSidebarWrapper').classList.add('hidden-sidebar');
-        }
+    restoreColumnOrder(); // Enforces the order (must happen BEFORE setupColumnToggles)
+    setupColumnToggles(); // Renders the dropdown with checked items on top
+    
+    setupFilterInteractions();
+    setupLazyDatalists();
+    refreshVisibleRows();
+    setupFileUpload();
+    restorePinnedFilters();
+    renderCustomViews();
+    renderSavedSidebarFilters();
+    restoreSidebarFiltersFromUrl();
+
+    document.querySelectorAll('.header-menu-btn').forEach(btn => {
+        btn.setAttribute('data-bs-boundary', 'window');
+        btn.setAttribute('data-bs-reference', 'parent');
     });
+
+    initializeTooltips();
+
+    if (localStorage.getItem('crm_filter_hidden') === 'true') {
+        document.getElementById('filterSidebarWrapper').classList.add('hidden-sidebar');
+    }
+});
 
     // ==========================================
     // 🚀 DYNAMIC CUSTOM VIEWS & CRITERIA BUILDER
@@ -2725,25 +2752,16 @@ function initializeTooltips() {
         }
     };
 
-    // ==========================================
-    // 2. JS FILTER/SORT REFRESH
-    // ==========================================
     function refreshVisibleRows() {
         currentVisibleRows = [];
         allRows.forEach(r => {
-            // Check if hidden by sidebar
             const sidebarHidden = r.classList.contains('filtered-out');
-
-            // Check if hidden by ANY column search filter
             let colHidden = false;
             for (const key in r.dataset) {
                 if (key.startsWith('colFilter_') && r.dataset[key] === "hidden") {
-                    colHidden = true;
-                    break;
+                    colHidden = true; break;
                 }
             }
-
-            // Decide visibility
             if (!sidebarHidden && !colHidden) {
                 r.style.display = '';
                 currentVisibleRows.push(r);
@@ -2752,18 +2770,21 @@ function initializeTooltips() {
             }
         });
 
-        // 🚀 FIX: Update BOTH top and bottom total counters
-        const originalTotal = document.getElementById('pageInfo') ? document.getElementById('pageInfo').innerText.match(/\d+ total/)?.[0]?.replace(' total', '') : allRows.length;
-        const displayCount = (currentVisibleRows.length === allRows.length) ? (originalTotal || allRows.length) : currentVisibleRows.length + ' (Filtered)';
-       
+        // 🚀 CRITICAL FIX: Pull the true database total from C# Razor directly instead of counting the HTML rows on the current page
+        const actualTotalRecords = @totalRecords;
+        const displayCount = (currentVisibleRows.length === allRows.length) 
+            ? actualTotalRecords 
+            : currentVisibleRows.length + ` (Filtered from ${actualTotalRecords})`;
+        
         const topCountBadge = document.getElementById('topTotalCount');
         const bottomCountBadge = document.getElementById('bottomTotalCount');
-       
+        
         if (topCountBadge) topCountBadge.innerText = displayCount;
         if (bottomCountBadge) bottomCountBadge.innerText = displayCount;
 
         const selectAllCb = document.getElementById('selectAllCb');
         if (selectAllCb) selectAllCb.checked = false;
+
         updateSelectedCount();
     }
 
@@ -2857,37 +2878,121 @@ function initializeTooltips() {
         });
     }
 
-    // 🚀 FIX: Prevent Create Task modal freeze by moving it to the body
+   // 🚀 NEW: Global array to hold all selected IDs for the task
+    let bulkTaskAccountIds = [];
+
+    // 🚀 FIX: Update modal to handle multiple selections
     window.openTaskModal = function() {
         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
         const accountDropdown = document.getElementById('taskModalAccountId');
+        const multipleOption = document.getElementById('multipleAccountsOption');
 
-        if (selectedCbs.length > 0 && accountDropdown) {
-            accountDropdown.value = selectedCbs[0].value;
-        } else if (accountDropdown) {
-            accountDropdown.value = "";
+        // Grab all selected IDs
+        bulkTaskAccountIds = Array.from(selectedCbs).map(cb => cb.value);
+
+        if (accountDropdown) {
+            if (bulkTaskAccountIds.length > 1) {
+                // Bulk Selection Mode
+                if (multipleOption) {
+                    multipleOption.style.display = 'block';
+                    multipleOption.textContent = `${bulkTaskAccountIds.length} Accounts Selected`;
+                    multipleOption.value = "MULTIPLE";
+                }
+                accountDropdown.value = "MULTIPLE";
+                accountDropdown.disabled = true; // Lock dropdown when doing bulk
+            } else if (bulkTaskAccountIds.length === 1) {
+                // Single Selection Mode
+                if (multipleOption) multipleOption.style.display = 'none';
+                accountDropdown.value = bulkTaskAccountIds[0];
+                accountDropdown.disabled = false;
+            } else {
+                // Zero Selected
+                if (multipleOption) multipleOption.style.display = 'none';
+                accountDropdown.value = "";
+                accountDropdown.disabled = false;
+            }
         }
 
         const modalEl = document.getElementById('quickTaskModal');
         if (!modalEl) return;
 
-        // Move the modal directly to the <body> tag to escape CSS backdrop traps
         document.body.appendChild(modalEl);
         modalEl.style.zIndex = "1055";
 
         try {
-            // Modern Bootstrap 5 method
             const taskModal = new bootstrap.Modal(modalEl);
             taskModal.show();
         } catch (error) {
-            // Fallback for Bootstrap 4 / jQuery
-            if (typeof $ !== 'undefined') {
-                $(modalEl).modal('show');
+            if (typeof $!== 'undefined') {$(modalEl).modal('show');
             } else {
                 console.error("Bootstrap is not loaded properly.", error);
             }
         }
     };
+
+    // 🚀 NEW: Add this right below the openTaskModal function
+    // This intercepts the Task save button and loops through all selected accounts
+    document.addEventListener("DOMContentLoaded", function () {
+        const taskForm = document.querySelector('#quickTaskModal form');
+
+        if (taskForm) {
+            taskForm.onsubmit = async function (e) {
+                e.preventDefault();
+
+                const submitBtn = taskForm.querySelector('.btn-task-save');
+                if (submitBtn.disabled) return false;
+
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving...';
+                submitBtn.disabled = true;
+
+                const formData = new FormData(taskForm);
+
+                try {
+                    if (bulkTaskAccountIds.length > 1) {
+                        // BULK CREATE: Loop and save a task for every checked record
+                        const promises = bulkTaskAccountIds.map(accountId => {
+                            formData.set('AccountId', accountId); // Inject the specific Account ID
+                            return fetch(taskForm.action, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        });
+
+                        await Promise.all(promises);
+                        
+                        alert(`Successfully created tasks for ${bulkTaskAccountIds.length} accounts!`);
+                        window.location.reload();
+                    } else {
+                        // SINGLE CREATE
+                        if (bulkTaskAccountIds.length === 1) {
+                            formData.set('AccountId', bulkTaskAccountIds[0]);
+                        }
+
+                        const response = await fetch(taskForm.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok || response.redirected) {
+                            window.location.reload();
+                        } else {
+                            alert("There was an issue saving the task.");
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }
+                    }
+                } catch (err) {
+                    console.error("Task Save Error: ", err);
+                    alert("Network error occurred.");
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+
+                return false;
+            };
+        }
+    });
    
     function getActiveSidebarFilters() {
     const activeFilters = [];
@@ -3124,84 +3229,100 @@ function initializeTooltips() {
     };
 
 
-    // ==========================================
-    // 5. COLUMN MANAGEMENT & DRAG-DROP
-    // ==========================================
     function toggleColumnVisibility(idx, isVisible, isRestoring = false) {
-        const idxStr = idx.toString();
-        if(isVisible) hiddenCols.delete(idxStr);
-        else hiddenCols.add(idxStr);
+    const idxStr = idx.toString();
+    if(isVisible) hiddenCols.delete(idxStr);
+    else hiddenCols.add(idxStr);
 
-        let css = '';
-        hiddenCols.forEach(colIdx => {
-            css += `table#accountsTable th[data-col-index="${colIdx}"], table#accountsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
-        });
-        document.getElementById('dynamic-col-styles').innerHTML = css;
+    let css = '';
+    hiddenCols.forEach(colIdx => {
+        css += `table#accountsTable th[data-col-index="${colIdx}"], table#accountsTable td[data-col-index="${colIdx}"] { display: none !important; }\n`;
+    });
+    document.getElementById('dynamic-col-styles').innerHTML = css;
 
-        if (!isRestoring) {
-            localStorage.setItem('crm_hidden_cols', JSON.stringify(Array.from(hiddenCols)));
-        }
+    if (!isRestoring) {
+        localStorage.setItem(STORAGE_KEY_HIDDEN, JSON.stringify(Array.from(hiddenCols)));
     }
+}
+
+function saveColumnOrder() {
+    const menu = document.getElementById("columnToggleMenu");
+    const items = menu.querySelectorAll("li.draggable-col-item");
+    const order = Array.from(items).map(li => li.dataset.colIndex);
+    localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(order));
+}
 
     function setupColumnToggles() {
-        const table = document.querySelector("#accountsTable");
-        const theadRows = table.querySelectorAll("thead tr:first-child th[data-col-index]");
-        const columnMenu = document.getElementById("columnToggleMenu");
-        columnMenu.innerHTML = `
-        <li class="px-2 pb-2 mb-2 border-bottom" style="position: sticky; top: 0; background: white; z-index: 10;">
-            <div class="input-group input-group-sm border rounded">
-                <span class="input-group-text bg-transparent border-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                <input type="text" class="form-control border-0 shadow-none" placeholder="Search columns..." id="manageColSearch" onkeyup="filterManageColumns()">
-            </div>
-        </li>
-        `;
+    const table = document.querySelector("#accountsTable");
+    
+    // 🚀 We select headers in their CURRENT DOM ORDER (which was just fixed by restoreColumnOrder)
+    const theadRows = Array.from(table.querySelectorAll("thead tr:first-child th[data-col-index]"));
+    const columnMenu = document.getElementById("columnToggleMenu");
+    
+    columnMenu.innerHTML = `
+    <li class="px-2 pb-2 mb-2 border-bottom" style="position: sticky; top: 0; background: white; z-index: 10;">
+        <div class="input-group input-group-sm border rounded">
+            <span class="input-group-text bg-transparent border-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+            <input type="text" class="form-control border-0 shadow-none" placeholder="Search columns..." id="manageColSearch" onkeyup="filterManageColumns()">
+        </div>
+    </li>
+    `;
 
-        const hasSavedState = localStorage.getItem('crm_hidden_cols') !== null;
+    let visibleItemsHTML = [];
+    let hiddenItemsHTML = [];
 
-        theadRows.forEach((th) => {
-            const colIndex = th.getAttribute("data-col-index");
-            const colName = th.getAttribute("data-col-name");
+    theadRows.forEach((th) => {
+        const colIndex = th.getAttribute("data-col-index");
+        const colName = th.getAttribute("data-col-name");
 
-            if(colName) {
-                let isVisible;
-                if (hasSavedState) {
-                    isVisible = !hiddenCols.has(colIndex.toString());
-                } else {
-                    isVisible = defaultVisibleColumns.includes(colName) || defaultVisibleColumns.length === 0;
-                }
+        if(colName) {
+            const isVisible = !hiddenCols.has(colIndex.toString());
 
-                const li = document.createElement("li");
-                li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
-                li.draggable = true;
-                li.dataset.colIndex = colIndex;
+            const li = document.createElement("li");
+            li.className = "dropdown-item px-3 py-2 d-flex align-items-center gap-2 draggable-col-item rounded";
+            li.draggable = true;
+            li.dataset.colIndex = colIndex;
 
-                li.innerHTML = `
-                    <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
-                    <div class="form-check m-0 w-100 d-flex align-items-center">
-                        <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isVisible ? 'checked' : ''}>
-                        <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
-                    </div>`;
+            li.innerHTML = `
+                <i class="fa-solid fa-grip-vertical drag-handle text-muted"></i>
+                <div class="form-check m-0 w-100 d-flex align-items-center">
+                    <input class="form-check-input col-toggle-cb m-0 border-secondary" type="checkbox" value="${colIndex}" id="colToggle${colIndex}" ${isVisible ? 'checked' : ''}>
+                    <label class="form-check-label ms-2 w-100 fw-semibold text-dark" for="colToggle${colIndex}" style="cursor:pointer; user-select:none;">${colName}</label>
+                </div>`;
 
-                li.addEventListener('click', e => e.stopPropagation());
-                li.addEventListener('dragstart', handleDragStart);
-                li.addEventListener('dragover', handleDragOver);
-                li.addEventListener('dragenter', handleDragEnter);
-                li.addEventListener('dragleave', handleDragLeave);
-                li.addEventListener('drop', handleDrop);
-                li.addEventListener('dragend', handleDragEnd);
+            li.addEventListener('click', e => e.stopPropagation());
+            li.addEventListener('dragstart', handleDragStart);
+            li.addEventListener('dragover', handleDragOver);
+            li.addEventListener('dragenter', handleDragEnter);
+            li.addEventListener('dragleave', handleDragLeave);
+            li.addEventListener('drop', handleDrop);
+            li.addEventListener('dragend', handleDragEnd);
 
-                columnMenu.appendChild(li);
-
-                if(!isVisible) toggleColumnVisibility(colIndex, false, true);
+            // 🚀 Separate visible and hidden items
+            if(isVisible) {
+                visibleItemsHTML.push(li);
+            } else {
+                hiddenItemsHTML.push(li);
+                toggleColumnVisibility(colIndex, false, true); // Ensure CSS hides it
             }
-        });
+        }
+    });
 
-        document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
-            toggle.addEventListener('change', function() {
-                toggleColumnVisibility(this.value, this.checked);
-            });
-        });
+    // 🚀 Append visible items first, then hidden items below
+    visibleItemsHTML.forEach(li => columnMenu.appendChild(li));
+    
+    if (hiddenItemsHTML.length > 0 && visibleItemsHTML.length > 0) {
+        // Add a visual separator between checked and unchecked fields
+        columnMenu.insertAdjacentHTML('beforeend', `<div class="dropdown-divider my-2"></div>`);
     }
+    hiddenItemsHTML.forEach(li => columnMenu.appendChild(li));
+
+    document.querySelectorAll('.col-toggle-cb').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            toggleColumnVisibility(this.value, this.checked);
+        });
+    });
+}
 
     // 🚀 FIX: Replaced explicit inline styles with d-none and d-flex to overcome Bootstrap !important flags
     window.filterManageColumns = function () {
@@ -3284,28 +3405,48 @@ function initializeTooltips() {
     // ==========================================
     // MASS UPDATE
     // ==========================================
-       const massUpdateOptionsMap = {
-            "AccountOwnerId": ownerOptionsList,
-            "CoOwnerId": ownerOptionsList,
-            "GroupName": vendorOptionsList,
-            "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
-            "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
-            "CurrentStatus": ["User", "Non User"],
-            "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
-            "ProfilePendingReason": ["Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times"],
-            "QualificationStatus": ["Qualified", "Notqualified"],
-            "Profilestatus": ["Completed", "Strongly Completed", "Not Completed", "Not-Qualified"],
-            "IsHomeopathicDoctor": ["Yes — MD(Homeopathy)", "मैं होम्योपैथी डॉक्टर हूँ।", "हां- बीएचएमएस", "नहीं", "बीएचएमएस की पढ़ाई कर रहा हूँ", "Yes - BHMS", "Not a Homeopath Doctor", "Yes", "No", "Not a Homeopathy Doctor", "Pursuing BHMS"],
-            "WorkType": ["Practicing", "Job", "Research", "others"],
-            "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
-            "HasComputer": ["Yes", "No"],
-            "Qualification": ["BHMS", "MD", "BAMS", "Student"],
-            "PaymentType": ["Upfront", "EMI - 3Months", "EMI - 6Months"],
-            "PaymentStatus": ["Paid", "Pending", "Partial", "Refunded"],
-            "CurrentlyUsingSoftware": ["Yes", "No"]
-        };
+    
+    // 🚀 FIX 1: Safely cast to IEnumerable<SelectListItem> to prevent Razor crashes
+    const massUpdateOwnerOptions = [
+        @if (ViewBag.UsersList != null) {
+            foreach (var user in (IEnumerable<SelectListItem>)ViewBag.UsersList) {
+                <text>{ value: "@Html.Raw(user.Value)", text: "@Html.Raw(user.Text)" },</text>
+            }
+        }
+    ];
 
-    // 🚀 FIX: Prevented the modal from collapsing when no field is selected
+    const massUpdateVendorOptions = [
+        @if (ViewBag.VendorsList != null) {
+            foreach (var vendor in (IEnumerable<SelectListItem>)ViewBag.VendorsList) {
+                <text>{ value: "@Html.Raw(vendor.Value)", text: "@Html.Raw(vendor.Text)" },</text>
+            }
+        }
+    ];
+
+    // 🚀 FIX 2: Map BOTH the raw property name ("AccountOwner") AND the DB ID ("AccountOwnerId")
+    const massUpdateOptionsMap = {
+        "AccountOwner": massUpdateOwnerOptions,
+        "AccountOwnerId": massUpdateOwnerOptions,
+        "CoOwner": massUpdateOwnerOptions,
+        "CoOwnerId": massUpdateOwnerOptions,
+        "GroupName": massUpdateVendorOptions,
+        "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
+        "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
+        "CurrentStatus": ["User", "Non User"],
+        "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
+        "ProfilePendingReason": ["Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times"],
+        "QualificationStatus": ["Qualified", "Notqualified"],
+        "Profilestatus": ["Completed", "Strongly Completed", "Not Completed", "Not-Qualified"],
+        "IsHomeopathicDoctor": ["Yes — MD(Homeopathy)", "मैं होम्योपैथी डॉक्टर हूँ।", "हां- बीएचएमएस", "नहीं", "बीएचएमएस की पढ़ाई कर रहा हूँ", "Yes - BHMS", "Not a Homeopath Doctor", "Yes", "No", "Not a Homeopathy Doctor", "Pursuing BHMS"],
+        "WorkType": ["Practicing", "Job", "Research", "others"],
+        "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
+        "HasComputer": ["Yes", "No"],
+        "Qualification": ["BHMS", "MD", "BAMS", "Student"],
+        "PaymentType": ["Upfront", "EMI - 3Months", "EMI - 6Months"],
+        "PaymentStatus": ["Paid", "Pending", "Partial", "Refunded"],
+        "CurrentlyUsingSoftware": ["Yes", "No"]
+    };
+
     window.renderMassUpdateInput = function() {
         const fieldSelect = document.getElementById('massUpdateField');
         const inputArea = document.getElementById('dynamicInputArea');
@@ -3313,7 +3454,6 @@ function initializeTooltips() {
         const selectedOption = fieldSelect.options[fieldSelect.selectedIndex];
         const fieldType = selectedOption ? selectedOption.getAttribute('data-type') : '';
 
-        // If no field is selected, show the disabled input instead of hiding the box
         if (!selectedField) {
             inputArea.innerHTML = `<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />`;
             return;
@@ -3324,32 +3464,41 @@ function initializeTooltips() {
         if (massUpdateOptionsMap[selectedField]) {
             let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>`;
             selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
+            
             massUpdateOptionsMap[selectedField].forEach(opt => {
-                selectHTML += `<option value="${opt}">${opt}</option>`;
+                // 🚀 FIX 3: Intelligently render JS Objects (IDs) vs Standard Strings
+                if (typeof opt === 'object') {
+                    selectHTML += `<option value="${opt.value}">${opt.text}</option>`;
+                } else {
+                    selectHTML += `<option value="${opt}">${opt}</option>`;
+                }
             });
+            
             selectHTML += `</select>`;
             inputArea.innerHTML = selectHTML;
         }
-        else if (fieldType && fieldType.includes('DateTime'))
-        {
+        else if (fieldType && fieldType.includes('DateTime')) {
             inputArea.innerHTML = `<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />`;
         }
-        else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double')))
-        {
+        else if (fieldType && (fieldType.includes('Int') || fieldType.includes('Decimal') || fieldType.includes('Double'))) {
             inputArea.innerHTML = `<input type="number" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter numeric value..." />`;
         }
-        else
-        {
+        else {
             inputArea.innerHTML = `<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />`;
         }
     }
 
     function executeMassUpdateAjax() {
-         const field = document.getElementById('massUpdateField').value;
+         let field = document.getElementById('massUpdateField').value;
          const valInput = document.getElementById('massUpdateValue');
          let val = valInput ? valInput.value : '';
 
          if (val === "CLEAR_VALUE_COMMAND") val = "";
+
+         // 🚀 FIX 4: Convert UI-friendly display names to their actual Database ID column names
+         if (field === "AccountOwner" || field === "CoOwner") {
+             field = field + "Id";
+         }
 
          const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
          const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
@@ -3699,41 +3848,50 @@ function initializeTooltips() {
         }
     }
 
-    // ==========================================
-    // 🚀 NEW: SAVE & RESTORE COLUMN ORDER
-    // ==========================================
-    function saveColumnOrder() {
-        const menu = document.getElementById("columnToggleMenu");
-        const items = menu.querySelectorAll("li.draggable-col-item");
-        const order = Array.from(items).map(li => li.dataset.colIndex);
-        localStorage.setItem('crm_col_order_accounts', JSON.stringify(order));
-    }
+
 
     function restoreColumnOrder() {
-        const savedOrder = JSON.parse(localStorage.getItem('crm_col_order_accounts'));
-        if (!savedOrder || savedOrder.length === 0) return;
+    let savedOrder = JSON.parse(localStorage.getItem(STORAGE_KEY_ORDER));
+    const table = document.querySelector("#accountsTable");
+    const theadRow = table.querySelector("thead tr");
+    const actionsTh = theadRow.querySelector('.sticky-actions');
 
-        const table = document.querySelector("#accountsTable");
-        const theadRow = table.querySelector("thead tr");
-        const actionsTh = theadRow.querySelector('.sticky-actions');
-
-        savedOrder.forEach(colIdx => {
-            const th = theadRow.querySelector(`th[data-col-index="${colIdx}"]`);
-            if (th && actionsTh) {
-                theadRow.insertBefore(th, actionsTh);
+    // 🚀 NEW: If no saved order exists (or we reset it), build the default order
+    if (!savedOrder || savedOrder.length === 0) {
+        savedOrder = [];
+        // 1. Push defaults in exact order
+        defaultVisibleColumns.forEach(colName => {
+            const th = theadRow.querySelector(`th[data-col-name="${colName}"]`);
+            if (th) savedOrder.push(th.dataset.colIndex);
+        });
+        // 2. Push all the remaining hidden columns at the end
+        theadRow.querySelectorAll('th[data-col-index]').forEach(th => {
+            if (!savedOrder.includes(th.dataset.colIndex)) {
+                savedOrder.push(th.dataset.colIndex);
             }
         });
-
-        allRows.forEach(row => {
-            const actionsTd = row.querySelector('.sticky-actions');
-            savedOrder.forEach(colIdx => {
-                const td = row.querySelector(`td[data-col-index="${colIdx}"]`);
-                if (td && actionsTd) {
-                    row.insertBefore(td, actionsTd);
-                }
-            });
-        });
+        localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(savedOrder));
     }
+
+    // Apply the column order to Table Header
+    savedOrder.forEach(colIdx => {
+        const th = theadRow.querySelector(`th[data-col-index="${colIdx}"]`);
+        if (th && actionsTh) {
+            theadRow.insertBefore(th, actionsTh);
+        }
+    });
+
+    // Apply the column order to all Table Rows
+    allRows.forEach(row => {
+        const actionsTd = row.querySelector('.sticky-actions');
+        savedOrder.forEach(colIdx => {
+            const td = row.querySelector(`td[data-col-index="${colIdx}"]`);
+            if (td && actionsTd) {
+                row.insertBefore(td, actionsTd);
+            }
+        });
+    });
+}
 
         async function openNotesPanel(accountId, accountName) {
             currentNoteAccountId = accountId;

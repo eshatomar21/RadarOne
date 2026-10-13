@@ -37,24 +37,9 @@ namespace Radar_CRM.Controllers
             try
             {
                 // 2. IDENTIFY DATA SOURCE
-                string leadSource = "";
+                string leadSource = !string.IsNullOrEmpty(formData.Gclid) ? "Google AdWords" : "Website Direct";
 
-                // Check if it came from Google Ads (has a GCLID)
-                if (!string.IsNullOrEmpty(formData.Gclid))
-                {
-                    // Matches the exact HTML dropdown: <option value="Google AdWords">
-                    leadSource = "Google AdWords";
-                }
-                else
-                {
-                    // Matches the exact HTML dropdown: <option value="Website Direct">
-                    // We map all CF7 forms to "Website Direct" because specific form names 
-                    // like "POP UP Form" are NOT in your HTML Data Source dropdown list.
-                    leadSource = "Website Direct";
-                }
-
-                // 3. DYNAMIC ASSIGNMENT LOGIC (Replaces Hardcoded ID)
-                // Query the database for an active rule that matches this exact Data Source
+                // 3. DYNAMIC ASSIGNMENT LOGIC
                 var matchedRule = await _context.AssignmentRules.FirstOrDefaultAsync(r =>
                     r.IsActive == true &&
                     r.TargetModule == "Accounts" &&
@@ -62,66 +47,96 @@ namespace Radar_CRM.Controllers
                     r.ConditionValue == leadSource
                 );
 
-                // If a rule matches, assign that specific user. 
-                // If no rule is found, it will safely leave the owner blank.
-                string assignedOwnerId = null;
-
-                // 🚀 STRICT FK CHECK: Prevent database crash!
-                // Validate that the rule's Assigned User ID actually exists in the database.
+                string assignedOwnerId = "zcrm_1092392000000518001"; // Default Fallback Owner
                 if (matchedRule != null && !string.IsNullOrWhiteSpace(matchedRule.AssignToUserId))
                 {
                     bool userExists = await _context.Users.AnyAsync(u => u.Id == matchedRule.AssignToUserId);
-                    if (userExists)
-                    {
-                        assignedOwnerId = matchedRule.AssignToUserId;
-                    }
-                    else
-                    {
-                        Console.WriteLine($"WEBHOOK WARNING: Assignment Rule {matchedRule.Id} contains an invalid User ID: {matchedRule.AssignToUserId}. Falling back to unassigned.");
-                    }
+                    if (userExists) assignedOwnerId = matchedRule.AssignToUserId;
                 }
 
-                // 4. CREATE ONLY THE ACCOUNT RECORD
-                var newAccount = new Account
+                // ====================================================================
+                // 4. DUPLICATE CHECK & RECORD CREATION (ZOHO SCRIPT REPLICATION)
+                // ====================================================================
+
+                // Search for existing account by Email OR Phone (ignoring empty values)
+                var existingAccount = await _context.Accounts.FirstOrDefaultAsync(a =>
+                    (!string.IsNullOrEmpty(formData.Email) && a.Email == formData.Email) ||
+                    (!string.IsNullOrEmpty(formData.Phone) && a.MobileNumber == formData.Phone)
+                );
+
+                if (existingAccount != null)
                 {
-                    AccountName = formData.Name,
-                    ContactPersonName = formData.Name,
-                    Email = formData.Email,
-                    MobileNumber = formData.Phone,
-                    IsHomeopathicDoctor = formData.DoctorRole,
+                    // 🔴 DUPLICATE FOUND: Update existing record instead of creating a new one
+                    existingAccount.IsDuplicated = true;
 
-                    Description = $"Message: {formData.Message}\n\n" +
-                                  $"--- Tracking Info ---\n" +
-                                  $"Form ID: {formData.FormId}\n" +
-                                  $"Source: {formData.UtmSource}\n" +
-                                  $"Medium: {formData.UtmMedium}\n" +
-                                  $"Campaign: {formData.UtmCampaign}\n" +
-                                  $"GCLID: {formData.Gclid}",
+                    // Append the new message to the existing description so history isn't lost
+                    string newMessage = $"--- New Webhook Inquiry ({DateTime.Now.ToString("g")}) ---\nMessage: {formData.Message}";
+                    existingAccount.Description = string.IsNullOrEmpty(existingAccount.Description)
+                        ? newMessage
+                        : existingAccount.Description + $"\n\n{newMessage}";
 
-                    MetaCampaignName = formData.UtmCampaign,
+                    // Update Tracking Info if the new form submission has it
+                    if (!string.IsNullOrEmpty(formData.Gclid)) existingAccount.Gclid = formData.Gclid;
+                    if (!string.IsNullOrEmpty(formData.UtmCampaign)) existingAccount.MetaCampaignName = formData.UtmCampaign;
 
-                    // This now strictly matches your HTML dropdown values ("Google AdWords" or "Website Direct")
-                    DataSource = leadSource,
+                    existingAccount.ModifiedBy = "Webhook System";
 
-                    CurrentStatus = "Non User",
-                    DateOfEntry = DateTime.Now,
+                    _context.Accounts.Update(existingAccount);
+                    await _context.SaveChangesAsync();
 
-                    // 🚀 THIS links the record to the dynamically found user in the CRM UI
-                    AccountOwnerId = "zcrm_1092392000000518001",
-
-                    CreatedBy = "Webhook System",
-                    ModifiedBy = "Webhook System"
-                };
-
-                _context.Accounts.Add(newAccount);
-                await _context.SaveChangesAsync();
-
-                return Ok(new
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Duplicate lead found. Record updated successfully.",
+                        accountId = existingAccount.Id
+                    });
+                }
+                else
                 {
-                    success = true,
-                    message = "Account created successfully. Lead creation skipped.",
-                    accountId = newAccount.Id
-                });
+                    // 🟢 NO DUPLICATE: Create a fresh new Account
+
+                    // Format UTMs cleanly for the description if they exist
+                    string trackingFooter = "";
+                    if (!string.IsNullOrEmpty(formData.UtmSource) || !string.IsNullOrEmpty(formData.UtmMedium))
+                    {
+                        trackingFooter = $"\n\n[Tracking: Source={formData.UtmSource} | Medium={formData.UtmMedium} | FormID={formData.FormId}]";
+                    }
+
+                    var newAccount = new Account
+                    {
+                        AccountName = formData.Name,
+                        ContactPersonName = formData.Name,
+                        Email = formData.Email,
+                        MobileNumber = formData.Phone,
+                        IsHomeopathicDoctor = formData.DoctorRole,
+
+                        // 🚀 FIX: Message goes to Description cleanly
+                        Description = formData.Message + trackingFooter,
+
+                        // 🚀 FIX: GCLID goes directly to its dedicated database column
+                        Gclid = formData.Gclid,
+                        MetaCampaignName = formData.UtmCampaign,
+
+                        DataSource = leadSource,
+                        CurrentStatus = "Non User",
+                        DateOfEntry = DateTime.Now,
+                        CreatedDateAndTime = DateTime.Now,
+                        ModifiedDateAndTime = DateTime.Now,
+                        AccountOwnerId = assignedOwnerId,
+                        CreatedBy = "Webhook System",
+                        ModifiedBy = "Webhook System"
+                    };
+
+                    _context.Accounts.Add(newAccount);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Record added successfully",
+                        accountId = newAccount.Id
+                    });
+                }
             }
             catch (Exception ex)
             {
