@@ -1709,24 +1709,23 @@ namespace Radar_CRM.Controllers
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
             var accountsToInsert = new List<Account>();
+            // REMOVED: accountsToUpdate list
             var skippedRecords = new List<string>();
             int currentRow = 1;
 
-            // 🚀 NEW: Ultra-fast Name-to-ID Resolver for Users (Fixes the "Sitara Khan" issue)
-            var usersDb = await _context.Users.AsNoTracking().ToListAsync();
-            var userDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var u in usersDb)
-            {
-                userDict[u.Id] = u.Id; // Map ID to ID
-                if (!string.IsNullOrWhiteSpace(u.fullName)) userDict[u.fullName.Trim()] = u.Id; // Map Full Name to ID
-                if (!string.IsNullOrWhiteSpace(u.FirstName)) userDict[u.FirstName.Trim()] = u.Id; // Map First Name to ID
-            }
+            // Load existing data for ultra-fast checking
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
 
-            // Load existing unique constraints to prevent duplicates
-            var existingZohoIds = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.ZohoRecordId)).Select(a => a.ZohoRecordId).ToListAsync());
+            var existingAccountsDb = await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.ZohoRecordId))
+                .AsNoTracking()
+                .GroupBy(a => a.ZohoRecordId)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
+
             var existingMobiles = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.MobileNumber)).Select(a => a.MobileNumber).ToListAsync());
             var existingEmails = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.Email)).Select(a => a.Email.ToLower()).ToListAsync());
 
+            // Helper to Standardize Country to INDIA
             string NormalizeCountry(string input)
             {
                 if (string.IsNullOrWhiteSpace(input)) return null;
@@ -1742,25 +1741,18 @@ namespace Radar_CRM.Controllers
                     var headerLine = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(headerLine)) return BadRequest("Empty CSV");
 
+                    // Standardize headers
                     var headers = ParseCsvLine(headerLine).Select(h => h.Trim().ToLower().Replace(" ", "")).ToList();
 
-                    // 🚀 NEW: Smart Helper that accepts multiple fallback header names
-                    string GetValSafe(string[] vals, params string[] colNames)
+                    string GetValSafe(string[] vals, string colName)
                     {
-                        foreach (var colName in colNames)
-                        {
-                            var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
-                            if (idx >= 0 && idx < vals.Length && !string.IsNullOrWhiteSpace(vals[idx]))
-                            {
-                                return vals[idx].Trim();
-                            }
-                        }
-                        return "";
+                        var idx = headers.IndexOf(colName.ToLower().Replace(" ", ""));
+                        return idx >= 0 && idx < vals.Length ? vals[idx]?.Trim() ?? "" : "";
                     }
 
-                    decimal? GetDecimalSafe(string[] vals, params string[] colNames)
+                    decimal? GetDecimalSafe(string[] vals, string colName)
                     {
-                        string raw = GetValSafe(vals, colNames);
+                        string raw = GetValSafe(vals, colName);
                         if (string.IsNullOrWhiteSpace(raw)) return null;
                         string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
                         return decimal.TryParse(clean, out decimal result) ? result : null;
@@ -1773,36 +1765,34 @@ namespace Radar_CRM.Controllers
                         if (string.IsNullOrWhiteSpace(line)) continue;
 
                         var values = ParseCsvLine(line);
-
-                        string zohoRecordId = GetValSafe(values, "RecordId", "ZohoRecordId");
+                        string zohoRecordId = GetValSafe(values, "RecordId");
                         string mobile = GetValSafe(values, "MobileNumber");
                         string email = GetValSafe(values, "Email")?.ToLower();
 
-                        // 🚀 INSERT-ONLY LOGIC: If it exists ANYWHERE, skip it entirely!
-                        bool isZohoDup = !string.IsNullOrEmpty(zohoRecordId) && existingZohoIds.Contains(zohoRecordId);
+                        // 🚀 CHANGED: INSERT-ONLY LOGIC
+                        bool isZohoDup = !string.IsNullOrEmpty(zohoRecordId) && existingAccountsDb.ContainsKey(zohoRecordId);
                         bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
                         bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
 
+                        // If it exists ANYWHERE in the database, skip this row completely!
                         if (isZohoDup || isMobileDup || isEmailDup)
                         {
                             skippedRecords.Add($"Row {currentRow}: Skipped (Duplicate Record found)");
-                            continue; // Immediately jump to the next row in the Excel file
+                            continue;
                         }
 
-                        // If we reach here, it is a brand new record. Register it in memory so we don't duplicate it in the same file.
+                        // If we reach here, it is 100% brand new.
                         Account acc = new Account();
-                        if (!string.IsNullOrEmpty(zohoRecordId)) existingZohoIds.Add(zohoRecordId);
                         if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
                         if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
 
-                        // 🚀 FIX: Map Owner Name to System ID
-                        string rawOwnerStr = GetValSafe(values, "AccountsOwner", "AccountsOwner.id");
-                        acc.AccountOwnerId = userDict.ContainsKey(rawOwnerStr) ? userDict[rawOwnerStr] : null;
-
-                        string rawCoOwnerStr = GetValSafe(values, "Co-Owner", "Co-Owner.id");
-                        acc.CoOwnerId = userDict.ContainsKey(rawCoOwnerStr) ? userDict[rawCoOwnerStr] : null;
+                        // 🚀 MAP ALL FIELDS FOR THE NEW RECORD
+                        string rawOwnerId = GetValSafe(values, "AccountsOwner.id");
+                        string rawCoOwnerId = GetValSafe(values, "Co-Owner.id");
 
                         acc.ZohoRecordId = zohoRecordId;
+                        acc.AccountOwnerId = validUserIds.Contains(rawOwnerId) ? rawOwnerId : null;
+                        acc.CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null;
                         acc.AccountName = GetValSafe(values, "AccountName");
                         acc.Email = GetValSafe(values, "Email");
                         acc.AlternateEmailID = GetValSafe(values, "AlternateEmailID");
@@ -1812,26 +1802,57 @@ namespace Radar_CRM.Controllers
                         acc.Description = GetValSafe(values, "Description");
                         acc.CurrentStatus = GetValSafe(values, "CurrentStatus");
                         acc.AccountType = GetValSafe(values, "AccountType");
-                        acc.DateOfEntry = DateTime.TryParse(GetValSafe(values, "DateofEntry", "Date of Entry"), out DateTime doe) ? doe : DateTime.Now;
+                        acc.DateOfEntry = DateTime.TryParse(GetValSafe(values, "DateofEntry"), out DateTime doe) ? doe : DateTime.Now;
+                        acc.CreatedDateAndTime = DateTime.TryParse(GetValSafe(values, "Created Time"), out DateTime cdt) ? cdt : DateTime.Now;
+                        acc.ModifiedDateAndTime = DateTime.TryParse(GetValSafe(values, "Modified Time"), out DateTime mdt) ? mdt : DateTime.Now;
                         acc.CreatedBy = GetValSafe(values, "CreatedBy");
                         acc.ModifiedBy = GetValSafe(values, "ModifiedBy");
                         acc.IsDuplicated = bool.TryParse(GetValSafe(values, "IsDuplicated"), out bool isDup) ? isDup : false;
 
-                        // --- Professional Details --- (Notice the multiple fallback headers)
-                        acc.GroupName = GetValSafe(values, "GroupsName", "GroupName");
+                        // --- Address 1 ---
+                        acc.Addr1_Country = NormalizeCountry(GetValSafe(values, "Address1-Country/Region"));
+                        acc.Addr1_FlatHouse = GetValSafe(values, "Address1-Flat/HouseNo./Building/ApartmentName");
+                        acc.Addr1_Street = GetValSafe(values, "Address1-StreetAddress");
+                        acc.Addr1_City = GetValSafe(values, "Address1-City");
+                        acc.Addr1_State = GetValSafe(values, "Address1-State/Province");
+                        acc.Addr1_Zip = GetValSafe(values, "Address1-Zip/PostalCode");
+                        acc.Addr1_Latitude = GetValSafe(values, "Address1-Latitude");
+                        acc.Addr1_Longitude = GetValSafe(values, "Address1-Longitude");
+
+                        // --- Address 2 ---
+                        acc.Addr2_Country = NormalizeCountry(GetValSafe(values, "Address2-Country/Region"));
+                        acc.Addr2_FlatHouse = GetValSafe(values, "Address2-Flat/HouseNo./Building/ApartmentName");
+                        acc.Addr2_Street = GetValSafe(values, "Address2-StreetAddress");
+                        acc.Addr2_City = GetValSafe(values, "Address2-City");
+                        acc.Addr2_State = GetValSafe(values, "Address2-State/Province");
+                        acc.Addr2_Zip = GetValSafe(values, "Address2-Zip/PostalCode");
+                        acc.Addr2_Latitude = GetValSafe(values, "Address2-Latitude");
+                        acc.Addr2_Longitude = GetValSafe(values, "Address2-Longitude");
+
+                        // --- Contact Persons ---
+                        acc.ContactPersonName = GetValSafe(values, "ContactPersonName");
+                        acc.ContactPerson1 = GetValSafe(values, "ContactPersonName1");
+                        acc.ContactPerson2 = GetValSafe(values, "ContactPersonName2");
+                        acc.ContactPerson3 = GetValSafe(values, "ContactPersonName3");
+                        acc.Contact1Phone = GetValSafe(values, "Contact1PhoneNumber");
+                        acc.Contact2Phone = GetValSafe(values, "Contact2PhoneNumber");
+                        acc.Contact3Phone = GetValSafe(values, "Contact3PhoneNumber");
+
+                        // --- Professional Details ---
+                        acc.GroupName = GetValSafe(values, "GroupsName");
                         acc.SeminarName = GetValSafe(values, "SeminarName");
                         acc.LeadStatus = GetValSafe(values, "LeadStatus");
                         acc.ProfilePendingReason = GetValSafe(values, "ProfilePendingReason");
-                        acc.QualificationStatus = GetValSafe(values, "QualifiactionStatus", "QualificationStatus");
-                        acc.IsHomeopathicDoctor = GetValSafe(values, "IsHomeopathicDoctor", "AreYouaHomeopathicDoctor");
+                        acc.QualificationStatus = GetValSafe(values, "QualifiactionStatus");
+                        acc.IsHomeopathicDoctor = GetValSafe(values, "AreYouaHomeopathicDoctor");
                         acc.ClinicType = GetValSafe(values, "ClinicType");
-                        acc.YearsOfPractice = int.TryParse(GetValSafe(values, "YearsofParctice", "YearsOfPractice"), out int yop) ? yop : null;
+                        acc.YearsOfPractice = int.TryParse(GetValSafe(values, "YearsofParctice"), out int yop) ? yop : null;
                         acc.Qualification = GetValSafe(values, "Qualification");
                         acc.YearOfPassing = GetValSafe(values, "Yearofpassing");
                         acc.AveragePatientFee = GetDecimalSafe(values, "AveragePatientFee");
                         acc.DateOfBirth = DateTime.TryParse(GetValSafe(values, "DateofBirth"), out DateTime dob) ? dob : null;
                         acc.WorkType = GetValSafe(values, "WorkType");
-                        acc.HasComputer = GetValSafe(values, "HasComputer", "HavingComputer/Laptop");
+                        acc.HasComputer = GetValSafe(values, "HavingComputer/Laptop");
                         acc.PatientsPerDay = int.TryParse(GetValSafe(values, "PatientsperDay"), out int ppd) ? ppd : null;
                         acc.CollegeName = GetValSafe(values, "CollegeName");
                         acc.TotalExperience = int.TryParse(GetValSafe(values, "Totalexperience"), out int te) ? te : null;
@@ -1842,7 +1863,19 @@ namespace Radar_CRM.Controllers
                         acc.ProfileRate = int.TryParse(GetValSafe(values, "ProfileRate"), out int pr) ? pr : null;
                         acc.ReferralSource = GetValSafe(values, "ReferralSource");
 
-                        // --- Ad & Campaign Tracking ---
+                        // --- Software & Purchases ---
+                        acc.CurrentlyUsingSoftware = GetValSafe(values, "CurrentlyUsingSoftware");
+                        acc.CurrentSoftwareName = GetValSafe(values, "CurrentsoftwareName");
+                        acc.RadarOpusLicenseNo = GetValSafe(values, "RadarOpusLicenseno");
+                        acc.RadarOpusVersion = GetValSafe(values, "RadarOpusversion");
+                        acc.ProductPurchased = GetValSafe(values, "Product/PackagePurchased");
+                        acc.PurchaseDate = DateTime.TryParse(GetValSafe(values, "PurchaseDate"), out DateTime pd) ? pd : null;
+                        acc.PurchaseValue = GetDecimalSafe(values, "PurchaseValue(â‚¹)");
+                        acc.PaymentType = GetValSafe(values, "PaymentType");
+                        acc.PaymentStatus = GetValSafe(values, "PaymentStatus");
+                        acc.InvoiceNumber = GetValSafe(values, "InvoiceNumber");
+
+                        // 🚀 --- NEW: AD & CAMPAIGN TRACKING --- 🚀
                         acc.MetaCampaignName = GetValSafe(values, "MetaCampaignName");
                         acc.SocialLeadId = GetValSafe(values, "SocialLeadID");
                         acc.LeadStage = GetValSafe(values, "LeadStage");
@@ -1855,27 +1888,27 @@ namespace Radar_CRM.Controllers
                         acc.Keyword = GetValSafe(values, "Keyword");
                         acc.ClickType = GetValSafe(values, "ClickType");
                         acc.DeviceType = GetValSafe(values, "DeviceType");
+                        acc.AdNetwork = GetValSafe(values, "AdNetwork");
+                        acc.SearchPartnerNetwork = GetValSafe(values, "SearchPartnerNetwork");
+                        acc.AdCampaignName = GetValSafe(values, "AdCampaignName");
+                        acc.AdGroupName = GetValSafe(values, "AdGroupName");
+                        acc.Ad = GetValSafe(values, "Ad");
+                        acc.Gadconfigid = GetValSafe(values, "GADCONFIGID");
+                        acc.AdClickDate = DateTime.TryParse(GetValSafe(values, "AdClickDate"), out DateTime acd) ? acd : null;
+                        acc.CostPerClick = GetDecimalSafe(values, "CostperClick");
+                        acc.CostPerConversion = GetDecimalSafe(values, "CostperConversion");
+                        acc.ConversionExportedOn = DateTime.TryParse(GetValSafe(values, "ConversionExportedOn"), out DateTime ceo) ? ceo : null;
+                        acc.ConversionExportStatus = GetValSafe(values, "ConversionExportStatus");
+                        acc.ReasonForConversionFailure = GetValSafe(values, "ReasonforConversionFailure");
 
-                        // --- Timestamps ---
-                        string csvCreatedDate = GetValSafe(values, "Created Time", "DateofEntry");
-                        if (!string.IsNullOrWhiteSpace(csvCreatedDate) && DateTime.TryParse(csvCreatedDate, out DateTime cdt))
-                        {
-                            acc.CreatedDateAndTime = cdt;
-                            acc.ModifiedDateAndTime = cdt;
-                        }
-                        else
-                        {
-                            acc.CreatedDateAndTime = DateTime.Now;
-                            acc.ModifiedDateAndTime = DateTime.Now;
-                        }
-
+                        // Just add to Insert list (no Update list anymore)
                         accountsToInsert.Add(acc);
                     }
                 }
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                // 🚀 ONLY INSERTS NEW DATA
+                // 🚀 Execute Inserts Only
                 if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert);
 
                 await _context.SaveChangesAsync();
@@ -1890,11 +1923,14 @@ namespace Radar_CRM.Controllers
             {
                 success = true,
                 insertedCount = accountsToInsert.Count,
-                updatedCount = 0,
-                skippedCount = skippedRecords.Count,
-                message = $"Successfully inserted {accountsToInsert.Count} new records. Skipped {skippedRecords.Count} duplicate records."
+                updatedCount = 0, // Hardcoded to 0 since updates are disabled
+                skippedCount = skippedRecords.Count
             });
         }
+
+
+
+
 
         private string GetVal(string[] values, int index)
         {

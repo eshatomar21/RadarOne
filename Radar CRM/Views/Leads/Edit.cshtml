@@ -559,34 +559,48 @@
                     </div>
                 </div>
 
-                <!-- Data Sources -->
-                <div class="col-md-6 mb-3">
-                    <div class="row align-items-center">
-                        <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Data Sources</div>
-                        <div class="col-8">
-                            <div class="d-flex align-items-center gap-2">
-                                <select class="form-select form-select-sm border border-secondary" id="QuickDataSources" data-original="@Model.DataSources" onchange="showQuickActions('DataSources')">
-                                    <option value="">- None -</option>
-                                    <option value="InboundCall">InboundCall</option>
-                                    <option value="Referral/Dealer">Referral/Dealer</option>
-                                    <option value="Meta Ads">Meta Ads</option>
-                                    <option value="Google AdWords">Google AdWords</option>
-                                    <option value="Outreach">Outreach</option>
-                                    <option value="Group Lead">Group Lead</option>
-                                    <option value="Institutiona">Institutional</option>
-                                    <option value="Webinar">Webinar</option>
-                                    <option value="KOMMO">KOMMO</option>
-                                    <option value="Google Organic SEO">Google Organic SEO</option>
-                                    <option value="Website Direct">Website Direct</option>
-                                </select>
-                                <div id="actions-DataSources" style="display: none; white-space: nowrap;">
-                                    <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('DataSources')"></i>
-                                    <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('DataSources')"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+               <!-- Data Sources -->
+<div class="col-md-6 mb-3">
+    <div class="row align-items-center">
+        <div class="col-4 text-muted fw-bold" style="font-size: 0.85rem;">Data Sources</div>
+        <div class="col-8">
+            <div class="d-flex align-items-center gap-2">
+                <!-- 🚀 FIX: Added asp-for="DataSources" and name="QuickDataSources" for native server-side binding -->
+                <select asp-for="DataSources" name="QuickDataSources" class="form-select form-select-sm border border-secondary" id="QuickDataSources" data-original="@Model.DataSources" onchange="showQuickActions('DataSources')">
+                    <option value="">- None -</option>
+                    <option value="InboundCall">InboundCall</option>
+                    <option value="Referral/Dealer">Referral/Dealer</option>
+                    <option value="Meta Ads">Meta Ads</option>
+                    <option value="Google AdWords">Google AdWords</option>
+                    <option value="Outreach">Outreach</option>
+                    <option value="Group Lead">Group Lead</option>
+                    <option value="Institutional">Institutional</option>
+                    <option value="Webinar">Webinar</option>
+                    <option value="KOMMO">KOMMO</option>
+                    <option value="Google Organic SEO">Google Organic SEO</option>
+                    <option value="Website Direct">Website Direct</option>
+                    <option value="YouTube">YouTube</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Instagram Organic">Instagram Organic</option>
+                    <option value="Zoho Webinar">Zoho Webinar</option>
+                    <option value="Reference Doctor">Reference Doctor</option>
+                    <option value="Reference Dealer Partner">Reference Dealer Partner</option>
+                    <option value="Free Trial Self Register">Free Trial Self Register</option>
+                    <option value="Seminar Conference">Seminar Conference</option>
+                    <option value="Cold Calling">Cold Calling</option>
+                    <option value="WhatsApp Campaign">WhatsApp Campaign</option>
+                    <option value="Email Campaign">Email Campaign</option>
+                    <option value="Data Import Old DB">Data Import Old DB</option>
+                    <option value="WHATSAPP - BJAIN RX LLP">WHATSAPP - BJAIN RX LLP</option>
+                </select>
+                <div id="actions-DataSources" style="display: none; white-space: nowrap;">
+                    <i class="fa-solid fa-circle-check text-success" style="cursor:pointer; font-size: 1.2rem;" onclick="saveQuickField('DataSources')"></i>
+                    <i class="fa-solid fa-circle-xmark text-secondary" style="cursor:pointer; font-size: 1.2rem;" onclick="cancelQuickField('DataSources')"></i>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <!-- Alt Mobile -->
                 <div class="col-md-6 mb-3">
@@ -770,8 +784,6 @@
                                 <span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span>
                                 <span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span>
 
-                                <!-- 🚀 NEW: Edit Button safely using data- attributes -->
-                                <!-- 🚀 ADDED ID: id="edit-note-btn-@note.Id" -->
                                 <button type="button" class="btn btn-sm btn-light border-0 text-primary ms-2 p-1 rounded" title="Edit Note"
                                         id="edit-note-btn-@note.Id"
                                         data-note-id="@note.Id"
@@ -781,21 +793,23 @@
                                     <i class="fa-solid fa-pencil"></i>
                                 </button>
                             </div>
-                            <!-- 🚀 ADDED ID: id="note-content-@note.Id" -->
+
+                            <!-- Kept the row with the ID, deleted the duplicate below it -->
                             <div id="note-content-@note.Id" class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
-                            <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
+
                             @if (!string.IsNullOrEmpty(note.AttachmentFileName))
                             {
                                 <div class="mt-2"><a href="@Url.Action("DownloadNoteFile", "Leads", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;"><i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName</a></div>
                             }
                         </div>
                     }
+
                     <div id="extraNotesContainer" style="display: none;">
                         @foreach (var note in extraNotes)
                         {
                             <div class="p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--theme-navy-primary); background: #ffffff; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
                                 <div class="d-flex align-items-center mb-1"><span class="fw-bold text-dark" style="font-size: 0.85rem;">@(note.NoteOwner?.fullName ?? "System User")</span><span class="text-muted ms-auto" style="font-size: 0.75rem;">@note.CreatedDateTime.ToString("MMM dd, yyyy hh:mm tt")</span></div>
-                                <div class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
+                                <div id="note-content-@note.Id" class="mt-1 text-secondary" style="font-size: 0.9rem; white-space: pre-wrap;">@(!string.IsNullOrEmpty(note.NoteTitle) ? Html.Raw($"<b>{note.NoteTitle}</b><br>") : "")@note.Description</div>
                                 @if (!string.IsNullOrEmpty(note.AttachmentFileName))
                                 {
                                     <div class="mt-2"><a href="@Url.Action("DownloadNoteFile", "Leads", new { noteId = note.Id })" target="_blank" class="text-decoration-none fw-semibold shadow-sm" style="font-size: 0.75rem; color: #ffffff; background: var(--theme-navy-primary); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center;"><i class="fa-solid fa-paperclip me-2"></i> @note.AttachmentFileName</a></div>

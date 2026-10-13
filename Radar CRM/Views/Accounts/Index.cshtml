@@ -1020,7 +1020,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 <div id="pinnedItemsContainer"></div>
             </div>
 
-           <!-- UNPINNED LIST -->
+          <!-- UNPINNED LIST -->
             <div id="sidebarList">
                 @{
                     var predefinedLists = new Dictionary<string, string[]>
@@ -1034,7 +1034,12 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                         { "PaymentType", new[] { "Upfront", "EMI - 3Months", "EMI - 6Months" } },
                         { "PaymentStatus", new[] { "Paid", "Pending", "Partial", "Refunded" } },
                         { "HasComputer", new[] { "Yes", "No" } },
-                        { "CurrentlyUsingSoftware", new[] { "Yes", "No" } }
+                        { "CurrentlyUsingSoftware", new[] { "Yes", "No" } },
+                        { "QualificationStatus", new[] { "Qualified", "Notqualified" } },
+                        { "ProfilePendingReason", new[] { "Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times" } },
+                        { "IsDuplicated", new[] { "True", "False" } },
+                        { "IsDuplicate", new[] { "True", "False" } },
+                        { "Profilestatus", new[] { "Completed", "Strongly Completed", "Not-Completed", "Not-Qualified" } }
                     };
                 }
 
@@ -1042,7 +1047,9 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 {
                     bool isDate = prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?) || prop.Name.Contains("Date") || prop.Name.Contains("Time");
                     bool isUserField = prop.Name.Contains("Owner") || prop.Name == "CreatedBy" || prop.Name == "ModifiedBy";
-                    bool isPredefined = predefinedLists.ContainsKey(prop.Name);
+                    
+                    // 🚀 FORCE FIX: Automatically treat anything with "Duplicat" in the name as a predefined True/False dropdown
+                    bool isPredefined = predefinedLists.ContainsKey(prop.Name) || prop.Name.Contains("Duplicat");
 
                     <div class="filter-field-item field-item-row" data-field-type="@(isDate ? "date" : "text")">
                         <div class="d-flex align-items-center m-0 w-100">
@@ -1051,7 +1058,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                             <label class="form-check-label flex-grow-1 text-dark text-truncate" for="chk_@prop.Name" style="font-size: 0.8rem; cursor: pointer;">
                                 @prop.Name
                             </label>
-                           
+                            
                             <!-- Icons pushed to the right -->
                             <i class="fa-regular fa-star pin-filter-btn flex-shrink-0 ms-auto" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="togglePinFilter(event, this)"></i>
                             <i class="fa-regular fa-floppy-disk save-filter-btn flex-shrink-0 ms-2" style="font-size: 13px; cursor: pointer; color: #cbd5e1;" onclick="saveFieldFilter(event, this, '@prop.Name')"></i>
@@ -1102,7 +1109,11 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                 </select>
                                 <select class="form-select form-select-sm condition-val">
                                     <option value="" disabled selected>- Select @prop.Name -</option>
-                                    @foreach (var opt in predefinedLists[prop.Name])
+                                    @{
+                                        // 🚀 SAFE FALLBACK: If missing from dictionary, automatically generate True/False options
+                                        var dropdownOptions = predefinedLists.ContainsKey(prop.Name) ? predefinedLists[prop.Name] : new[] { "True", "False" };
+                                    }
+                                    @foreach (var opt in dropdownOptions)
                                     {
                                         <option value="@opt">@opt</option>
                                     }
@@ -1130,7 +1141,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                             }
                             else
                             {
-                                <!-- Text Field for Large Data (AccountName, LeadName, etc.) -->
+                                <!-- Text Field for Large Data -->
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
                                     <option value="contains" selected>contains</option>
                                     <option value="does_not_contain">does not contain</option>
@@ -1361,27 +1372,53 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                             }
                                         }
 
-                                        <td data-col-index="@tdIndex">
-                                            @if (prop.Name == "AccountName")
-                                            {
-                                                <a href="@Url.Action("Edit", "Accounts", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a>
-                                            }
-                                            else if (prop.Name.Contains("Status"))
-                                            {
-                                                @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active")
-                                                {
-                                                    <span class="badge-soft-success">@value</span>
-                                                }
-                                                else if (!string.IsNullOrEmpty(value))
-                                                {
-                                                    <span class="badge-soft-warning">@value</span>
-                                                }
-                                            }
-                                            else
-                                            {
-                                                @value
-                                            }
-                                        </td>
+                                      <td data-col-index="@tdIndex">
+    @if (prop.Name == "AccountName")
+    {
+        <a href="@Url.Action("Edit", "Accounts", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a>
+    }
+    else if (prop.Name.Equals("Profilestatus", StringComparison.OrdinalIgnoreCase))
+    {
+        // Force the value to lowercase and remove hyphens so it matches reliably
+        string cleanVal = value.Replace("-", " ").ToLower();
+        
+        @if (cleanVal == "not completed")
+        {
+            <span style="background: #fef2f2; color: #b91c1c; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; border: 1px solid #fca5a5;">@value</span>
+        }
+        else if (cleanVal == "strongly completed")
+        {
+            <span style="background: #dcfce3; color: #166534; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; border: 1px solid #86efac;">@value</span>
+        }
+        else if (cleanVal == "completed")
+        {
+            <span style="background: #f0fdf4; color: #22c55e; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; border: 1px solid #bbf7d0;">@value</span>
+        }
+        else if (cleanVal == "not qualified")
+        {
+            <span style="background: #f3f4f6; color: #4b5563; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; border: 1px solid #d1d5db;">@value</span>
+        }
+        else if (!string.IsNullOrEmpty(value))
+        {
+            <span class="badge-soft-warning">@value</span>
+        }
+    }
+    else if (prop.Name.Contains("Status"))
+    {
+        @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active")
+        {
+            <span class="badge-soft-success">@value</span>
+        }
+        else if (!string.IsNullOrEmpty(value))
+        {
+            <span class="badge-soft-warning">@value</span>
+        }
+    }
+    else
+    {
+        @value
+    }
+</td>
                                         tdIndex++;
                                     }
                                 }
@@ -2290,7 +2327,9 @@ function initializeTooltips() {
         "CurrentStatus": ["User", "Non User"],
         "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
         "QualificationStatus": ["Qualified", "Notqualified"],
-        "Profilestatus": ["Completed", "Strongly Completed", "Not Completed", "Not-Qualified"],
+        // 🚀 ADD THIS LINE for IsDuplicate
+        "IsDuplicate": ["True", "False"],
+        "Profilestatus": ["Completed", "Strongly Completed", "Not-Completed", "Not-Qualified"],
         "IsHomeopathicDoctor": ["Yes — MD(Homeopathy)", "मैं होम्योपैथी डॉक्टर हूँ", "हां- बीएचएमएस", "नहीं", "बीएचएमएस की पढ़ाई कर रहा हूँ", "Yes - BHMS", "Not a Homeopath Doctor", "Yes", "No", "Not a Homeopathy Doctor", "Pursuing BHMS"],
         "WorkType": ["Practicing", "Job", "Research", "others"],
         "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
@@ -2301,7 +2340,7 @@ function initializeTooltips() {
         "CurrentlyUsingSoftware": ["Yes", "No"]
     };
 
-    function handleCriteriaFieldChange(selectEl) {
+   function handleCriteriaFieldChange(selectEl) {
         const row = selectEl.closest('.criteria-row-builder');
         const fieldName = selectEl.value;
         const valueContainer = row.querySelector('.cv-value-container');
@@ -2317,10 +2356,15 @@ function initializeTooltips() {
             opts += `</datalist>`;
             valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select or type user..." style="width:100%;">${opts}`;
         }
-        else if (criteriaFilterOptionsMap[fieldName]) {
+        // 🚀 BULLETPROOF FIX: Match map OR any field containing "duplicate" case-insensitively
+        else if (criteriaFilterOptionsMap[fieldName] || fieldName.toLowerCase().includes('duplicate')) {
             conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
             let opts = '<option value="" disabled selected>Select Value</option>';
-            criteriaFilterOptionsMap[fieldName].forEach(o => { opts += `<option value="${o}">${o}</option>`; });
+            
+            // Use mapped options, or fallback to True/False for dynamically caught boolean fields
+            let mapValues = criteriaFilterOptionsMap[fieldName] || ["True", "False"];
+            
+            mapValues.forEach(o => { opts += `<option value="${o}">${o}</option>`; });
             valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" style="width:100%;">${opts}</select>`;
         }
         else if (fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('time')) {

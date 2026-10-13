@@ -26,8 +26,9 @@ namespace Radar_CRM.Controllers
                 return Json(new List<GlobalSearchResult>());
             }
 
-            // Clean the query for robust SQL searching
-            query = query.Trim();
+            // 🚀 NEW: Create a completely space-stripped version of the user's query
+            // E.g., "John Doe" becomes "JohnDoe", "8859 401" becomes "8859401"
+            string strippedQuery = query.Replace(" ", "");
 
             // ==========================================
             // 🚀 1. GET CURRENT USER & ADMIN STATUS
@@ -75,20 +76,19 @@ namespace Radar_CRM.Controllers
             // 🚀 3. SMART ACCOUNTS SEARCH
             // ==========================================
             var accounts = await _context.Accounts
-                .Where(a => a.AccountName.Contains(query) ||
-                            a.Email.Contains(query) ||
-                            a.AlternateEmailID.Contains(query) ||
-                            a.MobileNumber.Contains(query) ||
-                            a.AlternateMobile.Contains(query) ||
-                            a.Phone.Contains(query) ||
-                            a.Contact1Phone.Contains(query) ||
-                            a.ContactPersonName.Contains(query))
+                .Where(a => a.AccountName.Replace(" ", "").Contains(strippedQuery) ||
+                            a.Email.Replace(" ", "").Contains(strippedQuery) ||
+                            a.AlternateEmailID.Replace(" ", "").Contains(strippedQuery) ||
+                            a.ContactPersonName.Replace(" ", "").Contains(strippedQuery) ||
+                            a.MobileNumber.Replace(" ", "").Contains(strippedQuery) ||
+                            a.AlternateMobile.Replace(" ", "").Contains(strippedQuery) ||
+                            a.Phone.Replace(" ", "").Contains(strippedQuery) ||
+                            a.Contact1Phone.Replace(" ", "").Contains(strippedQuery))
                 .Take(5)
                .Select(a => new GlobalSearchResult
                {
                    Id = a.Id.ToString(),
                    Title = a.AccountName,
-                   // 🚀 ADDED: Appending Owner Name via inline subquery
                    Subtitle = (a.Email ?? a.MobileNumber ?? "Account") + " | Owner: " + (_context.Users.Where(u => u.Id == a.AccountOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
                    Module = "Accounts",
                    Icon = "bi-buildings",
@@ -100,20 +100,19 @@ namespace Radar_CRM.Controllers
             // 🚀 4. SMART LEADS SEARCH
             // ==========================================
             var leads = await _context.Leads
-                .Where(l => l.LeadName.Contains(query) ||
-                            l.EmailID.Contains(query) ||
-                            l.AlternateEmailID.Contains(query) ||
-                            l.MobileNumber.Contains(query) ||
-                            l.AlternateMobile.Contains(query) ||
-                            l.Phone.Contains(query) ||
-                            l.Contact1Phone.Contains(query) ||
-                            l.ContactName.Contains(query))
+                .Where(l => l.LeadName.Replace(" ", "").Contains(strippedQuery) ||
+                            l.EmailID.Replace(" ", "").Contains(strippedQuery) ||
+                            l.AlternateEmailID.Replace(" ", "").Contains(strippedQuery) ||
+                            l.ContactName.Replace(" ", "").Contains(strippedQuery) ||
+                            l.MobileNumber.Replace(" ", "").Contains(strippedQuery) ||
+                            l.AlternateMobile.Replace(" ", "").Contains(strippedQuery) ||
+                            l.Phone.Replace(" ", "").Contains(strippedQuery) ||
+                            l.Contact1Phone.Replace(" ", "").Contains(strippedQuery))
                 .Take(5)
                 .Select(l => new GlobalSearchResult
                 {
                     Id = l.Id.ToString(),
                     Title = l.LeadName,
-                    // 🚀 ADDED: Appending Owner Name
                     Subtitle = (l.EmailID ?? l.MobileNumber ?? "Lead") + " | Owner: " + (_context.Users.Where(u => u.Id == l.LeadOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
                     Module = "Leads",
                     Icon = "bi-person-lines-fill",
@@ -125,15 +124,14 @@ namespace Radar_CRM.Controllers
             // 🚀 5. SMART DEALS SEARCH
             // ==========================================
             var deals = await _context.Deals
-                .Where(d => d.DealName.Contains(query) ||
-                            d.AccountName.Contains(query) ||
-                            d.LeadName.Contains(query))
+                .Where(d => d.DealName.Replace(" ", "").Contains(strippedQuery) ||
+                            d.AccountName.Replace(" ", "").Contains(strippedQuery) ||
+                            d.LeadName.Replace(" ", "").Contains(strippedQuery))
                 .Take(5)
                .Select(d => new GlobalSearchResult
                {
                    Id = d.Id.ToString(),
                    Title = d.DealName,
-                   // 🚀 ADDED: Appending Owner Name
                    Subtitle = (d.AccountName ?? $"Value: {d.GrandTotal}") + " | Owner: " + (_context.Users.Where(u => u.Id == d.DealOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
                    Module = "Deals",
                    Icon = "bi-briefcase",
@@ -145,14 +143,13 @@ namespace Radar_CRM.Controllers
             // 🚀 6. SMART TASKS SEARCH
             // ==========================================
             var tasks = await _context.Tasks
-                .Where(t => t.Subject.Contains(query) ||
-                            t.Mobile.Contains(query))
+                .Where(t => t.Subject.Replace(" ", "").Contains(strippedQuery) ||
+                            t.Mobile.Replace(" ", "").Contains(strippedQuery))
                 .Take(5)
                .Select(t => new GlobalSearchResult
                {
                    Id = t.Id.ToString(),
                    Title = t.Subject,
-                   // 🚀 ADDED: Appending Owner Name
                    Subtitle = $"Status: {t.Status} | Owner: " + (_context.Users.Where(u => u.Id == t.TaskOwnerId).Select(u => u.FirstName).FirstOrDefault() ?? "Unassigned"),
                    Module = "Tasks",
                    Icon = "bi-check2-square",
@@ -164,9 +161,9 @@ namespace Radar_CRM.Controllers
             // 🚀 7. SMART VENDORS SEARCH
             // ==========================================
             var vendors = await _context.Vendors
-                .Where(v => v.VendorName.Contains(query) ||
-                            v.Email.Contains(query) ||
-                            v.Phone.Contains(query))
+                .Where(v => v.VendorName.Replace(" ", "").Contains(strippedQuery) ||
+                            v.Email.Replace(" ", "").Contains(strippedQuery) ||
+                            v.Phone.Replace(" ", "").Contains(strippedQuery))
                 .Take(5)
                 .Select(v => new GlobalSearchResult
                 {
@@ -175,7 +172,6 @@ namespace Radar_CRM.Controllers
                     Subtitle = v.Email ?? v.Phone ?? "Vendor",
                     Module = "Vendors",
                     Icon = "bi-shop",
-                    // Vendors are usually public catalogs, but if restricted, apply rule:
                     Url = (isAdmin || visibleUserIds.Contains(v.VendorOwnerId)) ? $"/Vendors/Edit/{v.Id}" : ""
                 }).ToListAsync();
             results.AddRange(vendors);
