@@ -537,6 +537,47 @@ namespace Radar_CRM.Controllers
                 _context.UpdateRange(leadsToUpdate);
                 await _context.SaveChangesAsync();
 
+                // =========================================================
+                // 🚀 NEW: TRANSFER TASKS IF LEAD OWNER WAS CHANGED IN BULK
+                // =========================================================
+                if (targetFieldName.Equals("LeadOwnerId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(request.NewValue))
+                {
+                    // 1. FETCH NEW OWNER'S NAME (Crucial for the UI)
+                    string newOwnerName = "System User";
+                    var newOwnerUser = await _context.Users.FindAsync(request.NewValue);
+                    if (newOwnerUser != null)
+                    {
+                        newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                    }
+
+                    // 2. Fetch all incomplete tasks related to ALL selected Leads
+                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                        .Where(t => t.LeadId.HasValue && request.Ids.Contains(t.LeadId.Value) && t.Status != "Completed")
+                        .ToListAsync();
+
+                    if (relatedTasks.Any())
+                    {
+                        string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System Bulk Update";
+
+                        foreach (var task in relatedTasks)
+                        {
+                            // Update both the ID and the Text Field for the UI
+                            task.TaskOwnerId = request.NewValue;
+                            task.TaskOwner = newOwnerName;
+
+                            task.ModifiedBy = $"{currentUser} (System Bulk Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                            task.ModifiedTime = DateTime.Now;
+
+                            // 🚀 CRITICAL FIX: Force Entity Framework to track this modification
+                            _context.Entry(task).State = EntityState.Modified;
+                        }
+
+                        _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                // =========================================================
+
                 return Json(new { success = true });
             }
             catch (Exception ex)
@@ -1210,6 +1251,46 @@ namespace Radar_CRM.Controllers
                     await _context.SaveChangesAsync();
 
                     // =========================================================
+                    // 🚀 NEW: TRANSFER TASKS IF LEAD OWNER CHANGED
+                    // =========================================================
+                    bool ownerChanged = existingLead != null &&
+                        !string.Equals(existingLead.LeadOwnerId?.Trim(), lead.LeadOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                    if (ownerChanged && !string.IsNullOrWhiteSpace(lead.LeadOwnerId))
+                    {
+                        // 1. FETCH THE NEW OWNER'S NAME (Crucial for the UI)
+                        string newOwnerName = "System User";
+                        var newOwnerUser = await _context.Users.FindAsync(lead.LeadOwnerId);
+                        if (newOwnerUser != null)
+                        {
+                            newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                        }
+
+                        // 2. Fetch all incomplete tasks related to this Lead
+                        var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                            .Where(t => t.LeadId == lead.Id && t.Status != "Completed")
+                            .ToListAsync();
+
+                        if (relatedTasks.Any())
+                        {
+                            foreach (var task in relatedTasks)
+                            {
+                                // 3. UPDATE BOTH THE ID *AND* THE TEXT NAME
+                                task.TaskOwnerId = lead.LeadOwnerId;
+                                task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+
+                                task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                                task.ModifiedTime = DateTime.Now;
+
+                                // 4. Force Entity Framework to track this specific modification
+                                _context.Entry(task).State = EntityState.Modified;
+                            }
+                            _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+
+                    // =========================================================
                     // 🚀 NEW: SYNC UPDATES TO THE LINKED ACCOUNT
                     // =========================================================
                     // 🚀 FIX: Declare trueAccountName OUTSIDE the if-block so the Deal logic can see it
@@ -1469,6 +1550,9 @@ namespace Radar_CRM.Controllers
 
             string trimmedValue = newValue?.Trim() ?? "";
 
+            // 🚀 CAPTURE OLD OWNER ID BEFORE UPDATING OR AUTOMATION TRIGGERS
+            string oldOwnerId = lead.LeadOwnerId;
+
             try
             {
                 // 🚀 FIX: Use Reflection to dynamically update ANY field passed from the frontend
@@ -1547,6 +1631,45 @@ namespace Radar_CRM.Controllers
 
                 _context.Update(lead);
                 await _context.SaveChangesAsync();
+
+                // =========================================================
+                // 🚀 NEW: TRANSFER TASKS IF LEAD OWNER CHANGED (Manually OR via Handover Automation)
+                // =========================================================
+                bool ownerChanged = !string.Equals(oldOwnerId?.Trim(), lead.LeadOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                if (ownerChanged && !string.IsNullOrWhiteSpace(lead.LeadOwnerId))
+                {
+                    // 1. FETCH THE NEW OWNER'S NAME (Crucial for the UI)
+                    string newOwnerName = "System User";
+                    var newOwnerUser = await _context.Users.FindAsync(lead.LeadOwnerId);
+                    if (newOwnerUser != null)
+                    {
+                        newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                    }
+
+                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                        .Where(t => t.LeadId == lead.Id && t.Status != "Completed")
+                        .ToListAsync();
+
+                    if (relatedTasks.Any())
+                    {
+                        foreach (var task in relatedTasks)
+                        {
+                            // 2. UPDATE BOTH THE ID *AND* THE TEXT NAME
+                            task.TaskOwnerId = lead.LeadOwnerId;
+                            task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+
+                            task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                            task.ModifiedTime = DateTime.Now;
+
+                            // 3. Force Entity Framework to track this specific modification
+                            _context.Entry(task).State = EntityState.Modified;
+                        }
+                        _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                // =========================================================
 
                 return Json(new { success = true });
             }

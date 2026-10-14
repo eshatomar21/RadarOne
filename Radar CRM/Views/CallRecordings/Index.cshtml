@@ -69,32 +69,32 @@
         border-spacing: 0;
     }
 
-    .table-custom thead th {
-        background-color: #f8fafc;
-        color: var(--text-muted);
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        padding: 16px 24px;
-        border-bottom: 1px solid var(--border-soft);
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
+        .table-custom thead th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-soft);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
 
-    .table-custom tbody td {
-        padding: 16px 24px;
-        font-size: 0.875rem;
-        vertical-align: middle;
-        color: var(--text-dark);
-        border-bottom: 1px solid #f1f5f9;
-        transition: background-color 0.2s;
-    }
+        .table-custom tbody td {
+            padding: 16px 24px;
+            font-size: 0.875rem;
+            vertical-align: middle;
+            color: var(--text-dark);
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.2s;
+        }
 
-    .table-custom tbody tr:hover td {
-        background-color: #f8fafc;
-    }
+        .table-custom tbody tr:hover td {
+            background-color: #f8fafc;
+        }
 
     .btn-action {
         background-color: #eff6ff;
@@ -111,10 +111,10 @@
         gap: 6px;
     }
 
-    .btn-action:hover {
-        background-color: #2563eb;
-        color: #ffffff;
-    }
+        .btn-action:hover {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
 
     .audio-compact {
         height: 32px;
@@ -281,8 +281,8 @@
             })
             .then(data => {
                 if(data.success) {
-                    alert(data.message); 
-                    window.location.reload(); 
+                    alert(data.message);
+                    window.location.reload();
                 } else {
                     alert("Import Failed: " + data.message);
                 }

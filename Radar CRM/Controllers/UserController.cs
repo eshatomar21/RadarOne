@@ -383,19 +383,26 @@ namespace Radar_CRM.Controllers
                 if (user != null)
                 {
                     var claims = new List<Claim>
-{
-    new Claim(ClaimTypes.NameIdentifier, user.Id),
-    new Claim(ClaimTypes.Name, user.fullName ?? $"{user.FirstName} {user.LastName}"),
-    new Claim(ClaimTypes.Email, user.Email ?? ""),
-    new Claim(ClaimTypes.Role, user.Role ?? "User"),
-    new Claim("Profile", user.Profile ?? "Standard"),
-    new Claim(ClaimTypes.MobilePhone, user.Phone ?? "N/A") // Added Phone claim
-};
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, user.Id),
+                        new Claim(ClaimTypes.Name, user.fullName ?? $"{user.FirstName} {user.LastName}"),
+                        new Claim(ClaimTypes.Email, user.Email ?? ""),
+                        new Claim(ClaimTypes.Role, user.Role ?? "User"),
+                        new Claim("Profile", user.Profile ?? "Standard"),
+                        new Claim(ClaimTypes.MobilePhone, user.Phone ?? "N/A")
+                    };
 
                     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var principal = new ClaimsPrincipal(identity);
 
-                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+                    // 🚀 FIX 3: Force the cookie to be persistent across browser restarts
+                    var authProperties = new AuthenticationProperties
+                    {
+                        IsPersistent = true,
+                        ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
+                    };
+
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
                     return RedirectToAction("Index", "Home");
                 }
@@ -492,22 +499,17 @@ namespace Radar_CRM.Controllers
         [HttpPost]
         public async Task<IActionResult> SsoLogin(string username, string ssoToken, string returnUrl)
         {
-            // 1. Define your shared secret (this must match the Javascript exact string)
             string expectedToken = "BJain_Radar_Sso_Secret_2026!";
 
-            // 2. Validate Token and Username
             if (ssoToken != expectedToken || string.IsNullOrEmpty(username))
             {
-                // Invalid token or missing email -> Kick back to Launchpad
                 return Redirect("http://pems:8081/");
             }
 
-            // 3. Find the user BY EMAIL ONLY (We trust HRMS, so no password check needed)
             var user = await _context.Users.FirstOrDefaultAsync(u =>
                 u.Email == username &&
                 u.UserStatus != null && u.UserStatus.ToLower() == "active");
 
-            // 4. If user exists in RadarCRM, log them in
             if (user != null)
             {
                 var claims = new List<Claim>
@@ -523,9 +525,15 @@ namespace Radar_CRM.Controllers
                 var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var principal = new ClaimsPrincipal(identity);
 
-                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+                // 🚀 FIX 4: Force the SSO cookie to be persistent across browser restarts
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
+                };
 
-                // Redirect to the target dashboard or default Home
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
+
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 {
                     return Redirect(returnUrl);
@@ -534,8 +542,8 @@ namespace Radar_CRM.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            // If user exists in HRMS but NOT in RadarONE database -> Kick back
             return Redirect("http://pems:8081/");
         }
+
     }
 }

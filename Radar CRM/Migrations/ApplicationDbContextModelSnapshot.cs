@@ -409,13 +409,25 @@ namespace Radar_CRM.Migrations
                     b.Property<int>("DurationSeconds")
                         .HasColumnType("int");
 
+                    b.Property<string>("GapAnalysis")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("LeadId")
                         .HasColumnType("int");
 
                     b.Property<string>("LocalFilePath")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("RecommendedProducts")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RecordingUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SalespersonConfidence")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SalespersonEmpathy")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SalespersonName")
@@ -426,7 +438,13 @@ namespace Radar_CRM.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SalespersonTone")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("TranscriptionText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserNeeds")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");

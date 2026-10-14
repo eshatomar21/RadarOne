@@ -1030,7 +1030,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                         { "DataSource", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
                         { "CurrentStatus", new[] { "User", "Non User" } },
-                        { "LeadStatus", new[] { "Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested" } },
+                        { "LeadStatus", new[] { "Cold", "Not interested", "Warm", "Hot", "ImportantContact","Not Answering", "InterestedCold"} },
                         { "PaymentType", new[] { "Upfront", "EMI - 3Months", "EMI - 6Months" } },
                         { "PaymentStatus", new[] { "Paid", "Pending", "Partial", "Refunded" } },
                         { "HasComputer", new[] { "Yes", "No" } },
@@ -1039,6 +1039,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                         { "ProfilePendingReason", new[] { "Connected", "Wrong Number/Invalid Number", "Ringing", "Switched Off", "Busy-Call Back Later", "Not-Interested", "Not a Doctor", "Student", "Still Ringing Tried 3 times" } },
                         { "IsDuplicated", new[] { "True", "False" } },
                         { "IsDuplicate", new[] { "True", "False" } },
+                        { "LeadStage", new[] { "Open", "Demo Scheduled", "Demo Done", "Trial Offered", "Direct Deal", "Won", "Lost" } },
                         { "Profilestatus", new[] { "Completed", "Strongly Completed", "Not-Completed", "Not-Qualified" } }
                     };
                 }
@@ -1278,6 +1279,18 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                        
                         <th class="sticky-actions text-center">
                             <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
+                        </th>
+                    </tr>
+
+                    <tr id="selectAllPagesBanner" style="display:none; background-color: #eff6ff; border-bottom: 1px solid #bfdbfe;">
+                        <th colspan="50" class="text-center py-2" style="font-size: 0.85rem; font-weight: 500; text-transform: none; letter-spacing: normal;">
+                            <span id="selectAllBannerText">All <strong id="pageSelCount">0</strong> records on this page are selected.</span>
+                            <a href="javascript:void(0)" class="fw-bold ms-2 text-primary text-decoration-none" id="selectAllPagesLink" onclick="selectAllAcrossPages()">
+                                Select all <strong id="globalSelCount">@totalRecords</strong> records that match this search.
+                            </a>
+                            <a href="javascript:void(0)" class="fw-bold ms-2 text-danger text-decoration-none" id="clearSelectionBtn" style="display:none;" onclick="clearGlobalSelection()">
+                                Clear selection
+                            </a>
                         </th>
                     </tr>
                 </thead>
@@ -2325,7 +2338,7 @@ function initializeTooltips() {
         "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
         "CurrentStatus": ["User", "Non User"],
-        "LeadStatus": ["Important contact", "Not a Doctor", "Warm", "Hot", "Not Interested"],
+        "LeadStatus": ["Cold", "Not interested", "Warm", "Hot", "ImportantContact","Not Answering", "InterestedCold"],
         "QualificationStatus": ["Qualified", "Notqualified"],
         // 🚀 ADD THIS LINE for IsDuplicate
         "IsDuplicate": ["True", "False"],
@@ -2335,6 +2348,7 @@ function initializeTooltips() {
         "ClinicType": ["Own", "Visiting", "Hospital Attached", "Govt.service", "Chain Clinics"],
         "HasComputer": ["Yes", "No"],
         "Qualification": ["BHMS", "MD", "BAMS", "Student"],
+        "LeadStage": ["Open", "Demo Scheduled", "Demo Done", "Trial Offered", "Direct Deal", "Won", "Lost"],
         "PaymentType": ["Upfront", "EMI - 3Months", "EMI - 6Months"],
         "PaymentStatus": ["Paid", "Pending", "Partial", "Refunded"],
         "CurrentlyUsingSoftware": ["Yes", "No"]
@@ -3651,64 +3665,144 @@ function saveColumnOrder() {
     // ==========================================
     // 6. BULK ACTIONS, EXPORT & DELETE
     // ==========================================
-    function toggleAllRowCheckboxes(sourceCb) {
-        currentVisibleRows.forEach(row => {
-            const cb = row.querySelector('.row-cb');
-            if(cb) cb.checked = sourceCb.checked;
-        });
-        updateSelectedCount();
+  function toggleAllRowCheckboxes(sourceCb) {
+    currentVisibleRows.forEach(row => {
+        const cb = row.querySelector('.row-cb');
+        if(cb) cb.checked = sourceCb.checked;
+    });
+
+    isGlobalSelectAll = false; // Reset global state on manual toggle
+
+    const banner = document.getElementById('selectAllPagesBanner');
+    const actualTotalRecords = @totalRecords;
+
+    // Show banner if we selected all on this page AND there are more records on other pages
+    if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
+        if(banner) {
+            document.getElementById('pageSelCount').innerText = currentVisibleRows.length;
+            document.getElementById('globalSelCount').innerText = actualTotalRecords;
+            document.getElementById('selectAllBannerText').innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
+
+            banner.style.display = 'table-row';
+            document.getElementById('clearSelectionBtn').style.display = 'none';
+            document.getElementById('selectAllPagesLink').style.display = 'inline';
+        }
+    } else {
+        if(banner) banner.style.display = 'none';
     }
 
-    function updateSelectedCount() {
-         const selected = document.querySelectorAll('tbody .row-cb:checked').length;
-         document.getElementById('selCount').innerText = selected;
-         document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+    updateSelectedCount();
+}
 
-         const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-         if (massUpdateCountDisplay) {
-             massUpdateCountDisplay.innerText = selected;
-         }
+// 3. 🚀 NEW: Functions to handle the Banner interactions
+function selectAllAcrossPages() {
+    isGlobalSelectAll = true;
+    const actualTotalRecords = @totalRecords;
 
-         const totalVisible = currentVisibleRows.length;
-         const selectAllCb = document.getElementById('selectAllCb');
-         if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
+    document.getElementById('selectAllBannerText').innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
+    document.getElementById('selectAllPagesLink').style.display = 'none';
+    document.getElementById('clearSelectionBtn').style.display = 'inline';
+
+    updateSelectedCount();
+}
+
+function clearGlobalSelection() {
+    isGlobalSelectAll = false;
+    const selectAllCb = document.getElementById('selectAllCb');
+    if(selectAllCb) selectAllCb.checked = false;
+
+    document.getElementById('selectAllPagesBanner').style.display = 'none';
+
+    currentVisibleRows.forEach(row => {
+        const cb = row.querySelector('.row-cb');
+        if(cb) cb.checked = false;
+    });
+
+    updateSelectedCount();
+}
+
+   function updateSelectedCount() {
+     const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
+     const actualTotalRecords = @totalRecords;
+
+     // Determine the true count to display (Page count vs Global count)
+     const displayCount = isGlobalSelectAll ? actualTotalRecords : selectedOnPage;
+
+     document.getElementById('selCount').innerText = displayCount;
+     document.getElementById('bulkActionsContainer').style.display = displayCount > 0 ? 'flex' : 'none';
+
+     const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
+     if (massUpdateCountDisplay) {
+         massUpdateCountDisplay.innerText = displayCount;
      }
 
-       function deleteSelected() {
-            const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-            if(selectedCbs.length === 0) return;
+     const totalVisible = currentVisibleRows.length;
+     const selectAllCb = document.getElementById('selectAllCb');
 
-            if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)? This will also delete all linked Deals, Leads, Tasks, and Notes.`)) {
-                let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+     // Only auto-check/uncheck the header box if we aren't in Global mode
+     if(selectAllCb && !isGlobalSelectAll) {
+         selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
+     }
 
-                fetch('@Url.Action("BulkDelete", "Accounts")', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(selectedIds)
-                })
-                .then(async response => {
-                    if (!response.ok) {
-                        const err = await response.text();
-                        throw new Error(err);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert("Database Error:\n" + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error("Deletion Error:", error);
-                    alert("Server error occurred. Please check the browser console (F12) for details.");
-                });
+     // Hide banner if user manually unchecks a single row
+     if (!isGlobalSelectAll && selectedOnPage < totalVisible) {
+         const banner = document.getElementById('selectAllPagesBanner');
+         if(banner) banner.style.display = 'none';
+     }
+}
+
+     function deleteSelected() {
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+
+    // Abort if nothing is selected (neither globally nor locally)
+    if(selectedCbs.length === 0 && !isGlobalSelectAll) return;
+
+    // Use the global count if the banner was clicked, otherwise use the checkbox count
+    const actualTotalRecords = @totalRecords;
+    const displayCount = isGlobalSelectAll ? actualTotalRecords : selectedCbs.length;
+
+    if(confirm(`Are you sure you want to delete ${displayCount} selected record(s)? This will also delete all linked Deals, Leads, Tasks, and Notes.`)) {
+
+        let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+        // Grab the active filters from the URL so C# knows which records to delete globally
+        const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
+
+        // Build the new payload
+        const payload = {
+            Ids: selectedIds,
+            IsGlobalSelectAll: isGlobalSelectAll,
+            FiltersJson: activeFilters
+        };
+
+        fetch('@Url.Action("BulkDelete", "Accounts")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(err);
             }
-        }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert("Database Error:\n" + data.message);
+            }
+        })
+        .catch(error => {
+            console.error("Deletion Error:", error);
+            alert("Server error occurred. Please check the browser console (F12) for details.");
+        });
+    }
+}
 
     function deleteSingleRecord(element, id) {
         if(confirm('Are you sure you want to delete this record?')) {

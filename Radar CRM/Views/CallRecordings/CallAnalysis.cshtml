@@ -75,7 +75,7 @@
     /* Chat UI Styling for Transcript */
     .transcript-box {
         padding: 24px;
-        height: 500px;
+        height: 800px; /* 🚀 Extended slightly to balance with the new left column height */
         overflow-y: auto;
         background-color: #f8fafc;
         flex-grow: 1;
@@ -101,14 +101,49 @@
         outline: none;
         border-radius: 50rem;
     }
+
+    /* 🚀 NEW: AI Insights Styles */
+    .score-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        height: 100%;
+    }
+
+    .score-value {
+        font-size: 1.15rem;
+        font-weight: 800;
+        margin-top: 6px;
+    }
+
+    .insight-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid var(--primary);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        font-size: 0.95rem;
+        color: #334155;
+    }
+
+    .insight-title {
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
 </style>
 
 <div class="container-fluid px-4 pb-4 mt-3">
-    
+
     <!-- Top Navigation & Details Header -->
     <div class="analysis-header">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <a href="@Url.Action("Index", "CallRecords")" class="text-decoration-none text-muted fw-semibold" style="transition: color 0.2s;">
+            <a href="@Url.Action("Index", "CallRecordings")" class="text-decoration-none text-muted fw-semibold" style="transition: color 0.2s;">
                 <i class="fa-solid fa-arrow-left me-2"></i> Back to Logs
             </a>
             <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill" style="font-size: 0.85rem;">
@@ -145,9 +180,20 @@
                 <div class="stat-block">
                     <span class="stat-label">CRM Match</span>
                     <span class="stat-value">
-                        @if (Model.Account != null) { <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">@Model.Account.AccountName</span> }
-                        else if (Model.Lead != null) { <span class="badge bg-success bg-opacity-10 text-success border border-success">@Model.Lead.LeadName</span> }
-                        else { <span class="text-muted fst-italic">Unlinked</span> }
+                        @if (Model.Account != null)
+                        {
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">@Model.Account.AccountName</span>
+                        }
+                        else if (Model.Lead != null)
+                        {
+
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success">@Model.Lead.LeadName</span>
+                        }
+                        else
+                        {
+
+                            <span class="text-muted fst-italic">Unlinked</span>
+                        }
                     </span>
                 </div>
             </div>
@@ -171,17 +217,72 @@
 
     <!-- AI Layout -->
     <div class="row g-4">
-        
-        <!-- Left Column: AI Summary -->
-        <div class="col-lg-5">
+
+        <!-- Left Column: AI Analytics & Summary -->
+        <div class="col-lg-5 d-flex flex-column gap-4">
+
+            <!-- 🚀 NEW: Agent Score Card -->
             <div class="card-custom">
                 <div class="card-header-custom">
-                    <i class="fa-solid fa-bolt text-warning"></i> Executive Summary
+                    <i class="fa-solid fa-clipboard-check text-success"></i> Agent Score Card
                 </div>
-                <div class="summary-content">
-                    @(string.IsNullOrEmpty(Model.AiSummary) ? "No summary generated yet." : Model.AiSummary)
+                <div class="p-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="score-box shadow-sm">
+                                <div class="insight-title"><i class="fa-solid fa-bolt text-warning me-1"></i> Confidence</div>
+                                <div class="score-value text-primary">@(Model.SalespersonConfidence ?? "Processing...")</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="score-box shadow-sm">
+                                <div class="insight-title"><i class="fa-solid fa-hand-holding-heart text-danger me-1"></i> Empathy</div>
+                                <div class="score-value text-success">@(Model.SalespersonEmpathy ?? "Processing...")</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="score-box shadow-sm">
+                                <div class="insight-title"><i class="fa-solid fa-wave-square text-info me-1"></i> Tone</div>
+                                <div class="score-value" style="color: #7c3aed;">@(Model.SalespersonTone ?? "Processing...")</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- 🚀 NEW: Conversation Insights -->
+            <div class="card-custom">
+                <div class="card-header-custom">
+                    <i class="fa-solid fa-brain text-primary"></i> Call Analytics
+                </div>
+                <div class="p-4 pb-2">
+                    <div class="insight-box shadow-sm" style="border-left-color: #3b82f6;">
+                        <div class="insight-title text-primary"><i class="fa-solid fa-user-tag me-1"></i> User Needs</div>
+                        <div>@Html.Raw(Model.UserNeeds?.Replace("\n", "<br/>") ?? "<span class='text-muted fst-italic'>Analyzing conversation...</span>")</div>
+                    </div>
+
+                    <div class="insight-box shadow-sm" style="border-left-color: #059669;">
+                        <div class="insight-title text-success"><i class="fa-solid fa-cart-arrow-down me-1"></i> Recommended Products</div>
+                        <div>@Html.Raw(Model.RecommendedProducts?.Replace("\n", "<br/>") ?? "<span class='text-muted fst-italic'>Analyzing conversation...</span>")</div>
+                    </div>
+
+                    <div class="insight-box shadow-sm" style="border-left-color: #dc2626;">
+                        <div class="insight-title text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Gap Analysis</div>
+                        <div>@Html.Raw(Model.GapAnalysis?.Replace("\n", "<br/>") ?? "<span class='text-muted fst-italic'>Analyzing conversation...</span>")</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Executive Summary -->
+            <div class="card-custom h-auto">
+                <div class="card-header-custom">
+                    <i class="fa-solid fa-file-lines text-secondary"></i> Executive Summary
+                </div>
+                <div class="summary-content">
+                    @Html.Raw(Model.AiSummary?.Replace("\n", "<br/>") ?? "No summary generated yet.")
+                </div>
+            </div>
+
         </div>
 
         <!-- Right Column: Raw Transcript Box -->
@@ -190,18 +291,21 @@
                 <div class="card-header-custom">
                     <i class="fa-solid fa-align-left text-primary"></i> Full Transcript
                 </div>
-               <div class="transcript-box custom-scrollbar">
+                <div class="transcript-box custom-scrollbar">
                     @{
                         bool isJson = false;
                         System.Text.Json.JsonDocument chatArray = null;
-                        
+
                         // Check if the text in the database is a valid JSON array
-                        try {
-                            if (!string.IsNullOrEmpty(Model.TranscriptionText) && Model.TranscriptionText.Trim().StartsWith("[")) {
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(Model.TranscriptionText) && Model.TranscriptionText.Trim().StartsWith("["))
+                            {
                                 chatArray = System.Text.Json.JsonDocument.Parse(Model.TranscriptionText);
                                 isJson = true;
                             }
-                        } catch { }
+                        }
+                        catch { }
                     }
 
                     @if (isJson && chatArray != null)
@@ -218,8 +322,8 @@
                                     <span class="text-muted mb-1 px-1" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
                                         @(isSales ? "Sales Agent" : "Customer")
                                     </span>
-                                    <div class="shadow-sm" style="max-width: 85%; padding: 14px 18px; font-size: 0.95rem; line-height: 1.6; border-radius: 16px; 
-                                                @(isSales ? "background-color: #4f46e5; color: #ffffff; border-bottom-right-radius: 4px;" : "background-color: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px;")">
+                                    <div class="shadow-sm" style="max-width: 85%; padding: 14px 18px; font-size: 0.95rem; line-height: 1.6; border-radius: 16px;
+                                        @(isSales ? "background-color: #4f46e5; color: #ffffff; border-bottom-right-radius: 4px;" : "background-color: #ffffff; color: #334155; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px;")">
                                         @text
                                     </div>
                                 </div>

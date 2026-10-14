@@ -946,50 +946,143 @@
         });
     };
 
-    // ==========================================
+   // ==========================================
     // 10. MAIN FORM SUBMISSION & LOGIC
     // ==========================================
     document.addEventListener("DOMContentLoaded", function () {
         const accountForm = document.getElementById('accountForm');
         if (accountForm) {
-            accountForm.addEventListener('submit', function (e) {
+            accountForm.addEventListener('submit', async function (e) {
                 e.preventDefault(); // Stop default submission
 
+                const submitBtn = document.getElementById('saveAccountBtn') || this.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                
+                // Show checking state
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Checking...';
+                submitBtn.disabled = true;
+
+                // --- STEP 1: BASIC CLIENT LENGTH & MATCHING CHECKS ---
                 let mobileNumber = window.getFieldValue('MobileNumber');
+                let altMobile = window.getFieldValue('AlternateMobile');
+                let emailVal = window.getFieldValue('Email');
+                let altEmailVal = window.getFieldValue('AlternateEmailID');
+
+                let digitsOnly = "";
+                let altDigitsOnly = "";
+
+                // Check Primary Mobile Length
                 if (mobileNumber !== "") {
-                    let digitsOnly = mobileNumber.replace(/\D/g, ''); 
+                    digitsOnly = mobileNumber.replace(/\D/g, ''); 
                     if (digitsOnly.length < 10) {
                         Swal.fire("Invalid!", "Mobile Number must contain a valid 10-digit number.", "error");
                         document.getElementById('MobileNumber')?.focus();
+                        submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
                         return;
                     }
                 }
 
-                let altMobile = window.getFieldValue('AlternateMobile');
+                // Check Alternate Mobile Length
                 if (altMobile !== "") {
-                    let altDigitsOnly = altMobile.replace(/\D/g, ''); 
+                    altDigitsOnly = altMobile.replace(/\D/g, ''); 
                     if (altDigitsOnly.length > 0 && altDigitsOnly.length < 10) {
                          Swal.fire("Invalid!", "Alternate Mobile Number must contain at least 10 digits.", "error");
                          document.getElementById('AlternateMobile')?.focus();
+                         submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
                          return;
                     }
                 }
 
+                // 🚀 NEW: Check if Mobile and Alternate Mobile are exactly the same
+                if (digitsOnly !== "" && altDigitsOnly !== "" && digitsOnly.slice(-10) === altDigitsOnly.slice(-10)) {
+                    Swal.fire("Error!", "Main Mobile and Alternate Mobile cannot be the exact same number!", "error");
+                    document.getElementById('AlternateMobile')?.focus();
+                    submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
+                    return;
+                }
 
-                // --- STEP 2: STATE OR PROFILE PENDING REASON LOGIC ---
-                // Only ONE of them is required. If BOTH are empty, block the save.
-              const stateValue = window.getFieldValue('Addr1_State');
+                // 🚀 NEW: Check if Email and Alternate Email are exactly the same
+                if (emailVal !== "" && altEmailVal !== "" && emailVal.toLowerCase() === altEmailVal.toLowerCase()) {
+                    Swal.fire("Error!", "Email and Alternate Email cannot be the exact same!", "error");
+                    document.getElementById('AlternateEmailID')?.focus();
+                    submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
+                    return;
+                }
+
+                // --- STEP 2: SERVER-SIDE DUPLICATE VALIDATION ON SUBMIT ---
+                try {
+                    let isDuplicate = false;
+                    let dupMessage = "";
+
+                    // 1. Check Primary Mobile
+                    if (digitsOnly.length >= 10) {
+                        let searchPhone = digitsOnly.slice(-10);
+                        let phoneRes = await fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(searchPhone));
+                        if (phoneRes.ok) {
+                            let phoneData = await phoneRes.json();
+                            if (phoneData.isDuplicate) {
+                                isDuplicate = true;
+                                dupMessage = `The <b>Primary Mobile Number</b> already exists in the system!<br><br><b>Record Type:</b> ${phoneData.recordType}<br><b>Name:</b> <span class="text-primary">${phoneData.recordName}</span><br><b>Owner:</b> <span class="text-danger">${phoneData.ownerName}</span>`;
+                            }
+                        }
+                    }
+
+                    // 2. Check Alternate Mobile (if provided and no primary duplicate found)
+                    if (!isDuplicate && altDigitsOnly.length >= 10) {
+                        let searchAltPhone = altDigitsOnly.slice(-10);
+                        let altPhoneRes = await fetch('@Url.Action("CheckDuplicatePhone", "Accounts")?phone=' + encodeURIComponent(searchAltPhone));
+                        if (altPhoneRes.ok) {
+                            let altPhoneData = await altPhoneRes.json();
+                            if (altPhoneData.isDuplicate) {
+                                isDuplicate = true;
+                                dupMessage = `The <b>Alternate Mobile Number</b> already exists in the system!<br><br><b>Record Type:</b> ${altPhoneData.recordType}<br><b>Name:</b> <span class="text-primary">${altPhoneData.recordName}</span><br><b>Owner:</b> <span class="text-danger">${altPhoneData.ownerName}</span>`;
+                            }
+                        }
+                    }
+
+                    // 3. Check Primary Email (If phones are clean)
+                    if (!isDuplicate && emailVal !== "") {
+                        let emailRes = await fetch('@Url.Action("CheckEmailDuplicate", "Accounts")?email=' + encodeURIComponent(emailVal));
+                        if (emailRes.ok) {
+                            let emailData = await emailRes.json();
+                            if (emailData.isDuplicate) {
+                                isDuplicate = true;
+                                dupMessage = `The <b>Email</b> already exists in the system!<br><br><b>Record Type:</b> ${emailData.recordType}<br><b>Name:</b> <span class="text-primary">${emailData.recordName}</span><br><b>Owner:</b> <span class="text-danger">${emailData.ownerName}</span>`;
+                            }
+                        }
+                    }
+
+                    // 🛑 HALT SAVING IF DUPLICATE IS FOUND
+                    if (isDuplicate) {
+                        Swal.fire({
+                            title: 'Duplicate Found!',
+                            html: dupMessage,
+                            icon: 'warning'
+                        });
+                        submitBtn.innerHTML = originalBtnText; 
+                        submitBtn.disabled = false;
+                        return; 
+                    }
+
+                } catch (error) {
+                    console.error("Duplicate validation check failed:", error);
+                    // If network fails, we'll continue to let standard C# backend handle it
+                }
+
+                // Set to Saving mode if all duplicate checks pass
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Saving...';
+
+                // --- STEP 3: STATE OR PROFILE PENDING REASON LOGIC ---
+                const stateValue = window.getFieldValue('Addr1_State');
                 const pendingReason = window.getFieldValue('ProfilePendingReason');
                 
                 const hasState = stateValue !== "" && stateValue !== "-None-";
                 const hasReason = pendingReason !== "" && pendingReason !== "-None-";
 
-                // If State is filled, automatically clear the pending reason (it's not needed)
                 if (hasState) {
                     const reasonField = document.getElementById('ProfilePendingReason');
                     if (reasonField) reasonField.value = ""; 
                 } 
-                // If BOTH are empty, block the save
                 else if (!hasState && !hasReason) {
                     Swal.fire("Required", "You must provide either a State OR a Profile Pending Reason.", "warning");
                     const reasonField = document.getElementById('ProfilePendingReason');
@@ -998,16 +1091,16 @@
                         reasonField.style.boxShadow = "0 0 0 3px #ef4444";
                         setTimeout(() => reasonField.style.boxShadow = "none", 3500);
                     }
+                    submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; 
                     return;
                 }
 
-                // --- STEP 3: CHECK OTHER MANDATORY FIELDS ---
+                // --- STEP 4: CHECK OTHER MANDATORY FIELDS ---
                let isMandatoryValid = true;
                 const requiredFields = this.querySelectorAll('[required]');
                 
                 requiredFields.forEach(field => {
                     if (field.id === 'MobileNumber') return;
-                    // Skip checking State dynamically here because we handled it above
                     if (field.id === 'Addr1_State') return; 
 
                     if (!field.value.trim()) {
@@ -1021,10 +1114,12 @@
                     const mandatoryModalEl = document.getElementById('mandatoryFieldsModal');
                     if (mandatoryModalEl) new bootstrap.Modal(mandatoryModalEl).show();
                     else Swal.fire("Required", "Please fill in all mandatory fields marked with an asterisk (*).", "warning");
+                    
+                    submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; 
                     return;
                 }
 
-                // --- STEP 4: PROFESSIONAL PROFILE CHECK (< 4 Fields) ---
+                // --- STEP 5: PROFESSIONAL PROFILE CHECK (< 4 Fields) ---
                const profileFieldsList = [
                     'IsHomeopathicDoctor', 'WorkType', 'HasComputer', 'ClinicType',
                     'Qualification', 'CollegeName', 'YearOfPassing', 'TotalExperience',
@@ -1040,7 +1135,6 @@
                     }
                 });
 
-                // 🚀 FIX IS HERE: Only show the popup if they have < 4 fields AND they DID NOT fill the State AND they DID NOT fill the reason
                 if (filledFieldsCount < 4 && !hasReason && !hasState) {
                     const pendingModalEl = document.getElementById('pendingReasonModal');
                     if (pendingModalEl) new bootstrap.Modal(pendingModalEl).show();
@@ -1052,10 +1146,11 @@
                         reasonField.style.boxShadow = "0 0 0 3px #ef4444";
                         setTimeout(() => reasonField.style.boxShadow = "none", 3500);
                     }
+                    submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; 
                     return;
                 }
 
-                // --- STEP 5: QUALIFIED STATUS CONFIRMATION ---
+                // --- STEP 6: QUALIFIED STATUS CONFIRMATION ---
                 const qualStatus = document.getElementById('QualificationStatus')?.value;
                 const formToSubmit = this;
 
@@ -1074,9 +1169,9 @@
                             if (result.isConfirmed) {
                                 window.submitFormAjax(formToSubmit);
                             } else {
-                                // 🛑 REVERT TO NONE IF CANCEL IS CLICKED
                                 const dropDown = document.getElementById('QualificationStatus');
                                 if (dropDown) dropDown.value = "-None-";
+                                submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; 
                             }
                         });
                         return; 
@@ -1086,6 +1181,7 @@
                         } else {
                             const dropDown = document.getElementById('QualificationStatus');
                             if (dropDown) dropDown.value = "-None-";
+                            submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; 
                         }
                         return;
                     }

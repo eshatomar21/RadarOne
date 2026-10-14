@@ -174,7 +174,6 @@ namespace Radar_CRM.Controllers
                             // REGULAR STRINGS
                             else if (propertyInfo.PropertyType == typeof(string))
                             {
-                                var valConst = System.Linq.Expressions.Expression.Constant(safeValue);
                                 var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
                                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
                                 var startsWithMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
@@ -184,8 +183,35 @@ namespace Radar_CRM.Controllers
                                 var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
                                 var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
-                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
-                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                // 🚀 FIX: Handle Multi-Select Comma Separated lists for 'is' and 'is_not'
+                                if (f.Condition == "is") 
+                                {
+                                    if (safeValue.Contains(",")) 
+                                    {
+                                        var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
+                                        var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
+                                        var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp);
+                                    }
+                                    else 
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                    }
+                                }
+                                else if (f.Condition == "is_not") 
+                                {
+                                    if (safeValue.Contains(",")) 
+                                    {
+                                        var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
+                                        var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
+                                        var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp));
+                                    }
+                                    else 
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                    }
+                                }
                                 else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
                                 else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
                                 else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
@@ -580,9 +606,43 @@ namespace Radar_CRM.Controllers
                 _context.UpdateRange(accountsToUpdate);
                 await _context.SaveChangesAsync();
 
-                // 🚀 TRIGGER EMAIL IF OWNER WAS CHANGED
+                // 🚀 TRIGGER EMAIL & TRANSFER TASKS IF OWNER WAS CHANGED
                 if (request.FieldName.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(request.NewValue))
                 {
+                    // 1. FETCH NEW OWNER'S NAME (Crucial for the UI)
+                    string newOwnerName = "System User";
+                    var newOwnerUser = await _context.Users.FindAsync(request.NewValue);
+                    if (newOwnerUser != null)
+                    {
+                        newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                    }
+
+                    // 2. Transfer Incomplete Tasks for all selected Accounts
+                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                        .Where(t => t.AccountId.HasValue && request.Ids.Contains(t.AccountId.Value) && t.Status != "Completed")
+                        .ToListAsync();
+
+                    if (relatedTasks.Any())
+                    {
+                        string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System Bulk Update";
+
+                        foreach (var task in relatedTasks)
+                        {
+                            // 🚀 UPDATE BOTH ID AND TEXT NAME
+                            task.TaskOwnerId = request.NewValue;
+                            task.TaskOwner = newOwnerName;
+
+                            task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                            task.ModifiedTime = DateTime.Now;
+
+                            // 🚀 CRITICAL FIX: Force Entity Framework to track this modification
+                            _context.Entry(task).State = EntityState.Modified;
+                        }
+                        _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    // 3. Notify New Owner
                     await NotifyNewOwnerAsync(request.NewValue, updatedAccountsList);
                 }
 
@@ -939,12 +999,50 @@ namespace Radar_CRM.Controllers
                         account.CreatedBy = existingAccount.CreatedBy;
                     }
 
-                    // Compare the database owner to the new form owner
-                    bool ownerChanged = existingAccount != null && existingAccount.AccountOwnerId != account.AccountOwnerId;
+                    // 🚀 FIX: Bulletproof string comparison to accurately detect owner changes
+                    bool ownerChanged = existingAccount != null &&
+                        !string.Equals(existingAccount.AccountOwnerId?.Trim(), account.AccountOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
 
                     // Save the new changes
                     _context.Update(account);
                     await _context.SaveChangesAsync();
+
+                    // =========================================================
+                    // 🚀 NEW: TRANSFER TASKS IF ACCOUNT OWNER CHANGED
+                    // =========================================================
+                    if (ownerChanged && !string.IsNullOrWhiteSpace(account.AccountOwnerId))
+                    {
+                        // 1. FETCH THE NEW OWNER'S NAME (Crucial for the UI)
+                        string newOwnerName = "System User";
+                        var newOwnerUser = await _context.Users.FindAsync(account.AccountOwnerId);
+                        if (newOwnerUser != null)
+                        {
+                            newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                        }
+
+                        var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                            .Where(t => t.AccountId == account.Id && t.Status != "Completed")
+                            .ToListAsync();
+
+                        if (relatedTasks.Any())
+                        {
+                            foreach (var task in relatedTasks)
+                            {
+                                // 2. UPDATE BOTH THE ID *AND* THE TEXT NAME
+                                task.TaskOwnerId = account.AccountOwnerId;
+                                task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+
+                                task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                                task.ModifiedTime = DateTime.Now;
+
+                                // 3. Force Entity Framework to track this specific modification
+                                _context.Entry(task).State = EntityState.Modified;
+                            }
+                            _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    // =========================================================
 
                     await SaveNotesAsync(account.Id, "Account", SavedNoteOwner, SavedNoteDateTime, SavedNoteDesc, SavedNoteFiles);
                     await CheckAndCreateContactFromAccountAsync(account);
@@ -963,7 +1061,6 @@ namespace Radar_CRM.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-
             // Fallback if ModelState is invalid
             ViewBag.ExistingNotes = await _context.Note
                 .Where(n => n.AccountId == id)
@@ -975,7 +1072,6 @@ namespace Radar_CRM.Controllers
 
             return View(account);
         }
-
         // ==========================================
         // HELPER: Save Notes & Files to C Drive
         // ==========================================
@@ -1156,20 +1252,11 @@ namespace Radar_CRM.Controllers
                 // ==========================================
                 string assignedOwnerId = acc.AccountOwnerId;
 
-                // 🚀 FIX: Ensure we retrieve the user safely to grab their full name string
+                // 🚀 Ensure we retrieve the user safely to grab their full name string
                 var ownerUser = await _context.Users.FindAsync(acc.AccountOwnerId);
                 string ownerFullName = ownerUser?.fullName ?? ownerUser?.FirstName ?? "System User";
 
-                // 🚀 FIX: Removed Vishakha from here. Now ONLY Mamta assigns to Aman. 
-                if (ownerFullName.Contains("Mamta", StringComparison.OrdinalIgnoreCase))
-                {
-                    var amanUser = await _context.Users.FirstOrDefaultAsync(u => u.FirstName.Contains("Aman"));
-                    if (amanUser != null)
-                    {
-                        assignedOwnerId = amanUser.Id;
-                        ownerFullName = amanUser.fullName ?? amanUser.FirstName; // Capture Aman's name
-                    }
-                }
+               
 
                 // 🚀 NEW FIX: Grab the live user who is actively clicking "Save" triggering this automation
                 string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
@@ -1322,6 +1409,9 @@ namespace Radar_CRM.Controllers
                         // Disconnect from the Account and attach to the newly created Lead
                         task.AccountId = null;
                         task.LeadId = newContact.Id;
+
+                        // 🚀 NEW: Transfer Task Ownership to the New Lead's Owner
+                        task.TaskOwnerId = assignedOwnerId;
 
                         // Optionally log that the system moved it
                         task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
@@ -1967,9 +2057,6 @@ namespace Radar_CRM.Controllers
         // ==========================================
         // QUICK INFO AUTO-SAVE: AJAX POST
         // ==========================================
-        // ==========================================
-        // QUICK INFO AUTO-SAVE: AJAX POST
-        // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
         [Route("Accounts/UpdateQuickInfo")]
@@ -1980,6 +2067,9 @@ namespace Radar_CRM.Controllers
 
             // Safely extract the value
             string trimmedValue = newValue?.Trim() ?? "";
+
+            // 🚀 CAPTURE OLD OWNER ID BEFORE UPDATING
+            string oldOwnerId = account.AccountOwnerId;
 
             try
             {
@@ -2021,18 +2111,58 @@ namespace Radar_CRM.Controllers
                     : "System User";
 
                 account.ModifiedBy = $"{currentUser} on {DateTime.Now.ToString("dd/MM/yy HH:mm")}";
-
                 account.ModifiedDateAndTime = DateTime.Now;
 
                 // Explicitly tell Entity Framework to update the record
                 _context.Update(account);
                 await _context.SaveChangesAsync();
 
+
+                // =========================================================
+                // 🚀 NEW: TRANSFER TASKS IF OWNER CHANGED VIA QUICK INFO
+                // =========================================================
+                bool ownerChanged = field.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) &&
+                                    !string.Equals(oldOwnerId?.Trim(), account.AccountOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                if (ownerChanged && !string.IsNullOrWhiteSpace(account.AccountOwnerId))
+                {
+                    // 1. FETCH THE NEW OWNER'S NAME (Crucial for the UI)
+                    string newOwnerName = "System User";
+                    var newOwnerUser = await _context.Users.FindAsync(account.AccountOwnerId);
+                    if (newOwnerUser != null)
+                    {
+                        newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
+                    }
+
+                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                        .Where(t => t.AccountId == account.Id && t.Status != "Completed")
+                        .ToListAsync();
+
+                    if (relatedTasks.Any())
+                    {
+                        foreach (var task in relatedTasks)
+                        {
+                            // 2. UPDATE BOTH THE ID *AND* THE TEXT NAME
+                            task.TaskOwnerId = account.AccountOwnerId;
+                            task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+
+                            task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                            task.ModifiedTime = DateTime.Now;
+
+                            // 3. Force Entity Framework to track this specific modification
+                            _context.Entry(task).State = EntityState.Modified;
+                        }
+                        _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                // =========================================================
+
                 return Json(new { success = true });
             }
             catch (Exception ex)
             {
-                // ⚠️️ NOTE: If the email already belongs to someone else, SQL will reject it here
+                // ⚠ NOTE: If the email already belongs to someone else, SQL will reject it here
                 string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return Json(new { success = false, message = trueError });
             }

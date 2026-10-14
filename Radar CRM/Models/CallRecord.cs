@@ -29,12 +29,19 @@ namespace Radar_CRM.Models
         [Display(Name = "Duration (Seconds)")]
         public int DurationSeconds { get; set; }
 
-        // Add this inside Radar_CRM.Models.CallRecord
         public string SalespersonName { get; set; }
 
-        // AI Results
+        // AI Results - Core
         public string? TranscriptionText { get; set; } = "Processing...";
         public string? AiSummary { get; set; } = "Processing...";
+
+        // 🚀 NEW: AI Results - Score Card & Analysis
+        public string? SalespersonConfidence { get; set; } = "Processing...";
+        public string? SalespersonEmpathy { get; set; } = "Processing...";
+        public string? SalespersonTone { get; set; } = "Processing...";
+        public string? UserNeeds { get; set; } = "Processing...";
+        public string? RecommendedProducts { get; set; } = "Processing...";
+        public string? GapAnalysis { get; set; } = "Processing...";
 
         public DateTime CallDate { get; set; } = DateTime.UtcNow;
 
