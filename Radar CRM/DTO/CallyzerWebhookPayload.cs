@@ -18,4 +18,16 @@ namespace Radar_CRM.DTOs
         public string? duration { get; set; }
         public string? call_type { get; set; }
     }
+
+    // --- 🚀 NEW: OpenAI Analysis DTO ---
+    public class AiAnalysisResult
+    {
+        public string AiSummary { get; set; }
+        public string SalespersonConfidence { get; set; }
+        public string SalespersonEmpathy { get; set; }
+        public string SalespersonTone { get; set; }
+        public string UserNeeds { get; set; }
+        public string RecommendedProducts { get; set; }
+        public string GapAnalysis { get; set; }
+    }
 }

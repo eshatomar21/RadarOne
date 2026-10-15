@@ -1305,7 +1305,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                 <!-- 🚀 FIX: Added event.stopPropagation() so checking the box doesn't open the record -->
                                 <td class="sticky-cb" style="width: 120px; min-width: 120px;" onclick="event.stopPropagation()">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
-                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="toggleRowCheckbox(this)">
 
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
@@ -3548,42 +3548,48 @@ function saveColumnOrder() {
         }
     }
 
-    function executeMassUpdateAjax() {
-         let field = document.getElementById('massUpdateField').value;
-         const valInput = document.getElementById('massUpdateValue');
-         let val = valInput ? valInput.value : '';
+  function executeMassUpdateAjax() {
+    let field = document.getElementById('massUpdateField').value;
+    const valInput = document.getElementById('massUpdateValue');
+    let val = valInput ? valInput.value : '';
 
-         if (val === "CLEAR_VALUE_COMMAND") val = "";
+    if (val === "CLEAR_VALUE_COMMAND") val = "";
+    if (field === "AccountOwner" || field === "CoOwner") { field = field + "Id"; }
 
-         // 🚀 FIX 4: Convert UI-friendly display names to their actual Database ID column names
-         if (field === "AccountOwner" || field === "CoOwner") {
-             field = field + "Id";
-         }
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+    const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
 
-         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-         const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+    // Abort if nothing is selected (neither globally nor locally)
+    if (!field || (selectedIds.length === 0 && !isGlobalSelectAll)) {
+        alert("Please select a field and ensure records are checked.");
+        return;
+    }
 
-         if (!field || selectedIds.length === 0) {
-             alert("Please select a field and ensure records are checked.");
-             return;
-         }
+    if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
+        return;
+    }
 
-         if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
-             return;
-         }
+    const btn = document.getElementById('btnExecuteMassUpdate');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+    btn.disabled = true;
 
-         const btn = document.getElementById('btnExecuteMassUpdate');
-         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-         btn.disabled = true;
+    // 🚀 NEW: Grab active filters from URL to send with global flag
+    const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
 
-         fetch('@Url.Action("BulkUpdate", "Accounts")', {
-             method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-                 'Accept': 'application/json'
-             },
-             body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
-         })
+    const payload = {
+        Ids: selectedIds,
+        FieldName: field,
+        NewValue: val,
+        IsGlobalSelectAll: isGlobalSelectAll,
+        FiltersJson: activeFilters
+    };
+
+    fetch('/Accounts/BulkUpdate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    
          .then(async response => {
              if (!response.ok) {
                  const errorText = await response.text();

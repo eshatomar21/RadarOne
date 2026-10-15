@@ -240,6 +240,16 @@ namespace Radar_CRM.Controllers
                                         else if (f.Condition == "is_not" || f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
                                     }
                                 }
+                                // 🚀 ADD THIS NEW BLOCK TO HANDLE TRUE/FALSE (BOOLEANS)
+                                else if (propertyInfo.PropertyType == typeof(bool) || propertyInfo.PropertyType == typeof(bool?))
+                                {
+                                    if (bool.TryParse(safeValue, out bool boolVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(boolVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
+                                }
                             }
 
                             if (conditionExpr != null)
@@ -564,18 +574,33 @@ namespace Radar_CRM.Controllers
         [IgnoreAntiforgeryToken]
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
-            if (request == null || request.Ids == null || !request.Ids.Any() || string.IsNullOrEmpty(request.FieldName))
+            // 1. 🚀 Modify initial validation to allow empty IDs *only if* Global Select is active
+            if (request == null || string.IsNullOrEmpty(request.FieldName))
             {
                 return Json(new { success = false, message = "Invalid data provided." });
             }
 
+            if (!request.IsGlobalSelectAll && (request.Ids == null || !request.Ids.Any()))
+            {
+                return Json(new { success = false, message = "No records selected." });
+            }
+
             try
             {
-                var accountsToUpdate = await _context.Accounts.Where(a => request.Ids.Contains(a.Id)).ToListAsync();
+                // 2. 🚀 Determine target IDs (either from the checkboxes, or fetch ALL from DB)
+                List<int> targetIds = request.Ids ?? new List<int>();
+                if (request.IsGlobalSelectAll)
+                {
+                    targetIds = await GetFilteredAccountIds(request.FiltersJson);
+                }
+
+                // 3. 🚀 Use targetIds to fetch the accounts to update
+                var accountsToUpdate = await _context.Accounts.Where(a => targetIds.Contains(a.Id)).ToListAsync();
                 var propertyInfo = typeof(Account).GetProperty(request.FieldName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo == null)
                     return Json(new { success = false, message = "Field not found in database." });
+
                 var updatedAccountsList = new Dictionary<int, string>();
 
                 foreach (var account in accountsToUpdate)
@@ -588,6 +613,10 @@ namespace Radar_CRM.Controllers
                         if (t == typeof(DateTime))
                         {
                             if (DateTime.TryParse(request.NewValue, out DateTime d)) safeValue = d;
+                        }
+                        else if (t == typeof(bool)) // Safety catch for boolean fields
+                        {
+                            if (bool.TryParse(request.NewValue, out bool b)) safeValue = b;
                         }
                         else
                         {
@@ -617,9 +646,9 @@ namespace Radar_CRM.Controllers
                         newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
                     }
 
-                    // 2. Transfer Incomplete Tasks for all selected Accounts
+                    // 2. 🚀 Use targetIds here instead of request.Ids to ensure all pages' tasks are moved
                     var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
-                        .Where(t => t.AccountId.HasValue && request.Ids.Contains(t.AccountId.Value) && t.Status != "Completed")
+                        .Where(t => t.AccountId.HasValue && targetIds.Contains(t.AccountId.Value) && t.Status != "Completed")
                         .ToListAsync();
 
                     if (relatedTasks.Any())
@@ -628,14 +657,14 @@ namespace Radar_CRM.Controllers
 
                         foreach (var task in relatedTasks)
                         {
-                            // 🚀 UPDATE BOTH ID AND TEXT NAME
+                            // UPDATE BOTH ID AND TEXT NAME
                             task.TaskOwnerId = request.NewValue;
                             task.TaskOwner = newOwnerName;
 
                             task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
                             task.ModifiedTime = DateTime.Now;
 
-                            // 🚀 CRITICAL FIX: Force Entity Framework to track this modification
+                            // CRITICAL FIX: Force Entity Framework to track this modification
                             _context.Entry(task).State = EntityState.Modified;
                         }
                         _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
@@ -660,6 +689,15 @@ namespace Radar_CRM.Controllers
             public List<int> Ids { get; set; }
             public string FieldName { get; set; }
             public string NewValue { get; set; }
+            public bool IsGlobalSelectAll { get; set; }
+            public string FiltersJson { get; set; }
+        }
+
+        public class BulkDeleteRequest
+        {
+            public List<int> Ids { get; set; }
+            public bool IsGlobalSelectAll { get; set; }
+            public string FiltersJson { get; set; }
         }
 
         // ==========================================
@@ -777,6 +815,107 @@ namespace Radar_CRM.Controllers
             {
                 return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        private async Task<List<int>> GetFilteredAccountIds(string advancedFilters)
+        {
+            var query = _context.Accounts.AsQueryable();
+
+            // 1. Role / User visibility restrictions (Same as Index)
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser?.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            if (!isAdmin && currentUser != null)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id).ToListAsync();
+
+                visibleUserIds.Add(currentUserId);
+                query = query.Where(a => visibleUserIds.Contains(a.AccountOwnerId));
+            }
+
+            // 2. Parse the JSON filters to match the exact search criteria
+            if (!string.IsNullOrWhiteSpace(advancedFilters) && advancedFilters != "[]")
+            {
+                try
+                {
+                    string jsonString = advancedFilters.Contains("%5B") ? Uri.UnescapeDataString(advancedFilters) : advancedFilters;
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                    if (filters != null && filters.Any())
+                    {
+                        var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
+                        System.Linq.Expressions.Expression combinedPredicate = null;
+
+                        foreach (var f in filters.Where(f => !f.ColumnName.StartsWith("Task.") && f.ColumnName != "RelatedTasksPresence"))
+                        {
+                            if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                            string dbColName = f.ColumnName;
+                            var propertyInfo = typeof(Account).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                            if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                            {
+                                var idProp = typeof(Account).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (idProp != null) { dbColName = idProp.Name; propertyInfo = idProp; }
+                            }
+
+                            if (propertyInfo == null) continue;
+
+                            var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
+                            System.Linq.Expressions.Expression conditionExpr = null;
+                            string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
+
+                            if (propertyInfo.PropertyType == typeof(string))
+                            {
+                                var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+                                var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
+
+                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                            }
+
+                            if (conditionExpr != null)
+                            {
+                                combinedPredicate = combinedPredicate == null ? conditionExpr :
+                                    (f.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase) ?
+                                     System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr) :
+                                     System.Linq.Expressions.Expression.AndAlso(combinedPredicate, conditionExpr));
+                            }
+                        }
+
+                        if (combinedPredicate != null)
+                        {
+                            var lambda = System.Linq.Expressions.Expression.Lambda<Func<Account, bool>>(combinedPredicate, parameter);
+                            query = query.Where(lambda);
+                        }
+                    }
+                }
+                catch { /* Fallback to un-filtered query if parse fails */ }
+            }
+
+            return await query.Select(a => a.Id).ToListAsync();
         }
 
         // ==========================================
@@ -1530,25 +1669,31 @@ namespace Radar_CRM.Controllers
         // BULK DELETE: AJAX POST (Safely deletes all linked data)
         // ==========================================
         [HttpPost]
-        [IgnoreAntiforgeryToken] // 🚀 FIX: Prevents 400 Bad Request "Network Errors" in AJAX
-        public async Task<IActionResult> BulkDelete([FromBody] List<int> ids)
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest request)
         {
-            if (ids == null || !ids.Any())
+            if (request == null || (!request.IsGlobalSelectAll && (request.Ids == null || !request.Ids.Any())))
                 return Json(new { success = false, message = "No records selected." });
 
             try
             {
-                var accountsToDelete = await _context.Accounts.Where(a => ids.Contains(a.Id)).ToListAsync();
+                // 🚀 IF GLOBAL SELECT IS TRUE, FETCH ALL MATCHING IDs
+                List<int> targetIds = request.Ids ?? new List<int>();
+                if (request.IsGlobalSelectAll)
+                {
+                    targetIds = await GetFilteredAccountIds(request.FiltersJson);
+                }
+
+                var accountsToDelete = await _context.Accounts.Where(a => targetIds.Contains(a.Id)).ToListAsync();
                 if (!accountsToDelete.Any()) return Json(new { success = true });
 
-                // 1. Delete Tasks linked to Accounts
-                var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
-                    .Where(t => t.AccountId != null && ids.Contains((int)t.AccountId)).ToListAsync();
+                // ... (Keep the rest of your original BulkDelete logic exactly the same from here down)
+                // 1. Delete Tasks
+                var relatedTasks = await _context.Set<Radar_CRM.Models.Task>().Where(t => t.AccountId != null && targetIds.Contains((int)t.AccountId)).ToListAsync();
                 if (relatedTasks.Any()) _context.Set<Radar_CRM.Models.Task>().RemoveRange(relatedTasks);
 
-                // 2. Delete Deals (AND any Notes attached to those Deals)
-                var relatedDeals = await _context.Set<Deal>()
-                    .Where(d => d.AccountId != null && ids.Contains((int)d.AccountId)).ToListAsync();
+                // 2. Delete Deals
+                var relatedDeals = await _context.Set<Deal>().Where(d => d.AccountId != null && targetIds.Contains((int)d.AccountId)).ToListAsync();
                 if (relatedDeals.Any())
                 {
                     var dealIds = relatedDeals.Select(d => d.Id).ToList();
@@ -1560,12 +1705,10 @@ namespace Radar_CRM.Controllers
                     _context.Set<Deal>().RemoveRange(relatedDeals);
                 }
 
-                // 3. Delete Leads (AND any Notes attached to those Leads)
+                // 3. Delete Leads
                 if (_context.Leads != null)
                 {
-                    var relatedLeads = await _context.Leads
-                        .Where(l => l.AccountId != null && ids.Contains((int)l.AccountId)).ToListAsync();
-
+                    var relatedLeads = await _context.Leads.Where(l => l.AccountId != null && targetIds.Contains((int)l.AccountId)).ToListAsync();
                     if (relatedLeads.Any())
                     {
                         var leadIds = relatedLeads.Select(l => l.Id).ToList();
@@ -1578,15 +1721,14 @@ namespace Radar_CRM.Controllers
                     }
                 }
 
-                // 4. Delete Notes attached directly to the Account
+                // 4. Delete Notes
                 if (_context.Note != null)
                 {
-                    var relatedNotes = await _context.Note
-                        .Where(n => n.AccountId != null && ids.Contains((int)n.AccountId)).ToListAsync();
+                    var relatedNotes = await _context.Note.Where(n => n.AccountId != null && targetIds.Contains((int)n.AccountId)).ToListAsync();
                     if (relatedNotes.Any()) _context.Note.RemoveRange(relatedNotes);
                 }
 
-                // 5. Finally, remove the Accounts safely!
+                // 5. Delete Accounts
                 _context.Accounts.RemoveRange(accountsToDelete);
                 await _context.SaveChangesAsync();
 
@@ -1594,7 +1736,6 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // Returns clean JSON instead of crashing so your frontend can show the exact SQL error
                 string errorMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return Json(new { success = false, message = "DB Error: " + errorMessage });
             }

@@ -38,7 +38,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 // Add this line where your other services are registered
 builder.Services.AddScoped<IHierarchyService, HierarchyService>();
-builder.Services.AddSingleton<Radar_CRM.Services.AiCallService>();
+
+builder.Services.AddScoped<AiCallService>();
 
 
 builder.Services.Configure<FormOptions>(options =>

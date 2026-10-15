@@ -1,4 +1,12 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Radar_CRM.Data;
+using Radar_CRM.DTOs;
+using Radar_CRM.Models;
+using Radar_CRM.Services;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,13 +14,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Radar_CRM.Data;
-using Radar_CRM.DTOs;
-using Radar_CRM.Models;
 
 namespace Radar_CRM.Controllers
 {
@@ -108,49 +109,84 @@ namespace Radar_CRM.Controllers
 
                                 try
                                 {
-                                    byte[] audioBytes = await DownloadAudioBytesAsync(recordingUrl);
-                                    if (audioBytes != null && audioBytes.Length > 0)
+                                    var aiService = scope.ServiceProvider.GetRequiredService<AiCallService>();
+
+                                    byte[] audioBytes = await aiService.DownloadAudioAsync(recordingUrl);
+
+                                    // 🚀 FIX 1: If audio download fails, update the DB instead of silently returning
+                                    if (audioBytes == null || audioBytes.Length == 0)
                                     {
-                                        string folderPath = @"C:\CRM_files\Call_recordings";
-                                        if (!System.IO.Directory.Exists(folderPath))
+                                        var failedAudioRecord = await bgContext.CallRecords.FindAsync(savedCallId);
+                                        if (failedAudioRecord != null)
                                         {
-                                            System.IO.Directory.CreateDirectory(folderPath);
-                                        }
-
-                                        string fileName = $"call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
-                                        string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
-
-                                        await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
-
-                                        string rawTranscription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
-                                        string finalTranscript = "No speech detected.";
-                                        string finalSummary = "No speech detected.";
-
-                                        if (!string.IsNullOrWhiteSpace(rawTranscription) && !rawTranscription.Contains("ERROR]"))
-                                        {
-                                            var aiResult = await AnalyzeCallWithGptAsync(rawTranscription, apiKey);
-                                            finalTranscript = aiResult.FormattedChat;
-                                            finalSummary = aiResult.Summary;
-                                        }
-                                        else if (rawTranscription.Contains("ERROR]"))
-                                        {
-                                            finalTranscript = rawTranscription;
-                                            finalSummary = "Whisper Translation Failed.";
-                                        }
-
-                                        var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
-                                        if (recordToUpdate != null)
-                                        {
-                                            recordToUpdate.LocalFilePath = fullLocalPath;
-                                            recordToUpdate.TranscriptionText = finalTranscript;
-                                            recordToUpdate.AiSummary = finalSummary;
+                                            failedAudioRecord.TranscriptionText = "ERROR: Failed to download audio from URL.";
+                                            failedAudioRecord.AiSummary = "Audio download failed. Cannot analyze.";
                                             await bgContext.SaveChangesAsync();
                                         }
+                                        return;
+                                    }
+
+                                    string folderPath = @"C:\CRM_files\Call_recordings";
+                                    if (!System.IO.Directory.Exists(folderPath)) System.IO.Directory.CreateDirectory(folderPath);
+
+                                    string fileName = $"call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
+                                    string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
+                                    await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
+
+                                    var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
+                                    if (recordToUpdate != null)
+                                    {
+                                        recordToUpdate.LocalFilePath = fullLocalPath;
+
+                                        string transcriptionText = await aiService.TranscribeAudioAsync(audioBytes);
+                                        recordToUpdate.TranscriptionText = transcriptionText;
+
+                                        // 🚀 FIX 2: Only call AnalyzeCallAsync if transcription actually succeeded
+                                        if (!string.IsNullOrWhiteSpace(transcriptionText) && !transcriptionText.Contains("Transcription failed"))
+                                        {
+                                            var aiResult = await aiService.AnalyzeCallAsync(transcriptionText);
+
+                                            // 🚀 FIX 3: Null coalescing (??) prevents null values from crashing the database save
+                                            if (aiResult != null)
+                                            {
+                                                recordToUpdate.AiSummary = aiResult.AiSummary ?? "N/A";
+                                                recordToUpdate.SalespersonConfidence = aiResult.SalespersonConfidence ?? "N/A";
+                                                recordToUpdate.SalespersonEmpathy = aiResult.SalespersonEmpathy ?? "N/A";
+                                                recordToUpdate.SalespersonTone = aiResult.SalespersonTone ?? "N/A";
+                                                recordToUpdate.UserNeeds = aiResult.UserNeeds ?? "N/A";
+                                                recordToUpdate.RecommendedProducts = aiResult.RecommendedProducts ?? "N/A";
+                                                recordToUpdate.GapAnalysis = aiResult.GapAnalysis ?? "N/A";
+                                            }
+                                            else
+                                            {
+                                                recordToUpdate.AiSummary = "AI Analysis returned null or failed to parse JSON.";
+                                            }
+                                        }
+                                        else
+                                        {
+                                            recordToUpdate.AiSummary = "Skipped AI analysis because transcription was empty or failed.";
+                                        }
+
+                                        await bgContext.SaveChangesAsync();
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    LogError($"[Audio Processing Error] Call ID {savedCallId}: {ex.Message}");
+                                    // 3. THE TRAP DOOR: If ANYTHING crashes, we save the error directly to the database!
+                                    try
+                                    {
+                                        var failedRecord = await bgContext.CallRecords.FindAsync(savedCallId);
+                                        if (failedRecord != null)
+                                        {
+                                            failedRecord.TranscriptionText = "SYSTEM CRASH: " + ex.Message;
+                                            failedRecord.AiSummary = "Check TranscriptionText for error details.";
+                                            failedRecord.SalespersonTone = "CRASH";
+                                            failedRecord.SalespersonEmpathy = "CRASH";
+                                            failedRecord.SalespersonConfidence = "CRASH";
+                                            await bgContext.SaveChangesAsync();
+                                        }
+                                    }
+                                    catch { /* Ignore if the database fallback also fails */ }
                                 }
                             });
                         }

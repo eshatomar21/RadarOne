@@ -22,7 +22,7 @@ namespace Radar_CRM.Services
     public class AiCallService
     {
         // Replace with your actual OpenAI API Key
-        private readonly string _apiKey = "sk-proj-YOUR_API_KEY_HERE";
+      //  private readonly string _apiKey = "sk-proj-YOUR_API_KEY_HERE";
 
         // 1. Download the audio file from Callyzer
         public async Task<byte[]> DownloadAudioAsync(string url)

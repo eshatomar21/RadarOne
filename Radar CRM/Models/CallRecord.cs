@@ -32,7 +32,7 @@ namespace Radar_CRM.Models
         // AI Results
         public string? TranscriptionText { get; set; } = "Processing...";
         public string? AiSummary { get; set; } = "Processing...";
-        public string? SalespersonConfidence { get; set; } = "Processing...";
+        public string? SalespersonConfidence { get; set; } 
         public string? SalespersonEmpathy { get; set; } = "Processing...";
         public string? SalespersonTone { get; set; } = "Processing...";
         public string? UserNeeds { get; set; } = "Processing...";
