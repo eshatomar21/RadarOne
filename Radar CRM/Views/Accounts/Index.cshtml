@@ -2186,6 +2186,8 @@ let hiddenCols = new Set();
 let sortStates = {};
 let isFilterSortedAsc = true;
 
+    let isGlobalSelectAll = false;
+
         // Cache the options globally so `addCriteriaRow` can access them dynamically
         const criteriaFieldOptions = `@foreach (var prop in tableProps) {
             <option value="@prop.Name">@prop.Name</option>

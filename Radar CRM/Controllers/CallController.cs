@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
-using System.Threading.Tasks;
+using Radar_CRM.Services;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Radar_CRM.Controllers
 {
@@ -51,6 +52,42 @@ namespace Radar_CRM.Controllers
             }
 
             return View(callRecord);
+        }
+
+        [HttpPost("ProcessAudio/{id}")]
+        public async Task<IActionResult> ProcessAudio(int id, [FromServices] AiCallService aiCallService)
+        {
+            var callRecord = await _context.CallRecords.FindAsync(id);
+            if (callRecord == null || string.IsNullOrEmpty(callRecord.RecordingUrl))
+            {
+                return NotFound("Call record or Audio URL not found.");
+            }
+
+            // 1. Download the audio
+            byte[] audioBytes = await aiCallService.DownloadAudioAsync(callRecord.RecordingUrl);
+
+            // 2. PASTE YOUR AI LOGIC HERE
+            string transcriptionText = await aiCallService.TranscribeAudioAsync(audioBytes);
+            callRecord.TranscriptionText = transcriptionText;
+
+            var aiResult = await aiCallService.AnalyzeCallAsync(transcriptionText);
+
+            if (aiResult != null)
+            {
+                callRecord.AiSummary = aiResult.AiSummary;
+                callRecord.SalespersonConfidence = aiResult.SalespersonConfidence;
+                callRecord.SalespersonEmpathy = aiResult.SalespersonEmpathy;
+                callRecord.SalespersonTone = aiResult.SalespersonTone;
+                callRecord.UserNeeds = aiResult.UserNeeds;
+                callRecord.RecommendedProducts = aiResult.RecommendedProducts;
+                callRecord.GapAnalysis = aiResult.GapAnalysis;
+            }
+
+            // 3. Save to database
+            await _context.SaveChangesAsync();
+
+            // 4. Reload the page to show the new data!
+            return RedirectToAction("CallAnalysis", new { id = callRecord.Id });
         }
     }
 }

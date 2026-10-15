@@ -7,6 +7,18 @@ using System.Threading.Tasks;
 
 namespace Radar_CRM.Services
 {
+    // 🚀 NEW: Class to hold the parsed JSON data from OpenAI
+    public class AiAnalysisResult
+    {
+        public string AiSummary { get; set; }
+        public string SalespersonConfidence { get; set; }
+        public string SalespersonEmpathy { get; set; }
+        public string SalespersonTone { get; set; }
+        public string UserNeeds { get; set; }
+        public string RecommendedProducts { get; set; }
+        public string GapAnalysis { get; set; }
+    }
+
     public class AiCallService
     {
         // Replace with your actual OpenAI API Key
@@ -42,20 +54,27 @@ namespace Radar_CRM.Services
             return document.RootElement.GetProperty("text").GetString();
         }
 
-        // 3. Summarize and Format using GPT-4o-mini
-        public async Task<string> SummarizeCallAsync(string rawTranscription)
+        // 3. 🚀 UPDATED: Analyze Call using JSON mode for detailed metrics
+        public async Task<AiAnalysisResult> AnalyzeCallAsync(string rawTranscription)
         {
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            string systemPrompt = @"You are an expert CRM assistant. Analyze the raw transcription of a sales call. 
-            Provide a clean, readable output with two sections:
-            1. SUMMARY: A brief paragraph summarizing the customer's intent, the salesperson's actions, and the outcome.
-            2. KEY POINTS: 3-4 bullet points highlighting important details or follow-up tasks.";
+            // Instruct the AI to strictly return JSON matching your database properties
+            string systemPrompt = @"You are an expert CRM assistant analyzing a sales call transcription. 
+            You MUST return your analysis ONLY as a valid JSON object with the following exact string properties:
+            - ""AiSummary"": A brief paragraph summarizing the customer's intent, the salesperson's actions, and the outcome.
+            - ""SalespersonConfidence"": A short phrase or score (e.g., 'High', '8/10', 'Hesitant').
+            - ""SalespersonEmpathy"": A short phrase (e.g., 'Excellent', 'Moderate', 'Needs Improvement').
+            - ""SalespersonTone"": A brief description (e.g., 'Professional & Helpful', 'Aggressive').
+            - ""UserNeeds"": Bullet points defining what the customer explicitly wants.
+            - ""RecommendedProducts"": Products or services that fit the customer's needs based on the call.
+            - ""GapAnalysis"": Bullet points on what the salesperson missed or could have done better.";
 
             var payload = new
             {
                 model = "gpt-4o-mini",
+                response_format = new { type = "json_object" }, // Forces strict JSON output
                 messages = new[]
                 {
                     new { role = "system", content = systemPrompt },
@@ -67,11 +86,17 @@ namespace Radar_CRM.Services
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", content);
 
-            if (!response.IsSuccessStatusCode) return "Summary generation failed.";
+            if (!response.IsSuccessStatusCode) return null;
 
             var responseString = await response.Content.ReadAsStringAsync();
             using var document = JsonDocument.Parse(responseString);
-            return document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString().Trim();
+
+            // Extract the JSON string from the AI's response
+            var jsonContent = document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString().Trim();
+
+            // Deserialize the AI's JSON string directly into our C# object
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<AiAnalysisResult>(jsonContent, options);
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -23,19 +22,16 @@ namespace Radar_CRM.Models
         [DataType(DataType.Url)]
         public string? RecordingUrl { get; set; } = "";
 
-        // 🚀 NEW: Stores the physical C: drive path of the downloaded recording
         public string? LocalFilePath { get; set; }
 
         [Display(Name = "Duration (Seconds)")]
         public int DurationSeconds { get; set; }
 
-        public string SalespersonName { get; set; }
+        public string SalespersonName { get; set; } = "";
 
-        // AI Results - Core
+        // AI Results
         public string? TranscriptionText { get; set; } = "Processing...";
         public string? AiSummary { get; set; } = "Processing...";
-
-        // 🚀 NEW: AI Results - Score Card & Analysis
         public string? SalespersonConfidence { get; set; } = "Processing...";
         public string? SalespersonEmpathy { get; set; } = "Processing...";
         public string? SalespersonTone { get; set; } = "Processing...";
@@ -49,11 +45,11 @@ namespace Radar_CRM.Models
         public int? LeadId { get; set; }
 
         [ForeignKey("LeadId")]
-        public virtual Lead Lead { get; set; }
+        public virtual Lead? Lead { get; set; }
 
         public int? AccountId { get; set; }
 
         [ForeignKey("AccountId")]
-        public virtual Account Account { get; set; }
+        public virtual Account? Account { get; set; }
     }
 }
