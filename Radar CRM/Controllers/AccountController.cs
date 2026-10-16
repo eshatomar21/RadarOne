@@ -8,10 +8,14 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 using CrmTaskModel = Radar_CRM.Models.Task;
 using Task = System.Threading.Tasks.Task;
+using ClosedXML.Excel;
+
 
 namespace Radar_CRM.Controllers
 {
@@ -1942,19 +1946,17 @@ namespace Radar_CRM.Controllers
         }
 
 
-        // ==========================================
-        // EXPORT ALL FILTERED RECORDS (Streaming direct from DB)
-        // ==========================================
-
         [HttpGet]
-        [Route("Accounts/Export")] // 🚀 Explicit route guarantees the backend is hit
+        [Route("Accounts/Export")]
         public async Task<IActionResult> Export(string format, string filters, string search = "")
         {
             try
             {
                 var query = _context.Accounts.AsNoTracking().AsQueryable();
 
-                // 1. Role Visibility Restrictions
+                // ==========================================
+                // 1. ORIGINAL SECURITY & FILTER LOGIC
+                // ==========================================
                 string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var currentUser = await _context.Users.FindAsync(currentUserId);
                 bool isAdmin = !string.IsNullOrWhiteSpace(currentUser?.Profile) &&
@@ -1965,7 +1967,7 @@ namespace Radar_CRM.Controllers
                 {
                     var allRoles = await _context.Roles.ToListAsync();
                     var visibleRoleIds = new List<int>();
-                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId); // Assumes you have this method
                     visibleRoleIds.AddRange(subordinateIds);
 
                     var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
@@ -1982,7 +1984,7 @@ namespace Radar_CRM.Controllers
                     query = query.Where(a => visibleUserIds.Contains(a.AccountOwnerId));
                 }
 
-                // 2. Search Box Filter
+                // Search Box Filter
                 if (!string.IsNullOrEmpty(search))
                 {
                     var searchLower = search.ToLower();
@@ -1993,13 +1995,15 @@ namespace Radar_CRM.Controllers
                     );
                 }
 
-                // 3. Dynamic Filter Expressions
+                // Dynamic Filter Expressions
                 if (!string.IsNullOrWhiteSpace(filters) && filters != "[]")
                 {
                     try
                     {
                         string jsonString = filters.Contains("%5B") ? Uri.UnescapeDataString(filters) : filters;
                         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                        // Assuming FilterCriteria is defined in your project
                         var filterList = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
 
                         if (filterList != null && filterList.Any())
@@ -2053,34 +2057,75 @@ namespace Radar_CRM.Controllers
                     catch { /* Ignore parse errors for export */ }
                 }
 
-                // 4. Stream to CSV directly from Database
-                var memoryStream = new MemoryStream();
-                using (var writer = new StreamWriter(memoryStream, System.Text.Encoding.UTF8, leaveOpen: true))
-                {
-                    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
-                    var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        .Where(p => !excludedFields.Contains(p.Name) &&
-                                    (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
-                        .ToArray();
+                // ==========================================
+                // 2. EXPORT LOGIC (CSV OR XLSX)
+                // ==========================================
 
-                    // Headers
+                var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
+                var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(p => !excludedFields.Contains(p.Name) &&
+                                (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                    .ToArray();
+
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    // --- EXCEL GENERATION ---
+                    using var workbook = new XLWorkbook();
+                    var worksheet = workbook.Worksheets.Add("Accounts");
+
+                    // Write Headers
+                    for (int i = 0; i < properties.Length; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+                    }
+
+                    int rowIdx = 2;
+                    // STREAM DATA to save RAM
+                    await foreach (var acc in query.AsAsyncEnumerable())
+                    {
+                        for (int i = 0; i < properties.Length; i++)
+                        {
+                            worksheet.Cell(rowIdx, i + 1).Value = properties[i].GetValue(acc, null)?.ToString() ?? "";
+                        }
+                        rowIdx++;
+                    }
+
+                    worksheet.Columns().AdjustToContents();
+                    var memoryStream = new MemoryStream();
+                    workbook.SaveAs(memoryStream);
+                    memoryStream.Position = 0;
+
+                    return File(memoryStream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Accounts_All_{timestamp}.xlsx");
+                }
+                else
+                {
+                    // --- CSV STREAMING (ZERO RAM USAGE) ---
+                    Response.Clear();
+                    Response.ContentType = "text/csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Accounts_All_{timestamp}.csv");
+
+                    await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
+
+                    // Write Headers
                     await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
 
-                    // Fetch and write rows directly from the query
-                    var accountsToExport = await query.ToListAsync();
-                    foreach (var acc in accountsToExport)
+                    // Stream rows directly from SQL to HTTP Response
+                    await foreach (var acc in query.AsAsyncEnumerable())
                     {
                         var rowValues = properties.Select(p =>
                         {
                             var val = p.GetValue(acc, null)?.ToString() ?? "";
-                            return $"\"{val.Replace("\"", "\"\"")}\""; // Escapes quotes inside strings
+                            return $"\"{val.Replace("\"", "\"\"")}\"";
                         });
                         await writer.WriteLineAsync(string.Join(",", rowValues));
                     }
-                }
 
-                memoryStream.Position = 0;
-                return File(memoryStream, "text/csv", $"Accounts_All_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    await writer.FlushAsync();
+                    return new EmptyResult();
+                }
             }
             catch (Exception ex)
             {
@@ -2089,33 +2134,71 @@ namespace Radar_CRM.Controllers
         }
 
 
-        // ==========================================
-        // EXPORT SPECIFICALLY SELECTED IDS (CROSS-PAGE)
-        // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
         [Route("Accounts/ExportSelected")]
-        public async Task<IActionResult> ExportSelected([FromForm] string selectedIds)
+        public async Task<IActionResult> ExportSelected([FromQuery] string format, [FromForm] string selectedIds)
         {
             try
             {
-                // 1. Parse the IDs sent from the JavaScript
-                var ids = System.Text.Json.JsonSerializer.Deserialize<List<int>>(selectedIds) ?? new List<int>();
+                var options = new JsonSerializerOptions
+                {
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+                };
+                var ids = JsonSerializer.Deserialize<List<int>>(selectedIds, options) ?? new List<int>();
+                
                 if (!ids.Any()) return BadRequest("No records selected.");
 
-                var memoryStream = new MemoryStream();
-                using (var writer = new StreamWriter(memoryStream, System.Text.Encoding.UTF8, leaveOpen: true))
-                {
-                    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
-                    var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        .Where(p => !excludedFields.Contains(p.Name) &&
-                                    (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
-                        .ToArray();
+                var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
+                var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(p => !excludedFields.Contains(p.Name) &&
+                                (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                    .ToArray();
 
-                    // Write Headers
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var workbook = new XLWorkbook();
+                    var worksheet = workbook.Worksheets.Add("Selected Accounts");
+
+                    for (int i = 0; i < properties.Length; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+                    }
+
+                    int rowIdx = 2;
+                    int chunkSize = 2000;
+
+                    for (int i = 0; i < ids.Count; i += chunkSize)
+                    {
+                        var batch = ids.Skip(i).Take(chunkSize).ToList();
+                        var chunkData = await _context.Accounts.AsNoTracking().Where(a => batch.Contains(a.Id)).ToListAsync();
+
+                        foreach (var acc in chunkData)
+                        {
+                            for (int col = 0; col < properties.Length; col++)
+                            {
+                                worksheet.Cell(rowIdx, col + 1).Value = properties[col].GetValue(acc, null)?.ToString() ?? "";
+                            }
+                            rowIdx++;
+                        }
+                    }
+
+                    var ms = new MemoryStream();
+                    workbook.SaveAs(ms);
+                    return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Accounts_Selected_{timestamp}.xlsx");
+                }
+                else
+                {
+                    Response.Clear();
+                    Response.ContentType = "text/csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Accounts_Selected_{timestamp}.csv");
+
+                    await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
                     await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
 
-                    // 2. Fetch the specific records in chunks of 2,000 to avoid SQL crashes
                     int chunkSize = 2000;
                     for (int i = 0; i < ids.Count; i += chunkSize)
                     {
@@ -2127,15 +2210,15 @@ namespace Radar_CRM.Controllers
                             var rowValues = properties.Select(p =>
                             {
                                 var val = p.GetValue(acc, null)?.ToString() ?? "";
-                                return $"\"{val.Replace("\"", "\"\"")}\""; // Escape quotes
+                                return $"\"{val.Replace("\"", "\"\"")}\"";
                             });
                             await writer.WriteLineAsync(string.Join(",", rowValues));
                         }
                     }
-                }
 
-                memoryStream.Position = 0;
-                return File(memoryStream, "text/csv", $"Accounts_SelectedExport_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    await writer.FlushAsync();
+                    return new EmptyResult();
+                }
             }
             catch (Exception ex)
             {

@@ -1225,9 +1225,23 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 <div class="vr mx-1 d-none d-md-block" style="background-color: #d1d5db;"></div>
             </div>
 
-            <button class="btn-saas" type="button" onclick="exportTableData('Accounts', 'csv', event)">
-                <i class="fa-solid fa-arrow-up-from-bracket"></i>
-            </button>
+            <div class="dropdown d-inline-block">
+                <button class="btn-saas dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="gap: 6px;">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Export
+                </button>
+                <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
+                    <li>
+                        <a class="dropdown-item py-2 fw-medium" href="#" onclick="triggerBackendExport('Accounts', 'csv', event)">
+                            <i class="fa-solid fa-file-csv me-2 text-primary"></i> Export as CSV
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item py-2 fw-medium" href="#" onclick="triggerBackendExport('Accounts', 'xlsx', event)">
+                            <i class="fa-solid fa-file-excel me-2 text-success"></i> Export as Excel
+                        </a>
+                    </li>
+                </ul>
+            </div>
             <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
            
             <div class="dropdown">
@@ -3814,46 +3828,43 @@ window.clearGlobalSelection = function() {
         }
     };
 
- window.exportTableData = function(module, format, event) {
+ window.triggerBackendExport = function(module, format, event) {
     if (event) event.preventDefault();
-
-    console.log("=== EXPORT TRIGGERED ===");
-    console.log("Global Select All Active: ", window.isGlobalSelectAll);
-    console.log("Total Selected IDs: ", window.selectedRowIds.length);
 
     const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
     const searchText = new URLSearchParams(window.location.search).get('search') || "";
 
     // SCENARIO 1: EXPORT ALL (Global mode active, or no specific checkboxes checked)
     if (window.isGlobalSelectAll || window.selectedRowIds.length === 0) {
-        if (window.selectedRowIds.length === 0 && !confirm("No specific records selected. Do you want to download ALL records matching your current filter?")) {
+        if (window.selectedRowIds.length === 0 && !confirm(`No specific records selected. Do you want to download ALL records matching your current filter as ${format.toUpperCase()}?`)) {
             return;
         }
-
-        console.log("Routing to C# /Export for ALL records...");
+        
         const exportUrl = `/${module}/Export?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
         window.location.href = exportUrl;
         return;
     }
 
     // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
-    console.log("Routing to C# /ExportSelected for SPECIFIC records...");
-
-    // Create a temporary hidden form to send the Array of IDs to C#
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = `/${module}/ExportSelected`;
+    form.action = `/${module}/ExportSelected?format=${format}`;
 
     const inputIds = document.createElement("input");
     inputIds.type = "hidden";
     inputIds.name = "selectedIds";
-    inputIds.value = JSON.stringify(window.selectedRowIds);
+    
+    // Force the array of strings into an array of integers before sending to C#
+    const numericIds = window.selectedRowIds.map(id => parseInt(id, 10));
+    inputIds.value = JSON.stringify(numericIds);
+    
     form.appendChild(inputIds);
 
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);
 };
+
      function deleteSelected() {
     const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
 
