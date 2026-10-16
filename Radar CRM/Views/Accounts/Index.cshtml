@@ -3609,7 +3609,7 @@ function saveColumnOrder() {
         }
     }
 
-  function executeMassUpdateAjax() {
+ function executeMassUpdateAjax() {
     let field = document.getElementById('massUpdateField').value;
     const valInput = document.getElementById('massUpdateValue');
     let val = valInput ? valInput.value : '';
@@ -3634,7 +3634,6 @@ function saveColumnOrder() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
     btn.disabled = true;
 
-    // 🚀 NEW: Grab active filters from URL to send with global flag
     const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
 
     const payload = {
@@ -3645,12 +3644,12 @@ function saveColumnOrder() {
         FiltersJson: activeFilters
     };
 
-    fetch('/Accounts/BulkUpdate', {
+    // 🚀 FIX: Use Razor to dynamically generate the correct route path
+    fetch('@Url.Action("BulkUpdate", "Accounts")', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
     })
-    
          .then(async response => {
              if (!response.ok) {
                  const errorText = await response.text();
@@ -3675,7 +3674,7 @@ function saveColumnOrder() {
              btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
              btn.disabled = false;
          });
-    }
+ }
 
     function toggleMoreFields() {
         const container = document.getElementById("moreFieldsContainer");

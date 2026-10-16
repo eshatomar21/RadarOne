@@ -576,9 +576,9 @@ namespace Radar_CRM.Controllers
         // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
+        [Route("Accounts/BulkUpdate")] // 🚀 FIX: Explicitly map the route so it doesn't 404
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
-            // 1. 🚀 Modify initial validation to allow empty IDs *only if* Global Select is active
             if (request == null || string.IsNullOrEmpty(request.FieldName))
             {
                 return Json(new { success = false, message = "Invalid data provided." });
