@@ -1940,6 +1940,324 @@ namespace Radar_CRM.Controllers
                 Console.WriteLine($"In-App Notification Failed: {ex.Message}");
             }
         }
+
+
+        // ==========================================
+        // EXPORT ALL FILTERED RECORDS (Streaming direct from DB)
+        // ==========================================
+
+        [HttpGet]
+        [Route("Accounts/Export")] // 🚀 Explicit route guarantees the backend is hit
+        public async Task<IActionResult> Export(string format, string filters, string search = "")
+        {
+            try
+            {
+                var query = _context.Accounts.AsNoTracking().AsQueryable();
+
+                // 1. Role Visibility Restrictions
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var currentUser = await _context.Users.FindAsync(currentUserId);
+                bool isAdmin = !string.IsNullOrWhiteSpace(currentUser?.Profile) &&
+                               (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+                if (!isAdmin && currentUser != null)
+                {
+                    var allRoles = await _context.Roles.ToListAsync();
+                    var visibleRoleIds = new List<int>();
+                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                    visibleRoleIds.AddRange(subordinateIds);
+
+                    var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                    if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                    {
+                        visibleRoleIds.Add(currentUser.RoleId.Value);
+                    }
+
+                    var visibleUserIds = await _context.Users
+                        .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                        .Select(u => u.Id).ToListAsync();
+
+                    visibleUserIds.Add(currentUserId);
+                    query = query.Where(a => visibleUserIds.Contains(a.AccountOwnerId));
+                }
+
+                // 2. Search Box Filter
+                if (!string.IsNullOrEmpty(search))
+                {
+                    var searchLower = search.ToLower();
+                    query = query.Where(a =>
+                        (a.AccountName != null && a.AccountName.ToLower().Contains(searchLower)) ||
+                        (a.MobileNumber != null && a.MobileNumber.Contains(search)) ||
+                        (a.Email != null && a.Email.ToLower().Contains(searchLower))
+                    );
+                }
+
+                // 3. Dynamic Filter Expressions
+                if (!string.IsNullOrWhiteSpace(filters) && filters != "[]")
+                {
+                    try
+                    {
+                        string jsonString = filters.Contains("%5B") ? Uri.UnescapeDataString(filters) : filters;
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        var filterList = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                        if (filterList != null && filterList.Any())
+                        {
+                            var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
+                            System.Linq.Expressions.Expression combinedPredicate = null;
+
+                            foreach (var f in filterList.Where(f => !f.ColumnName.StartsWith("Task.") && f.ColumnName != "RelatedTasksPresence"))
+                            {
+                                if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                                string dbColName = f.ColumnName;
+                                var propertyInfo = typeof(Account).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                                if (propertyInfo == null) continue;
+
+                                var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
+                                System.Linq.Expressions.Expression conditionExpr = null;
+                                string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
+
+                                if (propertyInfo.PropertyType == typeof(string))
+                                {
+                                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                    var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                    var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                    var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+                                    var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
+
+                                    if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                    else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                    else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                    else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                                }
+
+                                if (conditionExpr != null)
+                                {
+                                    combinedPredicate = combinedPredicate == null ? conditionExpr :
+                                        (f.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase) ?
+                                         System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr) :
+                                         System.Linq.Expressions.Expression.AndAlso(combinedPredicate, conditionExpr));
+                                }
+                            }
+
+                            if (combinedPredicate != null)
+                            {
+                                var lambda = System.Linq.Expressions.Expression.Lambda<Func<Account, bool>>(combinedPredicate, parameter);
+                                query = query.Where(lambda);
+                            }
+                        }
+                    }
+                    catch { /* Ignore parse errors for export */ }
+                }
+
+                // 4. Stream to CSV directly from Database
+                var memoryStream = new MemoryStream();
+                using (var writer = new StreamWriter(memoryStream, System.Text.Encoding.UTF8, leaveOpen: true))
+                {
+                    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
+                    var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                        .Where(p => !excludedFields.Contains(p.Name) &&
+                                    (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                        .ToArray();
+
+                    // Headers
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+
+                    // Fetch and write rows directly from the query
+                    var accountsToExport = await query.ToListAsync();
+                    foreach (var acc in accountsToExport)
+                    {
+                        var rowValues = properties.Select(p =>
+                        {
+                            var val = p.GetValue(acc, null)?.ToString() ?? "";
+                            return $"\"{val.Replace("\"", "\"\"")}\""; // Escapes quotes inside strings
+                        });
+                        await writer.WriteLineAsync(string.Join(",", rowValues));
+                    }
+                }
+
+                memoryStream.Position = 0;
+                return File(memoryStream, "text/csv", $"Accounts_All_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Export failed: {ex.Message}");
+            }
+        }
+
+
+        // ==========================================
+        // EXPORT SPECIFICALLY SELECTED IDS (CROSS-PAGE)
+        // ==========================================
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        [Route("Accounts/ExportSelected")]
+        public async Task<IActionResult> ExportSelected([FromForm] string selectedIds)
+        {
+            try
+            {
+                // 1. Parse the IDs sent from the JavaScript
+                var ids = System.Text.Json.JsonSerializer.Deserialize<List<int>>(selectedIds) ?? new List<int>();
+                if (!ids.Any()) return BadRequest("No records selected.");
+
+                var memoryStream = new MemoryStream();
+                using (var writer = new StreamWriter(memoryStream, System.Text.Encoding.UTF8, leaveOpen: true))
+                {
+                    var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
+                    var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                        .Where(p => !excludedFields.Contains(p.Name) &&
+                                    (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                        .ToArray();
+
+                    // Write Headers
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+
+                    // 2. Fetch the specific records in chunks of 2,000 to avoid SQL crashes
+                    int chunkSize = 2000;
+                    for (int i = 0; i < ids.Count; i += chunkSize)
+                    {
+                        var batch = ids.Skip(i).Take(chunkSize).ToList();
+                        var chunkData = await _context.Accounts.AsNoTracking().Where(a => batch.Contains(a.Id)).ToListAsync();
+
+                        foreach (var acc in chunkData)
+                        {
+                            var rowValues = properties.Select(p =>
+                            {
+                                var val = p.GetValue(acc, null)?.ToString() ?? "";
+                                return $"\"{val.Replace("\"", "\"\"")}\""; // Escape quotes
+                            });
+                            await writer.WriteLineAsync(string.Join(",", rowValues));
+                        }
+                    }
+                }
+
+                memoryStream.Position = 0;
+                return File(memoryStream, "text/csv", $"Accounts_SelectedExport_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Export failed: {ex.Message}");
+            }
+        }
+
+        // ==========================================
+        // FETCH FILTERED IDs (Now supports 'Search' parameter)
+        // ==========================================
+        private async Task<List<int>> GetFilteredAccountIds(string advancedFilters, string search = "")
+        {
+            var query = _context.Accounts.AsQueryable();
+
+            // 1. Role / User visibility restrictions
+            string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            bool isAdmin = !string.IsNullOrWhiteSpace(currentUser?.Profile) &&
+                           (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                            currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+            if (!isAdmin && currentUser != null)
+            {
+                var allRoles = await _context.Roles.ToListAsync();
+                var visibleRoleIds = new List<int>();
+                var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                visibleRoleIds.AddRange(subordinateIds);
+
+                var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                {
+                    visibleRoleIds.Add(currentUser.RoleId.Value);
+                }
+
+                var visibleUserIds = await _context.Users
+                    .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                    .Select(u => u.Id).ToListAsync();
+
+                visibleUserIds.Add(currentUserId);
+                query = query.Where(a => visibleUserIds.Contains(a.AccountOwnerId));
+            }
+
+            // 2. APPLY QUICK SEARCH
+            if (!string.IsNullOrEmpty(search))
+            {
+                var searchLower = search.ToLower();
+                query = query.Where(a =>
+                    (a.AccountName != null && a.AccountName.ToLower().Contains(searchLower)) ||
+                    (a.MobileNumber != null && a.MobileNumber.Contains(search)) ||
+                    (a.Email != null && a.Email.ToLower().Contains(searchLower))
+                );
+            }
+
+            // 3. Parse the JSON filters to match the exact search criteria
+            if (!string.IsNullOrWhiteSpace(advancedFilters) && advancedFilters != "[]")
+            {
+                try
+                {
+                    string jsonString = advancedFilters.Contains("%5B") ? Uri.UnescapeDataString(advancedFilters) : advancedFilters;
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var filters = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
+
+                    if (filters != null && filters.Any())
+                    {
+                        var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
+                        System.Linq.Expressions.Expression combinedPredicate = null;
+
+                        foreach (var f in filters.Where(f => !f.ColumnName.StartsWith("Task.") && f.ColumnName != "RelatedTasksPresence"))
+                        {
+                            if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                            string dbColName = f.ColumnName;
+                            var propertyInfo = typeof(Account).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                            if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                            {
+                                var idProp = typeof(Account).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                if (idProp != null) { dbColName = idProp.Name; propertyInfo = idProp; }
+                            }
+
+                            if (propertyInfo == null) continue;
+
+                            var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
+                            System.Linq.Expressions.Expression conditionExpr = null;
+                            string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
+
+                            if (propertyInfo.PropertyType == typeof(string))
+                            {
+                                var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+                                var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
+
+                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                            }
+
+                            if (conditionExpr != null)
+                            {
+                                combinedPredicate = combinedPredicate == null ? conditionExpr :
+                                    (f.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase) ?
+                                     System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr) :
+                                     System.Linq.Expressions.Expression.AndAlso(combinedPredicate, conditionExpr));
+                            }
+                        }
+
+                        if (combinedPredicate != null)
+                        {
+                            var lambda = System.Linq.Expressions.Expression.Lambda<Func<Account, bool>>(combinedPredicate, parameter);
+                            query = query.Where(lambda);
+                        }
+                    }
+                }
+                catch { /* Fallback to un-filtered query if parse fails */ }
+            }
+
+            return await query.Select(a => a.Id).ToListAsync();
+        }
+
         // ==========================================
         // UPLOAD FILE (With Duplicate Checking)
         // ==========================================

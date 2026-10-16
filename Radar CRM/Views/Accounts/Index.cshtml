@@ -1225,7 +1225,9 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 <div class="vr mx-1 d-none d-md-block" style="background-color: #d1d5db;"></div>
             </div>
 
-            <button class="btn-saas" onclick="exportTableData('Accounts', 'csv')"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+            <button class="btn-saas" type="button" onclick="exportTableData('Accounts', 'csv', event)">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
             <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
            
             <div class="dropdown">
@@ -3673,92 +3675,185 @@ function saveColumnOrder() {
     // ==========================================
     // 6. BULK ACTIONS, EXPORT & DELETE
     // ==========================================
-  function toggleAllRowCheckboxes(sourceCb) {
-    currentVisibleRows.forEach(row => {
-        const cb = row.querySelector('.row-cb');
-        if(cb) cb.checked = sourceCb.checked;
+ // 1. Manage state across page reloads using SessionStorage
+   window.isGlobalSelectAll = sessionStorage.getItem('crm_global_select') === 'true';
+    window.selectedRowIds = JSON.parse(sessionStorage.getItem('crm_selected_rows')) || [];
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (window.isGlobalSelectAll) {
+            selectAllAcrossPages();
+        } else if (window.selectedRowIds.length > 0) {
+            document.querySelectorAll('.row-cb').forEach(cb => {
+                if (window.selectedRowIds.includes(cb.value)) cb.checked = true;
+            });
+            updateSelectedCount();
+        }
     });
 
-    isGlobalSelectAll = false; // Reset global state on manual toggle
+    // 2. MISSING FUNCTION: Handle individual row clicks
+   window.toggleRowCheckbox = function(cb) {
+        if (cb.checked) {
+            if (!window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+        } else {
+            window.isGlobalSelectAll = false;
+            sessionStorage.setItem('crm_global_select', 'false');
+            window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
 
-    const banner = document.getElementById('selectAllPagesBanner');
-    const actualTotalRecords = @totalRecords;
+            const selectAllCb = document.getElementById('selectAllCb');
+            if (selectAllCb) selectAllCb.checked = false;
 
-    // Show banner if we selected all on this page AND there are more records on other pages
-    if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
-        if(banner) {
-            document.getElementById('pageSelCount').innerText = currentVisibleRows.length;
-            document.getElementById('globalSelCount').innerText = actualTotalRecords;
-            document.getElementById('selectAllBannerText').innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
-
-            banner.style.display = 'table-row';
-            document.getElementById('clearSelectionBtn').style.display = 'none';
-            document.getElementById('selectAllPagesLink').style.display = 'inline';
+            const banner = document.getElementById('selectAllPagesBanner');
+            if (banner) banner.style.display = 'none';
         }
-    } else {
-        if(banner) banner.style.display = 'none';
-    }
 
-    updateSelectedCount();
-}
+        sessionStorage.setItem('crm_selected_rows', JSON.stringify(window.selectedRowIds));
+        updateSelectedCount();
+    };
+
+    window.toggleAllRowCheckboxes = function(sourceCb) {
+        currentVisibleRows.forEach(row => {
+            const cb = row.querySelector('.row-cb');
+            if(cb) {
+                cb.checked = sourceCb.checked;
+                if (cb.checked && !window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+                else if (!cb.checked) window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
+            }
+        });
+
+        window.isGlobalSelectAll = false;
+        sessionStorage.setItem('crm_global_select', 'false');
+        sessionStorage.setItem('crm_selected_rows', JSON.stringify(window.selectedRowIds));
+
+        const banner = document.getElementById('selectAllPagesBanner');
+        const actualTotalRecords = parseInt('@totalRecords') || 0;
+
+        if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
+            if(banner) {
+                // FIXED: Safely inject text without destroying HTML tags
+                const bannerTextEl = document.getElementById('selectAllBannerText');
+                if (bannerTextEl) {
+                    bannerTextEl.innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
+                }
+
+                banner.style.display = 'table-row';
+
+                const clearBtn = document.getElementById('clearSelectionBtn');
+                const selectAllLink = document.getElementById('selectAllPagesLink');
+                if (clearBtn) clearBtn.style.display = 'none';
+                if (selectAllLink) {
+                    selectAllLink.style.display = 'inline';
+                    selectAllLink.innerHTML = `Select all <strong>${actualTotalRecords}</strong> records that match this search.`;
+                }
+            }
+        } else {
+            if(banner) banner.style.display = 'none';
+        }
+
+        updateSelectedCount();
+    };
 
 // 3. 🚀 NEW: Functions to handle the Banner interactions
-function selectAllAcrossPages() {
-    isGlobalSelectAll = true;
-    const actualTotalRecords = @totalRecords;
+window.selectAllAcrossPages = function() {
+        window.isGlobalSelectAll = true;
+        sessionStorage.setItem('crm_global_select', 'true');
 
-    document.getElementById('selectAllBannerText').innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
-    document.getElementById('selectAllPagesLink').style.display = 'none';
-    document.getElementById('clearSelectionBtn').style.display = 'inline';
+        const actualTotalRecords = parseInt('@totalRecords') || 0;
+        const banner = document.getElementById('selectAllPagesBanner');
 
-    updateSelectedCount();
-}
+        if (banner) {
+            banner.style.display = 'table-row';
+            const bannerTextEl = document.getElementById('selectAllBannerText');
+            if (bannerTextEl) {
+                bannerTextEl.innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
+            }
 
-function clearGlobalSelection() {
-    isGlobalSelectAll = false;
-    const selectAllCb = document.getElementById('selectAllCb');
-    if(selectAllCb) selectAllCb.checked = false;
+            const clearBtn = document.getElementById('clearSelectionBtn');
+            const selectAllLink = document.getElementById('selectAllPagesLink');
+            if (selectAllLink) selectAllLink.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'inline';
+        }
 
-    document.getElementById('selectAllPagesBanner').style.display = 'none';
+        document.querySelectorAll('.row-cb').forEach(cb => cb.checked = true);
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) selectAllCb.checked = true;
 
-    currentVisibleRows.forEach(row => {
-        const cb = row.querySelector('.row-cb');
-        if(cb) cb.checked = false;
-    });
+        updateSelectedCount();
+    };
 
-    updateSelectedCount();
-}
 
-   function updateSelectedCount() {
-     const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
-     const actualTotalRecords = @totalRecords;
+window.clearGlobalSelection = function() {
+        window.isGlobalSelectAll = false;
+        sessionStorage.setItem('crm_global_select', 'false');
+        window.selectedRowIds = [];
+        sessionStorage.setItem('crm_selected_rows', JSON.stringify([]));
 
-     // Determine the true count to display (Page count vs Global count)
-     const displayCount = isGlobalSelectAll ? actualTotalRecords : selectedOnPage;
+        const selectAllCb = document.getElementById('selectAllCb');
+        if(selectAllCb) selectAllCb.checked = false;
 
-     document.getElementById('selCount').innerText = displayCount;
-     document.getElementById('bulkActionsContainer').style.display = displayCount > 0 ? 'flex' : 'none';
+        document.getElementById('selectAllPagesBanner').style.display = 'none';
 
-     const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-     if (massUpdateCountDisplay) {
-         massUpdateCountDisplay.innerText = displayCount;
-     }
+        document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+        updateSelectedCount();
+    };
 
-     const totalVisible = currentVisibleRows.length;
-     const selectAllCb = document.getElementById('selectAllCb');
+ window.updateSelectedCount = function() {
+        const selectedCount = window.isGlobalSelectAll ? parseInt('@totalRecords') : window.selectedRowIds.length;
 
-     // Only auto-check/uncheck the header box if we aren't in Global mode
-     if(selectAllCb && !isGlobalSelectAll) {
-         selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
-     }
+        document.getElementById('selCount').innerText = selectedCount;
+        document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
 
-     // Hide banner if user manually unchecks a single row
-     if (!isGlobalSelectAll && selectedOnPage < totalVisible) {
-         const banner = document.getElementById('selectAllPagesBanner');
-         if(banner) banner.style.display = 'none';
-     }
-}
+        const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
+        if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selectedCount;
 
+        const totalVisible = currentVisibleRows.length;
+        const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
+        const selectAllCb = document.getElementById('selectAllCb');
+
+        if(selectAllCb && !window.isGlobalSelectAll) {
+            selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
+        }
+    };
+
+ window.exportTableData = function(module, format, event) {
+    if (event) event.preventDefault();
+
+    console.log("=== EXPORT TRIGGERED ===");
+    console.log("Global Select All Active: ", window.isGlobalSelectAll);
+    console.log("Total Selected IDs: ", window.selectedRowIds.length);
+
+    const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
+    const searchText = new URLSearchParams(window.location.search).get('search') || "";
+
+    // SCENARIO 1: EXPORT ALL (Global mode active, or no specific checkboxes checked)
+    if (window.isGlobalSelectAll || window.selectedRowIds.length === 0) {
+        if (window.selectedRowIds.length === 0 && !confirm("No specific records selected. Do you want to download ALL records matching your current filter?")) {
+            return;
+        }
+
+        console.log("Routing to C# /Export for ALL records...");
+        const exportUrl = `/${module}/Export?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
+        window.location.href = exportUrl;
+        return;
+    }
+
+    // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
+    console.log("Routing to C# /ExportSelected for SPECIFIC records...");
+
+    // Create a temporary hidden form to send the Array of IDs to C#
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `/${module}/ExportSelected`;
+
+    const inputIds = document.createElement("input");
+    inputIds.type = "hidden";
+    inputIds.name = "selectedIds";
+    inputIds.value = JSON.stringify(window.selectedRowIds);
+    form.appendChild(inputIds);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+};
      function deleteSelected() {
     const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
 
