@@ -184,30 +184,30 @@ namespace Radar_CRM.Controllers
                                 var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
                                 // 🚀 FIX: Handle Multi-Select Comma Separated lists for 'is' and 'is_not'
-                                if (f.Condition == "is") 
+                                if (f.Condition == "is")
                                 {
-                                    if (safeValue.Contains(",")) 
+                                    if (safeValue.Contains(","))
                                     {
                                         var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
                                         var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
                                         var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
                                         conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp);
                                     }
-                                    else 
+                                    else
                                     {
                                         conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
                                     }
                                 }
-                                else if (f.Condition == "is_not") 
+                                else if (f.Condition == "is_not")
                                 {
-                                    if (safeValue.Contains(",")) 
+                                    if (safeValue.Contains(","))
                                     {
                                         var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
                                         var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
                                         var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
                                         conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp));
                                     }
-                                    else 
+                                    else
                                     {
                                         conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
                                     }
@@ -279,7 +279,7 @@ namespace Radar_CRM.Controllers
                         }
 
                         // =======================================================
-                        // 3. 🚀 PROCESS ZOHO-STYLE RELATED TASKS FILTERS 
+                        // 3. 🚀 PROCESS ZOHO-STYLE RELATED TASKS FILTERS
                         // =======================================================
                         if (taskFilters.Any())
                         {
@@ -1387,7 +1387,7 @@ namespace Radar_CRM.Controllers
                 if (recordExists) return;
 
                 // ==========================================
-                // OWNER ASSIGNMENT LOGIC 
+                // OWNER ASSIGNMENT LOGIC
                 // ==========================================
                 string assignedOwnerId = acc.AccountOwnerId;
 
@@ -1395,7 +1395,7 @@ namespace Radar_CRM.Controllers
                 var ownerUser = await _context.Users.FindAsync(acc.AccountOwnerId);
                 string ownerFullName = ownerUser?.fullName ?? ownerUser?.FirstName ?? "System User";
 
-               
+
 
                 // 🚀 NEW FIX: Grab the live user who is actively clicking "Save" triggering this automation
                 string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
@@ -1484,7 +1484,7 @@ namespace Radar_CRM.Controllers
 
                     Description = acc.Description,
                     // --- System Logic Default Fields ---
-                  
+
                     CreatedDateAndTime = DateTime.Now,
                     LeadCreatedTime = DateTime.Now,
                     Pipeline = acc.CurrentStatus == "User" ? "Upgrade Software" : "New Software"
@@ -1845,7 +1845,11 @@ namespace Radar_CRM.Controllers
             if (string.IsNullOrEmpty(newOwnerId) || assignedAccounts == null || !assignedAccounts.Any()) return;
 
             var newOwner = await _context.Users.FindAsync(newOwnerId);
-            if (newOwner == null || string.IsNullOrEmpty(newOwner.Email)) return;
+            if (newOwner == null || string.IsNullOrEmpty(newOwner.Email))
+            {
+                // Fails silently if the user has no email in the DB
+                return;
+            }
 
             string ownerName = newOwner.fullName ?? newOwner.FirstName ?? "Team Member";
             bool isBulk = assignedAccounts.Count > 1;
@@ -1854,40 +1858,44 @@ namespace Radar_CRM.Controllers
                 ? $"Action Required: {assignedAccounts.Count} Accounts Assigned to You"
                 : $"Action Required: Account '{assignedAccounts.Values.First()}' Assigned to You";
 
-            // 🚀 FIX: Get the live Base URL of the application to build absolute links
             string baseUrl = $"{Request.Scheme}://{Request.Host}";
 
-            // 🚀 FIX: Build Email Body with clickable links targeting the Edit page
             string accountListHtml = string.Join("", assignedAccounts.Select(acc =>
             {
-                // This builds the full URL (e.g., https://yourdomain.com/Accounts/Edit/5)
                 string linkUrl = Url.Action("Edit", "Accounts", new { id = acc.Key }, Request.Scheme);
-
                 return $"<li style='margin-bottom: 8px;'><a href='{linkUrl}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{acc.Value}</a></li>";
             }));
+
             string body = $@"
-                <div style='font-family: Arial, sans-serif; color: #333;'>
-                    <h3>Hi {ownerName},</h3>
-                    <p>You have been assigned as the new owner for the following {(isBulk ? "accounts" : "account")}:</p>
-                    <ul>{accountListHtml}</ul>
-                    <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
-                    <br/>
-                    <p><small>This is an automated notification from Radar CRM.</small></p>
-                </div>";
+        <div style='font-family: Arial, sans-serif; color: #333;'>
+            <h3>Hi {ownerName},</h3>
+            <p>You have been assigned as the new owner for the following {(isBulk ? "accounts" : "account")}:</p>
+            <ul>{accountListHtml}</ul>
+            <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
+            <br/>
+            <p><small>This is an automated notification from Radar CRM.</small></p>
+        </div>";
 
             // 2. Send Email via Resend API
             try
             {
                 string apiKey = _configuration["Resend:ApiKey"];
+
+                // 🚨 CHECK: Ensure the API key actually exists in appsettings.json
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    throw new Exception("Resend API Key is missing in appsettings.json.");
+                }
+
                 string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
 
                 var emailPayload = new Dictionary<string, object>
-                {
-                    { "from", senderEmail },
-                    { "to", new List<string> { newOwner.Email.Trim() } },
-                    { "subject", subject },
-                    { "html", body }
-                };
+        {
+            { "from", senderEmail },
+            { "to", new List<string> { newOwner.Email.Trim() } },
+            { "subject", subject },
+            { "html", body }
+        };
 
                 using (var client = new HttpClient())
                 {
@@ -1896,16 +1904,19 @@ namespace Radar_CRM.Controllers
                     requestMessage.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(emailPayload), System.Text.Encoding.UTF8, "application/json");
 
                     var response = await client.SendAsync(requestMessage);
+
                     if (!response.IsSuccessStatusCode)
                     {
                         var errorContent = await response.Content.ReadAsStringAsync();
-                        Console.WriteLine($"Resend API Error: {errorContent}");
+                        // 🚨 FIX: Throw the exact Resend error so it shows up in your application logs/UI
+                        throw new Exception($"Resend API rejected the email. Status: {response.StatusCode}. Details: {errorContent}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
+                // 🚨 FIX: If it fails, log it properly or throw it so it doesn't fail silently
+                throw new Exception($"Email Dispatch Failed: {ex.Message}", ex);
             }
 
             // 3. Create In-App Notification for Popup

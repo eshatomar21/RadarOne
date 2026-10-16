@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Radar_CRM.Data;
 using Radar_CRM.Migrations;
+using Microsoft.Extensions.Configuration;
 using Radar_CRM.Models;
 using System;
 using System.Collections.Generic;
@@ -18,11 +19,13 @@ namespace Radar_CRM.Controllers
     public class LeadsController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        // Inject the DbContext
-        public LeadsController(ApplicationDbContext context)
+        // 🚀 FIX: Add 'IConfiguration configuration' inside the parentheses here
+        public LeadsController(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration; // Now it knows where this comes from!
         }
 
         // ==========================================
@@ -575,6 +578,10 @@ namespace Radar_CRM.Controllers
                         _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
                         await _context.SaveChangesAsync();
                     }
+
+                    // 🚀 NEW: SEND EMAIL NOTIFICATION TO THE NEW OWNER FOR BULK TRANSFER
+                    var assignedLeads = leadsToUpdate.ToDictionary(l => l.Id, l => l.LeadName ?? "Unknown Lead");
+                    await NotifyNewOwnerAsync(request.NewValue, assignedLeads);
                 }
                 // =========================================================
 
@@ -1185,6 +1192,10 @@ namespace Radar_CRM.Controllers
                         // Save the notes so they are immediately available for the Deal Transfer query
                         await _context.SaveChangesAsync();
                     }
+
+                    // 🚀 NEW: SEND EMAIL NOTIFICATION TO THE NEW OWNER FOR SINGLE TRANSFER
+                    var assignedLeadDict = new Dictionary<int, string> { { lead.Id, lead.LeadName ?? "Unknown Lead" } };
+                    await NotifyNewOwnerAsync(lead.LeadOwnerId, assignedLeadDict);
                     // =========================================================
                     // HANDOVER LEAD AUTOMATION
                     // =========================================================
@@ -1411,7 +1422,7 @@ namespace Radar_CRM.Controllers
                                 DemoOwner = lead.DemoOwnerId,
                                 AccountType = lead.AccountType,
                                 CreatedBy = lead.CreatedBy,
-                                SeminarName =  lead.SeminarName,
+                                SeminarName = lead.SeminarName,
                                 GroupName = lead.GroupName,
 
                                 DateOfEntry = DateTime.Now,
@@ -1668,6 +1679,10 @@ namespace Radar_CRM.Controllers
                         _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
                         await _context.SaveChangesAsync();
                     }
+
+                    // 🚀 NEW: SEND EMAIL NOTIFICATION TO THE NEW OWNER FOR SINGLE TRANSFER
+                    var assignedLeadDict = new Dictionary<int, string> { { lead.Id, lead.LeadName ?? "Unknown Lead" } };
+                    await NotifyNewOwnerAsync(lead.LeadOwnerId, assignedLeadDict);
                 }
                 // =========================================================
 
@@ -2016,6 +2031,96 @@ namespace Radar_CRM.Controllers
                 updatedCount = leadsToUpdate.Count,
                 skippedCount = skippedRecords.Count
             });
+        }
+
+        // ==========================================
+        // NOTIFICATION HELPER: Email & In-App Popup
+        // ==========================================
+        private async System.Threading.Tasks.Task NotifyNewOwnerAsync(string newOwnerId, Dictionary<int, string> assignedLeads)
+        {
+            if (string.IsNullOrEmpty(newOwnerId) || assignedLeads == null || !assignedLeads.Any()) return;
+
+            var newOwner = await _context.Users.FindAsync(newOwnerId);
+            if (newOwner == null || string.IsNullOrEmpty(newOwner.Email)) return;
+
+            string ownerName = newOwner.fullName ?? newOwner.FirstName ?? "Team Member";
+            bool isBulk = assignedLeads.Count > 1;
+
+            string subject = isBulk
+                ? $"Action Required: {assignedLeads.Count} Leads Assigned to You"
+                : $"Action Required: Lead '{assignedLeads.Values.First()}' Assigned to You";
+
+            // Build the live clickable links using Url.Action
+            string leadListHtml = string.Join("", assignedLeads.Select(lead =>
+            {
+                string linkUrl = Url.Action("Edit", "Leads", new { id = lead.Key }, Request.Scheme);
+                return $"<li style='margin-bottom: 8px;'><a href='{linkUrl}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{lead.Value}</a></li>";
+            }));
+
+            string body = $@"
+        <div style='font-family: Arial, sans-serif; color: #333;'>
+            <h3>Hi {ownerName},</h3>
+            <p>You have been assigned as the new owner for the following {(isBulk ? "leads" : "lead")}:</p>
+            <ul>{leadListHtml}</ul>
+            <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
+            <br/>
+            <p><small>This is an automated notification from Radar CRM.</small></p>
+        </div>";
+
+            // 1. Send Email via Resend API
+            try
+            {
+                string apiKey = _configuration["Resend:ApiKey"];
+                if (string.IsNullOrEmpty(apiKey)) throw new Exception("Resend API Key is missing in appsettings.json.");
+
+                string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
+                var emailPayload = new Dictionary<string, object>
+                {
+                    { "from", senderEmail },
+                    { "to", new List<string> { newOwner.Email.Trim() } },
+                    { "subject", subject },
+                    { "html", body }
+                };
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    var requestMessage = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.resend.com/emails");
+                    requestMessage.Headers.Add("Authorization", $"Bearer {apiKey}");
+                    requestMessage.Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(emailPayload), System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(requestMessage);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Resend API Error: {errorContent}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
+            }
+
+            // 2. Create In-App Notification (System Task)
+            try
+            {
+                var systemTask = new CrmTaskModel
+                {
+                    Subject = isBulk ? $"You have been assigned {assignedLeads.Count} new leads." : $"You are the new owner of {assignedLeads.Values.First()}.",
+                    Status = "Not Started",
+                    Priority = "High",
+                    TaskOwnerId = newOwnerId,
+                    CreatedDateAndTime = DateTime.Now,
+                    DueDate = DateTime.Now.AddDays(1)
+                };
+
+                _context.Set<CrmTaskModel>().Add(systemTask);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"In-App Notification Failed: {ex.Message}");
+            }
         }
 
 

@@ -51,5 +51,26 @@ namespace Radar_CRM.Models
 
         [ForeignKey("AccountId")]
         public virtual Account? Account { get; set; }
+
+        // ==========================================
+        // NEW PROFILE & SOFTWARE FIELDS (AI EXTRACTED)
+        // ==========================================
+        public string? IsHomeopathicDoctor { get; set; }
+        public string? ClinicType { get; set; }
+        public string? WorkType { get; set; }
+        public string? HasComputer { get; set; }
+        public string? DateOfBirth { get; set; }
+        public string? Age { get; set; }
+        public string? YearsOfPractice { get; set; }
+        public string? TotalExperience { get; set; }
+        public string? NumberOfClinics { get; set; }
+        public string? PatientsPerDay { get; set; }
+        public string? Qualification { get; set; }
+        public string? YearOfPassing { get; set; }
+        public string? CollegeName { get; set; }
+        public string? AveragePatientFee { get; set; }
+        public string? CurrentlyUsingSoftware { get; set; }
+        public string? CurrentSoftwareName { get; set; }
+
     }
 }

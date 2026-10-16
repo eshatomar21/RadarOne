@@ -75,7 +75,7 @@
     /* Chat UI Styling for Transcript */
     .transcript-box {
         padding: 24px;
-        height: 800px; /* 🚀 Extended slightly to balance with the new left column height */
+        height: 800px;
         overflow-y: auto;
         background-color: #f8fafc;
         flex-grow: 1;
@@ -102,7 +102,7 @@
         border-radius: 50rem;
     }
 
-    /* 🚀 NEW: AI Insights Styles */
+    /* AI Insights Styles */
     .score-box {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -182,16 +182,18 @@
                     <span class="stat-value">
                         @if (Model.Account != null)
                         {
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">@Model.Account.AccountName</span>
+                            <a asp-controller="Accounts" asp-action="Edit" asp-route-id="@Model.AccountId" class="text-decoration-none">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">@Model.Account.AccountName</span>
+                            </a>
                         }
                         else if (Model.Lead != null)
                         {
-
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success">@Model.Lead.LeadName</span>
+                            <a asp-controller="Leads" asp-action="Edit" asp-route-id="@Model.LeadId" class="text-decoration-none">
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success">@Model.Lead.LeadName</span>
+                            </a>
                         }
                         else
                         {
-
                             <span class="text-muted fst-italic">Unlinked</span>
                         }
                     </span>
@@ -218,10 +220,10 @@
     <!-- AI Layout -->
     <div class="row g-4">
 
-        <!-- Left Column: AI Analytics & Summary -->
+        <!-- Left Column: AI Analytics, Profile, & Summary -->
         <div class="col-lg-5 d-flex flex-column gap-4">
 
-            <!-- 🚀 NEW: Agent Score Card -->
+            <!-- Agent Score Card -->
             <div class="card-custom">
                 <div class="card-header-custom">
                     <i class="fa-solid fa-clipboard-check text-success"></i> Agent Score Card
@@ -250,7 +252,7 @@
                 </div>
             </div>
 
-            <!-- 🚀 NEW: Conversation Insights -->
+            <!-- Conversation Insights -->
             <div class="card-custom">
                 <div class="card-header-custom">
                     <i class="fa-solid fa-brain text-primary"></i> Call Analytics
@@ -273,7 +275,83 @@
                 </div>
             </div>
 
-            <!-- Existing Executive Summary -->
+            <!-- ========================================== -->
+            <!-- PROFESSIONAL PROFILE & SOFTWARE (AI DATA)  -->
+            <!-- ========================================== -->
+            <div class="card-custom">
+                <div class="card-header-custom">
+                    <i class="fa-solid fa-user-doctor text-info"></i> Customer Profile (AI Extracted)
+                </div>
+                <div class="p-4 pb-2">
+                    <div class="row g-4">
+                        
+                        <!-- General Profile -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-muted border-bottom pb-2 mb-3" style="font-size: 0.85rem; text-transform: uppercase;">General Details</h6>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Doctor Status</span>
+                                <span class="text-dark fw-bold">@(string.IsNullOrEmpty(Model.IsHomeopathicDoctor) ? "N/A" : Model.IsHomeopathicDoctor)</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Qualification</span>
+                                <span class="text-dark">@(string.IsNullOrEmpty(Model.Qualification) ? "N/A" : Model.Qualification)</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Passing Year / College</span>
+                                <span class="text-dark">
+                                    @(string.IsNullOrEmpty(Model.YearOfPassing) ? "N/A" : Model.YearOfPassing) -
+                                    @(string.IsNullOrEmpty(Model.CollegeName) ? "N/A" : Model.CollegeName)
+                                </span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">DOB / Age</span>
+                                <span class="text-dark">
+                                    @(string.IsNullOrEmpty(Model.DateOfBirth) ? "N/A" : Model.DateOfBirth) /
+                                    @(string.IsNullOrEmpty(Model.Age) ? "N/A" : Model.Age)
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Practice & Software -->
+                        <div class="col-md-6 border-start px-3">
+                            <h6 class="fw-bold text-muted border-bottom pb-2 mb-3" style="font-size: 0.85rem; text-transform: uppercase;">Practice & Tech</h6>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Clinic & Work Type</span>
+                                <span class="text-dark">
+                                    @(string.IsNullOrEmpty(Model.ClinicType) ? "N/A" : Model.ClinicType) /
+                                    @(string.IsNullOrEmpty(Model.WorkType) ? "N/A" : Model.WorkType)
+                                </span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Total Experience</span>
+                                <span class="text-dark">@(string.IsNullOrEmpty(Model.TotalExperience) ? "0" : Model.TotalExperience) yrs total</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold d-block">Patients/Day (Avg Fee)</span>
+                                <span class="text-dark">
+                                    @(string.IsNullOrEmpty(Model.PatientsPerDay) ? "N/A" : Model.PatientsPerDay)
+                                    (₹@(string.IsNullOrEmpty(Model.AveragePatientFee) ? "N/A" : Model.AveragePatientFee))
+                                </span>
+                            </div>
+                            <div class="mb-2 mt-3 pt-3 border-top">
+                                <span class="text-muted small fw-semibold d-block">Software Used</span>
+                                @if (Model.CurrentlyUsingSoftware != null && Model.CurrentlyUsingSoftware.Contains("Yes", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary mb-1"><i class="fa-solid fa-code me-1"></i> Yes</span>
+                                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">@(string.IsNullOrEmpty(Model.CurrentSoftwareName) ? "N/A" : Model.CurrentSoftwareName)</div>
+                                }
+                                else
+                                {
+                                    <span class="text-dark">@(string.IsNullOrEmpty(Model.CurrentlyUsingSoftware) ? "N/A" : Model.CurrentlyUsingSoftware)</span>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Executive Summary -->
             <div class="card-custom h-auto">
                 <div class="card-header-custom">
                     <i class="fa-solid fa-file-lines text-secondary"></i> Executive Summary
@@ -296,7 +374,6 @@
                         bool isJson = false;
                         System.Text.Json.JsonDocument chatArray = null;
 
-                        // Check if the text in the database is a valid JSON array
                         try
                         {
                             if (!string.IsNullOrEmpty(Model.TranscriptionText) && Model.TranscriptionText.Trim().StartsWith("["))
@@ -317,7 +394,6 @@
                                 string text = msg.GetProperty("Text").GetString();
                                 bool isSales = speaker.IndexOf("Sales", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                                // Dynamically align bubbles: Salesperson on Right (Blue), Customer on Left (White)
                                 <div class="mb-3 d-flex flex-column @(isSales ? "align-items-end" : "align-items-start")">
                                     <span class="text-muted mb-1 px-1" style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
                                         @(isSales ? "Sales Agent" : "Customer")
@@ -340,7 +416,6 @@
                     }
                     else
                     {
-                        <!-- Fallback if it's just plain text (like the Whisper error message) -->
                         <div class="d-flex flex-column gap-2">
                             <div class="text-muted fw-bold ms-1" style="font-size: 0.8rem; text-transform: uppercase;"><i class="fa-solid fa-robot me-1"></i> AI Raw Output</div>
                             <div class="chat-bubble">

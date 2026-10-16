@@ -2,9 +2,15 @@
 
 @{
     ViewData["Title"] = "Call Intelligence Logs";
-    // Filter out rows that do not have a recording
-    var validCalls = Model.Where(c => !string.IsNullOrEmpty(c.RecordingUrl) || !string.IsNullOrEmpty(c.LocalFilePath)).OrderByDescending(c => c.CallDate);
+    
+    // Filter out rows without recordings
+    var validCalls = Model.Where(c => !string.IsNullOrEmpty(c.RecordingUrl) || !string.IsNullOrEmpty(c.LocalFilePath));
     int totalRecords = validCalls.Count();
+
+    // Group records by Date (newest date first), ordered within each date by talk time descending
+    var groupedCalls = validCalls
+        .GroupBy(c => c.CallDate.Date)
+        .OrderByDescending(g => g.Key);
 }
 
 <style>
@@ -162,6 +168,9 @@
             </span>
         </h4>
         <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-danger fw-semibold px-3 shadow-sm" onclick="repairStuckCalls(this)">
+                <i class="fa-solid fa-screwdriver-wrench me-1"></i> Repair Stuck Calls
+            </button>
             <button class="btn btn-sm btn-primary border-0 fw-semibold px-3 shadow-sm" style="background-color: var(--primary);" onclick="syncHistoricalCalls(this)">
                 <i class="fa-solid fa-cloud-arrow-down me-1"></i> Sync Old Calls
             </button>
@@ -175,10 +184,10 @@
         <table class="table table-custom">
             <thead>
                 <tr>
-                    <th>Date & Time</th>
+                    <th>Time & Duration</th>
                     <th>Sales Agent</th>
                     <th>Customer Contact</th>
-                    <th>Duration</th>
+                    <th>AI Status</th>
                     <th>Recording</th>
                     <th>CRM Link</th>
                     <th class="text-end">Action</th>
@@ -187,66 +196,129 @@
             <tbody>
                 @if (validCalls.Any())
                 {
-                    foreach (var call in validCalls)
+                    foreach (var dayGroup in groupedCalls)
                     {
-                        <tr>
-                            <td>
-                                <div class="fw-bold">@call.CallDate.ToString("dd MMM yyyy")</div>
-                                <div class="text-muted mt-1" style="font-size: 0.75rem;">
-                                    <i class="fa-regular fa-clock"></i> @call.CallDate.ToString("hh:mm tt")
-                                </div>
-                            </td>
-                            <td>
-                                <div class="agent-highlight">
-                                    <i class="fa-solid fa-user-tie me-2"></i>
-                                    @(string.IsNullOrEmpty(call.SalespersonName) ? "Unknown Agent" : call.SalespersonName)
-                                </div>
-                                <div class="text-muted mt-1 ms-1" style="font-size: 0.8rem; font-weight: 600;">
-                                    <i class="fa-solid fa-phone me-1"></i> @(string.IsNullOrEmpty(call.SalespersonPhone) ? "N/A" : call.SalespersonPhone)
-                                </div>
-                            </td>
-                            <td>
-                                <div class="fw-semibold text-dark">
-                                    <i class="fa-solid fa-phone text-muted me-2"></i>@call.CustomerPhone
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1">
-                                    @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
-                                </span>
-                            </td>
-                            <td>
-                                @if (!string.IsNullOrEmpty(call.LocalFilePath))
-                                {
-                                    <audio controls class="audio-compact">
-                                        <source src="/api/webhook/play-audio/@call.Id" type="audio/mpeg">
-                                    </audio>
-                                }
-                                else
-                                {
-                                    <span class="status-badge bg-warning bg-opacity-10 text-warning border border-warning">Downloading...</span>
-                                }
-                            </td>
-                            <td>
-                                @if (call.Account != null)
-                                {
-                                    <span class="linked-badge"><i class="fa-regular fa-building"></i> @call.Account.AccountName</span>
-                                }
-                                else if (call.Lead != null)
-                                {
-                                    <span class="linked-badge"><i class="fa-regular fa-user"></i> @call.Lead.LeadName</span>
-                                }
-                                else
-                                {
-                                    <span class="text-muted fst-italic" style="font-size: 0.75rem;">Unlinked</span>
-                                }
-                            </td>
-                            <td class="text-end">
-                                <a asp-controller="CallRecordings" asp-action="CallAnalysis" asp-route-id="@call.Id" class="btn-action shadow-sm">
-                                    <i class="fa-solid fa-chart-line"></i> View Analysis
-                                </a>
+                        <!-- Date Header Row -->
+                        <tr style="background-color: #f1f5f9;">
+                            <td colspan="7" class="fw-bold" style="color: var(--primary);">
+                                <i class="fa-regular fa-calendar-days me-2"></i> @dayGroup.Key.ToString("dddd, dd MMMM yyyy")
                             </td>
                         </tr>
+
+                        foreach (var call in dayGroup.OrderByDescending(c => c.DurationSeconds))
+                        {
+                            bool isProcessing = call.SalespersonTone != null && call.SalespersonTone.Contains("Processing");
+                            bool isError = (call.SalespersonTone != null && call.SalespersonTone.Contains("ERROR")) ||
+                                           (call.AiSummary != null && call.AiSummary.Contains("ERROR"));
+                            bool isPending = call.SalespersonTone == null || call.SalespersonTone == "Pending";
+                            bool isReady = !isProcessing && !isError && !isPending &&
+                                           !string.IsNullOrEmpty(call.AiSummary) && call.AiSummary != "N/A";
+
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">
+                                        <i class="fa-regular fa-clock text-muted me-1 small"></i> @call.CallDate.ToString("hh:mm tt")
+                                    </div>
+                                    <div class="text-muted mt-1 fw-semibold" style="font-size: 0.8rem;">
+                                        @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="agent-highlight">
+                                        <i class="fa-solid fa-user-tie me-2"></i>
+                                        @(string.IsNullOrEmpty(call.SalespersonName) ? "Unknown Agent" : call.SalespersonName)
+                                    </div>
+                                    <div class="text-muted mt-1 ms-1" style="font-size: 0.8rem; font-weight: 600;">
+                                        <!-- FIXED: Changed AgentNumber to SalespersonPhone -->
+                                        <i class="fa-solid fa-phone me-1"></i> @(string.IsNullOrEmpty(call.SalespersonPhone) ? "N/A" : call.SalespersonPhone)
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">
+                                        <i class="fa-solid fa-phone text-muted me-2"></i>@call.CustomerPhone
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (isReady)
+                                    {
+                                        <span class="status-badge bg-success bg-opacity-10 text-success border border-success">
+                                            <i class="fa-solid fa-circle-check me-1"></i> AI Ready
+                                        </span>
+                                    }
+                                    else if (isProcessing)
+                                    {
+                                        <span class="status-badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                            <i class="fa-solid fa-spinner fa-spin me-1"></i> Processing...
+                                        </span>
+                                    }
+                                    else if (isError)
+                                    {
+                                        <span class="status-badge bg-danger bg-opacity-10 text-danger border border-danger">
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i> Failed
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary">
+                                            <i class="fa-regular fa-clock me-1"></i> In Queue
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(call.LocalFilePath))
+                                    {
+                                        <audio controls class="audio-compact">
+                                            <source src="/api/webhook/play-audio/@call.Id" type="audio/mpeg">
+                                        </audio>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge bg-warning bg-opacity-10 text-warning border border-warning">Downloading...</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (call.Account != null)
+                                    {
+                                        <!-- Change "Accounts" and "Edit" to match your actual controller names -->
+                                        <a asp-controller="Accounts" asp-action="Edit" asp-route-id="@call.AccountId" class="text-decoration-none">
+                                            <span class="linked-badge hover-effect">
+                                                <i class="fa-regular fa-building text-primary"></i> @call.Account.AccountName
+                                            </span>
+                                        </a>
+                                    }
+                                    else if (call.Lead != null)
+                                    {
+                                        <a asp-controller="Leads" asp-action="Edit" asp-route-id="@call.LeadId" class="text-decoration-none">
+                                            <span class="linked-badge hover-effect">
+                                                <i class="fa-regular fa-user text-primary"></i> @call.Lead.LeadName
+                                            </span>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted fst-italic" style="font-size: 0.75rem;">Unlinked</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (isReady)
+                                    {
+                                        <a asp-controller="CallRecordings" asp-action="CallAnalysis" asp-route-id="@call.Id" class="btn-action shadow-sm">
+                                            <i class="fa-solid fa-chart-line"></i> View Analysis
+                                        </a>
+                                    }
+                                    else if (isError)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger px-2" title="@call.AiSummary" onclick="alert('@(call.AiSummary?.Replace("'", "\\'"))')">
+                                            <i class="fa-solid fa-circle-info me-1"></i> Details
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-light border text-muted px-3" disabled>Queued</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
                     }
                 }
                 else
@@ -272,29 +344,56 @@
             btn.disabled = true;
 
             fetch('/api/webhook/import-historical-callyzer', { method: 'POST' })
-            .then(async response => {
-                if (!response.ok) {
-                    const err = await response.text();
-                    throw new Error(err);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if(data.success) {
+                .then(async response => {
+                    if (!response.ok) {
+                        const err = await response.text();
+                        throw new Error(err);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert("Import Failed: " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error("Sync Error:", error);
+                    alert("Network error occurred while trying to sync historical data.");
+                })
+                .finally(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                });
+        }
+
+        function repairStuckCalls(btn) {
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Queuing...';
+            btn.disabled = true;
+
+            fetch('/api/webhook/fix-processing-records', { method: 'POST' })
+                .then(async response => {
+                    if (!response.ok) {
+                        const err = await response.text();
+                        throw new Error(err);
+                    }
+                    return response.json();
+                })
+                .then(data => {
                     alert(data.message);
                     window.location.reload();
-                } else {
-                    alert("Import Failed: " + data.message);
-                }
-            })
-            .catch(error => {
-                console.error("Sync Error:", error);
-                alert("Network error occurred while trying to sync historical data.");
-            })
-            .finally(() => {
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
-            });
+                })
+                .catch(error => {
+                    console.error("Repair Error:", error);
+                    alert("Network error occurred while trying to repair records.");
+                })
+                .finally(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                });
         }
     </script>
 }

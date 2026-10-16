@@ -49,6 +49,9 @@ builder.Services.Configure<FormOptions>(options =>
     options.MemoryBufferThreshold = int.MaxValue;
 });
 
+builder.Services.AddScoped<AiCallService>();
+builder.Services.AddHostedService<Radar_CRM.Workers.CallBatchWorker>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

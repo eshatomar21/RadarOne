@@ -1,11 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Radar_CRM.Data;
 using Radar_CRM.DTOs;
 using Radar_CRM.Models;
-using Radar_CRM.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,6 +12,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Radar_CRM.Controllers
 {
@@ -22,25 +21,21 @@ namespace Radar_CRM.Controllers
     public class WebhookcallyzerController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly IServiceScopeFactory _scopeFactory;
-        private readonly string _openAiApiKey;
 
-        public WebhookcallyzerController(ApplicationDbContext context, IServiceScopeFactory scopeFactory, IConfiguration configuration)
+        public WebhookcallyzerController(ApplicationDbContext context)
         {
             _context = context;
-            _scopeFactory = scopeFactory;
-            _openAiApiKey = configuration["OpenAI:ApiKey"];
         }
 
+        // ==============================================================
+        // 1. REAL-TIME WEBHOOK (Lightning Fast - No AI processing here)
+        // ==============================================================
         [HttpPost("callyzer")]
-        public async System.Threading.Tasks.Task<IActionResult> ReceiveCallyzerData([FromBody] List<CallyzerWebhookEvent> events)
+        public async Task<IActionResult> ReceiveCallyzerData([FromBody] List<CallyzerWebhookEvent> events)
         {
             try
             {
-                if (events == null || !events.Any())
-                {
-                    return BadRequest(new { success = false, message = "Invalid data received." });
-                }
+                if (events == null || !events.Any()) return BadRequest(new { success = false, message = "Invalid data received." });
 
                 foreach (var evt in events)
                 {
@@ -49,20 +44,22 @@ namespace Radar_CRM.Controllers
                     foreach (var payload in evt.call_logs)
                     {
                         if (string.IsNullOrWhiteSpace(payload.client_number)) continue;
-
                         string phoneToMatch = payload.client_number.Replace("+", "").Trim();
 
-                        var matchedLead = await _context.Leads
-                            .FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
+                        // Extract exactly the last 10 digits to ignore country codes (+91, 0, etc.)
+                        string last10Digits = phoneToMatch.Length >= 10 ? phoneToMatch.Substring(phoneToMatch.Length - 10) : phoneToMatch;
 
-                        var matchedAccount = await _context.Accounts
-                            .FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
+                        // Search Leads (assumes Lead has a 'Phone' property)
+                        var matchedLead = await _context.Leads.FirstOrDefaultAsync(l =>
+                            l.Phone != null && l.Phone.Contains(last10Digits));
+
+                        // Search Accounts across MobileNumber OR AlternateMobile
+                        var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a =>
+                            (a.MobileNumber != null && a.MobileNumber.Contains(last10Digits)) ||
+                            (a.AlternateMobile != null && a.AlternateMobile.Contains(last10Digits)));
 
                         int parsedDuration = 0;
-                        if (!string.IsNullOrWhiteSpace(payload.duration))
-                        {
-                            int.TryParse(payload.duration, out parsedDuration);
-                        }
+                        if (!string.IsNullOrWhiteSpace(payload.duration)) int.TryParse(payload.duration, out parsedDuration);
 
                         string customerPhoneSafe = payload.client_number ?? "";
                         if (customerPhoneSafe.Length > 20) customerPhoneSafe = customerPhoneSafe.Substring(0, 20);
@@ -74,9 +71,7 @@ namespace Radar_CRM.Controllers
                         string urlSafe = payload.call_recording_url ?? "";
                         if (urlSafe.Length > 500) urlSafe = urlSafe.Substring(0, 500);
 
-                        // 🚀 STRICT NULL CHECK FOR LIVE CALLS
-                        string empNameRaw = evt.emp_name;
-                        if (string.IsNullOrWhiteSpace(empNameRaw)) empNameRaw = "Unknown Agent";
+                        string empNameRaw = string.IsNullOrWhiteSpace(evt.emp_name) ? "Unknown Agent" : evt.emp_name;
                         string safeSalesName = empNameRaw.Length > 100 ? empNameRaw.Substring(0, 100) : empNameRaw;
 
                         var callRecord = new CallRecord
@@ -89,200 +84,81 @@ namespace Radar_CRM.Controllers
                             CallDate = DateTime.UtcNow,
                             LeadId = matchedLead?.Id,
                             AccountId = matchedAccount?.Id,
+                            // Set to Pending so the 24/7 Background Worker picks it up automatically
                             TranscriptionText = "Pending AI Transcription...",
-                            AiSummary = "Pending AI Summary..."
+                            AiSummary = "Pending AI Summary...",
+                            SalespersonConfidence = "Pending",
+                            SalespersonEmpathy = "Pending",
+                            SalespersonTone = "Pending",
+                            UserNeeds = "Pending",
+                            RecommendedProducts = "Pending",
+                            GapAnalysis = "Pending"
                         };
 
                         _context.CallRecords.Add(callRecord);
-                        await _context.SaveChangesAsync();
-
-                        if (!string.IsNullOrEmpty(callRecord.RecordingUrl))
-                        {
-                            int savedCallId = callRecord.Id;
-                            string recordingUrl = callRecord.RecordingUrl;
-                            string apiKey = _openAiApiKey;
-
-                            _ = System.Threading.Tasks.Task.Run(async () =>
-                            {
-                                using var scope = _scopeFactory.CreateScope();
-                                var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                                try
-                                {
-                                    var aiService = scope.ServiceProvider.GetRequiredService<AiCallService>();
-
-                                    byte[] audioBytes = await aiService.DownloadAudioAsync(recordingUrl);
-
-                                    // 🚀 FIX 1: If audio download fails, update the DB instead of silently returning
-                                    if (audioBytes == null || audioBytes.Length == 0)
-                                    {
-                                        var failedAudioRecord = await bgContext.CallRecords.FindAsync(savedCallId);
-                                        if (failedAudioRecord != null)
-                                        {
-                                            failedAudioRecord.TranscriptionText = "ERROR: Failed to download audio from URL.";
-                                            failedAudioRecord.AiSummary = "Audio download failed. Cannot analyze.";
-                                            await bgContext.SaveChangesAsync();
-                                        }
-                                        return;
-                                    }
-
-                                    string folderPath = @"C:\CRM_files\Call_recordings";
-                                    if (!System.IO.Directory.Exists(folderPath)) System.IO.Directory.CreateDirectory(folderPath);
-
-                                    string fileName = $"call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
-                                    string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
-                                    await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
-
-                                    var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
-                                    if (recordToUpdate != null)
-                                    {
-                                        recordToUpdate.LocalFilePath = fullLocalPath;
-
-                                        string transcriptionText = await aiService.TranscribeAudioAsync(audioBytes);
-                                        recordToUpdate.TranscriptionText = transcriptionText;
-
-                                        // 🚀 FIX 2: Only call AnalyzeCallAsync if transcription actually succeeded
-                                        if (!string.IsNullOrWhiteSpace(transcriptionText) && !transcriptionText.Contains("Transcription failed"))
-                                        {
-                                            var aiResult = await aiService.AnalyzeCallAsync(transcriptionText);
-
-                                            // 🚀 FIX 3: Null coalescing (??) prevents null values from crashing the database save
-                                            if (aiResult != null)
-                                            {
-                                                recordToUpdate.AiSummary = aiResult.AiSummary ?? "N/A";
-                                                recordToUpdate.SalespersonConfidence = aiResult.SalespersonConfidence ?? "N/A";
-                                                recordToUpdate.SalespersonEmpathy = aiResult.SalespersonEmpathy ?? "N/A";
-                                                recordToUpdate.SalespersonTone = aiResult.SalespersonTone ?? "N/A";
-                                                recordToUpdate.UserNeeds = aiResult.UserNeeds ?? "N/A";
-                                                recordToUpdate.RecommendedProducts = aiResult.RecommendedProducts ?? "N/A";
-                                                recordToUpdate.GapAnalysis = aiResult.GapAnalysis ?? "N/A";
-                                            }
-                                            else
-                                            {
-                                                recordToUpdate.AiSummary = "AI Analysis returned null or failed to parse JSON.";
-                                            }
-                                        }
-                                        else
-                                        {
-                                            recordToUpdate.AiSummary = "Skipped AI analysis because transcription was empty or failed.";
-                                        }
-
-                                        await bgContext.SaveChangesAsync();
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    // 3. THE TRAP DOOR: If ANYTHING crashes, we save the error directly to the database!
-                                    try
-                                    {
-                                        var failedRecord = await bgContext.CallRecords.FindAsync(savedCallId);
-                                        if (failedRecord != null)
-                                        {
-                                            failedRecord.TranscriptionText = "SYSTEM CRASH: " + ex.Message;
-                                            failedRecord.AiSummary = "Check TranscriptionText for error details.";
-                                            failedRecord.SalespersonTone = "CRASH";
-                                            failedRecord.SalespersonEmpathy = "CRASH";
-                                            failedRecord.SalespersonConfidence = "CRASH";
-                                            await bgContext.SaveChangesAsync();
-                                        }
-                                    }
-                                    catch { /* Ignore if the database fallback also fails */ }
-                                }
-                            });
-                        }
                     }
                 }
 
-                return Ok(new { success = true, message = "Call logged and AI processing initiated." });
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Call logged successfully. AI worker will process it shortly." });
             }
             catch (Exception ex)
             {
-                string actualDbError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                return StatusCode(500, new { success = false, message = "Database Error: " + actualDbError });
+                return StatusCode(500, new { success = false, message = "Database Error: " + ex.Message });
             }
         }
 
+        // ==============================================================
+        // 2. PLAY AUDIO (Streams local file if downloaded by worker)
+        // ==============================================================
         [HttpGet("play-audio/{id}")]
-        public async System.Threading.Tasks.Task<IActionResult> PlayAudio(int id)
+        public async Task<IActionResult> PlayAudio(int id)
         {
             var record = await _context.CallRecords.FindAsync(id);
             if (record == null || string.IsNullOrEmpty(record.LocalFilePath) || !System.IO.File.Exists(record.LocalFilePath))
-            {
-                return NotFound("Audio file not downloaded or missing from server.");
-            }
+                return NotFound("Audio file missing from server.");
 
             var fileStream = new FileStream(record.LocalFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
         }
 
+        // ==============================================================
+        // 3. HISTORICAL IMPORT (Queues old calls for the worker)
+        // ==============================================================
         [HttpPost("import-historical-callyzer")]
-        public async System.Threading.Tasks.Task<IActionResult> ImportHistoricalData([FromServices] IConfiguration config)
+        public async Task<IActionResult> ImportHistoricalData([FromServices] IConfiguration config)
         {
             string callyzerApiToken = config["Callyzer:ApiToken"];
-            if (string.IsNullOrEmpty(callyzerApiToken))
-            {
-                return BadRequest(new { success = false, message = "Missing Callyzer:ApiToken in appsettings.json." });
-            }
+            if (string.IsNullOrEmpty(callyzerApiToken)) return BadRequest(new { success = false, message = "Missing API Token." });
 
             try
             {
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", callyzerApiToken);
 
-                long syncedTo = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                long syncedFrom = DateTimeOffset.UtcNow.AddDays(-175).ToUnixTimeSeconds();
-
                 var payload = new
                 {
-                    synced_from = syncedFrom,
-                    synced_to = syncedTo,
+                    synced_from = DateTimeOffset.UtcNow.AddDays(-175).ToUnixTimeSeconds(),
+                    synced_to = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     call_method = "PhoneCall",
                     call_mode = "Voice"
                 };
 
-                var jsonContent = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+                var jsonContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
                 var response = await client.PostAsync("https://api1.callyzer.co/api/v2.2/call-log/history", jsonContent);
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    string err = await response.Content.ReadAsStringAsync();
-                    return StatusCode(500, new { success = false, message = "Callyzer API error: " + err });
-                }
+                if (!response.IsSuccessStatusCode) return StatusCode(500, new { success = false, message = "Callyzer API error." });
 
-                string jsonResponse = await response.Content.ReadAsStringAsync();
-                using var doc = System.Text.Json.JsonDocument.Parse(jsonResponse);
-
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
                 var root = doc.RootElement;
-                System.Text.Json.JsonElement logsArray = default;
-                bool arrayFound = false;
+                JsonElement logsArray = default;
 
-                if (root.TryGetProperty("result", out var resultNode))
-                {
-                    if (resultNode.ValueKind == System.Text.Json.JsonValueKind.Array)
-                    {
-                        logsArray = resultNode;
-                        arrayFound = true;
-                    }
-                    else if (resultNode.TryGetProperty("data", out var dataNode) && dataNode.ValueKind == System.Text.Json.JsonValueKind.Array)
-                    {
-                        logsArray = dataNode;
-                        arrayFound = true;
-                    }
-                    else if (resultNode.TryGetProperty("call_logs", out var clNode) && clNode.ValueKind == System.Text.Json.JsonValueKind.Array)
-                    {
-                        logsArray = clNode;
-                        arrayFound = true;
-                    }
-                }
-
-                if (!arrayFound)
-                {
-                    return Ok(new { success = true, message = "No valid call logs array found in Callyzer response." });
-                }
+                if (root.TryGetProperty("result", out var resNode) && resNode.ValueKind == JsonValueKind.Array) logsArray = resNode;
+                else if (root.TryGetProperty("data", out var datNode) && datNode.ValueKind == JsonValueKind.Array) logsArray = datNode;
+                else if (root.TryGetProperty("call_logs", out var callNode) && callNode.ValueKind == JsonValueKind.Array) logsArray = callNode;
+                else return Ok(new { success = true, message = "No valid call logs array found." });
 
                 int processedCount = 0;
-                string folderPath = @"C:\CRM_files\Call_recordings";
-                if (!System.IO.Directory.Exists(folderPath)) System.IO.Directory.CreateDirectory(folderPath);
 
                 foreach (var log in logsArray.EnumerateArray())
                 {
@@ -290,270 +166,88 @@ namespace Radar_CRM.Controllers
                     string recordingUrl = log.TryGetProperty("call_recording_url", out var ru) ? ru.GetString() : "";
 
                     if (string.IsNullOrWhiteSpace(clientNumber)) continue;
-
                     string phoneToMatch = clientNumber.Replace("+", "").Trim();
 
                     var existingRecord = await _context.CallRecords.FirstOrDefaultAsync(c => c.RecordingUrl == recordingUrl && c.CustomerPhone.Contains(phoneToMatch));
+                    if (existingRecord != null) continue; // Skip if already imported
 
-                    int savedCallId = 0;
+                    var matchedLead = await _context.Leads.FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
+                    var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
 
-                    if (existingRecord != null)
+                    int parsedDuration = 0;
+                    if (log.TryGetProperty("duration", out var durNode) && durNode.ValueKind == JsonValueKind.String)
+                        int.TryParse(durNode.GetString(), out parsedDuration);
+
+                    string empNo = log.TryGetProperty("emp_number", out var eNum) ? eNum.GetString() : "";
+                    string empName = "Unknown Agent";
+                    if (log.TryGetProperty("emp_name", out var eName1) && eName1.ValueKind == JsonValueKind.String)
                     {
-                        bool hasError = string.IsNullOrEmpty(existingRecord.TranscriptionText) ||
-                                        existingRecord.TranscriptionText.Contains("Pending") ||
-                                        existingRecord.TranscriptionText.Contains("ERROR]");
-
-                        if (!hasError) continue;
-
-                        savedCallId = existingRecord.Id;
+                        empName = eName1.GetString();
                     }
-                    else
+                    else if (log.TryGetProperty("employee_name", out var eName2) && eName2.ValueKind == JsonValueKind.String)
                     {
-                        var matchedLead = await _context.Leads.FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
-                        var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
-
-                        int parsedDuration = 0;
-                        if (log.TryGetProperty("duration", out var durNode))
-                        {
-                            if (durNode.ValueKind == System.Text.Json.JsonValueKind.Number) parsedDuration = durNode.GetInt32();
-                            else if (durNode.ValueKind == System.Text.Json.JsonValueKind.String) int.TryParse(durNode.GetString(), out parsedDuration);
-                        }
-
-                        string empNo = "";
-                        if (log.TryGetProperty("emp_number", out var eNum)) empNo = eNum.GetString();
-                        else if (log.TryGetProperty("emp_no", out var eNo)) empNo = eNo.GetString();
-                        else if (log.TryGetProperty("employee_number", out var eFull)) empNo = eFull.GetString();
-
-                        // 🚀 FIX: Check every possible variation Callyzer uses for the Agent's Name
-                        string empName = "";
-                        if (log.TryGetProperty("employee_name", out var eFullName) && eFullName.ValueKind != System.Text.Json.JsonValueKind.Null)
-                        {
-                            empName = eFullName.GetString();
-                        }
-                        else if (log.TryGetProperty("emp_name", out var eName) && eName.ValueKind != System.Text.Json.JsonValueKind.Null)
-                        {
-                            empName = eName.GetString();
-                        }
-                        else if (log.TryGetProperty("name", out var justName) && justName.ValueKind != System.Text.Json.JsonValueKind.Null)
-                        {
-                            empName = justName.GetString();
-                        }
-
-                        // Force it to "Unknown Agent" if Callyzer sent null or empty
-                        if (string.IsNullOrWhiteSpace(empName))
-                        {
-                            empName = "Unknown Agent";
-                        }
-
-                        string safeCustomerPhone = clientNumber.Length > 20 ? clientNumber.Substring(0, 20) : clientNumber;
-                        string safeSalesPhone = empNo?.Length > 20 ? empNo.Substring(0, 20) : (empNo ?? "");
-                        string safeUrl = recordingUrl?.Length > 500 ? recordingUrl.Substring(0, 500) : (recordingUrl ?? "");
-                        string safeSalesName = empName.Length > 100 ? empName.Substring(0, 100) : empName;
-
-                        var callRecord = new CallRecord
-                        {
-                            CustomerPhone = safeCustomerPhone,
-                            SalespersonPhone = safeSalesPhone,
-                            SalespersonName = safeSalesName,
-                            RecordingUrl = safeUrl,
-                            DurationSeconds = parsedDuration,
-                            CallDate = DateTime.UtcNow,
-                            LeadId = matchedLead?.Id,
-                            AccountId = matchedAccount?.Id,
-                            TranscriptionText = "Processing AI Retry...",
-                            AiSummary = "Processing AI Retry..."
-                        };
-
-                        _context.CallRecords.Add(callRecord);
-                        await _context.SaveChangesAsync();
-
-                        savedCallId = callRecord.Id;
-                        processedCount++;
+                        empName = eName2.GetString();
                     }
+                    if (string.IsNullOrWhiteSpace(empName)) empName = "Unknown Agent";
 
-                    if (savedCallId > 0 && !string.IsNullOrEmpty(recordingUrl))
+                    var callRecord = new CallRecord
                     {
-                        string currentUrl = recordingUrl;
-                        string apiKey = _openAiApiKey;
+                        CustomerPhone = clientNumber.Length > 20 ? clientNumber.Substring(0, 20) : clientNumber,
+                        SalespersonPhone = empNo?.Length > 20 ? empNo.Substring(0, 20) : (empNo ?? ""),
+                        SalespersonName = empName.Length > 100 ? empName.Substring(0, 100) : empName,
+                        RecordingUrl = recordingUrl?.Length > 500 ? recordingUrl.Substring(0, 500) : (recordingUrl ?? ""),
+                        DurationSeconds = parsedDuration,
+                        CallDate = DateTime.UtcNow,
+                        LeadId = matchedLead?.Id,
+                        AccountId = matchedAccount?.Id,
+                        // Set to Pending for Background Worker
+                        TranscriptionText = "Pending AI Retry...",
+                        AiSummary = "Pending AI Retry...",
+                        SalespersonTone = "Pending"
+                    };
 
-                        _ = System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            using var scope = _scopeFactory.CreateScope();
-                            var bgContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                            try
-                            {
-                                byte[] audioBytes = await DownloadAudioBytesAsync(currentUrl);
-                                if (audioBytes != null && audioBytes.Length > 0)
-                                {
-                                    string fileName = $"historical_call_{savedCallId}_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
-                                    string fullLocalPath = System.IO.Path.Combine(folderPath, fileName);
-                                    await System.IO.File.WriteAllBytesAsync(fullLocalPath, audioBytes);
-
-                                    string rawTranscription = await TranscribeAudioWithWhisperAsync(audioBytes, apiKey);
-                                    string finalTranscript = "No speech detected.";
-                                    string finalSummary = "No speech detected.";
-
-                                    if (!string.IsNullOrWhiteSpace(rawTranscription) && !rawTranscription.Contains("ERROR]"))
-                                    {
-                                        var aiResult = await AnalyzeCallWithGptAsync(rawTranscription, apiKey);
-                                        finalTranscript = aiResult.FormattedChat;
-                                        finalSummary = aiResult.Summary;
-                                    }
-                                    else if (rawTranscription.Contains("ERROR]"))
-                                    {
-                                        finalTranscript = rawTranscription;
-                                        finalSummary = "Whisper Translation Failed.";
-                                    }
-
-                                    var recordToUpdate = await bgContext.CallRecords.FindAsync(savedCallId);
-                                    if (recordToUpdate != null)
-                                    {
-                                        recordToUpdate.LocalFilePath = fullLocalPath;
-                                        recordToUpdate.TranscriptionText = finalTranscript;
-                                        recordToUpdate.AiSummary = finalSummary;
-                                        await bgContext.SaveChangesAsync();
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                LogError($"[Historical Download Error] {ex.Message}");
-                            }
-                        });
-                    }
+                    _context.CallRecords.Add(callRecord);
+                    processedCount++;
                 }
 
-                return Ok(new { success = true, message = $"Successfully pulled {processedCount} historical calls." });
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = $"Successfully queued {processedCount} historical calls for the AI worker." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "Historical Import Error: " + (ex.InnerException?.Message ?? ex.Message) });
+                return StatusCode(500, new { success = false, message = "Historical Import Error: " + ex.Message });
             }
         }
 
-        // =========================================================================
-        // HELPER METHODS
-        // =========================================================================
-
-        private static void LogError(string message)
+        // ==============================================================
+        // 4. SMART REPAIR: RE-QUEUES FAILED OR STUCK RECORDS
+        // ==============================================================
+        [HttpPost("fix-processing-records")]
+        public async Task<IActionResult> FixProcessingRecords()
         {
-            try
+            // Find records that got stuck or threw an error during AI generation
+            var brokenRecords = await _context.CallRecords
+                .Where(c => c.SalespersonTone == null ||
+                            c.SalespersonTone == "N/A" ||
+                            c.SalespersonTone.Contains("ERROR") ||
+                            c.SalespersonTone.Contains("Processing") ||
+                            (c.AiSummary != null && c.AiSummary.Contains("ERROR")))
+                .ToListAsync();
+
+            if (!brokenRecords.Any())
+                return Ok(new { success = true, message = "All records are healthy. Nothing to repair!" });
+
+            // Reset them to 'Pending' so the 24/7 background worker picks them up on its next cycle
+            foreach (var record in brokenRecords)
             {
-                string folder = @"C:\CRM_files";
-                if (!System.IO.Directory.Exists(folder)) System.IO.Directory.CreateDirectory(folder);
-
-                string path = System.IO.Path.Combine(folder, "OpenAI_Logs.txt");
-                System.IO.File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
-            }
-            catch { }
-        }
-
-        private static async System.Threading.Tasks.Task<byte[]> DownloadAudioBytesAsync(string fileUrl)
-        {
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromMinutes(3);
-            return await client.GetByteArrayAsync(fileUrl);
-        }
-
-        private static async System.Threading.Tasks.Task<string> TranscribeAudioWithWhisperAsync(byte[] audioBytes, string apiKey)
-        {
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                LogError("Whisper API Error: OpenAI API Key is missing or empty in appsettings.json.");
-                return "[AI ERROR] Missing API Key";
+                record.SalespersonTone = "Pending";
+                record.AiSummary = "Re-queued for AI Processing...";
+                record.TranscriptionText = "Re-queued for AI Processing...";
             }
 
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromMinutes(3);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            await _context.SaveChangesAsync();
 
-            using var content = new MultipartFormDataContent();
-            var audioContent = new ByteArrayContent(audioBytes);
-            audioContent.Headers.ContentType = MediaTypeHeaderValue.Parse("audio/mpeg");
-
-            content.Add(audioContent, "file", "recording.mp3");
-            content.Add(new StringContent("whisper-1"), "model");
-
-            var response = await client.PostAsync("https://api.openai.com/v1/audio/translations", content);
-            if (!response.IsSuccessStatusCode)
-            {
-                string error = await response.Content.ReadAsStringAsync();
-                LogError($"Whisper API Error [{response.StatusCode}]: {error}");
-                return $"[OPENAI WHISPER ERROR] {response.StatusCode}. Check C:\\CRM_files\\OpenAI_Logs.txt";
-            }
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(responseString);
-            return document.RootElement.GetProperty("text").GetString();
-        }
-
-        private static async System.Threading.Tasks.Task<(string FormattedChat, string Summary)> AnalyzeCallWithGptAsync(string rawTranscription, string apiKey)
-        {
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromMinutes(2);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-            string systemPrompt = @"You are an expert CRM Sales Call Analyst.
-You will receive a raw audio translation. You MUST return ONLY a valid JSON object matching this exact structure:
-{
-  ""formatted_chat"": [
-    { ""Speaker"": ""Salesperson"", ""Text"": ""Hello, how can I help?"" },
-    { ""Speaker"": ""Customer"", ""Text"": ""I need info."" }
-  ],
-  ""summary"": ""A brief 2-sentence summary of the intent and outcome.""
-}
-If it is a voicemail, assign the speaker appropriately. Use exactly the keys 'formatted_chat' and 'summary'.";
-
-            var payload = new
-            {
-                model = "gpt-4o-mini",
-                response_format = new { type = "json_object" },
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = $"Raw Transcript:\n{rawTranscription}" }
-                },
-                temperature = 0.2
-            };
-
-            var jsonContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", jsonContent);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                string error = await response.Content.ReadAsStringAsync();
-                LogError($"GPT-4o-mini Error [{response.StatusCode}]: {error}");
-                return (rawTranscription, "OpenAI API Error. Check Logs.");
-            }
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            using var document = JsonDocument.Parse(responseString);
-            string jsonResult = document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-
-            try
-            {
-                using var resultDoc = JsonDocument.Parse(jsonResult);
-
-                string chatJsonArray = "[]";
-                if (resultDoc.RootElement.TryGetProperty("formatted_chat", out var chatNode))
-                {
-                    chatJsonArray = chatNode.GetRawText();
-                }
-
-                string summary = "No summary generated.";
-                if (resultDoc.RootElement.TryGetProperty("summary", out var summaryNode))
-                {
-                    summary = summaryNode.GetString();
-                }
-
-                return (chatJsonArray, summary);
-            }
-            catch (Exception ex)
-            {
-                LogError($"JSON Parsing Error: {ex.Message}\nRaw JSON from GPT: {jsonResult}");
-                return (rawTranscription, "Audio was too short or unclear to summarize.");
-            }
+            return Ok(new { success = true, message = $"Successfully re-queued {brokenRecords.Count} failed/stuck records. The background worker will process them shortly." });
         }
     }
 }

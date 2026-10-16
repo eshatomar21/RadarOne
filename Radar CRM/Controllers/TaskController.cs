@@ -18,10 +18,13 @@ namespace Radar_CRM.Controllers
     public class TasksController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
-        public TasksController(ApplicationDbContext context)
+        // 🚀 FIX: Add the configuration parameter inside these parentheses
+        public TasksController(ApplicationDbContext context, Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration; // Now it successfully maps!
         }
 
         // ==========================================
@@ -775,10 +778,22 @@ namespace Radar_CRM.Controllers
                     // =========================================================
 
                     // 4. SAVE TO DATABASE
+                    // 🚀 NEW: Detect if the owner changed before saving
+                    bool ownerChanged = existingTask != null &&
+                        !string.Equals(existingTask.TaskOwnerId?.Trim(), taskModel.TaskOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                    // 4. SAVE TO DATABASE
                     _context.Update(taskModel);
                     await _context.SaveChangesAsync();
 
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
+
+                    // 🚀 NEW: Trigger email and in-app notification if owner was changed
+                    if (ownerChanged && !string.IsNullOrWhiteSpace(taskModel.TaskOwnerId))
+                    {
+                        var assignedTaskDict = new Dictionary<int, string> { { taskModel.Id, taskModel.Subject ?? "Unknown Task" } };
+                        await NotifyNewOwnerAsync(taskModel.TaskOwnerId, assignedTaskDict);
+                    }
 
                     // Stay on the Edit page instead of redirecting to Index
                     return RedirectToAction(nameof(Edit), new { id = taskModel.Id });
@@ -856,7 +871,7 @@ namespace Radar_CRM.Controllers
         {
             if (uploadedFile == null || uploadedFile.Length == 0) return BadRequest("No file was uploaded.");
 
-            // 🚀 Explicitly specify Radar_CRM.Models.Task 
+            // 🚀 Explicitly specify Radar_CRM.Models.Task
             var tasksToInsert = new List<Radar_CRM.Models.Task>();
             int currentRow = 1;
             int skippedCount = 0; // 🚀 Added to track skipped records
@@ -1107,6 +1122,96 @@ namespace Radar_CRM.Controllers
                     }
                 }
                 await _context.SaveChangesAsync();
+            }
+        }
+
+        // ==========================================
+        // NOTIFICATION HELPER: Email & In-App Popup
+        // ==========================================
+        private async System.Threading.Tasks.Task NotifyNewOwnerAsync(string newOwnerId, Dictionary<int, string> assignedTasks)
+        {
+            if (string.IsNullOrEmpty(newOwnerId) || assignedTasks == null || !assignedTasks.Any()) return;
+
+            var newOwner = await _context.Users.FindAsync(newOwnerId);
+            if (newOwner == null || string.IsNullOrEmpty(newOwner.Email)) return;
+
+            string ownerName = newOwner.fullName ?? newOwner.FirstName ?? "Team Member";
+            bool isBulk = assignedTasks.Count > 1;
+
+            string subject = isBulk
+                ? $"Action Required: {assignedTasks.Count} Tasks Assigned to You"
+                : $"Action Required: Task '{assignedTasks.Values.First()}' Assigned to You";
+
+            // Build the live clickable links using Url.Action
+            string taskListHtml = string.Join("", assignedTasks.Select(t =>
+            {
+                string linkUrl = Url.Action("Edit", "Tasks", new { id = t.Key }, Request.Scheme);
+                return $"<li style='margin-bottom: 8px;'><a href='{linkUrl}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{t.Value}</a></li>";
+            }));
+
+            string body = $@"
+        <div style='font-family: Arial, sans-serif; color: #333;'>
+            <h3>Hi {ownerName},</h3>
+            <p>You have been assigned as the new owner for the following {(isBulk ? "tasks" : "task")}:</p>
+            <ul>{taskListHtml}</ul>
+            <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
+            <br/>
+            <p><small>This is an automated notification from Radar CRM.</small></p>
+        </div>";
+
+            // 1. Send Email via Resend API
+            try
+            {
+                string apiKey = _configuration["Resend:ApiKey"];
+                if (string.IsNullOrEmpty(apiKey)) throw new Exception("Resend API Key is missing in appsettings.json.");
+
+                string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
+                var emailPayload = new Dictionary<string, object>
+                {
+                    { "from", senderEmail },
+                    { "to", new List<string> { newOwner.Email.Trim() } },
+                    { "subject", subject },
+                    { "html", body }
+                };
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    var requestMessage = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.resend.com/emails");
+                    requestMessage.Headers.Add("Authorization", $"Bearer {apiKey}");
+                    requestMessage.Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(emailPayload), System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(requestMessage);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Resend API Error: {errorContent}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
+            }
+
+            // 2. Create In-App Notification (System Task)
+            try
+            {
+                var systemTask = new CrmTaskModel
+                {
+                    Subject = isBulk ? $"You have been assigned {assignedTasks.Count} new tasks." : $"You are the new owner of {assignedTasks.Values.First()}.",
+                    Status = "Not Started",
+                    Priority = "High",
+                    TaskOwnerId = newOwnerId,
+                    CreatedDateAndTime = DateTime.Now,
+                    DueDate = DateTime.Now.AddDays(1)
+                };
+
+                _context.Set<CrmTaskModel>().Add(systemTask);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"In-App Notification Failed: {ex.Message}");
             }
         }
 

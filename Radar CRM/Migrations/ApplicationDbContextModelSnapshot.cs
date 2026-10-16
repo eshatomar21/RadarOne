@@ -395,16 +395,37 @@ namespace Radar_CRM.Migrations
                     b.Property<int?>("AccountId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Age")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AiSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AveragePatientFee")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CallDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ClinicType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CollegeName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CurrentSoftwareName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CurrentlyUsingSoftware")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CustomerPhone")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("DateOfBirth")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("DurationSeconds")
                         .HasColumnType("int");
@@ -412,10 +433,25 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("GapAnalysis")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("HasComputer")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IsHomeopathicDoctor")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("LeadId")
                         .HasColumnType("int");
 
                     b.Property<string>("LocalFilePath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NumberOfClinics")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PatientsPerDay")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Qualification")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RecommendedProducts")
@@ -441,10 +477,22 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("SalespersonTone")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TotalExperience")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("TranscriptionText")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserNeeds")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WorkType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("YearOfPassing")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("YearsOfPractice")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
