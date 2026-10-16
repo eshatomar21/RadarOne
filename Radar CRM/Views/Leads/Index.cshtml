@@ -462,13 +462,26 @@
                                     <input type="date" class="form-control form-control-sm condition-val date-val-1" />
                                     <input type="date" class="form-control form-control-sm condition-val date-val-2" style="display:none;" />
                                 </div>
-                            } else if (isPredefined) {
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="is" selected>is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
-                                <select class="form-select form-select-sm condition-val">
-                                    <option value="" disabled selected>- Select @prop.Name -</option>
-                                    @foreach (var opt in predefinedLists[prop.Name]) { <option value="@opt">@opt</option> }
-                                </select>
-                            } else if (isUserField) {
+                           } else if (isPredefined) {
+    <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+        <option value="is" selected>is</option>
+        <option value="is_not">is not</option>
+        <option value="is_empty">is empty</option>
+        <option value="is_not_empty">is not empty</option>
+    </select>
+
+    <!-- 🚀 ADDED 'multiple' AND CUSTOM HEIGHT -->
+    <select class="form-select form-select-sm condition-val" multiple style="min-height: 120px;">
+        @{
+            var dropdownOptions = predefinedLists.ContainsKey(prop.Name) ? predefinedLists[prop.Name] : new[] { "True", "False" };
+        }
+        @foreach (var opt in dropdownOptions)
+        {
+            <option value="@opt">@opt</option>
+        }
+    </select>
+    <div class="text-muted mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-info"></i> Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
+} else if (isUserField) {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="is" selected>is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
                                 <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
                                 <datalist id="dl_users_@prop.Name">
@@ -1597,13 +1610,44 @@ function restoreSidebarFiltersFromUrl() {
                         }
                     } else {
                         const textVal = item.querySelector('.condition-val');
-                        if (textVal) textVal.value = f.Value;
+                        if (textVal) {
+                            // 🚀 MODIFIED: Safely split incoming commas and re-apply selection to the UI
+                            if (textVal.multiple) {
+                                const selectedVals = f.Value.split(',');
+                                Array.from(textVal.options).forEach(opt => {
+                                    opt.selected = selectedVals.includes(opt.value);
+                                });
+                            } else {
+                                textVal.value = f.Value;
+                            }
+                        }
                     }
                 }
             });
-        } catch (e) { console.error("Error restoring filters", e); }
+        } catch (e) { 
+            console.error("Error restoring filters", e); 
+        }
     }
 }
+
+
+// ==========================================
+// OVERRIDE NATIVE MULTI-SELECT BEHAVIOR
+// ==========================================
+document.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'OPTION' && e.target.parentElement.hasAttribute('multiple')) {
+        e.preventDefault(); 
+        
+        e.target.selected = !e.target.selected;
+        
+        e.target.parentElement.dispatchEvent(new Event('change'));
+        
+        const select = e.target.parentElement;
+        const top = select.scrollTop;
+        select.focus();
+        select.scrollTop = top;
+    }
+});
 
     // ==========================================
     // 🚀 NEW: SAVE & RESTORE COLUMN ORDER
@@ -2027,7 +2071,19 @@ function getActiveSidebarFilters() {
             let colName = cb.value;
             const condition = item.querySelector('.condition-select').value;
             const isDate = item.dataset.fieldType === "date";
-            let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+            
+            // 🚀 MODIFIED: Check if the element is a multi-select and join values
+            let val1 = '';
+            if (isDate) {
+                val1 = item.querySelector('.date-val-1')?.value || '';
+            } else {
+                const conditionValEl = item.querySelector('.condition-val');
+                if (conditionValEl && conditionValEl.multiple) {
+                    val1 = Array.from(conditionValEl.selectedOptions).map(opt => opt.value).join(',');
+                } else {
+                    val1 = conditionValEl?.value.trim() || '';
+                }
+            }
 
             if (colName === "AccountOwner" || colName === "CoOwner" || colName === "LeadOwner" || colName === "DemoOwner") {
                 colName += "Id";

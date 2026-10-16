@@ -1108,10 +1108,10 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                     <option value="is_empty">is empty</option>
                                     <option value="is_not_empty">is not empty</option>
                                 </select>
-                                <select class="form-select form-select-sm condition-val">
-                                    <option value="" disabled selected>- Select @prop.Name -</option>
+
+                                <!-- 🚀 ADDED 'multiple' AND CUSTOM HEIGHT -->
+                                <select class="form-select form-select-sm condition-val" multiple style="min-height: 120px;">
                                     @{
-                                        // 🚀 SAFE FALLBACK: If missing from dictionary, automatically generate True/False options
                                         var dropdownOptions = predefinedLists.ContainsKey(prop.Name) ? predefinedLists[prop.Name] : new[] { "True", "False" };
                                     }
                                     @foreach (var opt in dropdownOptions)
@@ -1119,6 +1119,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                         <option value="@opt">@opt</option>
                                     }
                                 </select>
+                                <div class="text-muted mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-info"></i> Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
                             }
                             else if (isUserField)
                             {
@@ -2623,7 +2624,7 @@ function initializeTooltips() {
         }
     }
 
-   function restoreSidebarFiltersFromUrl() {
+ function restoreSidebarFiltersFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     const filtersParam = urlParams.get('advancedFilters');
 
@@ -2708,9 +2709,19 @@ function initializeTooltips() {
                         }
                     } else {
                         const textVal = item.querySelector('.condition-val');
-                        if (textVal) textVal.value = f.Value;
-                    }
-                }
+                        if (textVal) {
+                            // 🚀 MODIFIED: Safely split incoming commas and re-apply selection to the UI
+                            if (textVal.multiple) {
+                                const selectedVals = f.Value.split(',');
+                                Array.from(textVal.options).forEach(opt => {
+                                    opt.selected = selectedVals.includes(opt.value);
+                                });
+                            } else {
+                                textVal.value = f.Value;
+                            }
+                        }
+                    } // <-- MISSING BRACE FIXED (Closes the 'else' block)
+                } // <-- MISSING BRACE FIXED (Closes the 'if (chk)' block)
             });
         } catch(e) {
             console.error("Error restoring filters from URL", e);
@@ -2769,6 +2780,29 @@ function initializeTooltips() {
             container.appendChild(badge);
         });
     }
+
+    // ==========================================
+// OVERRIDE NATIVE MULTI-SELECT BEHAVIOR
+// Allows users to click multiple options without holding Ctrl
+// ==========================================
+document.addEventListener('mousedown', function(e) {
+    // Check if the user is clicking an option inside a multi-select box
+    if (e.target.tagName === 'OPTION' && e.target.parentElement.hasAttribute('multiple')) {
+        e.preventDefault(); // Stop the browser from clearing other selections
+
+        // Toggle the clicked option on or off
+        e.target.selected = !e.target.selected;
+
+        // Let the select box know its value changed
+        e.target.parentElement.dispatchEvent(new Event('change'));
+
+        // Optional: force the select to briefly blur/focus to update the UI paint in some browsers
+        const select = e.target.parentElement;
+        const top = select.scrollTop;
+        select.focus();
+        select.scrollTop = top;
+    }
+});
 
     function applySavedSidebarFilter(id) {
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters') || '[]');
@@ -3070,15 +3104,27 @@ function initializeTooltips() {
         }
     });
    
-    function getActiveSidebarFilters() {
+   function getActiveSidebarFilters() {
     const activeFilters = [];
     document.querySelectorAll('.filter-field-item.active').forEach(item => {
         const cb = item.querySelector('.field-checkbox');
-        if (cb && cb.checked && cb.id !== "chk_related_tasks") { // 🚀 EXCLUDE TASK CHECKBOX
+        if (cb && cb.checked && cb.id !== "chk_related_tasks") {
             let colName = cb.value;
             const condition = item.querySelector('.condition-select').value;
             const isDate = item.dataset.fieldType === "date";
-            let val1 = isDate ? (item.querySelector('.date-val-1')?.value || '') : (item.querySelector('.condition-val')?.value.trim() || '');
+
+            // 🚀 MODIFIED: Check if the element is a multi-select and join values
+            let val1 = '';
+            if (isDate) {
+                val1 = item.querySelector('.date-val-1')?.value || '';
+            } else {
+                const conditionValEl = item.querySelector('.condition-val');
+                if (conditionValEl && conditionValEl.multiple) {
+                    val1 = Array.from(conditionValEl.selectedOptions).map(opt => opt.value).join(',');
+                } else {
+                    val1 = conditionValEl?.value.trim() || '';
+                }
+            }
 
             if (colName === "AccountOwner" || colName === "CoOwner" || colName === "LeadOwner" || colName === "DemoOwner") {
                 colName += "Id";
@@ -3094,17 +3140,17 @@ function initializeTooltips() {
         }
     });
 
-    // 🚀 NEW: Process Related Tasks Filter
+    // ... (Keep the rest of your Related Tasks Filter processing below) ...
     const taskChk = document.getElementById('chk_related_tasks');
     if (taskChk && taskChk.checked) {
-        const presence = document.getElementById('related_tasks_presence').value; // 'with' or 'without'
+        const presence = document.getElementById('related_tasks_presence').value;
         activeFilters.push({ LogicalOperator: "AND", ColumnName: "RelatedTasksPresence", Condition: "is", Value: presence, IsDate: false });
 
         document.querySelectorAll('#related_tasks_fields > div').forEach(block => {
             const fieldSel = block.querySelector('.task-rel-field');
             if (!fieldSel || !fieldSel.value) return;
 
-            const field = "Task." + fieldSel.value; // Explicitly tag as Task.ColumnName
+            const field = "Task." + fieldSel.value;
             const condition = block.querySelector('.task-rel-condition').value;
             const isDate = field.includes('Date');
             let val = block.querySelector('.task-rel-val-1').value;
@@ -3122,7 +3168,6 @@ function initializeTooltips() {
 
     return activeFilters;
 }
-
     function applyFilters() {
         const activeFilters = getActiveSidebarFilters();
         if (activeFilters.length === 0) {
