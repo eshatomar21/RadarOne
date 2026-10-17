@@ -482,12 +482,28 @@
     </select>
     <div class="text-muted mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-info"></i> Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
 } else if (isUserField) {
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="is" selected>is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
-                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
-                                <datalist id="dl_users_@prop.Name">
-                                    @if (ViewBag.UsersList != null) { foreach (var user in (SelectList)ViewBag.UsersList) { <option value="@user.Text">@user.Text</option> } }
-                                </datalist>
-                            } else {
+    <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+        <option value="is" selected>is</option>
+        <option value="in">in (multiple)</option>
+        <option value="is_not">is not</option>
+        <option value="is_empty">is empty</option>
+        <option value="is_not_empty">is not empty</option>
+    </select>
+    
+    <!-- 🚀 FIX: Converted to a true Multi-Select Dropdown using User IDs -->
+    <select class="form-select form-select-sm condition-val text-val" multiple style="min-height: 120px;">
+        @if (ViewBag.UsersList != null)
+        {
+            foreach (var user in (SelectList)ViewBag.UsersList)
+            {
+                <option value="@user.Value">@user.Text</option>
+            }
+        }
+    </select>
+    <div class="text-muted mt-1" style="font-size: 0.7rem;">
+        <i class="fa-solid fa-circle-info"></i> Click to select multiple users
+    </div>
+} else {
                                 <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold"><option value="contains" selected>contains</option><option value="does_not_contain">does not contain</option><option value="starts_with">starts with</option><option value="ends_with">ends with</option><option value="is">is exactly</option><option value="is_not">isn't</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option></select>
                                 <input type="text" class="form-control form-control-sm condition-val text-val" placeholder="Search @prop.Name..." />
                             }
@@ -1612,14 +1628,15 @@ function restoreSidebarFiltersFromUrl() {
                         const textVal = item.querySelector('.condition-val');
                         if (textVal) {
                             // 🚀 MODIFIED: Safely split incoming commas and re-apply selection to the UI
-                            if (textVal.multiple) {
-                                const selectedVals = f.Value.split(',');
-                                Array.from(textVal.options).forEach(opt => {
-                                    opt.selected = selectedVals.includes(opt.value);
-                                });
-                            } else {
-                                textVal.value = f.Value;
-                            }
+                           if (textVal.multiple) {
+    // 🚀 FIX: Convert both sides to lowercase and trim spaces so the match doesn't fail
+    const selectedVals = f.Value.split(',').map(v => v.trim().toLowerCase());
+    Array.from(textVal.options).forEach(opt => {
+        opt.selected = selectedVals.includes(opt.value.trim().toLowerCase());
+    });
+} else {
+    textVal.value = f.Value;
+}
                         }
                     }
                 }

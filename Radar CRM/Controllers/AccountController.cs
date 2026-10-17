@@ -159,35 +159,78 @@ namespace Radar_CRM.Controllers
                                 }
                             }
                             // OWNER / USER MAPPING
-                            else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
+                            // OWNER / USER MAPPING & AUDIT FIELDS
+                            else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
                             {
-                                var searchValue = safeValue.ToLower();
-                                var matchingUserIds = _context.Users
-                                    .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
-                                                (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
-                                    .Select(u => u.Id).ToList();
+                                // 🚀 The UI multi-select passes User IDs. Split them into a list.
+                                var userIds = safeValue.Split(',').Select(id => id.Trim()).ToList();
 
-                                var listExpr = System.Linq.Expressions.Expression.Constant(matchingUserIds);
-                                var containsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                // SCENARIO 1: The filter targets the exact ID column (e.g. "AccountOwnerId")
+                                if (dbColName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var listExpr = System.Linq.Expressions.Expression.Constant(userIds);
+                                    var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
 
-                                if (f.Condition == "contains" || f.Condition == "is")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr);
-                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
-                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr));
+                                    if (f.Condition == "is" || f.Condition == "in" || f.Condition == "contains")
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, propExpr);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain")
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, propExpr));
+                                    else if (f.Condition == "is_empty")
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                    else if (f.Condition == "is_not_empty")
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                }
+                                // SCENARIO 2: The filter targets the TEXT Name column (e.g., "AccountOwner")
+                                else
+                                {
+                                    // 🚀 We must translate the User IDs from the dropdown into User Names from the database!
+                                    var userNames = _context.Users
+                                        .Where(u => userIds.Contains(u.Id))
+                                        .Select(u => u.fullName ?? u.FirstName)
+                                        .ToList();
+
+                                    if (userNames.Any())
+                                    {
+                                        var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                        var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                        var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                        var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+
+                                        System.Linq.Expressions.Expression nameConditions = null;
+
+                                        // Build an OR condition for every selected name (e.g. AccountOwner contains "John" OR "Jane")
+                                        foreach (var name in userNames.Where(n => !string.IsNullOrWhiteSpace(n)))
+                                        {
+                                            var lowerVal = System.Linq.Expressions.Expression.Constant(name.Trim().ToLower());
+                                            var containsExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                            nameConditions = nameConditions == null ? containsExpr : System.Linq.Expressions.Expression.OrElse(nameConditions, containsExpr);
+                                        }
+
+                                        if (f.Condition == "is_not" || f.Condition == "does_not_contain")
+                                            conditionExpr = System.Linq.Expressions.Expression.Not(nameConditions);
+                                        else
+                                            conditionExpr = nameConditions;
+                                    }
+                                    else if (f.Condition == "is_empty")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                    }
+                                    else if (f.Condition == "is_not_empty")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                    }
+                                }
                             }
                             // REGULAR STRINGS
                             else if (propertyInfo.PropertyType == typeof(string))
                             {
                                 var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
                                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
-                                var startsWithMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
-                                var endsWithMethod = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
-
                                 var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
                                 var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
                                 var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
-                                // 🚀 FIX: Handle Multi-Select Comma Separated lists for 'is' and 'is_not'
+                                // 🚀 FIX: Automatically support comma-separated Multi-Selects for standard strings too (like LeadStatus)
                                 if (f.Condition == "is")
                                 {
                                     if (safeValue.Contains(","))
@@ -197,10 +240,7 @@ namespace Radar_CRM.Controllers
                                         var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
                                         conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp);
                                     }
-                                    else
-                                    {
-                                        conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
-                                    }
+                                    else conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
                                 }
                                 else if (f.Condition == "is_not")
                                 {
@@ -211,15 +251,12 @@ namespace Radar_CRM.Controllers
                                         var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
                                         conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp));
                                     }
-                                    else
-                                    {
-                                        conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
-                                    }
+                                    else conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
                                 }
                                 else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
                                 else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
-                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
-                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, endsWithMethod, lowerVal);
+                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, typeof(string).GetMethod("StartsWith", new[] { typeof(string) }), lowerVal);
+                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, typeof(string).GetMethod("EndsWith", new[] { typeof(string) }), lowerVal);
                                 else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
                                 else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
                             }

@@ -1121,26 +1121,31 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                 </select>
                                 <div class="text-muted mt-1" style="font-size: 0.7rem;"><i class="fa-solid fa-circle-info"></i> Hold Ctrl (Windows) or Cmd (Mac) to select multiple</div>
                             }
-                            else if (isUserField)
-                            {
-                                <!-- User Field with User Options -->
-                                <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
-                                    <option value="is" selected>is</option>
-                                    <option value="is_not">is not</option>
-                                    <option value="is_empty">is empty</option>
-                                    <option value="is_not_empty">is not empty</option>
-                                </select>
-                                <input type="text" list="dl_users_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Select or type user..." />
-                                <datalist id="dl_users_@prop.Name">
-                                    @if (ViewBag.UsersList != null)
-                                    {
-                                        foreach (var user in (SelectList)ViewBag.UsersList)
-                                        {
-                                            <option value="@user.Text">@user.Text</option>
-                                        }
-                                    }
-                                </datalist>
-                            }
+                           else if (isUserField)
+{
+    <!-- User Field with Multi-Select Options -->
+    <select class="form-select form-select-sm mb-2 text-primary border-primary condition-select fw-semibold">
+        <option value="is" selected>is</option>
+        <option value="in">in (multiple)</option>
+        <option value="is_not">is not</option>
+        <option value="is_empty">is empty</option>
+        <option value="is_not_empty">is not empty</option>
+    </select>
+    
+    <select class="form-select form-select-sm condition-val text-val" multiple style="min-height: 120px;">
+        @if (ViewBag.UsersList != null)
+        {
+            foreach (var user in (SelectList)ViewBag.UsersList)
+            {
+                <!-- 🚀 FIX: Must use user.Value (the ID) so the backend can match AccountOwnerId -->
+                <option value="@user.Value">@user.Text</option>
+            }
+        }
+    </select>
+    <div class="text-muted mt-1" style="font-size: 0.7rem;">
+        <i class="fa-solid fa-circle-info"></i> Hold Ctrl (Windows) or Cmd (Mac) to select multiple
+    </div>
+}
                             else
                             {
                                 <!-- Text Field for Large Data -->
@@ -1538,13 +1543,14 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
 
                 <div class="mb-4">
                     <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Select Field to Update</label>
-                    <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" onchange="renderMassUpdateInput()">
-                        <option value="" disabled selected>- Choose a field -</option>
-                        @foreach (var prop in tableProps)
-                        {
-                            <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
-                        }
-                    </select>
+                  <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" style="width: 100%;" onchange="renderMassUpdateInput()">
+    <option value="" disabled selected>- Choose a field -</option>
+    <!-- 🚀 FIX: Sort the fields alphabetically -->
+    @foreach (var prop in tableProps.OrderBy(p => p.Name))
+    {
+        <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
+    }
+</select>
                 </div>
 
                 <!-- 🚀 FIX: Removed display:none so the modal doesn't look cut off -->
@@ -2077,15 +2083,16 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
     };
 
 
-        const ownerOptionsList = [
-            @if (ViewBag.UsersList != null)
-            {
-                    foreach (var user in (SelectList)ViewBag.UsersList)
-                    {
-                            <text>"@Html.Raw(user.Text)",</text>
-                    }
-            }
-        ];
+       const ownerOptionsList = [
+    @if (ViewBag.UsersList != null)
+    {
+        foreach (var user in (SelectList)ViewBag.UsersList)
+        {
+            // 🚀 FIX: Store both the Value (ID) and Text (Name) for JavaScript
+            <text>{ value: "@Html.Raw(user.Value)", text: "@Html.Raw(user.Text)" },</text>
+        }
+    }
+];
 
         const vendorOptionsList = [
             @if (ViewBag.VendorsList != null)
@@ -2381,14 +2388,17 @@ function initializeTooltips() {
 
         let conditionOptions = '';
 
-        if (fieldName.includes("Owner") || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
-            conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
-            let datalistId = "dl_cv_owner_" + Date.now();
-            let opts = `<datalist id="${datalistId}">`;
-            ownerOptionsList.forEach(o => { opts += `<option value="${o}">${o}</option>`; });
-            opts += `</datalist>`;
-            valueContainer.innerHTML = `<input type="text" list="${datalistId}" class="form-control criteria-builder-input cv-value" placeholder="Select or type user..." style="width:100%;">${opts}`;
-        }
+      if (fieldName.includes("Owner") || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
+    conditionOptions = '<option value="is">is</option><option value="in">in (multiple)</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
+    
+    let opts = '';
+    // 🚀 FIX: Use o.value for the option value and o.text for the display text
+    ownerOptionsList.forEach(o => { 
+        opts += `<option value="${o.value}">${o.text}</option>`; 
+    });
+    
+    valueContainer.innerHTML = `<select class="form-select criteria-builder-input cv-value" multiple style="width:100%; min-height: 120px;">${opts}</select>`;
+}
         // 🚀 BULLETPROOF FIX: Match map OR any field containing "duplicate" case-insensitively
         else if (criteriaFilterOptionsMap[fieldName] || fieldName.toLowerCase().includes('duplicate')) {
             conditionOptions = '<option value="is">is</option><option value="is_not">is not</option><option value="is_empty">is empty</option><option value="is_not_empty">is not empty</option>';
@@ -2834,7 +2844,7 @@ document.addEventListener('mousedown', function(e) {
     }
 
     // 🚀 FIX: Prevent modal freeze by moving it to the body before opening
-    window.openMassUpdateModal = function() {
+   window.openMassUpdateModal = function() {
         const modalEl = document.getElementById('massUpdateModal');
 
         if (!modalEl) {
@@ -2843,22 +2853,28 @@ document.addEventListener('mousedown', function(e) {
         }
 
         // Move the modal directly to the <body> tag to escape CSS backdrop traps
-        document.body.appendChild(modalEl);
-
-        // Ensure it sits on top of everything
+        if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
         modalEl.style.zIndex = "1055";
 
         try {
-            // Modern Bootstrap 5 method
             const myModal = new bootstrap.Modal(modalEl);
             myModal.show();
-        } catch (error) {
-            // Fallback for Bootstrap 4 / jQuery
-            if (typeof $ !== 'undefined') {
-                $(modalEl).modal('show');
-            } else {
-                console.error("Bootstrap is not loaded properly.", error);
+            
+            // 🚀 NEW: Make the Field Dropdown Searchable
+            if (typeof $!== 'undefined' &&$.fn.select2) {
+                $('#massUpdateField').select2({
+                    dropdownParent: $('#massUpdateModal'),
+                    width: '100%',
+                    placeholder: "- Choose a field -"
+                });
+                
+                // Bind Select2 change to trigger our render function
+                $('#massUpdateField').off('change').on('change', function() {
+                    renderMassUpdateInput();
+                });
             }
+        } catch (error) {
+            if (typeof $!== 'undefined')$(modalEl).modal('show');
         }
     };
 
@@ -3060,18 +3076,18 @@ document.addEventListener('mousedown', function(e) {
 
                 try {
                     if (bulkTaskAccountIds.length > 1) {
-                        // BULK CREATE: Loop and save a task for every checked record
+                        // BULK CREATE
                         const promises = bulkTaskAccountIds.map(accountId => {
-                            formData.set('AccountId', accountId); // Inject the specific Account ID
-                            return fetch(taskForm.action, {
-                                method: 'POST',
-                                body: formData
-                            });
+                            formData.set('AccountId', accountId);
+                            return fetch(taskForm.action, { method: 'POST', body: formData });
                         });
 
                         await Promise.all(promises);
                         
                         alert(`Successfully created tasks for ${bulkTaskAccountIds.length} accounts!`);
+                        
+                        // 🚀 FIX: Clear checkboxes from memory before reload
+                        clearGlobalSelection();
                         window.location.reload();
                     } else {
                         // SINGLE CREATE
@@ -3085,6 +3101,8 @@ document.addEventListener('mousedown', function(e) {
                         });
 
                         if (response.ok || response.redirected) {
+                            // 🚀 FIX: Clear checkboxes from memory before reload
+                            clearGlobalSelection();
                             window.location.reload();
                         } else {
                             alert("There was an issue saving the task.");
@@ -3568,7 +3586,7 @@ function saveColumnOrder() {
         "CurrentlyUsingSoftware": ["Yes", "No"]
     };
 
-    window.renderMassUpdateInput = function() {
+   window.renderMassUpdateInput = function() {
         const fieldSelect = document.getElementById('massUpdateField');
         const inputArea = document.getElementById('dynamicInputArea');
         const selectedField = fieldSelect.value;
@@ -3583,11 +3601,18 @@ function saveColumnOrder() {
         inputArea.innerHTML = '';
 
         if (massUpdateOptionsMap[selectedField]) {
-            let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm"><option value="" disabled selected>- Select Option -</option>`;
+            // 🚀 NEW: Clone and Sort the Values array alphabetically
+            let optionsArray = [...massUpdateOptionsMap[selectedField]];
+            optionsArray.sort((a, b) => {
+                let textA = typeof a === 'object' ? a.text : a;
+                let textB = typeof b === 'object' ? b.text : b;
+                return textA.localeCompare(textB);
+            });
+
+            let selectHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm" style="width: 100%;"><option value="" disabled selected>- Select Option -</option>`;
             selectHTML += `<option value="CLEAR_VALUE_COMMAND">[ Clear / Remove Value ]</option>`;
             
-            massUpdateOptionsMap[selectedField].forEach(opt => {
-                // 🚀 FIX 3: Intelligently render JS Objects (IDs) vs Standard Strings
+            optionsArray.forEach(opt => {
                 if (typeof opt === 'object') {
                     selectHTML += `<option value="${opt.value}">${opt.text}</option>`;
                 } else {
@@ -3597,6 +3622,15 @@ function saveColumnOrder() {
             
             selectHTML += `</select>`;
             inputArea.innerHTML = selectHTML;
+
+            // 🚀 NEW: Make the Value Dropdown Searchable
+            if (typeof $!== 'undefined' &&$.fn.select2) {
+                $('#massUpdateValue').select2({
+                    dropdownParent: $('#massUpdateModal'),
+                    width: '100%',
+                    placeholder: "- Select Option -"
+                });
+            }
         }
         else if (fieldType && fieldType.includes('DateTime')) {
             inputArea.innerHTML = `<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />`;
@@ -3607,7 +3641,7 @@ function saveColumnOrder() {
         else {
             inputArea.innerHTML = `<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter text value..." />`;
         }
-    }
+    };
 
  function executeMassUpdateAjax() {
     let field = document.getElementById('massUpdateField').value;
@@ -3661,6 +3695,9 @@ function saveColumnOrder() {
              if (data.success) {
                  bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
                  alert(`Successfully updated ${selectedIds.length} records!`);
+                 
+                 // 🚀 FIX: Clear checkboxes from memory before reload
+                 clearGlobalSelection(); 
                  window.location.reload();
              } else {
                  alert("Update failed: " + data.message);
@@ -3948,9 +3985,11 @@ window.clearGlobalSelection = function() {
             }
             return response.json();
         })
-        .then(data => {
+       .then(data => {
             if (data.success) {
-                window.location.reload();
+                 // 🚀 FIX: Clear checkboxes from memory before reload
+                 clearGlobalSelection();
+                 window.location.reload();
             } else {
                 alert("Database Error:\n" + data.message);
             }

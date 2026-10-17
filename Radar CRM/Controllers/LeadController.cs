@@ -163,40 +163,104 @@ namespace Radar_CRM.Controllers
                                 }
                             }
                             // OWNER / USER MAPPING
-                            else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
+                            // OWNER / USER MAPPING & AUDIT FIELDS
+                            else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
                             {
-                                var searchValue = safeValue.ToLower();
-                                var matchingUserIds = _context.Users
-                                    .Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) ||
-                                                (u.FirstName != null && u.FirstName.ToLower().Contains(searchValue)))
-                                    .Select(u => u.Id).ToList();
+                                // 🚀 The UI multi-select passes User IDs. Split them into a list.
+                                var userIds = safeValue.Split(',').Select(id => id.Trim()).ToList();
 
-                                var listExpr = System.Linq.Expressions.Expression.Constant(matchingUserIds);
-                                var containsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                // SCENARIO 1: The filter targets the exact ID column (e.g. "LeadOwnerId")
+                                if (dbColName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var listExpr = System.Linq.Expressions.Expression.Constant(userIds);
+                                    var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
 
-                                if (f.Condition == "contains" || f.Condition == "is")
-                                    conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr);
-                                else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
-                                    conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, containsMethod, propExpr));
+                                    if (f.Condition == "is" || f.Condition == "in" || f.Condition == "contains")
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, propExpr);
+                                    else if (f.Condition == "is_not" || f.Condition == "does_not_contain")
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, propExpr));
+                                    else if (f.Condition == "is_empty")
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                    else if (f.Condition == "is_not_empty")
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                }
+                                // SCENARIO 2: The filter targets the TEXT Name column (e.g., "LeadOwner")
+                                else
+                                {
+                                    // 🚀 We must translate the User IDs from the dropdown into User Names from the database!
+                                    var userNames = _context.Users
+                                        .Where(u => userIds.Contains(u.Id))
+                                        .Select(u => u.fullName ?? u.FirstName)
+                                        .ToList();
+
+                                    if (userNames.Any())
+                                    {
+                                        var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                        var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                        var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                        var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+
+                                        System.Linq.Expressions.Expression nameConditions = null;
+
+                                        // Build an OR condition for every selected name
+                                        foreach (var name in userNames.Where(n => !string.IsNullOrWhiteSpace(n)))
+                                        {
+                                            var lowerVal = System.Linq.Expressions.Expression.Constant(name.Trim().ToLower());
+                                            var containsExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                            nameConditions = nameConditions == null ? containsExpr : System.Linq.Expressions.Expression.OrElse(nameConditions, containsExpr);
+                                        }
+
+                                        if (f.Condition == "is_not" || f.Condition == "does_not_contain")
+                                            conditionExpr = System.Linq.Expressions.Expression.Not(nameConditions);
+                                        else
+                                            conditionExpr = nameConditions;
+                                    }
+                                    else if (f.Condition == "is_empty")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                    }
+                                    else if (f.Condition == "is_not_empty")
+                                    {
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                    }
+                                }
                             }
                             // REGULAR STRINGS
                             else if (propertyInfo.PropertyType == typeof(string))
                             {
                                 var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
                                 var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
-                                var startsWithMethod = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
-                                var endsWithMethod = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
-
                                 var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
                                 var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
                                 var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
 
-                                if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
-                                else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                // 🚀 FIX: Automatically support comma-separated Multi-Selects for standard strings too
+                                if (f.Condition == "is")
+                                {
+                                    if (safeValue.Contains(","))
+                                    {
+                                        var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
+                                        var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
+                                        var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                        conditionExpr = System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp);
+                                    }
+                                    else conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                }
+                                else if (f.Condition == "is_not")
+                                {
+                                    if (safeValue.Contains(","))
+                                    {
+                                        var valuesList = safeValue.Split(',').Select(v => v.Trim().ToLower()).ToList();
+                                        var listExpr = System.Linq.Expressions.Expression.Constant(valuesList);
+                                        var listContainsMethod = typeof(List<string>).GetMethod("Contains", new[] { typeof(string) });
+                                        conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(listExpr, listContainsMethod, lowerProp));
+                                    }
+                                    else conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                }
                                 else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
                                 else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
-                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, startsWithMethod, lowerVal);
-                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, endsWithMethod, lowerVal);
+                                else if (f.Condition == "starts_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, typeof(string).GetMethod("StartsWith", new[] { typeof(string) }), lowerVal);
+                                else if (f.Condition == "ends_with") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, typeof(string).GetMethod("EndsWith", new[] { typeof(string) }), lowerVal);
                                 else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
                                 else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
                             }
@@ -1110,19 +1174,42 @@ namespace Radar_CRM.Controllers
 
                     // Dynamically compare every single property on the Lead
                     var properties = typeof(Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
+                         .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
 
                     foreach (var prop in properties)
                     {
                         var oldObj = prop.GetValue(existingLead);
                         var newObj = prop.GetValue(lead);
 
-                        string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
-                        string newVal = newObj?.ToString()?.Trim() ?? "blank value";
+                        // 🚀 BULLETPROOF FIX: Treat nulls, empty strings, and white spaces as the exact same thing
+                        string oldStr = oldObj?.ToString()?.Trim() ?? "";
+                        string newStr = newObj?.ToString()?.Trim() ?? "";
 
-                        // If the field changed, log it!
-                        if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                        string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
+                        string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
+
+                        // If the field TRULY changed, log it!
+                        if (oldVal != newVal)
                         {
+                            string displayFieldName = prop.Name;
+
+                            // 🚀 RESOLVE OWNER ID TO ACTUAL NAME FOR TIMELINE
+                            if (prop.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayFieldName = prop.Name.Replace("Id", ""); // e.g., "LeadOwnerId" -> "LeadOwner"
+
+                                if (oldVal != "blank value")
+                                {
+                                    var oldUser = await _context.Users.FindAsync(oldStr);
+                                    if (oldUser != null) oldVal = oldUser.fullName ?? oldUser.FirstName ?? oldVal;
+                                }
+                                if (newVal != "blank value")
+                                {
+                                    var newUser = await _context.Users.FindAsync(newStr);
+                                    if (newUser != null) newVal = newUser.fullName ?? newUser.FirstName ?? newVal;
+                                }
+                            }
+
                             timelineEvents.Add(new TimelineEvent
                             {
                                 EntityType = "Lead",
@@ -1131,7 +1218,7 @@ namespace Radar_CRM.Controllers
                                 FieldName = prop.Name,
                                 OldValue = oldVal,
                                 NewValue = newVal,
-                                ActionDescription = $"{prop.Name} was updated from {oldVal} to {newVal}",
+                                ActionDescription = $"{displayFieldName} was updated from <b>{oldVal}</b> to <b>{newVal}</b>",
                                 CreatedById = currentUserId,
                                 CreatedByName = currentUser,
                                 CreatedDate = DateTime.Now
@@ -1551,26 +1638,33 @@ namespace Radar_CRM.Controllers
             return View(lead);
         }
 
+        // ==========================================
+        // QUICK INFO AUTO-SAVE: AJAX POST
+        // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
         [Route("Leads/UpdateQuickInfo")]
-        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string newValue) // 🚀 FIX: Parameter changed to newValue to match JS
+        public async Task<IActionResult> UpdateQuickInfo(int id, string field, string newValue)
         {
             var lead = await _context.Leads.FindAsync(id);
             if (lead == null) return Json(new { success = false, message = "Lead not found." });
 
             string trimmedValue = newValue?.Trim() ?? "";
 
-            // 🚀 CAPTURE OLD OWNER ID BEFORE UPDATING OR AUTOMATION TRIGGERS
+            // 🚀 CAPTURE OLD OWNER ID BEFORE UPDATING
             string oldOwnerId = lead.LeadOwnerId;
 
             try
             {
-                // 🚀 FIX: Use Reflection to dynamically update ANY field passed from the frontend
                 var propertyInfo = typeof(Lead).GetProperty(field, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo != null)
                 {
+                    // 🚀 TIMELINE FIX: Capture old value before changing it
+                    var oldObj = propertyInfo.GetValue(lead);
+                    string oldStr = oldObj?.ToString()?.Trim() ?? "";
+                    string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
+
                     Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
                     object safeValue = null;
 
@@ -1592,6 +1686,50 @@ namespace Radar_CRM.Controllers
 
                     // Apply the value to the model
                     propertyInfo.SetValue(lead, safeValue, null);
+
+                    // 🚀 TIMELINE FIX: Compare and Log for Quick Info
+                    string newStr = safeValue?.ToString()?.Trim() ?? "";
+                    string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
+
+                    if (oldVal != newVal)
+                    {
+                        string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+                        string currentUserNameLog = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
+
+                        string displayFieldName = propertyInfo.Name;
+
+                        // 🚀 RESOLVE OWNER ID TO ACTUAL NAME FOR TIMELINE
+                        if (propertyInfo.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
+                        {
+                            displayFieldName = propertyInfo.Name.Replace("Id", ""); // e.g., "LeadOwnerId" -> "LeadOwner"
+
+                            if (oldVal != "blank value")
+                            {
+                                var oldUser = await _context.Users.FindAsync(oldStr);
+                                if (oldUser != null) oldVal = oldUser.fullName ?? oldUser.FirstName ?? oldVal;
+                            }
+                            if (newVal != "blank value")
+                            {
+                                var newUser = await _context.Users.FindAsync(newStr);
+                                if (newUser != null) newVal = newUser.fullName ?? newUser.FirstName ?? newVal;
+                            }
+                        }
+
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Lead",
+                            EntityId = lead.Id,
+                            EventType = "FieldUpdate",
+                            FieldName = propertyInfo.Name,
+                            OldValue = oldVal,
+                            NewValue = newVal,
+                            ActionDescription = $"{displayFieldName} was updated from <b>{oldVal}</b> to <b>{newVal}</b>",
+                            CreatedById = currentUserId,
+                            CreatedByName = currentUserNameLog,
+                            CreatedDate = DateTime.Now
+                        };
+                        _context.TimelineEvents.Add(timelineEvent);
+                    }
 
                     // =========================================================
                     // 🚀 HANDOVER LEAD AUTOMATION FOR QUICK EDIT
@@ -1644,7 +1782,7 @@ namespace Radar_CRM.Controllers
                 await _context.SaveChangesAsync();
 
                 // =========================================================
-                // 🚀 NEW: TRANSFER TASKS IF LEAD OWNER CHANGED (Manually OR via Handover Automation)
+                // 🚀 TRANSFER TASKS IF LEAD OWNER CHANGED (Manually OR via Handover Automation)
                 // =========================================================
                 bool ownerChanged = !string.Equals(oldOwnerId?.Trim(), lead.LeadOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
 
@@ -1668,7 +1806,7 @@ namespace Radar_CRM.Controllers
                         {
                             // 2. UPDATE BOTH THE ID *AND* THE TEXT NAME
                             task.TaskOwnerId = lead.LeadOwnerId;
-                            task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+                            task.TaskOwner = newOwnerName;
 
                             task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
                             task.ModifiedTime = DateTime.Now;

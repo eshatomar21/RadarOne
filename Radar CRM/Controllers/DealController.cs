@@ -231,25 +231,65 @@ namespace Radar_CRM.Controllers
                         }
                         else if (dbColName.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase))
                         {
-                            var searchValue = safeValue.ToLower().Trim();
-                            var matchingUserIds = _context.Users.Where(u => (u.fullName != null && u.fullName.ToLower().Contains(searchValue)) || (u.Id == searchValue)).Select(u => u.Id).ToList();
+                            var searchTerms = safeValue.Split(',').Select(v => v.Trim().ToLower()).Where(v => !string.IsNullOrEmpty(v)).ToList();
 
-                            if (f.Condition == "contains" || f.Condition == "is") query = query.Where(a => matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not") query = query.Where(a => !matchingUserIds.Contains(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            // 1. Fetch Users into memory first to avoid EF Core translation crashes on complex string matching
+                            var users = _context.Users.Select(u => new { u.Id, u.fullName, u.FirstName }).ToList();
+
+                            var matchedIds = users
+                                .Where(u => searchTerms.Contains(u.Id.ToLower()) ||
+                                            searchTerms.Any(term => (u.fullName != null && u.fullName.ToLower().Contains(term)) ||
+                                                                    (u.FirstName != null && u.FirstName.ToLower().Contains(term))))
+                                .Select(u => u.Id)
+                                .ToList();
+
+                            // 2. Include the exact raw values passed from the UI (in case they are exact IDs)
+                            var rawValues = safeValue.Split(',').Select(v => v.Trim()).ToList();
+                            var finalIds = matchedIds.Concat(rawValues).Distinct().ToList();
+
+                            // 3. Apply purely translatable EF Core conditions (Translates to SQL "IN" clause)
+                            if (f.Condition == "contains" || f.Condition == "is" || f.Condition == "in")
+                                query = query.Where(a => finalIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "does_not_contain" || f.Condition == "is_not")
+                                query = query.Where(a => !finalIds.Contains(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_empty")
+                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty")
+                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
                         else if (propertyInfo.PropertyType == typeof(string))
                         {
                             var searchValue = safeValue.ToLower().Trim();
-                            if (f.Condition == "contains") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
-                            else if (f.Condition == "does_not_contain") query = query.Where(a => EF.Property<string>(a, dbColName) == null || !EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
-                            else if (f.Condition == "starts_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().StartsWith(searchValue));
-                            else if (f.Condition == "ends_with") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower().EndsWith(searchValue));
-                            else if (f.Condition == "is") query = query.Where(a => EF.Property<string>(a, dbColName) != null && EF.Property<string>(a, dbColName).ToLower() == searchValue);
-                            else if (f.Condition == "is_not") query = query.Where(a => EF.Property<string>(a, dbColName) != searchValue);
-                            else if (f.Condition == "is_empty") query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
-                            else if (f.Condition == "is_not_empty") query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+
+                            // EF Core friendly list for IN clauses (Do NOT use .ToLower() inside EF Core Contains)
+                            var searchValuesList = safeValue.Split(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v)).ToList();
+
+                            if (f.Condition == "is" || f.Condition == "in")
+                            {
+                                if (searchValuesList.Count > 1)
+                                    query = query.Where(a => searchValuesList.Contains(EF.Property<string>(a, dbColName)));
+                                else
+                                    query = query.Where(a => EF.Property<string>(a, dbColName) == safeValue.Trim());
+                            }
+                            else if (f.Condition == "is_not")
+                            {
+                                if (searchValuesList.Count > 1)
+                                    query = query.Where(a => !searchValuesList.Contains(EF.Property<string>(a, dbColName)));
+                                else
+                                    query = query.Where(a => EF.Property<string>(a, dbColName) != safeValue.Trim());
+                            }
+                            else if (f.Condition == "contains")
+                                query = query.Where(a => EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "does_not_contain")
+                                query = query.Where(a => !EF.Property<string>(a, dbColName).ToLower().Contains(searchValue));
+                            else if (f.Condition == "starts_with")
+                                query = query.Where(a => EF.Property<string>(a, dbColName).ToLower().StartsWith(searchValue));
+                            else if (f.Condition == "ends_with")
+                                query = query.Where(a => EF.Property<string>(a, dbColName).ToLower().EndsWith(searchValue));
+                            else if (f.Condition == "is_empty")
+                                query = query.Where(a => string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
+                            else if (f.Condition == "is_not_empty")
+                                query = query.Where(a => !string.IsNullOrEmpty(EF.Property<string>(a, dbColName)));
                         }
                         else if (propertyInfo.PropertyType == typeof(int) || propertyInfo.PropertyType == typeof(int?))
                         {

@@ -2057,11 +2057,11 @@
 
 <script>
 
-    async function openUniversalTimeline(entityType, entityId, entityName) {
+   async function openUniversalTimeline(entityType, entityId, entityName) {
         const titleEl = document.getElementById('timelineEntityTitle');
         const list = document.getElementById('universalTimelineList');
 
-        if (titleEl) titleEl.innerText = `${entityType} Timeline: ${entityName}`;
+        if (titleEl) titleEl.innerText = `${entityType} Timeline`;
         if (list) list.innerHTML = '<div class="text-center mt-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading history...</div>';
 
         // Show the offcanvas panel
@@ -2072,7 +2072,6 @@
         bsOffcanvas.show();
 
         try {
-            // 🚀 CRITICAL FIX: Use Url.Content to safely resolve IIS virtual directories on the live server
             const baseUrl = '@Url.Content("~/api/timeline/")';
             const response = await fetch(`${baseUrl}${entityType}/${entityId}`);
 
@@ -2081,27 +2080,71 @@
             const events = await response.json();
 
             if (events && events.length > 0) {
-                let html = '';
+                // Group events by Date
+                let groupedEvents = {};
+                
                 events.forEach(ev => {
-                    html += `
-                        <div class="position-relative mb-4">
-                            <!-- Timeline Dot Icon -->
-                            <div class="position-absolute d-flex align-items-center justify-content-center bg-white shadow-sm" style="left: -33px; top: 0px; width: 18px; height: 18px; border: 2px solid #2563eb; border-radius: 50%; z-index: 2; font-size: 0.55rem; color: #2563eb;">
-                                <i class="fa-solid fa-pen"></i>
-                            </div>
+                    // C# returns format: "MMM dd, yyyy - h:mm tt" (e.g., "Oct 14, 2026 - 11:00 AM")
+                    let parts = ev.createdDate.split(' - ');
+                    let datePart = parts[0] || 'Unknown Date';
+                    let timePart = parts.length > 1 ? parts[1] : '';
+                    
+                    if(!groupedEvents[datePart]) {
+                        groupedEvents[datePart] = [];
+                    }
+                    ev.timeOnly = timePart;
+                    groupedEvents[datePart].push(ev);
+                });
 
-                            <!-- Timeline Card -->
-                            <div class="bg-white p-3 rounded-3 shadow-sm" style="border: 1px solid #e2e8f0;">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">${ev.actionDescription}</span>
+                // 🚀 UI FIX: Render exactly like the provided screenshot
+                // Creates the continuous vertical grey line container
+                let html = '<div style="position: relative; padding-left: 90px; margin-top: 10px;">';
+                html += '<div style="position: absolute; left: 80px; top: 15px; bottom: 0; width: 1px; background-color: #cbd5e1;"></div>';
+
+                for (const [dateGroup, dateEvents] of Object.entries(groupedEvents)) {
+                    
+                    // Render Date Header (The pill floating over the line)
+                    html += `
+                        <div style="position: relative; margin-left: -80px; margin-bottom: 24px;">
+                            <span style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 0.75rem; font-weight: 600; color: #475569;">
+                                ${dateGroup}
+                            </span>
+                        </div>
+                    `;
+
+                    // Render Events under this date
+                    dateEvents.forEach(ev => {
+                        let iconHtml = '<i class="fa-solid fa-pencil"></i>'; // Pencil for updates
+                        if (ev.actionDescription.toLowerCase().includes('note')) {
+                            iconHtml = '<i class="fa-regular fa-file-lines"></i>'; // Document for notes
+                        }
+
+                        html += `
+                        <div style="position: relative; margin-bottom: 28px; display: flex; align-items: flex-start;">
+                            <!-- Time stamp pushed to the far left -->
+                            <div style="position: absolute; left: -80px; top: 3px; width: 60px; text-align: right; font-size: 0.75rem; color: #475569; font-weight: 500;">
+                                ${ev.timeOnly}
+                            </div>
+                            
+                            <!-- Circular Icon directly intersecting the vertical line -->
+                            <div style="position: absolute; left: -14px; top: 0; width: 28px; height: 28px; border-radius: 50%; background: #ffffff; border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center; z-index: 2; color: #64748b; font-size: 0.75rem;">
+                                ${iconHtml}
+                            </div>
+                            
+                            <!-- Event Content Area -->
+                            <div style="padding-left: 24px; width: 100%;">
+                                <div style="font-size: 0.9rem; color: #1e293b; line-height: 1.4;">
+                                    ${ev.actionDescription}
                                 </div>
-                                <div class="d-flex justify-content-between text-muted" style="font-size: 0.75rem;">
-                                    <span>By <strong class="text-secondary">${ev.createdByName}</strong></span>
-                                    <span><i class="fa-regular fa-clock me-1"></i>${ev.createdDate}</span>
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                                    via <span class="fw-semibold text-secondary">${ev.createdByName}</span>
                                 </div>
                             </div>
                         </div>`;
-                });
+                    });
+                }
+                
+                html += '</div>';
                 list.innerHTML = html;
             } else {
                 list.innerHTML = `
