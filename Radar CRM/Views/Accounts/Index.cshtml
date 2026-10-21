@@ -1026,7 +1026,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                     var predefinedLists = new Dictionary<string, string[]>
                     {
                         { "AdCampaignName", new[] { "Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach" } },
-                        { "MetaCampaignName", new[] { "Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach" } },
+                       
                         { "DataSource", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
                         { "CurrentStatus", new[] { "User", "Non User" } },
@@ -1407,14 +1407,13 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                             }
                                         }
 
-                                      <td data-col-index="@tdIndex">
+                                     <td data-col-index="@tdIndex">
     @if (prop.Name == "AccountName")
     {
         <a href="@Url.Action("Edit", "Accounts", new { id = item.Id })" class="text-primary fw-bold text-decoration-none">@value</a>
     }
     else if (prop.Name.Equals("Profilestatus", StringComparison.OrdinalIgnoreCase))
     {
-        // Force the value to lowercase and remove hyphens so it matches reliably
         string cleanVal = value.Replace("-", " ").ToLower();
         
         @if (cleanVal == "not completed")
@@ -1438,16 +1437,25 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
             <span class="badge-soft-warning">@value</span>
         }
     }
+    else if (prop.Name.Equals("LeadStage", StringComparison.OrdinalIgnoreCase))
+    {
+        @if (!string.IsNullOrEmpty(value))
+        {
+            <!-- 🚀 NEW: Custom UI Badge for Lead Stage -->
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary px-2 py-1" style="font-size: 0.75rem; letter-spacing: 0.5px;">@value</span>
+        }
+    }
     else if (prop.Name.Contains("Status"))
     {
-        @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active")
+        @if (value.ToLower() == "completed" || value.ToLower() == "user" || value.ToLower() == "active" || value.ToLower() == "hot" || value.ToLower() == "warm" || value.ToLower() == "important contact")
         {
+            <!-- Added Hot, Warm, and Important Contact to Success Green -->
             <span class="badge-soft-success">@value</span>
         }
         else if (!string.IsNullOrEmpty(value))
         {
             <span class="badge-soft-warning">@value</span>
-        }
+        } 
     }
     else
     {
@@ -2200,8 +2208,8 @@ const defaultVisibleColumns = [
 ];
 
 // 🚀 FIX: Bumped to _v3 to forcefully apply this new layout for everyone
-const STORAGE_KEY_HIDDEN = 'crm_hidden_cols_accounts_v3';
-const STORAGE_KEY_ORDER = 'crm_col_order_accounts_v3';
+const STORAGE_KEY_HIDDEN = 'crm_hidden_cols_accounts_v4';
+const STORAGE_KEY_ORDER = 'crm_col_order_accounts_v4';
 
 let currentNoteAccountId = null;
 let allRows = [];
@@ -2360,7 +2368,7 @@ function initializeTooltips() {
 
     const criteriaFilterOptionsMap = {
         "AdCampaignName": ["Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach"],
-        "MetaCampaignName": ["Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach"],
+        
         "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
         "CurrentStatus": ["User", "Non User"],

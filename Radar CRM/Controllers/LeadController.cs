@@ -1262,14 +1262,13 @@ namespace Radar_CRM.Controllers
                             var noteDesc = newNoteDescs[i];
                             if (!string.IsNullOrWhiteSpace(noteDesc))
                             {
-                                // 🟢 CRITICAL FIX: Convert empty string "" to actual null to prevent FK constraint crashes
                                 string rawOwnerId = newNoteOwners.Count > i ? newNoteOwners[i] : null;
                                 string safeOwnerId = string.IsNullOrWhiteSpace(rawOwnerId) ? null : rawOwnerId;
 
                                 var newNote = new Notes
                                 {
                                     LeadId = lead.Id,
-                                    NoteOwnerId = safeOwnerId, // Passes null if empty, preventing the SQL crash
+                                    NoteOwnerId = safeOwnerId,
                                     Description = noteDesc,
                                     CreatedDateTime = DateTime.TryParse(newNoteDates.Count > i ? newNoteDates[i] : "", out DateTime dt) ? dt : DateTime.Now
                                 };
@@ -1280,14 +1279,12 @@ namespace Radar_CRM.Controllers
                         await _context.SaveChangesAsync();
                     }
 
-                    // 🚀 NEW: SEND EMAIL NOTIFICATION TO THE NEW OWNER FOR SINGLE TRANSFER
-                    var assignedLeadDict = new Dictionary<int, string> { { lead.Id, lead.LeadName ?? "Unknown Lead" } };
-                    await NotifyNewOwnerAsync(lead.LeadOwnerId, assignedLeadDict);
+                   
                     // =========================================================
                     // HANDOVER LEAD AUTOMATION
                     // =========================================================
                     bool isHandoverConditionMet = (lead.Stage == "Demo Done" && lead.LeadStatus == "Hot") ||
-                                                  (lead.LeadStatus == "Warm");
+                                                   (lead.LeadStatus == "Warm");
 
                     if (isHandoverConditionMet)
                     {
@@ -1320,25 +1317,21 @@ namespace Radar_CRM.Controllers
                     // =========================================================
                     if (lead.PaymentRow != null)
                     {
-                        // Clean sync process: Get valid rows from UI
                         var validRows = lead.PaymentRow
                             .Where(r => (r.ProductId.HasValue && r.ProductId.Value > 0) || !string.IsNullOrWhiteSpace(r.ProductName))
                             .ToList();
 
-                        // Detach to stop EF double tracking
                         lead.PaymentRow = null;
 
-                        // Wipe out existing rows for this lead in the DB to perfectly mirror the UI state
                         var oldRows = _context.Set<ProductPaymentRow>().Where(r => r.LeadId == lead.Id).ToList();
                         if (oldRows.Any())
                         {
                             _context.RemoveRange(oldRows);
                         }
 
-                        // Re-add the fresh list from the UI
                         foreach (var row in validRows)
                         {
-                            row.Id = 0; // Force as new
+                            row.Id = 0;
                             row.LeadId = lead.Id;
                             _context.Add(row);
                         }
@@ -1352,7 +1345,7 @@ namespace Radar_CRM.Controllers
                     // 🚀 NEW: TRANSFER TASKS IF LEAD OWNER CHANGED
                     // =========================================================
                     bool ownerChanged = existingLead != null &&
-                        !string.Equals(existingLead.LeadOwnerId?.Trim(), lead.LeadOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
+                         !string.Equals(existingLead.LeadOwnerId?.Trim(), lead.LeadOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
 
                     if (ownerChanged && !string.IsNullOrWhiteSpace(lead.LeadOwnerId))
                     {
@@ -1375,7 +1368,7 @@ namespace Radar_CRM.Controllers
                             {
                                 // 3. UPDATE BOTH THE ID *AND* THE TEXT NAME
                                 task.TaskOwnerId = lead.LeadOwnerId;
-                                task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
+                                task.TaskOwner = newOwnerName;
 
                                 task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
                                 task.ModifiedTime = DateTime.Now;
@@ -1386,7 +1379,13 @@ namespace Radar_CRM.Controllers
                             _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
                             await _context.SaveChangesAsync();
                         }
+
+                        // 🚀 FIX: Renamed to 'notifiedLeadDict' to prevent the scope error
+                        var notifiedLeadDict = new Dictionary<int, string> { { lead.Id, lead.LeadName ?? "Unknown Lead" } };
+                        await NotifyNewOwnerAsync(lead.LeadOwnerId, notifiedLeadDict);
                     }
+
+                  
 
                     // =========================================================
                     // 🚀 NEW: SYNC UPDATES TO THE LINKED ACCOUNT
@@ -2172,7 +2171,7 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // NOTIFICATION HELPER: Email & In-App Popup
+        // NOTIFICATION HELPER: Email Notification Only
         // ==========================================
         private async System.Threading.Tasks.Task NotifyNewOwnerAsync(string newOwnerId, Dictionary<int, string> assignedLeads)
         {
@@ -2195,15 +2194,7 @@ namespace Radar_CRM.Controllers
                 return $"<li style='margin-bottom: 8px;'><a href='{linkUrl}' style='color: #2563eb; text-decoration: none; font-weight: bold;'>{lead.Value}</a></li>";
             }));
 
-            string body = $@"
-        <div style='font-family: Arial, sans-serif; color: #333;'>
-            <h3>Hi {ownerName},</h3>
-            <p>You have been assigned as the new owner for the following {(isBulk ? "leads" : "lead")}:</p>
-            <ul>{leadListHtml}</ul>
-            <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>
-            <br/>
-            <p><small>This is an automated notification from Radar CRM.</small></p>
-        </div>";
+            string body = $@"  <div style='font-family: Arial, sans-serif; color: #333;'>      <h3>Hi {ownerName},</h3>      <p>You have been assigned as the new owner for the following {(isBulk ? "leads" : "lead")}:</p>      <ul>{leadListHtml}</ul>      <p>Please click the link(s) above or log in to the CRM to review your new assignments.</p>      <br/>      <p><small>This is an automated notification from Radar CRM.</small></p>  </div>";
 
             // 1. Send Email via Resend API
             try
@@ -2213,12 +2204,12 @@ namespace Radar_CRM.Controllers
 
                 string senderEmail = "Radar CRM <no-reply@bjaincorp.com>";
                 var emailPayload = new Dictionary<string, object>
-                {
-                    { "from", senderEmail },
-                    { "to", new List<string> { newOwner.Email.Trim() } },
-                    { "subject", subject },
-                    { "html", body }
-                };
+        {
+            { "from", senderEmail },
+            { "to", new List<string> { newOwner.Email.Trim() } },
+            { "subject", subject },
+            { "html", body }
+        };
 
                 using (var client = new System.Net.Http.HttpClient())
                 {
@@ -2239,28 +2230,9 @@ namespace Radar_CRM.Controllers
                 Console.WriteLine($"Email Dispatch Failed: {ex.Message}");
             }
 
-            // 2. Create In-App Notification (System Task)
-            try
-            {
-                var systemTask = new CrmTaskModel
-                {
-                    Subject = isBulk ? $"You have been assigned {assignedLeads.Count} new leads." : $"You are the new owner of {assignedLeads.Values.First()}.",
-                    Status = "Not Started",
-                    Priority = "High",
-                    TaskOwnerId = newOwnerId,
-                    CreatedDateAndTime = DateTime.Now,
-                    DueDate = DateTime.Now.AddDays(1)
-                };
-
-                _context.Set<CrmTaskModel>().Add(systemTask);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"In-App Notification Failed: {ex.Message}");
-            }
+            // 🚀 The code that was generating the "You are the new owner of..." Task has been COMPLETELY REMOVED!
+            // It will no longer spawn duplicate tasks in your Task index.
         }
-
 
 
         private string GetVal(string[] values, int index)

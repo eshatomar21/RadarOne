@@ -564,7 +564,8 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
                                     <option value="contains" selected>contains</option>
                                     <option value="is_empty">is empty</option>
                                 </select>
-                                <input type="text" class="form-control form-control-sm condition-val text-val" placeholder="Search @prop.Name..." />
+                               <input type="text" list="dl_@prop.Name" class="form-control form-control-sm condition-val text-val" placeholder="Search @prop.Name..." />
+    <datalist id="dl_@prop.Name"></datalist>
                             }
                         </div>
                     </div>

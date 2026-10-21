@@ -503,6 +503,30 @@ namespace Radar_CRM.Controllers
 
             // 🚀 NEW: Safely get note counts only for the loaded accounts (No Include needed!)
             var accountIds = accounts.Select(a => a.Id).ToList();
+
+            // =========================================================================
+            // 🚀 FIX: FETCH AND MAP LEAD STATUS & STAGE FOR THE INDEX LIST VIEW
+            // =========================================================================
+            var relatedLeads = await _context.Leads
+                .Where(l => l.AccountId.HasValue && accountIds.Contains(l.AccountId.Value) &&
+                           (!string.IsNullOrEmpty(l.LeadStatus) || !string.IsNullOrEmpty(l.Stage)))
+                .ToListAsync();
+
+            foreach (var acc in accounts)
+            {
+                var linkedLead = relatedLeads.FirstOrDefault(l => l.AccountId == acc.Id);
+                if (linkedLead != null)
+                {
+                    if (!string.IsNullOrEmpty(linkedLead.LeadStatus))
+                    {
+                        acc.LeadStatus = linkedLead.LeadStatus;
+                    }
+                    if (!string.IsNullOrEmpty(linkedLead.Stage))
+                    {
+                        acc.LeadStage = linkedLead.Stage;
+                    }
+                }
+            }
             var noteCounts = await _context.Note
                 .Where(n => n.AccountId != null && accountIds.Contains(n.AccountId.Value))
                 .GroupBy(n => n.AccountId.Value)
@@ -1430,15 +1454,16 @@ namespace Radar_CRM.Controllers
                 // ==========================================
                 // OWNER ASSIGNMENT LOGIC
                 // ==========================================
-                string assignedOwnerId = acc.AccountOwnerId;
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                // 🚀 Ensure we retrieve the user safely to grab their full name string
-                var ownerUser = await _context.Users.FindAsync(acc.AccountOwnerId);
+                // 🚀 Assign the new Lead to the person making the change (e.g., Vushka). Fallback to Account Owner if system automated.
+                string assignedOwnerId = !string.IsNullOrWhiteSpace(currentUserId) ? currentUserId : acc.AccountOwnerId;
+
+                // Ensure we retrieve the assigned user safely to grab their full name string
+                var ownerUser = await _context.Users.FindAsync(assignedOwnerId);
                 string ownerFullName = ownerUser?.fullName ?? ownerUser?.FirstName ?? "System User";
 
-
-
-                // 🚀 NEW FIX: Grab the live user who is actively clicking "Save" triggering this automation
+                // Grab the live user name for the "CreatedBy" string
                 string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
                                      ? User.Identity.Name
                                      : "System Automation";
@@ -1454,7 +1479,7 @@ namespace Radar_CRM.Controllers
 
                     Stage = "Open",
 
-                    // 🚀 FIX: Apply the live captured user string instead of acc.CreatedBy
+                    // Apply the live captured user string instead of acc.CreatedBy
                     CreatedBy = createdByString,
 
 
@@ -2663,7 +2688,7 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                // 🚀 FIX: Use Reflection to dynamically update ANY field passed from the frontend
+                // Use Reflection to dynamically update ANY field passed from the frontend
                 var propertyInfo = typeof(Account).GetProperty(field, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo != null)
@@ -2671,7 +2696,7 @@ namespace Radar_CRM.Controllers
                     Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
                     object safeValue = null;
 
-                    // 🚀 FIX: Prevent Null Reference Errors on Required Fields (Like Email)
+                    // Prevent Null Reference Errors on Required Fields
                     if (t == typeof(string))
                     {
                         safeValue = trimmedValue == "-None-" ? "" : trimmedValue;
@@ -2682,11 +2707,46 @@ namespace Radar_CRM.Controllers
                         {
                             if (DateTime.TryParse(trimmedValue, out DateTime d)) safeValue = d;
                         }
+                        else if (t == typeof(bool))
+                        {
+                            if (bool.TryParse(trimmedValue, out bool b)) safeValue = b;
+                        }
                         else
                         {
                             safeValue = Convert.ChangeType(trimmedValue, t);
                         }
                     }
+
+                    // =========================================================
+                    // 🚀 NEW: TIMELINE EVENT GENERATION FOR QUICK INFO
+                    // =========================================================
+                    var oldObj = propertyInfo.GetValue(account);
+                    string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
+                    string newVal = safeValue?.ToString()?.Trim() ?? "blank value";
+
+                    if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                    {
+                        string currentUserIdForTimeline = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+                        string currentUserNameForTimeline = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                            ? User.Identity.Name : "System User";
+
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Account",
+                            EntityId = account.Id,
+                            EventType = "FieldUpdate",
+                            FieldName = propertyInfo.Name,
+                            OldValue = oldVal,
+                            NewValue = newVal,
+                            ActionDescription = $"{propertyInfo.Name} was updated from {oldVal} to {newVal} via Quick Edit",
+                            CreatedById = currentUserIdForTimeline,
+                            CreatedByName = currentUserNameForTimeline,
+                            CreatedDate = DateTime.Now
+                        };
+
+                        _context.TimelineEvents.Add(timelineEvent);
+                    }
+                    // =========================================================
 
                     // Apply the value to the model
                     propertyInfo.SetValue(account, safeValue, null);
@@ -2709,14 +2769,14 @@ namespace Radar_CRM.Controllers
 
 
                 // =========================================================
-                // 🚀 NEW: TRANSFER TASKS IF OWNER CHANGED VIA QUICK INFO
+                // TRANSFER TASKS IF OWNER CHANGED VIA QUICK INFO
                 // =========================================================
                 bool ownerChanged = field.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) &&
                                     !string.Equals(oldOwnerId?.Trim(), account.AccountOwnerId?.Trim(), StringComparison.OrdinalIgnoreCase);
 
                 if (ownerChanged && !string.IsNullOrWhiteSpace(account.AccountOwnerId))
                 {
-                    // 1. FETCH THE NEW OWNER'S NAME (Crucial for the UI)
+                    // FETCH THE NEW OWNER'S NAME
                     string newOwnerName = "System User";
                     var newOwnerUser = await _context.Users.FindAsync(account.AccountOwnerId);
                     if (newOwnerUser != null)
@@ -2732,19 +2792,19 @@ namespace Radar_CRM.Controllers
                     {
                         foreach (var task in relatedTasks)
                         {
-                            // 2. UPDATE BOTH THE ID *AND* THE TEXT NAME
                             task.TaskOwnerId = account.AccountOwnerId;
-                            task.TaskOwner = newOwnerName; // 🚀 This fixes the UI issue!
-
+                            task.TaskOwner = newOwnerName;
                             task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
                             task.ModifiedTime = DateTime.Now;
-
-                            // 3. Force Entity Framework to track this specific modification
                             _context.Entry(task).State = EntityState.Modified;
                         }
                         _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
                         await _context.SaveChangesAsync();
                     }
+
+                    // Trigger email notification for new owner
+                    var accountDict = new Dictionary<int, string> { { account.Id, account.AccountName ?? "Unknown Account" } };
+                    await NotifyNewOwnerAsync(account.AccountOwnerId, accountDict);
                 }
                 // =========================================================
 
@@ -2752,7 +2812,6 @@ namespace Radar_CRM.Controllers
             }
             catch (Exception ex)
             {
-                // ⚠ NOTE: If the email already belongs to someone else, SQL will reject it here
                 string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 return Json(new { success = false, message = trueError });
             }

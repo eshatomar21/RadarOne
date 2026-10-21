@@ -235,6 +235,27 @@ namespace Radar_CRM.Controllers
                                     else
                                         query = query.Where(t => matchedUserIds.Contains(t.ModifiedById) || t.ModifiedBy == val);
                                 }
+                                // ====================================================================
+                                // 🚀 ADD THE RELATED TO FILTER INTERCEPTOR RIGHT HERE
+                                // ====================================================================
+                                else if (col == "RelatedTo")
+                                {
+                                    if (cond == "is_not" || cond == "does_not_contain")
+                                    {
+                                        query = query.Where(t =>
+                                            (t.Account == null || !t.Account.AccountName.ToLower().Contains(lowerVal)) &&
+                                            (t.Lead == null || !t.Lead.LeadName.ToLower().Contains(lowerVal))
+                                        );
+                                    }
+                                    else // "contains" or "is"
+                                    {
+                                        query = query.Where(t =>
+                                            (t.Account != null && t.Account.AccountName.ToLower().Contains(lowerVal)) ||
+                                            (t.Lead != null && t.Lead.LeadName.ToLower().Contains(lowerVal))
+                                        );
+                                    }
+                                }
+                                // ====================================================================
                             }
                         }
                     }
@@ -245,7 +266,7 @@ namespace Radar_CRM.Controllers
                 }
             }
 
-            if (!string.IsNullOrEmpty(search))
+                if (!string.IsNullOrEmpty(search))
             {
                 var searchLower = search.ToLower();
                 query = query.Where(t =>
