@@ -166,13 +166,27 @@ namespace Radar_CRM.Controllers
                     string recordingUrl = log.TryGetProperty("call_recording_url", out var ru) ? ru.GetString() : "";
 
                     if (string.IsNullOrWhiteSpace(clientNumber)) continue;
+
+
+
+
+                    if (string.IsNullOrWhiteSpace(clientNumber)) continue;
                     string phoneToMatch = clientNumber.Replace("+", "").Trim();
 
-                    var existingRecord = await _context.CallRecords.FirstOrDefaultAsync(c => c.RecordingUrl == recordingUrl && c.CustomerPhone.Contains(phoneToMatch));
+                    // 1. EXTRACT LAST 10 DIGITS TO BYPASS +91 COUNTRY CODES
+                    string last10Digits = phoneToMatch.Length >= 10 ? phoneToMatch.Substring(phoneToMatch.Length - 10) : phoneToMatch;
+
+                    var existingRecord = await _context.CallRecords.FirstOrDefaultAsync(c => c.RecordingUrl == recordingUrl && c.CustomerPhone.Contains(last10Digits));
                     if (existingRecord != null) continue; // Skip if already imported
 
-                    var matchedLead = await _context.Leads.FirstOrDefaultAsync(l => l.Phone != null && l.Phone.Contains(phoneToMatch));
-                    var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.Phone != null && a.Phone.Contains(phoneToMatch));
+                    // 2. SEARCH LEADS USING 10 DIGITS
+                    var matchedLead = await _context.Leads.FirstOrDefaultAsync(l =>
+                        l.Phone != null && l.Phone.Contains(last10Digits));
+
+                    // 3. SEARCH ACCOUNTS ACROSS MOBILENUMBER & ALTERNATEMOBILE USING 10 DIGITS
+                    var matchedAccount = await _context.Accounts.FirstOrDefaultAsync(a =>
+                        (a.MobileNumber != null && a.MobileNumber.Contains(last10Digits)) ||
+                        (a.AlternateMobile != null && a.AlternateMobile.Contains(last10Digits)));
 
                     int parsedDuration = 0;
                     if (log.TryGetProperty("duration", out var durNode) && durNode.ValueKind == JsonValueKind.String)

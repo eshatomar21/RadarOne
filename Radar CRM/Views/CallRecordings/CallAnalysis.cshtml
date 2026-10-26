@@ -201,18 +201,20 @@
             </div>
         </div>
 
-        <!-- Audio Player -->
+        <!-- Audio Player (Fixed to Stream Directly) -->
         <div class="mt-4 pt-4 border-top">
-            @if (!string.IsNullOrEmpty(Model.LocalFilePath))
+            @if (!string.IsNullOrEmpty(Model.RecordingUrl))
             {
                 <audio controls class="audio-full shadow-sm">
-                    <source src="/api/webhook/play-audio/@Model.Id" type="audio/mpeg">
+                    <source src="@Model.RecordingUrl" type="audio/mpeg">
                     Your browser does not support the audio element.
                 </audio>
             }
             else
             {
-                <div class="alert alert-warning mb-0 border-0 shadow-sm rounded-3"><i class="fa-solid fa-spinner fa-spin me-2"></i> Audio file is currently downloading...</div>
+                <div class="alert alert-warning mb-0 border-0 shadow-sm rounded-3">
+                    <i class="fa-solid fa-microphone-slash me-2"></i> No audio recording available for this call.
+                </div>
             }
         </div>
     </div>

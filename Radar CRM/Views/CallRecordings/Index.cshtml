@@ -265,15 +265,15 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (!string.IsNullOrEmpty(call.LocalFilePath))
+                                    @if (!string.IsNullOrEmpty(call.RecordingUrl))
                                     {
                                         <audio controls class="audio-compact">
-                                            <source src="/api/webhook/play-audio/@call.Id" type="audio/mpeg">
+                                            <source src="@call.RecordingUrl" type="audio/mpeg">
                                         </audio>
                                     }
                                     else
                                     {
-                                        <span class="status-badge bg-warning bg-opacity-10 text-warning border border-warning">Downloading...</span>
+                                        <span class="text-muted fst-italic" style="font-size:0.75rem;">No Audio</span>
                                     }
                                 </td>
                                 <td>

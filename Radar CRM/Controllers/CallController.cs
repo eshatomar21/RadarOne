@@ -21,10 +21,11 @@ namespace Radar_CRM.Controllers
         // 2. Map this method to /CallRecordings AND /CallRecordings/Index
         [Route("")]
         [Route("Index")]
-        
         public async Task<IActionResult> Index()
         {
             var records = await _context.CallRecords
+                .Include(c => c.Account) // 🚀 NEW: Loads Account details for the CRM Link column
+                .Include(c => c.Lead)    // 🚀 NEW: Loads Lead details for the CRM Link column
                 .OrderByDescending(c => c.CallDate.Date)
                 .ThenByDescending(c => c.DurationSeconds)
                 .ToListAsync();

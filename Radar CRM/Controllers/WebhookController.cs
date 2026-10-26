@@ -58,10 +58,25 @@ namespace Radar_CRM.Controllers
                 // 4. DUPLICATE CHECK & RECORD CREATION (ZOHO SCRIPT REPLICATION)
                 // ====================================================================
 
-                // Search for existing account by Email OR Phone (ignoring empty values)
+                // A. Clean and normalize inputs to prevent mismatch
+                string cleanEmail = formData.Email?.Trim();
+                string cleanPhone = formData.Phone?.Trim();
+
+                // If phone is longer than 10 digits (e.g., +919876543210), grab only the last 10
+                string last10Phone = null;
+                if (!string.IsNullOrEmpty(cleanPhone))
+                {
+                    last10Phone = cleanPhone.Length > 10 ? cleanPhone.Substring(cleanPhone.Length - 10) : cleanPhone;
+                }
+
+                // B. Search across main AND alternate columns, using EndsWith for phone
                 var existingAccount = await _context.Accounts.FirstOrDefaultAsync(a =>
-                    (!string.IsNullOrEmpty(formData.Email) && a.Email == formData.Email) ||
-                    (!string.IsNullOrEmpty(formData.Phone) && a.MobileNumber == formData.Phone)
+                    (!string.IsNullOrEmpty(cleanEmail) && (a.Email == cleanEmail || a.AlternateEmailID == cleanEmail))
+                    ||
+                    (!string.IsNullOrEmpty(last10Phone) && (
+                        (a.MobileNumber != null && a.MobileNumber.EndsWith(last10Phone)) ||
+                        (a.AlternateMobile != null && a.AlternateMobile.EndsWith(last10Phone))
+                    ))
                 );
 
                 if (existingAccount != null)
