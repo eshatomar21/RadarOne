@@ -542,6 +542,9 @@ namespace Radar_CRM.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("CreatedDateAndTime")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("CurrentPackage")
                         .HasColumnType("nvarchar(max)");
 
@@ -596,6 +599,9 @@ namespace Radar_CRM.Migrations
 
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedDateAndTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ModifiedTime")
                         .HasColumnType("datetime2");
@@ -1018,6 +1024,9 @@ namespace Radar_CRM.Migrations
 
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedDateAndTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ModifiedTime")
                         .HasColumnType("datetime2");

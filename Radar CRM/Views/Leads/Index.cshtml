@@ -615,6 +615,18 @@
                         <th class="dummy-filler-col"></th>
                         <th class="sticky-actions text-center"><i class="fa-solid fa-bolt text-muted me-1"></i> Actions</th>
                     </tr>
+
+                    <tr id="selectAllPagesBanner" style="display:none; background-color: #eff6ff; border-bottom: 1px solid #bfdbfe;">
+                        <th colspan="50" class="text-center py-2" style="font-size: 0.85rem; font-weight: 500; text-transform: none; letter-spacing: normal;">
+                            <span id="selectAllBannerText">All <strong id="pageSelCount">0</strong> records on this page are selected.</span>
+                            <a href="javascript:void(0)" class="fw-bold ms-2 text-primary text-decoration-none" id="selectAllPagesLink" onclick="selectAllAcrossPages()">
+                                Select all <strong id="globalSelCount">@totalRecords</strong> records that match this search.
+                            </a>
+                            <a href="javascript:void(0)" class="fw-bold ms-2 text-danger text-decoration-none" id="clearSelectionBtn" style="display:none;" onclick="clearGlobalSelection()">
+                                Clear selection
+                            </a>
+                        </th>
+                    </tr>
                 </thead>
                 <tbody id="tableBody">
                     @if (Model != null && Model.Any())
@@ -624,7 +636,7 @@
                             <tr class="lead-row" data-id="@item.Id">
                               <td class="sticky-cb" style="width: 120px; min-width: 120px;">
                                     <div class="d-flex align-items-center justify-content-start gap-2 w-100 ps-3">
-                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="updateSelectedCount()">
+                                        <input class="form-check-input m-0 row-cb border-secondary flex-shrink-0" type="checkbox" value="@item.Id" onchange="toggleRowCheckbox(this)">
                                        
                                         @{
                                             string flagColor = "#cbd5e1"; // Default gray (no task)
@@ -2405,70 +2417,204 @@ document.addEventListener('change', function (e) {
         }
     });
 
+    // 1. Global state management
+window.isGlobalSelectAll = sessionStorage.getItem('crm_global_select_leads') === 'true';
+window.selectedRowIds = JSON.parse(sessionStorage.getItem('crm_selected_rows_leads')) || [];
+
+document.addEventListener("DOMContentLoaded", function () {
+    // Restore selection state on page load
+    if (window.isGlobalSelectAll) {
+        selectAllAcrossPages();
+    } else if (window.selectedRowIds.length > 0) {
+        document.querySelectorAll('.row-cb').forEach(cb => {
+            if (window.selectedRowIds.includes(cb.value)) cb.checked = true;
+        });
+        updateSelectedCount();
+    }
+});
+
+// 2. Handle individual row checkbox clicks
+window.toggleRowCheckbox = function(cb) {
+    if (cb.checked) {
+        if (!window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+    } else {
+        window.isGlobalSelectAll = false;
+        sessionStorage.setItem('crm_global_select_leads', 'false');
+        window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
+
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) selectAllCb.checked = false;
+
+        const banner = document.getElementById('selectAllPagesBanner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
+    updateSelectedCount();
+};
+
+
+
 
     // ==========================================
     // BULK EXPORT/DELETE LOGIC
     // ==========================================
-    function toggleAllRowCheckboxes(sourceCb) {
-        currentVisibleRows.forEach(row => {
-            const cb = row.querySelector('.row-cb');
-            if(cb) cb.checked = sourceCb.checked;
-        });
-        updateSelectedCount();
+   window.toggleAllRowCheckboxes = function(sourceCb) {
+    currentVisibleRows.forEach(row => {
+        const cb = row.querySelector('.row-cb');
+        if(cb) {
+            cb.checked = sourceCb.checked;
+            if (cb.checked && !window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+            else if (!cb.checked) window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
+        }
+    });
+
+   window.isGlobalSelectAll = false;
+    sessionStorage.setItem('crm_global_select_leads', 'false');
+    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
+
+    const banner = document.getElementById('selectAllPagesBanner');
+    const actualTotalRecords = parseInt('@totalRecords') || 0;
+
+    if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
+        if(banner) {
+            const bannerTextEl = document.getElementById('selectAllBannerText');
+            if (bannerTextEl) {
+                bannerTextEl.innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
+            }
+
+            banner.style.display = 'table-row';
+
+            const clearBtn = document.getElementById('clearSelectionBtn');
+            const selectAllLink = document.getElementById('selectAllPagesLink');
+            if (clearBtn) clearBtn.style.display = 'none';
+            if (selectAllLink) {
+                selectAllLink.style.display = 'inline';
+                selectAllLink.innerHTML = `Select all <strong>${actualTotalRecords}</strong> records that match this search.`;
+            }
+        }
+    } else {
+        if(banner) banner.style.display = 'none';
     }
 
-    function updateSelectedCount() {
-        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
-        document.getElementById('selCount').innerText = selected;
-        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+    updateSelectedCount();
+};
 
-        const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-        if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selected;
+window.selectAllAcrossPages = function() {
+    window.isGlobalSelectAll = true;
+    sessionStorage.setItem('crm_global_select_leads', 'true');
 
-        const totalVisible = currentVisibleRows.length;
-        const selectAllCb = document.getElementById('selectAllCb');
-        if(selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
+    const actualTotalRecords = parseInt('@totalRecords') || 0;
+    const banner = document.getElementById('selectAllPagesBanner');
+
+    if (banner) {
+        banner.style.display = 'table-row';
+        const bannerTextEl = document.getElementById('selectAllBannerText');
+        if (bannerTextEl) {
+            bannerTextEl.innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
+        }
+
+        const clearBtn = document.getElementById('clearSelectionBtn');
+        const selectAllLink = document.getElementById('selectAllPagesLink');
+        if (selectAllLink) selectAllLink.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'inline';
     }
+
+    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = true);
+    const selectAllCb = document.getElementById('selectAllCb');
+    if (selectAllCb) selectAllCb.checked = true;
+
+    updateSelectedCount();
+};
+
+window.clearGlobalSelection = function() {
+    window.isGlobalSelectAll = false;
+    sessionStorage.setItem('crm_global_select_leads', 'false');
+    window.selectedRowIds = [];
+    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify([]));
+
+    const selectAllCb = document.getElementById('selectAllCb');
+    if(selectAllCb) selectAllCb.checked = false;
+
+    document.getElementById('selectAllPagesBanner').style.display = 'none';
+    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+
+    updateSelectedCount();
+};
+
+  window.updateSelectedCount = function() {
+    const selectedCount = window.isGlobalSelectAll ? parseInt('@totalRecords') : window.selectedRowIds.length;
+
+    document.getElementById('selCount').innerText = selectedCount;
+    document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
+
+    const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
+    if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selectedCount;
+
+    const totalVisible = currentVisibleRows.length;
+    const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
+    const selectAllCb = document.getElementById('selectAllCb');
+
+    if(selectAllCb && !window.isGlobalSelectAll) {
+        selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
+    }
+};
 
     function deleteSelected() {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        if(selectedCbs.length === 0) return;
+    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
 
-        if(confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
-            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+    // Abort if nothing is selected (neither globally nor locally)
+    if (selectedCbs.length === 0 && !window.isGlobalSelectAll && window.selectedRowIds.length === 0) return;
 
-            fetch('@Url.Action("BulkDelete", "Leads")', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(selectedIds)
-            })
-            .then(async response => {
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText || `HTTP Error ${response.status}`);
+    // Use the global count if the banner was clicked, otherwise use the selected array count
+    const actualTotalRecords = parseInt('@totalRecords') || 0;
+    const displayCount = window.isGlobalSelectAll ? actualTotalRecords : window.selectedRowIds.length;
+
+    if (confirm(`Are you sure you want to delete ${displayCount} selected record(s)?`)) {
+
+        let selectedIds = window.selectedRowIds.map(id => parseInt(id, 10));
+
+        // Grab the active filters from the URL so C# knows which records to delete globally
+        const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
+
+        // Build the new payload
+        const payload = {
+            Ids: selectedIds,
+            IsGlobalSelectAll: window.isGlobalSelectAll,
+            FiltersJson: activeFilters
+        };
+
+        fetch('@Url.Action("BulkDelete", "Leads")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `HTTP Error ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Clear selection state and reload so the pagination resets properly
+                if (typeof window.clearGlobalSelection === 'function') {
+                    window.clearGlobalSelection();
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    selectedCbs.forEach(cb => {
-                        const tr = cb.closest('tr');
-                        tr.remove();
-                        allRows = allRows.filter(r => r !== tr);
-                    });
-                    document.getElementById('selectAllCb').checked = false;
-                    updateSelectedCount();
-                    refreshVisibleRows();
-                } else alert("Database Error: " + data.message);
-            }).catch((err) => {
-                console.error("Delete Error Details:", err);
-                alert("Server Error Encountered:\n" + err.message.substring(0, 150));
-            });
-        }
+                window.location.reload();
+            } else {
+                alert("Database Error: " + data.message);
+            }
+        }).catch((err) => {
+            console.error("Delete Error Details:", err);
+            alert("Server Error Encountered:\n" + err.message.substring(0, 150));
+        });
     }
+}
 
 
 

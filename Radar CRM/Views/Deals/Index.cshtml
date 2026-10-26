@@ -1636,9 +1636,10 @@
                         }
 
                         if (f.IsDate) {
-                            const vals = f.Value.split('|');
+                            // 🚀 FIX: Prevent Javascript .split() crash if f.Value is null (like "Today")
+                            const vals = (f.Value || "").split('|');
                             const date1 = item.querySelector('.date-val-1');
-                            if (date1) date1.value = vals[0];
+                            if (date1) date1.value = vals[0] || '';
                             
                             if (vals.length > 1) {
                                 const date2 = item.querySelector('.date-val-2');
@@ -2016,12 +2017,15 @@
         });
     };
 
-    window.applyFilters = function() {
+   window.applyFilters = function() {
         const activeFilters = [];
+        // 🚀 FIX: Define which conditions are allowed to be completely blank
+        const noValueNeeded = ['is_empty', 'is_not_empty', 'on', 'before', 'after', 'Today', 'Tomorrow', 'Yesterday', 'Till Yesterday', 'Starting tomorrow', 'This Week', 'This Month', 'This Year', 'Previous Week', 'Previous Month', 'Previous Year', 'Current FY', 'Previous FY', 'Current FQ'];
+
         document.querySelectorAll('.filter-field-item.active').forEach(item => {
             const cb = item.querySelector('.field-checkbox');
             if (cb && cb.checked) {
-                let colName = cb.value; // 🚀 FIX: Keep the exact C# property name
+                let colName = cb.value; 
                 const condition = item.querySelector('.condition-select').value;
                 const isDate = item.dataset.fieldType === "date";
 
@@ -2031,6 +2035,9 @@
                     const val2 = item.querySelector('.date-val-2')?.value || '';
                     val1 = val1 + "|" + val2;
                 }
+
+                // 🚀 FIX: Prevent sending broken/empty filters to the C# backend
+                if (!val1 && !noValueNeeded.includes(condition)) return;
 
                 activeFilters.push({
                     LogicalOperator: "AND",

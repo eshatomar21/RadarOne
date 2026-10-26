@@ -97,10 +97,20 @@ namespace Radar_CRM.Controllers
                         // If it's empty AND doesn't match our allowed blank conditions, skip it
                         if (string.IsNullOrWhiteSpace(f.Value) && !noValueConditions.Contains(cond)) continue;
 
-                        var propertyInfo = typeof(Deal).GetProperty(f.ColumnName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (propertyInfo == null) continue;
+                        // 🚀 FIX: Map the UI date columns to the actual Database columns FIRST
+                        string dbColName = f.ColumnName;
+                        if (dbColName.Equals("CreatedDateAndTime", StringComparison.OrdinalIgnoreCase))
+                        {
+                            dbColName = "DateOfEntry";
+                        }
+                        else if (dbColName.Equals("ModifiedDateAndTime", StringComparison.OrdinalIgnoreCase))
+                        {
+                            dbColName = "ModifiedTime";
+                        }
 
-                        string dbColName = propertyInfo.Name;
+                        // Now look up the property using the mapped DB column name
+                        var propertyInfo = typeof(Deal).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        if (propertyInfo == null) continue;
 
                         if (propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
                         {
@@ -418,6 +428,7 @@ namespace Radar_CRM.Controllers
             // 🚀 SET "CREATED BY" AUTOMATICALLY
             string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System User";
             deal.CreatedBy = $"{currentUser} on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+            deal.CreatedDateAndTime = DateTime.Now;
 
             ModelState.Remove("CreatedBy");
             ModelState.Remove("ModifiedBy");
@@ -957,6 +968,7 @@ namespace Radar_CRM.Controllers
             if (existingDeal != null && string.IsNullOrEmpty(deal.CreatedBy))
             {
                 deal.CreatedBy = existingDeal.CreatedBy;
+                deal.CreatedDateAndTime = existingDeal.CreatedDateAndTime;
             }
 
             ModelState.Remove("CreatedBy");

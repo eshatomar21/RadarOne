@@ -26,6 +26,9 @@ namespace Radar_CRM.Models
         [DataType(DataType.DateTime)]
         public DateTime? ModifiedTime { get; set; }
 
+        [DataType(DataType.DateTime)]
+        public DateTime? ModifiedDateAndTime { get; set; }
+
         public DateOnly? TrialStartDate { get; set; }
         public DateOnly? TrialEndDate { get; set; }
 

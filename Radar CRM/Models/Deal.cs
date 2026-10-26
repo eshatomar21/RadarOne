@@ -68,6 +68,12 @@ namespace Radar_CRM.Models
         [DataType(DataType.DateTime)]
         public DateTime? ModifiedTime { get; set; }
 
+        [DataType(DataType.DateTime)]
+        public DateTime? CreatedDateAndTime { get; set; }
+
+        [DataType(DataType.DateTime)]
+        public DateTime? ModifiedDateAndTime { get; set; }
+
         // --- Products & Packages ---
         public string? ProductName { get; set; }
         public string? AddonModuleName { get; set; }

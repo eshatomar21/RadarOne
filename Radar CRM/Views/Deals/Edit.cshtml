@@ -626,6 +626,24 @@
                                 <input type="hidden" asp-for="ModifiedBy" />
                             </div>
 
+                            <!-- Created Date & Time Field -->
+<div class="col-md-6 form-group">
+    <label class="sf-label">Created Date & Time</label>
+    <input type="text" class="sf-input" 
+           value="@(Model != null && Model.DateOfEntry != DateTime.MinValue ? Model.DateOfEntry.ToString("MMM dd, yyyy - hh:mm tt") : "N/A")" 
+           readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+    <input type="hidden" asp-for="DateOfEntry" />
+</div>
+
+<!-- Modified Date (ModifiedTime) -->
+<div class="col-md-6 form-group">
+    <label class="sf-label">Modified Date & Time</label>
+    <input type="text" class="sf-input" 
+           value="@(Model != null && Model.ModifiedTime != null ? Convert.ToDateTime(Model.ModifiedTime).ToString("MMM dd, yyyy - hh:mm tt") : "Not modified yet")" 
+           readonly style="background-color: #f1f5f9; color: var(--theme-text-muted); font-weight: 600; cursor: not-allowed;" />
+    <input type="hidden" asp-for="ModifiedTime" />
+</div>
+
                       <!-- Date Of Entry Field -->
                         <div class="col-md-6 form-group">
                             <label class="sf-label">Date of Entry</label>

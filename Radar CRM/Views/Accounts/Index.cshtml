@@ -3937,7 +3937,7 @@ window.clearGlobalSelection = function() {
     // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = `/${module}/ExportSelected?format=${format}`;
+  form.action = `@Url.Action("ExportSelected", "Accounts")?format=${format}`;
 
     const inputIds = document.createElement("input");
     inputIds.type = "hidden";
@@ -4269,7 +4269,7 @@ window.clearGlobalSelection = function() {
                 const notesArray = Array.isArray(responseData)
                     ? responseData
                     : (responseData.data || responseData.notes || responseData.Data || responseData.Notes || []);
-
+                     
                 if (notesArray && notesArray.length > 0) {
                     let allNotesHtml = '';
 
