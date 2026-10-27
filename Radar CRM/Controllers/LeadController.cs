@@ -484,6 +484,7 @@ namespace Radar_CRM.Controllers
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPagesCalc;
             ViewBag.TotalRecords = totalRecords;
+            ViewBag.AllMatchingIds = await query.Select(l => l.Id).ToListAsync();
             ViewBag.UsersList = new SelectList(_context.Users, "Id", "fullName");
             // 🚀 ADD THIS LINE TO FIX THE CRASH:
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
@@ -684,6 +685,29 @@ namespace Radar_CRM.Controllers
             }
 
             return subordinateIds;
+        }
+
+        // ==========================================
+        // 🚀 NEW: GLOBAL BULK EXPORT ENDPOINT
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> ExportSelectedCsv([FromBody] List<int> ids)
+        {
+            if (ids == null || !ids.Any()) return BadRequest("No records selected.");
+
+            var leads = await _context.Leads.Where(l => ids.Contains(l.Id)).ToListAsync();
+
+            var builder = new System.Text.StringBuilder();
+            // Define your CSV column headers here
+            builder.AppendLine("Lead Name,Mobile Number,Email,Current Status,Stage,Data Source,Created Date");
+
+            foreach (var lead in leads)
+            {
+                builder.AppendLine($"\"{lead.LeadName}\",\"{lead.MobileNumber}\",\"{lead.EmailID}\",\"{lead.CurrentStatus}\",\"{lead.Stage}\",\"{lead.DataSources}\",\"{lead.CreatedDateAndTime:dd-MM-yyyy HH:mm}\"");
+            }
+
+            byte[] fileBytes = System.Text.Encoding.UTF8.GetBytes(builder.ToString());
+            return File(fileBytes, "text/csv", "Leads_Export.csv");
         }
 
         // GET: Leads/Create

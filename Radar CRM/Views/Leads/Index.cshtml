@@ -572,7 +572,23 @@
                 <div class="vr mx-1 d-none d-md-block" style="background-color: #d1d5db;"></div>
             </div>
 
-            <button class="btn-saas" onclick="exportTableData('Leads', 'csv')"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+            <div class="dropdown d-inline-block">
+                <button class="btn-saas dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="gap: 6px;">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Export
+                </button>
+                <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 8px;">
+                    <li>
+                        <a class="dropdown-item py-2 fw-medium" href="#" onclick="triggerBackendExport('Leads', 'csv', event)">
+                            <i class="fa-solid fa-file-csv me-2 text-primary"></i> Export as CSV
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item py-2 fw-medium" href="#" onclick="triggerBackendExport('Leads', 'xlsx', event)">
+                            <i class="fa-solid fa-file-excel me-2 text-success"></i> Export as Excel
+                        </a>
+                    </li>
+                </ul>
+            </div>
             <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
            
             <div class="dropdown">
@@ -2419,39 +2435,41 @@ document.addEventListener('change', function (e) {
 
     // 1. Global state management
 window.isGlobalSelectAll = sessionStorage.getItem('crm_global_select_leads') === 'true';
-window.selectedRowIds = JSON.parse(sessionStorage.getItem('crm_selected_rows_leads')) || [];
+        window.selectedRowIds = JSON.parse(sessionStorage.getItem('crm_selected_rows_leads')) || [];
 
-document.addEventListener("DOMContentLoaded", function () {
-    // Restore selection state on page load
-    if (window.isGlobalSelectAll) {
-        selectAllAcrossPages();
-    } else if (window.selectedRowIds.length > 0) {
-        document.querySelectorAll('.row-cb').forEach(cb => {
-            if (window.selectedRowIds.includes(cb.value)) cb.checked = true;
+        // 🚀 Fetch all IDs from C# for operations across pages
+        window.allMatchingIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.AllMatchingIds ?? new List<int>()));
+
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.isGlobalSelectAll) {
+                selectAllAcrossPages();
+            } else if (window.selectedRowIds.length > 0) {
+                document.querySelectorAll('.row-cb').forEach(cb => {
+                    if (window.selectedRowIds.includes(cb.value)) cb.checked = true;
+                });
+                updateSelectedCount();
+            }
         });
-        updateSelectedCount();
-    }
-});
 
 // 2. Handle individual row checkbox clicks
 window.toggleRowCheckbox = function(cb) {
-    if (cb.checked) {
-        if (!window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
-    } else {
-        window.isGlobalSelectAll = false;
-        sessionStorage.setItem('crm_global_select_leads', 'false');
-        window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
+            if (cb.checked) {
+                if (!window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+            } else {
+                window.isGlobalSelectAll = false;
+                sessionStorage.setItem('crm_global_select_leads', 'false');
+                window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
 
-        const selectAllCb = document.getElementById('selectAllCb');
-        if (selectAllCb) selectAllCb.checked = false;
+                const selectAllCb = document.getElementById('selectAllCb');
+                if (selectAllCb) selectAllCb.checked = false;
 
-        const banner = document.getElementById('selectAllPagesBanner');
-        if (banner) banner.style.display = 'none';
-    }
+                const banner = document.getElementById('selectAllPagesBanner');
+                if (banner) banner.style.display = 'none';
+            }
 
-    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
-    updateSelectedCount();
-};
+            sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
+            updateSelectedCount();
+        };
 
 
 
@@ -2460,205 +2478,212 @@ window.toggleRowCheckbox = function(cb) {
     // BULK EXPORT/DELETE LOGIC
     // ==========================================
    window.toggleAllRowCheckboxes = function(sourceCb) {
-    currentVisibleRows.forEach(row => {
-        const cb = row.querySelector('.row-cb');
-        if(cb) {
-            cb.checked = sourceCb.checked;
-            if (cb.checked && !window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
-            else if (!cb.checked) window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
-        }
-    });
-
-   window.isGlobalSelectAll = false;
-    sessionStorage.setItem('crm_global_select_leads', 'false');
-    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
-
-    const banner = document.getElementById('selectAllPagesBanner');
-    const actualTotalRecords = parseInt('@totalRecords') || 0;
-
-    if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
-        if(banner) {
-            const bannerTextEl = document.getElementById('selectAllBannerText');
-            if (bannerTextEl) {
-                bannerTextEl.innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
-            }
-
-            banner.style.display = 'table-row';
-
-            const clearBtn = document.getElementById('clearSelectionBtn');
-            const selectAllLink = document.getElementById('selectAllPagesLink');
-            if (clearBtn) clearBtn.style.display = 'none';
-            if (selectAllLink) {
-                selectAllLink.style.display = 'inline';
-                selectAllLink.innerHTML = `Select all <strong>${actualTotalRecords}</strong> records that match this search.`;
-            }
-        }
-    } else {
-        if(banner) banner.style.display = 'none';
-    }
-
-    updateSelectedCount();
-};
-
-window.selectAllAcrossPages = function() {
-    window.isGlobalSelectAll = true;
-    sessionStorage.setItem('crm_global_select_leads', 'true');
-
-    const actualTotalRecords = parseInt('@totalRecords') || 0;
-    const banner = document.getElementById('selectAllPagesBanner');
-
-    if (banner) {
-        banner.style.display = 'table-row';
-        const bannerTextEl = document.getElementById('selectAllBannerText');
-        if (bannerTextEl) {
-            bannerTextEl.innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
-        }
-
-        const clearBtn = document.getElementById('clearSelectionBtn');
-        const selectAllLink = document.getElementById('selectAllPagesLink');
-        if (selectAllLink) selectAllLink.style.display = 'none';
-        if (clearBtn) clearBtn.style.display = 'inline';
-    }
-
-    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = true);
-    const selectAllCb = document.getElementById('selectAllCb');
-    if (selectAllCb) selectAllCb.checked = true;
-
-    updateSelectedCount();
-};
-
-window.clearGlobalSelection = function() {
-    window.isGlobalSelectAll = false;
-    sessionStorage.setItem('crm_global_select_leads', 'false');
-    window.selectedRowIds = [];
-    sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify([]));
-
-    const selectAllCb = document.getElementById('selectAllCb');
-    if(selectAllCb) selectAllCb.checked = false;
-
-    document.getElementById('selectAllPagesBanner').style.display = 'none';
-    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
-
-    updateSelectedCount();
-};
-
-  window.updateSelectedCount = function() {
-    const selectedCount = window.isGlobalSelectAll ? parseInt('@totalRecords') : window.selectedRowIds.length;
-
-    document.getElementById('selCount').innerText = selectedCount;
-    document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
-
-    const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
-    if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selectedCount;
-
-    const totalVisible = currentVisibleRows.length;
-    const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
-    const selectAllCb = document.getElementById('selectAllCb');
-
-    if(selectAllCb && !window.isGlobalSelectAll) {
-        selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
-    }
-};
-
-    function deleteSelected() {
-    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-
-    // Abort if nothing is selected (neither globally nor locally)
-    if (selectedCbs.length === 0 && !window.isGlobalSelectAll && window.selectedRowIds.length === 0) return;
-
-    // Use the global count if the banner was clicked, otherwise use the selected array count
-    const actualTotalRecords = parseInt('@totalRecords') || 0;
-    const displayCount = window.isGlobalSelectAll ? actualTotalRecords : window.selectedRowIds.length;
-
-    if (confirm(`Are you sure you want to delete ${displayCount} selected record(s)?`)) {
-
-        let selectedIds = window.selectedRowIds.map(id => parseInt(id, 10));
-
-        // Grab the active filters from the URL so C# knows which records to delete globally
-        const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
-
-        // Build the new payload
-        const payload = {
-            Ids: selectedIds,
-            IsGlobalSelectAll: window.isGlobalSelectAll,
-            FiltersJson: activeFilters
-        };
-
-        fetch('@Url.Action("BulkDelete", "Leads")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(async response => {
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `HTTP Error ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // Clear selection state and reload so the pagination resets properly
-                if (typeof window.clearGlobalSelection === 'function') {
-                    window.clearGlobalSelection();
-                }
-                window.location.reload();
-            } else {
-                alert("Database Error: " + data.message);
-            }
-        }).catch((err) => {
-            console.error("Delete Error Details:", err);
-            alert("Server Error Encountered:\n" + err.message.substring(0, 150));
-        });
-    }
-}
-
-
-
-    function exportTableToCSV(filename) {
-        const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
-       
-        if (checkedCbs.length === 0) {
-            alert("Please select at least one record using the checkboxes before exporting.");
-            return;
-        }
-
-        let csv = [];
-        let headerRow = [];
-        const table = document.getElementById("leadsTable");
-
-        table.querySelectorAll("thead th[data-col-name]").forEach(th => {
-            if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
-        });
-        csv.push(headerRow.join(","));
-
-        let targetRows = [];
-        checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
-
-        targetRows.forEach(tr => {
-            let rowData = [];
-            tr.querySelectorAll("td[data-col-index]").forEach(td => {
-                if(td.style.display !== 'none') {
-                    let text = td.innerText.trim().replace(/"/g, '""');
-                    rowData.push(`"${text}"`);
+            currentVisibleRows.forEach(row => {
+                const cb = row.querySelector('.row-cb');
+                if(cb) {
+                    cb.checked = sourceCb.checked;
+                    if (cb.checked && !window.selectedRowIds.includes(cb.value)) window.selectedRowIds.push(cb.value);
+                    else if (!cb.checked) window.selectedRowIds = window.selectedRowIds.filter(id => id !== cb.value);
                 }
             });
-            csv.push(rowData.join(","));
-        });
 
-        let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
-        let downloadLink = document.createElement("a");
-        downloadLink.download = filename;
-        downloadLink.href = window.URL.createObjectURL(csvFile);
-        downloadLink.style.display = "none";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-    }
+  window.isGlobalSelectAll = false;
+            sessionStorage.setItem('crm_global_select_leads', 'false');
+            sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify(window.selectedRowIds));
 
+            const banner = document.getElementById('selectAllPagesBanner');
+            const actualTotalRecords = parseInt('@totalRecords') || 0;
+
+            if (sourceCb.checked && actualTotalRecords > currentVisibleRows.length) {
+                if(banner) {
+                    const bannerTextEl = document.getElementById('selectAllBannerText');
+                    if (bannerTextEl) {
+                        bannerTextEl.innerHTML = `All <strong>${currentVisibleRows.length}</strong> records on this page are selected.`;
+                    }
+
+                    banner.style.display = 'table-row';
+
+                    const clearBtn = document.getElementById('clearSelectionBtn');
+                    const selectAllLink = document.getElementById('selectAllPagesLink');
+                    if (clearBtn) clearBtn.style.display = 'none';
+                    if (selectAllLink) {
+                        selectAllLink.style.display = 'inline';
+                        selectAllLink.innerHTML = `Select all <strong>${actualTotalRecords}</strong> records that match this search.`;
+                    }
+                }
+            } else {
+                if(banner) banner.style.display = 'none';
+            }
+
+            updateSelectedCount();
+        };
+
+window.selectAllAcrossPages = function() {
+            window.isGlobalSelectAll = true;
+            sessionStorage.setItem('crm_global_select_leads', 'true');
+
+            const actualTotalRecords = parseInt('@totalRecords') || 0;
+            const banner = document.getElementById('selectAllPagesBanner');
+
+            if (banner) {
+                banner.style.display = 'table-row';
+                const bannerTextEl = document.getElementById('selectAllBannerText');
+                if (bannerTextEl) {
+                    bannerTextEl.innerHTML = `All <strong>${actualTotalRecords}</strong> records across all pages are selected.`;
+                }
+
+                const clearBtn = document.getElementById('clearSelectionBtn');
+                const selectAllLink = document.getElementById('selectAllPagesLink');
+                if (selectAllLink) selectAllLink.style.display = 'none';
+                if (clearBtn) clearBtn.style.display = 'inline';
+            }
+
+            document.querySelectorAll('.row-cb').forEach(cb => cb.checked = true);
+            const selectAllCb = document.getElementById('selectAllCb');
+            if (selectAllCb) selectAllCb.checked = true;
+
+            updateSelectedCount();
+        };
+
+
+window.clearGlobalSelection = function() {
+            window.isGlobalSelectAll = false;
+            sessionStorage.setItem('crm_global_select_leads', 'false');
+            window.selectedRowIds = [];
+            sessionStorage.setItem('crm_selected_rows_leads', JSON.stringify([]));
+
+            const selectAllCb = document.getElementById('selectAllCb');
+            if(selectAllCb) selectAllCb.checked = false;
+
+            document.getElementById('selectAllPagesBanner').style.display = 'none';
+            document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+
+            updateSelectedCount();
+        };
+
+ window.updateSelectedCount = function() {
+            const selectedCount = window.isGlobalSelectAll ? parseInt('@totalRecords') : window.selectedRowIds.length;
+
+            document.getElementById('selCount').innerText = selectedCount;
+            document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
+
+            const massUpdateCountDisplay = document.getElementById('massUpdateCountDisplay');
+            if (massUpdateCountDisplay) massUpdateCountDisplay.innerText = selectedCount;
+
+            const totalVisible = currentVisibleRows.length;
+            const selectedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
+            const selectAllCb = document.getElementById('selectAllCb');
+
+            if(selectAllCb && !window.isGlobalSelectAll) {
+                selectAllCb.checked = (selectedOnPage > 0 && selectedOnPage === totalVisible);
+            }
+        };
+
+  function deleteSelected() {
+            const selectedIds = window.isGlobalSelectAll 
+                ? window.allMatchingIds 
+                : window.selectedRowIds.map(id => parseInt(id, 10));
+
+            if (selectedIds.length === 0) return;
+
+            if (confirm(`Are you sure you want to delete ${selectedIds.length} selected record(s)?`)) {
+                const payload = {
+                    Ids: selectedIds,
+                    IsGlobalSelectAll: window.isGlobalSelectAll,
+                    FiltersJson: new URLSearchParams(window.location.search).get('advancedFilters') || "[]"
+                };
+
+                fetch('@Url.Action("BulkDelete", "Leads")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(payload.Ids) 
+                })
+                .then(async response => {
+                    if (!response.ok) throw new Error(await response.text());
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        if (typeof window.clearGlobalSelection === 'function') window.clearGlobalSelection();
+                        window.location.reload();
+                    } else {
+                        alert("Database Error: " + data.message);
+                    }
+                })
+                .catch((err) => alert("Server Error Encountered"));
+            }
+        }
+
+
+
+
+  function exportTableToCSV(filename) {
+            const selectedIds = window.isGlobalSelectAll
+                ? window.allMatchingIds
+                : window.selectedRowIds.map(id => parseInt(id, 10));
+
+            if (selectedIds.length === 0) {
+                alert("Please select at least one record before exporting.");
+                return;
+            }
+
+            if (window.isGlobalSelectAll || selectedIds.length > 100) {
+                alert(`Exporting ${selectedIds.length} records. The file will download shortly.`);
+
+                fetch('@Url.Action("ExportSelectedCsv", "Leads")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(selectedIds)
+                })
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename || 'Leads_Export.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                })
+                .catch(err => alert("Error exporting data: " + err));
+
+                return;
+            }
+
+            // Normal DOM export for a single page
+            let csv = [];
+            let headerRow = [];
+            const table = document.getElementById("leadsTable");
+
+            table.querySelectorAll("thead th[data-col-name]").forEach(th => {
+                if(th.style.display !== 'none') headerRow.push(`"${th.querySelector('span').innerText.trim()}"`);
+            });
+            csv.push(headerRow.join(","));
+
+            const checkedCbs = document.querySelectorAll("tbody .row-cb:checked");
+            let targetRows = [];
+            checkedCbs.forEach(cb => targetRows.push(cb.closest('tr')));
+
+            targetRows.forEach(tr => {
+                let rowData = [];
+                tr.querySelectorAll("td[data-col-index]").forEach(td => {
+                    if(td.style.display !== 'none') {
+                        let text = td.innerText.trim().replace(/"/g, '""');
+                        rowData.push(`"${text}"`);
+                    }
+                });
+                csv.push(rowData.join(","));
+            });
+
+            let csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+            let downloadLink = document.createElement("a");
+            downloadLink.download = filename || 'Export.csv';
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
     function setupFileUpload() {
         const fileInput = document.getElementById('fileUploadInput');
         if(!fileInput) return;
@@ -3033,54 +3058,51 @@ window.clearGlobalSelection = function() {
     };
 
 window.openTaskModal = function () {
-    document.querySelectorAll('.tooltip').forEach(t => t.remove());
+            document.querySelectorAll('.tooltip').forEach(t => t.remove());
 
-    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-    const selectedIds = Array.from(selectedCbs).map(cb => cb.value);
+            const selectedIds = window.isGlobalSelectAll
+                ? window.allMatchingIds
+                : window.selectedRowIds.map(id => parseInt(id, 10));
 
-    // Store all selected IDs in the hidden input
-    const bulkIdsInput = document.getElementById('bulkTaskLeadIds');
-    if (bulkIdsInput) bulkIdsInput.value = selectedIds.join(',');
+            const bulkIdsInput = document.getElementById('bulkTaskLeadIds');
+            if (bulkIdsInput) bulkIdsInput.value = selectedIds.join(',');
 
-    // Show banner indicating how many leads will get this task
-    const bulkAlert = document.getElementById('bulkTaskAlert');
-    const bulkCount = document.getElementById('bulkTaskCount');
-    if (bulkAlert && bulkCount) {
-        if (selectedIds.length > 0) {
-            bulkCount.innerText = selectedIds.length;
-            bulkAlert.style.display = 'block';
-        } else {
-            bulkAlert.style.display = 'none';
-        }
-    }
+            const bulkAlert = document.getElementById('bulkTaskAlert');
+            const bulkCount = document.getElementById('bulkTaskCount');
+            if (bulkAlert && bulkCount) {
+                if (selectedIds.length > 0) {
+                    bulkCount.innerText = selectedIds.length;
+                    bulkAlert.style.display = 'block';
+                } else {
+                    bulkAlert.style.display = 'none';
+                }
+            }
 
-    // Handle the single Lead dropdown inside "More Fields"
-    const leadDropdown = document.getElementById('taskModalLeadId');
-    if (leadDropdown) {
-        if (selectedIds.length === 1) {
-            leadDropdown.value = selectedIds[0];
-            leadDropdown.disabled = false;
-        } else if (selectedIds.length > 1) {
-            leadDropdown.value = "";
-            leadDropdown.disabled = true; // Disabled because we are creating for multiple leads
-        } else {
-            leadDropdown.value = "";
-            leadDropdown.disabled = false;
-        }
-    }
+            const leadDropdown = document.getElementById('taskModalLeadId');
+            if (leadDropdown) {
+                if (selectedIds.length === 1) {
+                    leadDropdown.value = selectedIds[0];
+                    leadDropdown.disabled = false;
+                } else if (selectedIds.length > 1) {
+                    leadDropdown.value = "";
+                    leadDropdown.disabled = true;
+                } else {
+                    leadDropdown.value = "";
+                    leadDropdown.disabled = false;
+                }
+            }
 
-    const modalEl = document.getElementById('quickTaskModal');
-    if (modalEl) {
-        document.body.appendChild(modalEl);
-        modalEl.style.zIndex = "1055";
-        try {
-            const taskModal = new bootstrap.Modal(modalEl);
-            taskModal.show();
-        } catch (error) {
-            if (typeof $ !== 'undefined') $(modalEl).modal('show');
-        }
-    }
-};
+            const modalEl = document.getElementById('quickTaskModal');
+            if (modalEl) {
+                document.body.appendChild(modalEl);
+                modalEl.style.zIndex = "1055";
+                try {
+                    new bootstrap.Modal(modalEl).show();
+                } catch (error) {
+                    if (typeof $ !== 'undefined') $(modalEl).modal('show');
+                }
+            }
+        };
 
 window.executeBulkTaskCreate = function (e) {
     e.preventDefault();
@@ -3207,63 +3229,60 @@ window.renderMassUpdateInput = function () {
     }
 };
 
-    window.executeMassUpdateAjax = function() {
-         const field = document.getElementById('massUpdateField').value;
-         const valInput = document.getElementById('massUpdateValue');
-         let val = valInput ? valInput.value : '';
+   // 🚀 1. Capture the global list of IDs injected by the C# Controller
+window.allMatchingIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.AllMatchingIds ?? new List<int>()));
 
-         if (val === "CLEAR_VALUE_COMMAND") val = "";
+// 🚀 2. MASS UPDATE FIX
+window.executeMassUpdateAjax = function() {
+            const field = document.getElementById('massUpdateField').value;
+            const valInput = document.getElementById('massUpdateValue');
+            let val = valInput ? valInput.value : '';
 
-         const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-         const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+            if (val === "CLEAR_VALUE_COMMAND") val = "";
 
-         if (!field || selectedIds.length === 0) {
-             alert("Please select a field and ensure records are checked.");
-             return;
-         }
+            const selectedIds = window.isGlobalSelectAll
+                ? window.allMatchingIds
+                : window.selectedRowIds.map(id => parseInt(id, 10));
 
-         if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
-             return;
-         }
+            if (!field || selectedIds.length === 0) {
+                alert("Please select a field and ensure records are checked.");
+                return;
+            }
 
-         const btn = document.getElementById('btnExecuteMassUpdate');
-         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
-         btn.disabled = true;
+            if (val === "" && !confirm("You are about to clear/empty this field for all selected records. Are you sure?")) {
+                return;
+            }
 
-         // Targets the LEADS controller
-         fetch('@Url.Action("BulkUpdate", "Leads")', {
-             method: 'POST',
-             headers: {
-                 'Content-Type': 'application/json',
-                 'Accept': 'application/json'
-             },
-             body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
-         })
-         .then(async response => {
-             if (!response.ok) {
-                 const errorText = await response.text();
-                 throw new Error(errorText || `HTTP Error ${response.status}`);
-             }
-             return response.json();
-         })
-         .then(data => {
-             if (data.success) {
-                 bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
-                 alert(`Successfully updated ${selectedIds.length} records!`);
-                 window.location.reload();
-             } else {
-                 alert("Update failed: " + data.message);
-                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-                 btn.disabled = false;
-             }
-         })
-         .catch((err) => {
-             console.error("Mass Update Error:", err);
-             alert("Connection error! Please check the browser console (F12) for exact details.");
-             btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-             btn.disabled = false;
-         });
-    };
+            const btn = document.getElementById('btnExecuteMassUpdate');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+            btn.disabled = true;
+
+            fetch('@Url.Action("BulkUpdate", "Leads")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ Ids: selectedIds, FieldName: field, NewValue: val })
+            })
+            .then(async response => {
+                if (!response.ok) throw new Error(await response.text());
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
+                    alert(`Successfully updated ${selectedIds.length} records!`);
+                    window.location.reload();
+                } else {
+                    alert("Update failed: " + data.message);
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+                    btn.disabled = false;
+                }
+            })
+            .catch((err) => {
+                alert("Connection error! See console.");
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+                btn.disabled = false;
+            });
+        };
 
     // --- LEAD NOTES SYSTEM ---
     async function openNotesPanel(leadId, leadName) {
@@ -3440,6 +3459,42 @@ window.renderMassUpdateInput = function () {
             </div>`;
         document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
+    window.triggerBackendExport = function(module, format, event) {
+    if (event) event.preventDefault();
 
+    const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
+    const searchText = new URLSearchParams(window.location.search).get('search') || "";
+
+    // SCENARIO 1: EXPORT ALL (Global mode active, or no specific checkboxes checked)
+    if (window.isGlobalSelectAll || window.selectedRowIds.length === 0) {
+        if (window.selectedRowIds.length === 0 && !confirm(`No specific records selected. Do you want to download ALL records matching your current filter as ${format.toUpperCase()}?`)) {
+            return;
+        }
+
+        const exportUrl = `/${module}/Export?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
+        window.location.href = exportUrl;
+        return;
+    }
+
+    // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
+    const form = document.createElement("form");
+    form.method = "POST";
+    // Point specifically to the controller dynamically
+    form.action = `/${module}/ExportSelected?format=${format}`;
+
+    const inputIds = document.createElement("input");
+    inputIds.type = "hidden";
+    inputIds.name = "selectedIds";
+
+    // Force the array of strings into an array of integers before sending to C#
+    const numericIds = window.selectedRowIds.map(id => parseInt(id, 10));
+    inputIds.value = JSON.stringify(numericIds);
+
+    form.appendChild(inputIds);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+};
 
 </script>

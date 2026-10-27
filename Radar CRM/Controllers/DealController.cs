@@ -436,7 +436,7 @@ namespace Radar_CRM.Controllers
             if (ModelState.IsValid)
             {
                 // 🚀 Cache valid user IDs to prevent Database Foreign Key crashes
-                var validUserIds = _context.Users.Select(u => u.Id).ToHashSet();
+                var validUserIds = _context.Users.Select(u => u.Id!).ToHashSet();
 
                 // 🚀 Use the unified Notes list instead of DealNote
                 deal.Notes ??= new List<Notes>();
@@ -518,7 +518,7 @@ namespace Radar_CRM.Controllers
             var skippedRecords = new List<string>();
             int currentRow = 1;
 
-            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id), StringComparer.OrdinalIgnoreCase);
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id!).ToList(), StringComparer.OrdinalIgnoreCase);
 
             // UPSERT DICTIONARY: Load existing Deals by Zoho ID
             var existingDealsDb = await _context.Deals
@@ -1046,7 +1046,7 @@ namespace Radar_CRM.Controllers
                     }
 
                     // 🚀 Cache valid user IDs to prevent Database Foreign Key crashes
-                    var validUserIds = _context.Users.Select(u => u.Id).ToHashSet();
+                    var validUserIds = _context.Users.Select(u => u.Id!).ToHashSet();
 
                     if (SavedNoteDesc != null)
                     {
