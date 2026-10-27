@@ -688,26 +688,290 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // 🚀 NEW: GLOBAL BULK EXPORT ENDPOINT
+        // 🚀 NEW: BULK EXPORT ENDPOINTS (WITH CHUNKING FOR >100 RECORDS)
         // ==========================================
-        [HttpPost]
-        public async Task<IActionResult> ExportSelectedCsv([FromBody] List<int> ids)
+        [HttpGet]
+        [Route("Leads/Export")]
+        public async Task<IActionResult> Export(string format, string filters, string search = "")
         {
-            if (ids == null || !ids.Any()) return BadRequest("No records selected.");
-
-            var leads = await _context.Leads.Where(l => ids.Contains(l.Id)).ToListAsync();
-
-            var builder = new System.Text.StringBuilder();
-            // Define your CSV column headers here
-            builder.AppendLine("Lead Name,Mobile Number,Email,Current Status,Stage,Data Source,Created Date");
-
-            foreach (var lead in leads)
+            try
             {
-                builder.AppendLine($"\"{lead.LeadName}\",\"{lead.MobileNumber}\",\"{lead.EmailID}\",\"{lead.CurrentStatus}\",\"{lead.Stage}\",\"{lead.DataSources}\",\"{lead.CreatedDateAndTime:dd-MM-yyyy HH:mm}\"");
-            }
+                var query = _context.Leads.AsNoTracking().AsQueryable();
 
-            byte[] fileBytes = System.Text.Encoding.UTF8.GetBytes(builder.ToString());
-            return File(fileBytes, "text/csv", "Leads_Export.csv");
+                // 1. Role / User visibility restrictions
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var currentUser = await _context.Users.FindAsync(currentUserId);
+                bool isAdmin = !string.IsNullOrWhiteSpace(currentUser?.Profile) &&
+                               (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
+
+                if (!isAdmin && currentUser != null)
+                {
+                    var allRoles = await _context.Roles.ToListAsync();
+                    var visibleRoleIds = new List<int>();
+                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
+                    visibleRoleIds.AddRange(subordinateIds);
+
+                    var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
+                    if (currentUserRoleModel != null && currentUserRoleModel.ShareDataWithPeers && currentUser.RoleId.HasValue)
+                    {
+                        visibleRoleIds.Add(currentUser.RoleId.Value);
+                    }
+
+                    var visibleUserIds = await _context.Users
+                        .Where(u => u.RoleId.HasValue && visibleRoleIds.Contains(u.RoleId.Value))
+                        .Select(u => u.Id).ToListAsync();
+
+                    visibleUserIds.Add(currentUserId);
+                    query = query.Where(a => visibleUserIds.Contains(a.LeadOwnerId));
+                }
+
+                // 2. Search Box Filter
+                if (!string.IsNullOrEmpty(search))
+                {
+                    var searchLower = search.ToLower();
+                    query = query.Where(a =>
+                        (a.LeadName != null && a.LeadName.ToLower().Contains(searchLower)) ||
+                        (a.MobileNumber != null && a.MobileNumber.Contains(search)) ||
+                        (a.EmailID != null && a.EmailID.ToLower().Contains(searchLower))
+                    );
+                }
+
+                // 3. Dynamic Filter Expressions (Same logic as Index)
+                if (!string.IsNullOrWhiteSpace(filters) && filters != "[]")
+                {
+                    try
+                    {
+                        string jsonString = filters.Contains("%5B") ? Uri.UnescapeDataString(filters) : filters;
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        var filterList = System.Text.Json.JsonSerializer.Deserialize<List<LeadFilterCriteria>>(jsonString, options);
+
+                        if (filterList != null && filterList.Any())
+                        {
+                            var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Lead), "a");
+                            System.Linq.Expressions.Expression combinedPredicate = null;
+
+                            foreach (var f in filterList.Where(f => !f.ColumnName.StartsWith("Task.") && f.ColumnName != "RelatedTasksPresence"))
+                            {
+                                if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+
+                                string dbColName = f.ColumnName;
+                                var propertyInfo = typeof(Lead).GetProperty(dbColName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                                // Safe resolution for ID foreign keys
+                                if (propertyInfo != null && propertyInfo.PropertyType.IsClass && propertyInfo.PropertyType != typeof(string))
+                                {
+                                    var idProp = typeof(Lead).GetProperty(dbColName + "Id", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                                    if (idProp != null) { propertyInfo = idProp; }
+                                }
+
+                                if (propertyInfo == null) continue;
+
+                                var propExpr = System.Linq.Expressions.Expression.Property(parameter, propertyInfo);
+                                System.Linq.Expressions.Expression conditionExpr = null;
+                                string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
+
+                                if (propertyInfo.PropertyType == typeof(string))
+                                {
+                                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                                    var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                                    var notNullProp = System.Linq.Expressions.Expression.Coalesce(propExpr, System.Linq.Expressions.Expression.Constant(""));
+                                    var lowerProp = System.Linq.Expressions.Expression.Call(notNullProp, toLowerMethod);
+                                    var lowerVal = System.Linq.Expressions.Expression.Constant(safeValue.ToLower());
+
+                                    if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(lowerProp, lowerVal);
+                                    else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(lowerProp, lowerVal);
+                                    else if (f.Condition == "contains") conditionExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
+                                    else if (f.Condition == "does_not_contain") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal));
+                                    else if (f.Condition == "is_empty") conditionExpr = System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr);
+                                    else if (f.Condition == "is_not_empty") conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
+                                }
+                                else if (propertyInfo.PropertyType == typeof(bool) || propertyInfo.PropertyType == typeof(bool?))
+                                {
+                                    if (bool.TryParse(safeValue, out bool boolVal))
+                                    {
+                                        var valExpr = System.Linq.Expressions.Expression.Constant(boolVal, propertyInfo.PropertyType);
+                                        if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                        else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                    }
+                                }
+
+                                if (conditionExpr != null)
+                                {
+                                    combinedPredicate = combinedPredicate == null ? conditionExpr :
+                                        (f.LogicalOperator.Equals("OR", StringComparison.OrdinalIgnoreCase) ?
+                                         System.Linq.Expressions.Expression.OrElse(combinedPredicate, conditionExpr) :
+                                         System.Linq.Expressions.Expression.AndAlso(combinedPredicate, conditionExpr));
+                                }
+                            }
+
+                            if (combinedPredicate != null)
+                            {
+                                var lambda = System.Linq.Expressions.Expression.Lambda<Func<Lead, bool>>(combinedPredicate, parameter);
+                                query = query.Where(lambda);
+                            }
+                        }
+                    }
+                    catch { /* Ignore parse errors */ }
+                }
+
+                // 🚀 FIX: Prevent Nullable IQueryable crashes by excluding virtual lists and only allowing primitive/nullable types
+                var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Deals", "PaymentRow", "LeadOwner", "AccountOwner", "CoOwner", "DemoOwner", "Note" };
+                var properties = typeof(Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(p => !excludedFields.Contains(p.Name) &&
+                                (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                    .ToArray();
+
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var workbook = new ClosedXML.Excel.XLWorkbook();
+                    var worksheet = workbook.Worksheets.Add("Leads");
+
+                    for (int i = 0; i < properties.Length; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+                    }
+
+                    int rowIdx = 2;
+                    await foreach (var lead in query.AsAsyncEnumerable())
+                    {
+                        for (int i = 0; i < properties.Length; i++)
+                        {
+                            worksheet.Cell(rowIdx, i + 1).Value = properties[i].GetValue(lead, null)?.ToString() ?? "";
+                        }
+                        rowIdx++;
+                    }
+
+                    worksheet.Columns().AdjustToContents();
+                    var memoryStream = new System.IO.MemoryStream();
+                    workbook.SaveAs(memoryStream);
+                    memoryStream.Position = 0;
+
+                    return File(memoryStream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Leads_All_{timestamp}.xlsx");
+                }
+                else
+                {
+                    Response.Clear();
+                    Response.ContentType = "text/csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Leads_All_{timestamp}.csv");
+
+                    await using var writer = new System.IO.StreamWriter(Response.Body, System.Text.Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+
+                    await foreach (var lead in query.AsAsyncEnumerable())
+                    {
+                        var rowValues = properties.Select(p =>
+                        {
+                            var val = p.GetValue(lead, null)?.ToString() ?? "";
+                            return $"\"{val.Replace("\"", "\"\"")}\"";
+                        });
+                        await writer.WriteLineAsync(string.Join(",", rowValues));
+                    }
+
+                    await writer.FlushAsync();
+                    return new EmptyResult();
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Export failed: {ex.Message}");
+            }
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        [Route("Leads/ExportSelected")]
+        public async Task<IActionResult> ExportSelected([FromQuery] string format, [FromForm] string selectedIds)
+        {
+            try
+            {
+                var options = new System.Text.Json.JsonSerializerOptions
+                {
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+                };
+                var ids = System.Text.Json.JsonSerializer.Deserialize<List<int>>(selectedIds, options) ?? new List<int>();
+
+                if (!ids.Any()) return BadRequest("No records selected.");
+
+                // 🚀 FIX: Prevent Nullable IQueryable crashes by excluding virtual lists and only allowing primitive/nullable types
+                var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Deals", "PaymentRow", "LeadOwner", "AccountOwner", "CoOwner", "DemoOwner", "Note" };
+                var properties = typeof(Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(p => !excludedFields.Contains(p.Name) &&
+                                (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>)))
+                    .ToArray();
+
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var workbook = new ClosedXML.Excel.XLWorkbook();
+                    var worksheet = workbook.Worksheets.Add("Selected Leads");
+
+                    for (int i = 0; i < properties.Length; i++)
+                    {
+                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+                    }
+
+                    int rowIdx = 2;
+                    int chunkSize = 2000; // 🚀 CHUNKING RESOLVES THE > 2100 SQL PARAMETER CRASH
+
+                    for (int i = 0; i < ids.Count; i += chunkSize)
+                    {
+                        var batch = ids.Skip(i).Take(chunkSize).ToList();
+                        var chunkData = await _context.Leads.AsNoTracking().Where(l => batch.Contains(l.Id)).ToListAsync();
+
+                        foreach (var lead in chunkData)
+                        {
+                            for (int col = 0; col < properties.Length; col++)
+                            {
+                                worksheet.Cell(rowIdx, col + 1).Value = properties[col].GetValue(lead, null)?.ToString() ?? "";
+                            }
+                            rowIdx++;
+                        }
+                    }
+
+                    var ms = new System.IO.MemoryStream();
+                    workbook.SaveAs(ms);
+                    return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Leads_Selected_{timestamp}.xlsx");
+                }
+                else
+                {
+                    Response.Clear();
+                    Response.ContentType = "text/csv";
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Leads_Selected_{timestamp}.csv");
+
+                    await using var writer = new System.IO.StreamWriter(Response.Body, System.Text.Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+
+                    int chunkSize = 2000; // 🚀 CHUNKING RESOLVES THE > 2100 SQL PARAMETER CRASH
+                    for (int i = 0; i < ids.Count; i += chunkSize)
+                    {
+                        var batch = ids.Skip(i).Take(chunkSize).ToList();
+                        var chunkData = await _context.Leads.AsNoTracking().Where(l => batch.Contains(l.Id)).ToListAsync();
+
+                        foreach (var lead in chunkData)
+                        {
+                            var rowValues = properties.Select(p =>
+                            {
+                                var val = p.GetValue(lead, null)?.ToString() ?? "";
+                                return $"\"{val.Replace("\"", "\"\"")}\"";
+                            });
+                            await writer.WriteLineAsync(string.Join(",", rowValues));
+                        }
+                    }
+
+                    await writer.FlushAsync();
+                    return new EmptyResult();
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Export failed: {ex.Message}");
+            }
         }
 
         // GET: Leads/Create
