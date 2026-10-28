@@ -3459,40 +3459,46 @@ window.executeMassUpdateAjax = function() {
             </div>`;
         document.getElementById('notesTimelineList').insertAdjacentHTML('afterbegin', noteHtml);
     }
-    window.triggerBackendExport = function(module, format, event) {
+window.triggerBackendExport = function (module, format, event) {
     if (event) event.preventDefault();
 
     const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
     const searchText = new URLSearchParams(window.location.search).get('search') || "";
 
-    // SCENARIO 1: EXPORT ALL (Global mode active, or no specific checkboxes checked)
+    // SCENARIO 1: EXPORT ALL
     if (window.isGlobalSelectAll || window.selectedRowIds.length === 0) {
         if (window.selectedRowIds.length === 0 && !confirm(`No specific records selected. Do you want to download ALL records matching your current filter as ${format.toUpperCase()}?`)) {
             return;
         }
 
-        const exportUrl = `/${module}/Export?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
-        window.location.href = exportUrl;
+        // Use Razor to ensure correct routing even if hosted in an IIS sub-application
+        let exportAllUrl = '@Url.Action("Export", "Leads")';
+        exportAllUrl += `?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
+        window.location.href = exportAllUrl;
         return;
     }
 
-    // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
+    // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS
     const form = document.createElement("form");
     form.method = "POST";
-    // Point specifically to the controller dynamically
-    form.action = `/${module}/ExportSelected?format=${format}`;
+    
+    // Use Razor to generate the correct base URL automatically
+    const baseUrl = '@Url.Action("ExportSelected", "Leads")';
+    form.action = `${baseUrl}?format=${format}`;
 
+    // Create ONE hidden input containing the JSON string to perfectly match: [FromForm] string selectedIds
     const inputIds = document.createElement("input");
     inputIds.type = "hidden";
     inputIds.name = "selectedIds";
-
-    // Force the array of strings into an array of integers before sending to C#
+    
+    // Ensure we are passing integers as expected by the C# List<int> deserializer
     const numericIds = window.selectedRowIds.map(id => parseInt(id, 10));
     inputIds.value = JSON.stringify(numericIds);
 
     form.appendChild(inputIds);
-
     document.body.appendChild(form);
+    
+    // Submit the form which natively triggers the file download
     form.submit();
     document.body.removeChild(form);
 };

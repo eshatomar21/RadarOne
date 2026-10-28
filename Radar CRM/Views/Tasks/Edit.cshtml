@@ -921,22 +921,27 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-     $(document).ready(function() {
+        $(document).ready(function () {
             // Apply 'Type and Search' to User Dropdown using AJAX
             $('#TaskOwnerId').select2({
                 placeholder: "-- Select Owner --",
                 allowClear: true,
                 width: '100%',
                 ajax: {
-                    url: '/Tasks/SearchUsers',
+                    // Using Razor @Url.Action to dynamically generate the correct path
+                    url: '@Url.Action("SearchUsers", "Tasks")',
                     dataType: 'json',
                     delay: 250,
-                    data: function (params) { return { q: params.term }; },
-                    processResults: function (data) { return { results: data.results }; },
+                    data: function (params) {
+                        return { q: params.term };
+                    },
+                    processResults: function (data) {
+                        return { results: data.results };
+                    },
                     cache: true
                 }
             });
-            });
+        });
 
          
 

@@ -3917,7 +3917,7 @@ window.clearGlobalSelection = function() {
         }
     };
 
- window.triggerBackendExport = function(module, format, event) {
+window.triggerBackendExport = function (module, format, event) {
     if (event) event.preventDefault();
 
     const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
@@ -3929,7 +3929,9 @@ window.clearGlobalSelection = function() {
             return;
         }
         
-        const exportUrl = `/${module}/Export?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
+        // 🚀 FIX: Use Razor to handle correct pathing on Live servers (IIS sub-folders)
+        let exportUrl = '@Url.Action("Export", "Accounts")';
+        exportUrl += `?format=${format}&filters=${encodeURIComponent(activeFilters)}&search=${encodeURIComponent(searchText)}`;
         window.location.href = exportUrl;
         return;
     }
@@ -3937,7 +3939,9 @@ window.clearGlobalSelection = function() {
     // SCENARIO 2: EXPORT SPECIFIC SELECTED ROWS (Across multiple pages)
     const form = document.createElement("form");
     form.method = "POST";
-  form.action = `@Url.Action("ExportSelected", "Accounts")?format=${format}`;
+    
+    // Use Razor to handle correct pathing for selected rows
+    form.action = `@Url.Action("ExportSelected", "Accounts")?format=${format}`;
 
     const inputIds = document.createElement("input");
     inputIds.type = "hidden";

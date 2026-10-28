@@ -881,9 +881,8 @@ namespace Radar_CRM.Controllers
             }
         }
 
-        [HttpPost]
+        [HttpPost("ExportSelected")] // <-- Change this to avoid double-routing
         [IgnoreAntiforgeryToken]
-        [Route("Leads/ExportSelected")]
         public async Task<IActionResult> ExportSelected([FromQuery] string format, [FromForm] string selectedIds)
         {
             try
