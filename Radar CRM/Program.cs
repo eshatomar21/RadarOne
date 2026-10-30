@@ -7,6 +7,10 @@ using Microsoft.AspNetCore.DataProtection; // 🚀 ADDED THIS
 using System.IO; // 🚀 ADDED THIS
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 🚀 ADDED THIS: Required for ExcelDataReader to read .xlsx text encoding
+System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));

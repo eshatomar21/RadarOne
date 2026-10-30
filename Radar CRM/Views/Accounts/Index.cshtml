@@ -1248,7 +1248,13 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                     </li>
                 </ul>
             </div>
-            <button class="btn-saas" onclick="document.getElementById('fileUploadInput').click();"><i class="fa-solid fa-download"></i></button>
+            <!-- Hidden file input accepting CSV and Excel formats -->
+            <input type="file" id="fileUploadInput" accept=".csv, .xls, .xlsx" style="display: none;" onchange="this.form.submit();" />
+
+            <!-- Your existing button -->
+            <button type="button" class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+                <i class="fa-solid fa-download"></i> Upload File
+            </button>
            
             <div class="dropdown">
                 <button class="btn-saas" data-bs-toggle="dropdown" data-bs-auto-close="outside">
