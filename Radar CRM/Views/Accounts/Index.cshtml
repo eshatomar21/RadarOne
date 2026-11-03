@@ -1025,7 +1025,7 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 @{
                     var predefinedLists = new Dictionary<string, string[]>
                     {
-                        { "AdCampaignName", new[] { "Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach" } },
+                        
                        
                         { "DataSource", new[] { "InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB" } },
                         { "AccountType", new[] { "Individual", "Group", "Institution", "Government Organisation" } },
@@ -2373,7 +2373,7 @@ function initializeTooltips() {
     }
 
     const criteriaFilterOptionsMap = {
-        "AdCampaignName": ["Meta Ads", "Google Ads", "YouTube Campaign", "Email Blast", "LinkedIn Outreach"],
+       
         
         "DataSource": ["InboundCall", "Referral/Dealer", "Meta Ads", "Google AdWords", "Outreach", "Group Lead", "Institutional", "Webinar", "KOMMO", "Google Organic SEO", "Website Direct", "YouTube", "LinkedIn", "Instagram Organic", "Zoho Webinar", "Reference Doctor", "Reference Dealer Partner", "Free Trial Self Register", "Seminar Conference", "Cold Calling", "WhatsApp Campaign", "Email Campaign", "Data Import Old DB"],
         "AccountType": ["Individual", "Group", "Institution", "Government Organisation"],
@@ -3657,7 +3657,10 @@ function saveColumnOrder() {
         }
     };
 
- function executeMassUpdateAjax() {
+// ==========================================
+// 🚀 UNIFIED MASS UPDATE FIX
+// ==========================================
+window.executeMassUpdateAjax = function() {
     let field = document.getElementById('massUpdateField').value;
     const valInput = document.getElementById('massUpdateValue');
     let val = valInput ? valInput.value : '';
@@ -3665,11 +3668,17 @@ function saveColumnOrder() {
     if (val === "CLEAR_VALUE_COMMAND") val = "";
     if (field === "AccountOwner" || field === "CoOwner") { field = field + "Id"; }
 
-    const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-    const selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+    const globalSelectActive = sessionStorage.getItem('crm_global_select') === 'true';
 
-    // Abort if nothing is selected (neither globally nor locally)
-    if (!field || (selectedIds.length === 0 && !isGlobalSelectAll)) {
+    // Fallback to safely get local IDs
+    let localIds = window.selectedRowIds || [];
+    if (!globalSelectActive && localIds.length === 0) {
+        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
+        localIds = Array.from(selectedCbs).map(cb => parseInt(cb.value, 10));
+    }
+
+    // 🚀 FIX: Allow bypass if Global Select is active (C# will fetch the IDs itself)
+    if (!field || (!globalSelectActive && localIds.length === 0)) {
         alert("Please select a field and ensure records are checked.");
         return;
     }
@@ -3682,50 +3691,51 @@ function saveColumnOrder() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
     btn.disabled = true;
 
+    // Send the active filters so C# can query the DB itself if Global Select is used
     const activeFilters = new URLSearchParams(window.location.search).get('advancedFilters') || "[]";
 
     const payload = {
-        Ids: selectedIds,
+        Ids: globalSelectActive ? [] : localIds.map(id => parseInt(id, 10)),
         FieldName: field,
         NewValue: val,
-        IsGlobalSelectAll: isGlobalSelectAll,
+        IsGlobalSelectAll: globalSelectActive,
         FiltersJson: activeFilters
     };
 
-    // 🚀 FIX: Use Razor to dynamically generate the correct route path
     fetch('@Url.Action("BulkUpdate", "Accounts")', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
     })
-         .then(async response => {
-             if (!response.ok) {
-                 const errorText = await response.text();
-                 throw new Error(errorText || `HTTP Error ${response.status}`);
-             }
-             return response.json();
-         })
-         .then(data => {
-             if (data.success) {
-                 bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide();
-                 alert(`Successfully updated ${selectedIds.length} records!`);
-                 
-                 // 🚀 FIX: Clear checkboxes from memory before reload
-                 clearGlobalSelection(); 
-                 window.location.reload();
-             } else {
-                 alert("Update failed: " + data.message);
-                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-                 btn.disabled = false;
-             }
-         })
-         .catch((err) => {
-             console.error("Mass Update Error:", err);
-             alert("Connection error! Please check the browser console (F12) for exact details.");
-             btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-             btn.disabled = false;
-         });
- }
+    .then(async response => {
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP Error ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            try { bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide(); } catch(e){}
+
+            // 🚀 FIX: Pull updated count from backend since C# processed it
+            alert(`Successfully updated ${data.updatedCount || (globalSelectActive ? 'all matching' : localIds.length)} records!`);
+
+            if (typeof window.clearGlobalSelection === 'function') window.clearGlobalSelection();
+            window.location.reload();
+        } else {
+            alert("Update failed: " + data.message);
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+            btn.disabled = false;
+        }
+    })
+    .catch((err) => {
+        console.error("Mass Update Error:", err);
+        alert("Connection error! Please check the browser console (F12) for exact details.");
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+        btn.disabled = false;
+    });
+};
 
     function toggleMoreFields() {
         const container = document.getElementById("moreFieldsContainer");

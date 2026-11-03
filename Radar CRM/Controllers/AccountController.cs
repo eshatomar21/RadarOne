@@ -104,9 +104,18 @@ namespace Radar_CRM.Controllers
                         var parameter = System.Linq.Expressions.Expression.Parameter(typeof(Account), "a");
                         System.Linq.Expressions.Expression combinedPredicate = null;
 
+                        // 🚀 FIX 1: Tell the system not to skip these specific date filters even if the text input is empty
+                        var noValueConditions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            "is_empty", "is_not_empty", "today", "tomorrow", "yesterday",
+                            "till yesterday", "starting tomorrow", "this week", "this month",
+                            "this year", "previous week", "previous month", "previous year"
+                        };
+
                         foreach (var f in filters)
                         {
-                            if (string.IsNullOrWhiteSpace(f.Value) && f.Condition != "is_empty" && f.Condition != "is_not_empty") continue;
+                            // If it's completely blank AND not a special date condition, skip it.
+                            if (string.IsNullOrWhiteSpace(f.Value) && !noValueConditions.Contains(f.Condition?.Trim() ?? "")) continue;
 
                             string dbColName = f.ColumnName;
 
@@ -127,46 +136,108 @@ namespace Radar_CRM.Controllers
                             System.Linq.Expressions.Expression conditionExpr = null;
                             string safeValue = f.Value?.Replace("+", " ").Trim() ?? "";
 
-                            // DATES
-                            if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?))
+                            // ==========================================
+                            // 🚀 FIX 2: DATES & DYNAMIC "TODAY" LOGIC
+                            // ==========================================
+                            if (f.IsDate || propertyInfo.PropertyType == typeof(DateTime) || propertyInfo.PropertyType == typeof(DateTime?) || dbColName.Contains("Date", StringComparison.OrdinalIgnoreCase) || dbColName.Contains("Time", StringComparison.OrdinalIgnoreCase))
                             {
-                                string[] dates = safeValue.Split('|');
-                                if (DateTime.TryParse(dates[0], out DateTime dVal))
-                                {
-                                    DateTime dVal2 = dates.Length > 1 && DateTime.TryParse(dates[1], out var d2) ? d2 : dVal;
+                                string cond = f.Condition?.ToLower().Trim() ?? "";
+                                DateTime dVal = DateTime.Today;
+                                DateTime dVal2 = DateTime.Today;
+                                bool isValidDate = false;
 
+                                // Auto-calculate special UI conditions (No physical date value needed)
+                                if (cond == "today")
+                                {
+                                    dVal = DateTime.Today;
+                                    isValidDate = true;
+                                    cond = "on"; // Convert to a standard 'on' query in the DB
+                                }
+                                else if (cond == "yesterday")
+                                {
+                                    dVal = DateTime.Today.AddDays(-1);
+                                    isValidDate = true;
+                                    cond = "on";
+                                }
+                                else if (cond == "tomorrow")
+                                {
+                                    dVal = DateTime.Today.AddDays(1);
+                                    isValidDate = true;
+                                    cond = "on";
+                                }
+                                else if (cond == "this week")
+                                {
+                                    dVal = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+                                    dVal2 = dVal.AddDays(6);
+                                    isValidDate = true;
+                                    cond = "between"; // Convert to a standard 'between' query
+                                }
+                                else if (cond == "this month")
+                                {
+                                    dVal = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+                                    dVal2 = dVal.AddMonths(1).AddDays(-1);
+                                    isValidDate = true;
+                                    cond = "between";
+                                }
+                                else if (cond == "this year")
+                                {
+                                    dVal = new DateTime(DateTime.Today.Year, 1, 1);
+                                    dVal2 = new DateTime(DateTime.Today.Year, 12, 31);
+                                    isValidDate = true;
+                                    cond = "between";
+                                }
+                                // Fallback for standard selected dates typed manually
+                                else if (!string.IsNullOrWhiteSpace(safeValue))
+                                {
+                                    string[] dates = safeValue.Split('|');
+                                    if (DateTime.TryParse(dates[0], out DateTime parsedD1))
+                                    {
+                                        dVal = parsedD1;
+                                        dVal2 = dates.Length > 1 && DateTime.TryParse(dates[1], out var parsedD2) ? parsedD2 : dVal;
+                                        isValidDate = true;
+                                    }
+                                }
+
+                                if (isValidDate)
+                                {
                                     var startOfDay = dVal.Date;
                                     var endOfDay = dVal.Date.AddDays(1).AddTicks(-1);
                                     var endOfDay2 = dVal2.Date.AddDays(1).AddTicks(-1);
 
+                                    // Create Expressions for exact property type to avoid type mismatch crashes
                                     var constStart = System.Linq.Expressions.Expression.Constant(startOfDay, propertyInfo.PropertyType);
                                     var constEnd = System.Linq.Expressions.Expression.Constant(endOfDay, propertyInfo.PropertyType);
                                     var constEnd2 = System.Linq.Expressions.Expression.Constant(endOfDay2, propertyInfo.PropertyType);
 
-                                    if (f.Condition == "on" || f.Condition == "On")
+                                    if (cond == "on" || cond == "is")
                                     {
                                         var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
                                         var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd);
                                         conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
                                     }
-                                    else if (f.Condition == "before") conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
-                                    else if (f.Condition == "after") conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
-                                    else if (f.Condition == "between")
+                                    else if (cond == "before") conditionExpr = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
+                                    else if (cond == "after") conditionExpr = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd);
+                                    else if (cond == "between")
                                     {
                                         var gte = System.Linq.Expressions.Expression.GreaterThanOrEqual(propExpr, constStart);
                                         var lte = System.Linq.Expressions.Expression.LessThanOrEqual(propExpr, constEnd2);
                                         conditionExpr = System.Linq.Expressions.Expression.AndAlso(gte, lte);
                                     }
+                                    else if (cond == "not between")
+                                    {
+                                        var lt = System.Linq.Expressions.Expression.LessThan(propExpr, constStart);
+                                        var gt = System.Linq.Expressions.Expression.GreaterThan(propExpr, constEnd2);
+                                        conditionExpr = System.Linq.Expressions.Expression.OrElse(lt, gt);
+                                    }
                                 }
                             }
-                            // OWNER / USER MAPPING
-                            // OWNER / USER MAPPING & AUDIT FIELDS
+                            // OWNER / USER MAPPING (Leave this below your Dates block exactly as I gave you in the previous step)
                             else if (dbColName.Contains("Owner", StringComparison.OrdinalIgnoreCase) || dbColName == "CreatedBy" || dbColName == "ModifiedBy")
                             {
-                                // 🚀 The UI multi-select passes User IDs. Split them into a list.
+                                // The UI multi-select passes User IDs. Split them into a list.
                                 var userIds = safeValue.Split(',').Select(id => id.Trim()).ToList();
 
-                                // SCENARIO 1: The filter targets the exact ID column (e.g. "AccountOwnerId")
+                                // SCENARIO 1: The filter targets an exact ID column (e.g. "AccountOwnerId")
                                 if (dbColName.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
                                 {
                                     var listExpr = System.Linq.Expressions.Expression.Constant(userIds);
@@ -181,10 +252,11 @@ namespace Radar_CRM.Controllers
                                     else if (f.Condition == "is_not_empty")
                                         conditionExpr = System.Linq.Expressions.Expression.Not(System.Linq.Expressions.Expression.Call(typeof(string).GetMethod("IsNullOrEmpty"), propExpr));
                                 }
-                                // SCENARIO 2: The filter targets the TEXT Name column (e.g., "AccountOwner")
+                                // SCENARIO 2: The filter targets a TEXT column (e.g., "ModifiedBy" or "CreatedBy")
                                 else
                                 {
-                                    // 🚀 We must translate the User IDs from the dropdown into User Names from the database!
+                                    // 🚀 CRITICAL FIX: Translate the User IDs from the dropdown into User Names from the database!
+                                    // Because "ModifiedBy" is stored as text like "Sitara on Nov 03", we need to search for "Sitara".
                                     var userNames = _context.Users
                                         .Where(u => userIds.Contains(u.Id))
                                         .Select(u => u.fullName ?? u.FirstName)
@@ -199,9 +271,10 @@ namespace Radar_CRM.Controllers
 
                                         System.Linq.Expressions.Expression nameConditions = null;
 
-                                        // Build an OR condition for every selected name (e.g. AccountOwner contains "John" OR "Jane")
+                                        // Build an OR condition for every selected name (e.g. ModifiedBy contains "John" OR "Jane")
                                         foreach (var name in userNames.Where(n => !string.IsNullOrWhiteSpace(n)))
                                         {
+                                            // Ensure we are searching against lowercase
                                             var lowerVal = System.Linq.Expressions.Expression.Constant(name.Trim().ToLower());
                                             var containsExpr = System.Linq.Expressions.Expression.Call(lowerProp, containsMethod, lowerVal);
                                             nameConditions = nameConditions == null ? containsExpr : System.Linq.Expressions.Expression.OrElse(nameConditions, containsExpr);
@@ -564,6 +637,7 @@ namespace Radar_CRM.Controllers
             // 4. Pass it to the ViewBag
             ViewBag.AccountTasks = accountTasksDict;
             ViewBag.VendorsList = new SelectList(_context.Vendors, "Id", "VendorName");
+            ViewBag.AllMatchingIds = await query.Select(a => a.Id).ToListAsync();
 
             return View(accounts);
         }
@@ -632,77 +706,75 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // BULK UPDATE: AJAX POST
+        // BULK UPDATE: AJAX POST (WITH CHUNKING)
         // ==========================================
         [HttpPost]
         [IgnoreAntiforgeryToken]
-        [Route("Accounts/BulkUpdate")] // 🚀 FIX: Explicitly map the route so it doesn't 404
+        [Route("Accounts/BulkUpdate")]
         public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateRequest request)
         {
             if (request == null || string.IsNullOrEmpty(request.FieldName))
-            {
                 return Json(new { success = false, message = "Invalid data provided." });
+
+            // 🚀 FIX: Determine target IDs (either from the local checkboxes, or fetch ALL from DB if global select is checked)
+            List<int> targetIds = request.Ids ?? new List<int>();
+            if (request.IsGlobalSelectAll)
+            {
+                targetIds = await GetFilteredAccountIds(request.FiltersJson);
             }
 
-            if (!request.IsGlobalSelectAll && (request.Ids == null || !request.Ids.Any()))
-            {
+            if (!targetIds.Any())
                 return Json(new { success = false, message = "No records selected." });
-            }
 
             try
             {
-                // 2. 🚀 Determine target IDs (either from the checkboxes, or fetch ALL from DB)
-                List<int> targetIds = request.Ids ?? new List<int>();
-                if (request.IsGlobalSelectAll)
-                {
-                    targetIds = await GetFilteredAccountIds(request.FiltersJson);
-                }
-
-                // 3. 🚀 Use targetIds to fetch the accounts to update
-                var accountsToUpdate = await _context.Accounts.Where(a => targetIds.Contains(a.Id)).ToListAsync();
                 var propertyInfo = typeof(Account).GetProperty(request.FieldName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
                 if (propertyInfo == null)
                     return Json(new { success = false, message = "Field not found in database." });
 
                 var updatedAccountsList = new Dictionary<int, string>();
+                int chunkSize = 2000;
 
-                foreach (var account in accountsToUpdate)
+                for (int i = 0; i < targetIds.Count; i += chunkSize)
                 {
-                    object safeValue = null;
-                    Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+                    var batch = targetIds.Skip(i).Take(chunkSize).ToList();
+                    var accountsToUpdate = await _context.Accounts.Where(a => batch.Contains(a.Id)).ToListAsync();
 
-                    if (!string.IsNullOrWhiteSpace(request.NewValue))
+                    foreach (var account in accountsToUpdate)
                     {
-                        if (t == typeof(DateTime))
+                        object safeValue = null;
+                        Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+
+                        if (!string.IsNullOrWhiteSpace(request.NewValue))
                         {
-                            if (DateTime.TryParse(request.NewValue, out DateTime d)) safeValue = d;
+                            if (t == typeof(DateTime))
+                            {
+                                if (DateTime.TryParse(request.NewValue, out DateTime d)) safeValue = d;
+                            }
+                            else if (t == typeof(bool))
+                            {
+                                if (bool.TryParse(request.NewValue, out bool b)) safeValue = b;
+                            }
+                            else
+                            {
+                                safeValue = Convert.ChangeType(request.NewValue, t);
+                            }
                         }
-                        else if (t == typeof(bool)) // Safety catch for boolean fields
-                        {
-                            if (bool.TryParse(request.NewValue, out bool b)) safeValue = b;
-                        }
-                        else
-                        {
-                            safeValue = Convert.ChangeType(request.NewValue, t);
-                        }
+
+                        propertyInfo.SetValue(account, safeValue, null);
+                        account.ModifiedDateAndTime = DateTime.Now;
+
+                        updatedAccountsList[account.Id] = account.AccountName ?? "Unknown Account";
                     }
 
-                    propertyInfo.SetValue(account, safeValue, null);
-
-                    account.ModifiedDateAndTime = DateTime.Now;
-
-                    // Add ID and Name to dictionary
-                    updatedAccountsList[account.Id] = account.AccountName ?? "Unknown Account";
+                    _context.UpdateRange(accountsToUpdate);
+                    await _context.SaveChangesAsync();
                 }
-
-                _context.UpdateRange(accountsToUpdate);
-                await _context.SaveChangesAsync();
 
                 // 🚀 TRIGGER EMAIL & TRANSFER TASKS IF OWNER WAS CHANGED
                 if (request.FieldName.Equals("AccountOwnerId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(request.NewValue))
                 {
-                    // 1. FETCH NEW OWNER'S NAME (Crucial for the UI)
                     string newOwnerName = "System User";
                     var newOwnerUser = await _context.Users.FindAsync(request.NewValue);
                     if (newOwnerUser != null)
@@ -710,36 +782,35 @@ namespace Radar_CRM.Controllers
                         newOwnerName = newOwnerUser.fullName ?? newOwnerUser.FirstName ?? "System User";
                     }
 
-                    // 2. 🚀 Use targetIds here instead of request.Ids to ensure all pages' tasks are moved
-                    var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
-                        .Where(t => t.AccountId.HasValue && targetIds.Contains(t.AccountId.Value) && t.Status != "Completed")
-                        .ToListAsync();
+                    string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System Bulk Update";
 
-                    if (relatedTasks.Any())
+                    for (int i = 0; i < targetIds.Count; i += chunkSize)
                     {
-                        string currentUser = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name) ? User.Identity.Name : "System Bulk Update";
+                        var batch = targetIds.Skip(i).Take(chunkSize).ToList();
+                        var relatedTasks = await _context.Set<Radar_CRM.Models.Task>()
+                            .Where(t => t.AccountId.HasValue && batch.Contains(t.AccountId.Value) && t.Status != "Completed")
+                            .ToListAsync();
 
-                        foreach (var task in relatedTasks)
+                        if (relatedTasks.Any())
                         {
-                            // UPDATE BOTH ID AND TEXT NAME
-                            task.TaskOwnerId = request.NewValue;
-                            task.TaskOwner = newOwnerName;
-
-                            task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
-                            task.ModifiedTime = DateTime.Now;
-
-                            // CRITICAL FIX: Force Entity Framework to track this modification
-                            _context.Entry(task).State = EntityState.Modified;
+                            foreach (var task in relatedTasks)
+                            {
+                                task.TaskOwnerId = request.NewValue;
+                                task.TaskOwner = newOwnerName;
+                                task.ModifiedBy = $"{currentUser} (System Transfer) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                                task.ModifiedTime = DateTime.Now;
+                                _context.Entry(task).State = EntityState.Modified;
+                            }
+                            _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
+                            await _context.SaveChangesAsync();
                         }
-                        _context.Set<Radar_CRM.Models.Task>().UpdateRange(relatedTasks);
-                        await _context.SaveChangesAsync();
                     }
 
-                    // 3. Notify New Owner
                     await NotifyNewOwnerAsync(request.NewValue, updatedAccountsList);
                 }
 
-                return Json(new { success = true });
+                // 🚀 Return the count so the UI knows how many were processed
+                return Json(new { success = true, updatedCount = targetIds.Count });
             }
             catch (Exception ex)
             {
@@ -747,6 +818,8 @@ namespace Radar_CRM.Controllers
                 return Json(new { success = false, message = trueError });
             }
         }
+
+
         // 🚀 Ensure this class is defined inside the controller for the JSON binding to work
         public class BulkUpdateRequest
         {
@@ -1102,6 +1175,12 @@ namespace Radar_CRM.Controllers
         public async Task<IActionResult> Edit(int id, Account account, string[] SavedNoteOwner, string[] SavedNoteDateTime, string[] SavedNoteDesc, List<IFormFile> SavedNoteFiles)
         {
             if (id != account.Id) return NotFound();
+
+            bool hasLead = await _context.Leads.AnyAsync(l => l.AccountId == account.Id);
+            if (hasLead)
+            {
+                return BadRequest("This account is locked and cannot be edited because a Lead has already been created.");
+            }
 
             // 🚀 FIX 1: PROFILE COMPLETION & STATE CHECK
             bool isProfileIncomplete =
@@ -2554,9 +2633,47 @@ namespace Radar_CRM.Controllers
                 acc.NumberOfClinics = int.TryParse(GetValSafe("NumberofClinics"), out int noc) ? noc : null;
                 acc.Age = int.TryParse(GetValSafe("Age"), out int age) ? age : null;
                 acc.ProfileCompletionPercentage = int.TryParse(GetValSafe("Profilecompletion(%)"), out int pcp) ? pcp : null;
-                acc.Profilestatus = GetValSafe("ProfileStatus");
-                acc.ProfileRate = int.TryParse(GetValSafe("ProfileRate"), out int pr) ? pr : null;
                 acc.ReferralSource = GetValSafe("ReferralSource");
+
+                // =========================================================
+                // 🚀 AUTO-CALCULATE PROFILE STATUS & RATE ON UPLOAD
+                // =========================================================
+                int filledFieldsCount = 0;
+                if (!string.IsNullOrWhiteSpace(acc.IsHomeopathicDoctor)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.WorkType)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.HasComputer)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.ClinicType)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.Qualification)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.CollegeName)) filledFieldsCount++;
+                if (!string.IsNullOrWhiteSpace(acc.YearOfPassing)) filledFieldsCount++;
+                if (acc.TotalExperience.HasValue) filledFieldsCount++;
+                if (acc.YearsOfPractice.HasValue) filledFieldsCount++;
+                if (acc.AveragePatientFee.HasValue) filledFieldsCount++;
+                if (acc.NumberOfClinics.HasValue) filledFieldsCount++;
+                if (acc.DateOfBirth.HasValue) filledFieldsCount++;
+                if (acc.Age.HasValue) filledFieldsCount++;
+                if (acc.PatientsPerDay.HasValue) filledFieldsCount++;
+
+                bool hasComputer = acc.HasComputer != "No" && !string.IsNullOrWhiteSpace(acc.HasComputer);
+                bool isHomeopath = acc.IsHomeopathicDoctor != "No" && acc.IsHomeopathicDoctor != "नहीं" && !string.IsNullOrWhiteSpace(acc.IsHomeopathicDoctor);
+
+                string profileStatus = "Not Completed";
+                if (filledFieldsCount > 4 && hasComputer && isHomeopath)
+                {
+                    profileStatus = "Strongly Completed";
+                }
+                else if (filledFieldsCount == 4 && hasComputer && isHomeopath)
+                {
+                    profileStatus = "Completed";
+                }
+                else if (filledFieldsCount >= 4 && (!hasComputer || !isHomeopath))
+                {
+                    profileStatus = "Not-Qualified";
+                }
+
+                acc.Profilestatus = profileStatus;
+                acc.ProfileRate = filledFieldsCount;
+                // =========================================================
 
                 // --- Software & Purchases ---
                 acc.CurrentlyUsingSoftware = GetValSafe("CurrentlyUsingSoftware");
@@ -2682,7 +2799,6 @@ namespace Radar_CRM.Controllers
 
 
 
-
         private string GetVal(string[] values, int index)
         {
             if (index < values.Length) return values[index]?.Trim() ?? "";
@@ -2725,6 +2841,16 @@ namespace Radar_CRM.Controllers
         {
             var account = await _context.Accounts.FindAsync(id);
             if (account == null) return Json(new { success = false, message = "Account not found" });
+
+            // =========================================================
+            // 🚀 SECURITY FIX: Block Quick Edit if Lead Exists
+            // =========================================================
+            bool hasLead = await _context.Leads.AnyAsync(l => l.AccountId == id);
+            if (hasLead)
+            {
+                return Json(new { success = false, message = "Account is locked. A Lead is already created." });
+            }
+            // =========================================================
 
             // Safely extract the value
             string trimmedValue = newValue?.Trim() ?? "";

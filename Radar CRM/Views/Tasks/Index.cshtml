@@ -644,6 +644,8 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
                     <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
                 </th>
             </tr>
+
+
         </thead>
         <tbody id="tableBody">
             @if (Model != null && Model.Any())
@@ -855,13 +857,13 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
 
                 <div class="mb-4">
                     <label class="form-label fw-bold text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">1. Select Field to Update</label>
-                    <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" onchange="renderMassUpdateInput()">
-                        <option value="" disabled selected>- Choose a field -</option>
-                        @foreach (var prop in tableProps)
-                        {
-                            <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
-                        }
-                    </select>
+                  <select id="massUpdateField" class="form-select fw-semibold border-secondary shadow-sm" onchange="renderMassUpdateInput()">
+    <option value="" disabled selected>- Choose a field -</option>
+    @foreach (var prop in tableProps)
+    {
+        <option value="@prop.Name" data-type="@(prop.PropertyType.Name)">@prop.Name</option>
+    }
+</select>
                 </div>
 
                 <div class="mb-2" id="massUpdateValueContainer">
@@ -1045,6 +1047,8 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     // ==========================================
     // 🚀 INJECT C# DATA ARRAYS DIRECTLY INTO JS
@@ -1143,6 +1147,14 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         renderCustomViews();
         renderSavedSidebarFilters();
         restoreSidebarFiltersFromUrl();
+
+        const savedIds = window.getPersistedSelection();
+        if (savedIds.length > 0) {
+            document.querySelectorAll('tbody .row-cb').forEach(cb => {
+                if (savedIds.includes(parseInt(cb.value))) cb.checked = true;
+            });
+            window.updateSelectedCount();
+        }
 
         refreshVisibleRows();
         initializeTooltips();
@@ -1822,53 +1834,234 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     // ==========================================
     // 4. BULK ACTIONS, CHECKBOXES & EXPORTS
     // ==========================================
-    window.toggleAllRowCheckboxes = function (sourceCb) {
+   window.toggleAllRowCheckboxes = function (sourceCb) {
+        let selectedIds = new Set(window.getPersistedSelection());
+
         allRows.forEach(row => {
             if (!row.classList.contains('filtered-out')) {
                 const cb = row.querySelector('.row-cb');
-                if (cb) cb.checked = sourceCb.checked;
+                if (cb) {
+                    cb.checked = sourceCb.checked;
+                    const id = parseInt(cb.value);
+                    if (sourceCb.checked) selectedIds.add(id);
+                    else selectedIds.delete(id);
+                }
             }
         });
+        
+        window.savePersistedSelection(Array.from(selectedIds));
         window.updateSelectedCount();
     };
 
-    window.updateSelectedCount = function () {
-        const selected = document.querySelectorAll('tbody .row-cb:checked').length;
-        document.getElementById('selCount').innerText = selected;
-        document.getElementById('bulkActionsContainer').style.display = selected > 0 ? 'flex' : 'none';
+    // --- Session Storage Helper for Pagination ---
+    const SELECTION_KEY = 'crm_task_selected_ids';
+
+    window.getPersistedSelection = function() {
+        return JSON.parse(sessionStorage.getItem(SELECTION_KEY) || '[]');
+    };
+
+    window.savePersistedSelection = function(idsArray) {
+        sessionStorage.setItem(SELECTION_KEY, JSON.stringify(idsArray));
+    };
+
+    window.clearPersistedSelection = function() {
+        sessionStorage.removeItem(SELECTION_KEY);
+    };
+
+  window.updateSelectedCount = function () {
+        let selectedIds = new Set(window.getPersistedSelection());
+        
+        // Sync current page checkboxes with our saved Session memory
+        document.querySelectorAll('tbody .row-cb').forEach(cb => {
+            const id = parseInt(cb.value);
+            if (cb.checked) selectedIds.add(id);
+            else selectedIds.delete(id);
+        });
+
+        const idsArray = Array.from(selectedIds);
+        window.savePersistedSelection(idsArray);
+
+        // Update UI
+        const selectedCount = idsArray.length;
+        document.getElementById('selCount').innerText = selectedCount;
+        document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
 
         const activeRows = allRows.filter(r => !r.classList.contains('filtered-out'));
-        const totalVisible = activeRows.length;
+        const checkedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
         const selectAllCb = document.getElementById('selectAllCb');
-        if (selectAllCb) selectAllCb.checked = (selected > 0 && selected === totalVisible);
+        if (selectAllCb) selectAllCb.checked = (checkedOnPage > 0 && checkedOnPage === activeRows.length);
     };
 
     window.deleteSelected = function () {
-        const selectedCbs = document.querySelectorAll('tbody .row-cb:checked');
-        if (selectedCbs.length === 0) return;
+        const selectedIds = window.getPersistedSelection();
+        if (selectedIds.length === 0) return;
 
-        if (confirm(`Are you sure you want to delete ${selectedCbs.length} selected record(s)?`)) {
-            let selectedIds = Array.from(selectedCbs).map(cb => parseInt(cb.value));
-
-            fetch('/Tasks/BulkDelete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(selectedIds)
-            })
+        // Upgraded to SweetAlert2 for a better UI experience
+        Swal.fire({
+            title: 'Are you sure?',
+            text: `You are about to delete ${selectedIds.length} selected record(s).`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444', // Danger red
+            cancelButtonColor: '#64748b',  // Muted gray
+            confirmButtonText: 'Yes, delete them!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch('/Tasks/BulkDelete', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // 🚀 FIX: Send the array directly to match the [FromBody] List<int>
+                    body: JSON.stringify(selectedIds) 
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        selectedCbs.forEach(cb => {
-                            const tr = cb.closest('tr');
-                            tr.remove();
-                            allRows = allRows.filter(r => r !== tr);
+                        Swal.fire('Deleted!', 'Records have been deleted.', 'success').then(() => {
+                            window.clearPersistedSelection();
+                            window.location.reload();
                         });
-                        document.getElementById('selectAllCb').checked = false;
-                        window.updateSelectedCount();
-                        refreshVisibleRows();
-                    } else alert("Database Error: " + data.message);
-                }).catch(() => alert("Network error occurred."));
+                    } else {
+                        // 🚀 FIX: Fallback string in case data.message is missing
+                        Swal.fire('Error', data.message || "Failed to delete records.", 'error');
+                    }
+                }).catch(() => Swal.fire('Error', "Network error occurred.", 'error'));
+            }
+        });
+    };
+
+    // --- MASS UPDATE LOGIC ---
+   window.openMassUpdateModal = function () {
+        let selectedIds = window.getPersistedSelection();
+        if (selectedIds.length === 0) {
+            Swal.fire("Warning", "Please select at least one record to update.", "warning");
+            return;
         }
+        
+        document.getElementById('massUpdateCountDisplay').innerText = selectedIds.length;
+        const modalEl = document.getElementById('massUpdateModal');
+
+        // 🚀 FIX 1: Move modal to body to prevent z-index backdrop freezing issues
+        document.body.appendChild(modalEl);
+
+        // 🚀 FIX 2: Get existing instance or create a new one to prevent multiple overlapping backdrops
+        let modal = bootstrap.Modal.getInstance(modalEl);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalEl);
+        }
+
+        modal.show();
+    };
+
+   // --- MASS UPDATE LOGIC ---
+    window.renderMassUpdateInput = function () {
+        const select = document.getElementById('massUpdateField');
+        const selectedOption = select.options[select.selectedIndex];
+        
+        if (!selectedOption || !selectedOption.value) {
+            document.getElementById('dynamicInputArea').innerHTML = '<input type="text" class="form-control border-secondary shadow-sm" style="background-color: #f1f5f9; cursor: not-allowed;" placeholder="Select a field first..." disabled />';
+            return;
+        }
+
+        const type = selectedOption.getAttribute('data-type');
+        const fieldName = selectedOption.value; // e.g., "TaskOwner", "Status", "Subject"
+        const container = document.getElementById('dynamicInputArea');
+
+        // 1. Check if it's a predefined Dropdown list (Status, Priority)
+        if (criteriaFilterOptionsMap[fieldName]) {
+            let optionsHtml = `<option value="" disabled selected>- Select ${fieldName} -</option>`;
+            criteriaFilterOptionsMap[fieldName].forEach(opt => {
+                optionsHtml += `<option value="${opt}">${opt}</option>`;
+            });
+            container.innerHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm">${optionsHtml}</select>`;
+        }
+        
+        // 2. 🚀 FIX: Check if it's a User/Owner Field and populate from ownerOptionsList
+        else if (fieldName.toLowerCase().includes('owner') || fieldName === "CreatedBy" || fieldName === "ModifiedBy") {
+            let optionsHtml = '<option value="" disabled selected>- Select User -</option>';
+            
+            // Uses the global ownerOptionsList already defined at the top of your script
+            ownerOptionsList.forEach(user => {
+                // We use user.id here so it passes the actual GUID to the backend
+                optionsHtml += `<option value="${user.id}">${user.text}</option>`;
+            });
+            
+            container.innerHTML = `<select id="massUpdateValue" class="form-select border-secondary shadow-sm">${optionsHtml}</select>`;
+            
+            // Optional: If you want to make the Mass Update dropdown searchable via Select2:
+            if (typeof $ !== 'undefined' && $.fn.select2) {
+                $('#massUpdateValue').select2({
+                    dropdownParent: $('#massUpdateModal'),
+                    width: '100%'
+                });
+            }
+        }
+        
+        // 3. Date fields
+        else if (type === 'DateTime' || type === 'DateOnly') {
+            container.innerHTML = '<input type="date" id="massUpdateValue" class="form-control border-secondary shadow-sm" />';
+        } 
+        
+        // 4. Boolean/Checkbox fields
+        else if (type === 'Boolean') {
+            container.innerHTML = `
+                <select id="massUpdateValue" class="form-select border-secondary shadow-sm">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>`;
+        } 
+        
+        // 5. Default Text fallback
+        else {
+            container.innerHTML = '<input type="text" id="massUpdateValue" class="form-control border-secondary shadow-sm" placeholder="Enter new value..." />';
+        }
+    };
+
+    window.executeMassUpdateAjax = function () {
+        const fieldName = document.getElementById('massUpdateField').value;
+        const newValueInput = document.getElementById('massUpdateValue');
+        const newValue = newValueInput ? newValueInput.value : '';
+        const selectedIds = window.getPersistedSelection();
+        
+        if (!fieldName) {
+            Swal.fire("Warning", "Please select a field to update.", "warning");
+            return;
+        }
+
+        const btn = document.getElementById('btnExecuteMassUpdate');
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+        btn.disabled = true;
+
+        const payload = {
+            Ids: selectedIds,
+            FieldName: fieldName,
+            NewValue: newValue,
+            IsGlobalSelectAll: false
+        };
+
+        fetch('/Tasks/BulkUpdate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire("Success!", `${selectedIds.length} records updated successfully.`, "success").then(() => {
+                    window.clearPersistedSelection();
+                    window.location.reload();
+                });
+            } else {
+                Swal.fire("Error", "Update failed: " + data.message, "error");
+                btn.innerHTML = origHtml;
+                btn.disabled = false;
+            }
+        })
+        .catch(err => {
+            Swal.fire("Error", "Network error occurred.", "error");
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        });
     };
 
     window.exportTableData = function (moduleName, format) {

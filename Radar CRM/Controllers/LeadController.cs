@@ -881,7 +881,11 @@ namespace Radar_CRM.Controllers
             }
         }
 
-        [HttpPost("ExportSelected")] // <-- Change this to avoid double-routing
+        // ==========================================
+        // EXPORT SECURELY VIA POST
+        // ==========================================
+        [HttpPost]
+        [Route("Leads/ExportSelected")] // 🚀 FIX: Explicit routing prevents 404s
         [IgnoreAntiforgeryToken]
         public async Task<IActionResult> ExportSelected([FromQuery] string format, [FromForm] string selectedIds)
         {
@@ -895,7 +899,7 @@ namespace Radar_CRM.Controllers
 
                 if (!ids.Any()) return BadRequest("No records selected.");
 
-                // 🚀 FIX: Prevent Nullable IQueryable crashes by excluding virtual lists and only allowing primitive/nullable types
+                // 🚀 Prevent Nullable crashes by excluding virtual lists
                 var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Deals", "PaymentRow", "LeadOwner", "AccountOwner", "CoOwner", "DemoOwner", "Note" };
                 var properties = typeof(Lead).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
                     .Where(p => !excludedFields.Contains(p.Name) &&
@@ -903,12 +907,14 @@ namespace Radar_CRM.Controllers
                     .ToArray();
 
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                int chunkSize = 2000; // 🚀 CHUNKING RESOLVES THE > 2100 SQL PARAMETER CRASH
 
                 if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
                 {
                     using var workbook = new ClosedXML.Excel.XLWorkbook();
-                    var worksheet = workbook.Worksheets.Add("Selected Leads");
+                    var worksheet = workbook.Worksheets.Add("Leads");
 
+                    // Add Headers
                     for (int i = 0; i < properties.Length; i++)
                     {
                         worksheet.Cell(1, i + 1).Value = properties[i].Name;
@@ -916,7 +922,6 @@ namespace Radar_CRM.Controllers
                     }
 
                     int rowIdx = 2;
-                    int chunkSize = 2000; // 🚀 CHUNKING RESOLVES THE > 2100 SQL PARAMETER CRASH
 
                     for (int i = 0; i < ids.Count; i += chunkSize)
                     {
@@ -935,18 +940,18 @@ namespace Radar_CRM.Controllers
 
                     var ms = new System.IO.MemoryStream();
                     workbook.SaveAs(ms);
-                    return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Leads_Selected_{timestamp}.xlsx");
+                    ms.Position = 0; // 🚀 FIX: Required before exporting stream to file
+                    return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Leads_Export_{timestamp}.xlsx");
                 }
                 else
                 {
                     Response.Clear();
                     Response.ContentType = "text/csv";
-                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Leads_Selected_{timestamp}.csv");
+                    Response.Headers.Add("Content-Disposition", $"attachment; filename=Leads_Export_{timestamp}.csv");
 
                     await using var writer = new System.IO.StreamWriter(Response.Body, System.Text.Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
                     await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
 
-                    int chunkSize = 2000; // 🚀 CHUNKING RESOLVES THE > 2100 SQL PARAMETER CRASH
                     for (int i = 0; i < ids.Count; i += chunkSize)
                     {
                         var batch = ids.Skip(i).Take(chunkSize).ToList();

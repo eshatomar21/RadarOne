@@ -6,6 +6,8 @@
 
     // 🚀 FIX: Use FindFirst() instead of FindFirstValue() to avoid extension method errors
     string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+    // 🚀 NEW: Check if Account is locked (i.e., it has at least one Lead)
+    bool isLocked = ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any();
 
     // Prepare Notes for Detail View
     var allNotes = ViewBag.ExistingNotes as IEnumerable<Radar_CRM.Models.Notes> ?? new List<Radar_CRM.Models.Notes>();
@@ -1231,6 +1233,16 @@
             </div>
         </div>
 
+
+        <div class="col-md-6">
+                    <div class="z-field-row">
+                        <div class="z-label">Ad Campaign Name</div>
+                        <div class="z-input-wrapper">
+                            <input asp-for="AdCampaignName" class="z-input" placeholder="e.g. Summer Promo..." />
+                        </div>
+                    </div>
+                </div>
+
         <!-- Alternate Mobile -->
         <div class="col-md-6 mb-3">
             <div class="row align-items-center">
@@ -1575,13 +1587,26 @@
         <input type="hidden" asp-for="Id" />
 
         <div class="z-edit-container">
-            <div class="z-edit-header shadow-sm">
-                <h4 class="m-0" style="color:var(--theme-navy-primary); font-weight:700;">Edit Account - @Model.AccountName</h4>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-light border px-4 fw-bold" onclick="toggleView('detail')">Cancel</button>
-                    <button type="submit" class="btn text-white px-5 fw-bold" style="background:var(--theme-navy-primary);">Save Account</button>
-                </div>
-            </div>
+    <div class="z-edit-header shadow-sm">
+        <h4 class="m-0" style="color:var(--theme-navy-primary); font-weight:700;">Edit Account - @Model.AccountName</h4>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-light border px-4 fw-bold" onclick="toggleView('detail')">@(isLocked ? "Back" : "Cancel")</button>
+            
+            <!-- 🚀 HIDE SAVE BUTTON IF LOCKED -->
+            @if (!isLocked) 
+            {
+                <button type="submit" class="btn text-white px-5 fw-bold" style="background:var(--theme-navy-primary);">Save Account</button>
+            }
+        </div>
+    </div>
+    
+    <!-- 🚀 ADD LOCK BANNER -->
+    @if(isLocked) 
+    {
+        <div class="alert alert-warning m-3 fw-bold shadow-sm" style="border: 1px solid #f59e0b; color: #b45309; background-color: #fffbeb;">
+            <i class="fa-solid fa-lock me-2"></i> This account is locked for editing because a Lead has already been created from it.
+        </div>
+    }
 
             <!-- SEC 1: MASTER DETAILS -->
             <h5 class="z-section-title">Master Details</h5>
@@ -3123,3 +3148,31 @@
             });
     }
 </script>
+
+                    <!-- 🚀 NEW: SCRIPT TO FREEZE ALL FIELDS IF LOCKED -->
+    @if (isLocked)
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+        // 1. Disable all inputs, selects, and textareas in the Main Edit Form
+        document.querySelectorAll('#accountForm input, #accountForm select, #accountForm textarea').forEach(el => {
+        el.setAttribute('readonly', 'readonly');
+        // Selects, Checkboxes, and Radios need 'disabled' to prevent interaction
+        if (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'radio') {
+        el.setAttribute('disabled', 'disabled');
+        }
+        });
+
+        // 2. Hide all "Verify" buttons
+        document.querySelectorAll('.verify-btn').forEach(btn => btn.style.display = 'none');
+
+        // 3. Disable "Quick Info" inline fields on the Detail View
+        document.querySelectorAll('.quick-edit-input').forEach(el => {
+        el.setAttribute('readonly', 'readonly');
+        if (el.tagName === 'SELECT') {
+        el.setAttribute('disabled', 'disabled');
+        }
+        });
+        });
+    </script>
+}

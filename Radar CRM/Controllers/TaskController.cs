@@ -312,6 +312,9 @@ namespace Radar_CRM.Controllers
                 .GroupBy(n => n.TaskId.Value)
                 .ToDictionaryAsync(g => g.Key, g => g.Count());
 
+            // Add this right before return View(tasks);
+            ViewBag.AllMatchingIds = await query.Select(t => t.Id).ToListAsync();
+
             return View(tasks);
         }
 
@@ -1045,15 +1048,27 @@ namespace Radar_CRM.Controllers
         [HttpPost]
         public async Task<IActionResult> BulkDelete([FromBody] List<int> ids)
         {
-            if (ids == null || !ids.Any()) return Json(new { success = false });
+            if (ids == null || !ids.Any())
+                return Json(new { success = false, message = "No records were selected or data format is incorrect." });
 
-            var tasksToDelete = await _context.Tasks.Where(t => ids.Contains(t.Id)).ToListAsync();
-            if (tasksToDelete.Any())
+            try
             {
-                _context.Tasks.RemoveRange(tasksToDelete);
-                await _context.SaveChangesAsync();
+                var tasksToDelete = await _context.Tasks.Where(t => ids.Contains(t.Id)).ToListAsync();
+                if (tasksToDelete.Any())
+                {
+                    // If your Tasks have foreign key constraints (like Notes), 
+                    // make sure they are configured for Cascade Delete in your DB, 
+                    // or delete the related Notes here first.
+                    _context.Tasks.RemoveRange(tasksToDelete);
+                    await _context.SaveChangesAsync();
+                }
+                return Json(new { success = true });
             }
-            return Json(new { success = true });
+            catch (Exception ex)
+            {
+                var trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = trueError });
+            }
         }
 
 
@@ -1143,6 +1158,90 @@ namespace Radar_CRM.Controllers
                     }
                 }
                 await _context.SaveChangesAsync();
+            }
+        }
+
+
+        // ==========================================
+        // BULK UPDATE (MASS UPDATE)
+        // ==========================================
+        [HttpPost]
+        public async Task<IActionResult> BulkUpdate([FromBody] BulkUpdateDto request)
+        {
+            if (request == null || request.Ids == null || !request.Ids.Any())
+                return Json(new { success = false, message = "No records selected." });
+
+            if (string.IsNullOrEmpty(request.FieldName))
+                return Json(new { success = false, message = "No field selected for update." });
+
+            try
+            {
+                var tasksToUpdate = await _context.Tasks.Where(t => request.Ids.Contains(t.Id)).ToListAsync();
+
+                if (!tasksToUpdate.Any())
+                    return Json(new { success = false, message = "Records not found." });
+
+                string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                string currentUserName = User.FindFirstValue(ClaimTypes.Name) ?? "System";
+
+                // Pre-fetch User Name if we are mass updating the Task Owner
+                string mappedOwnerName = null;
+                if ((request.FieldName == "TaskOwner" || request.FieldName == "TaskOwnerId") && !string.IsNullOrEmpty(request.NewValue))
+                {
+                    var user = await _context.Users.FindAsync(request.NewValue);
+                    if (user != null) mappedOwnerName = user.fullName ?? user.FirstName;
+                }
+
+                foreach (var task in tasksToUpdate)
+                {
+                    // Always update audit fields
+                    task.ModifiedTime = DateTime.Now;
+                    task.ModifiedById = currentUserId;
+                    task.ModifiedBy = currentUserName;
+
+                    // Handle specific complex fields explicitly
+                    if (request.FieldName == "TaskOwner" || request.FieldName == "TaskOwnerId")
+                    {
+                        task.TaskOwnerId = request.NewValue;
+                        task.TaskOwner = mappedOwnerName;
+                    }
+                    else if (request.FieldName == "DueDate")
+                    {
+                        if (DateTime.TryParse(request.NewValue, out DateTime parsedDate))
+                            task.DueDate = parsedDate;
+                        else
+                            task.DueDate = null;
+                    }
+                    else
+                    {
+                        // Standard dynamic field mapping via Reflection
+                        var propInfo = typeof(CrmTaskModel).GetProperty(request.FieldName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+                        if (propInfo != null && propInfo.CanWrite)
+                        {
+                            var targetType = Nullable.GetUnderlyingType(propInfo.PropertyType) ?? propInfo.PropertyType;
+
+                            object safeValue = null;
+                            if (!string.IsNullOrEmpty(request.NewValue))
+                            {
+                                // Converts string to integer, boolean, etc. dynamically
+                                safeValue = Convert.ChangeType(request.NewValue, targetType);
+                            }
+
+                            propInfo.SetValue(task, safeValue);
+                        }
+                    }
+                }
+
+                _context.UpdateRange(tasksToUpdate);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                var trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return Json(new { success = false, message = trueError });
             }
         }
 
@@ -1250,4 +1349,14 @@ namespace Radar_CRM.Controllers
         public string Value { get; set; }
         public bool IsDate { get; set; }
     }
+
+    // Add this right below your AdvancedFilter class at the bottom of the file
+    public class BulkUpdateDto
+    {
+        public List<int> Ids { get; set; }
+        public string FieldName { get; set; }
+        public string NewValue { get; set; }
+        public bool IsGlobalSelectAll { get; set; }
+    }
 }
+
