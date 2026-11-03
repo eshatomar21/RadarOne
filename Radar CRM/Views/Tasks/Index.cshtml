@@ -648,6 +648,21 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
 
         </thead>
         <tbody id="tableBody">
+
+                    <tr id="globalSelectBanner" style="display: none; background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                        <td colspan="50" class="text-center py-2" style="font-size: 0.85rem;">
+                            <span class="text-dark fw-medium">All <strong id="pageSelectCount">0</strong> records on this page are selected.</span>
+                            <a href="javascript:void(0);" onclick="selectAllGlobalRecords()" class="text-decoration-none fw-bold ms-2" style="color: #2563eb;">
+                                Select all @ViewBag.TotalRecords records that match this search.
+                            </a>
+                        </td>
+                    </tr>
+                    <tr id="globalSelectedConfirmedBanner" style="display: none; background-color: #f0fdf4; border-bottom: 2px solid #bbf7d0;">
+                        <td colspan="50" class="text-center py-2" style="font-size: 0.85rem;">
+                            <span class="text-dark fw-medium">All <strong id="globalSelectTotalCount">@ViewBag.TotalRecords</strong> records are selected.</span>
+                            <a href="javascript:void(0);" onclick="clearGlobalSelection()" class="text-decoration-none fw-bold ms-2" style="color: #2563eb;">Clear selection</a>
+                        </td>
+                    </tr>
             @if (Model != null && Model.Any())
             {
                 foreach (var item in Model)
@@ -1077,6 +1092,10 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     let currentVisibleRows = [];
     let hiddenCols = new Set();
     let sortStates = {};
+
+      const allMatchingIdsFromServer = @Html.Raw(Json.Serialize(ViewBag.AllMatchingIds ?? new List<int>()));
+      const totalServerRecords = @(ViewBag.TotalRecords ?? 0);
+      let isGlobalSelectionActive = false;
 
     const criteriaFilterOptionsMap = {
         "Status": ["Not Started", "In Progress", "Deferred", "Completed", "Waiting on input"],
@@ -1834,24 +1853,42 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     // ==========================================
     // 4. BULK ACTIONS, CHECKBOXES & EXPORTS
     // ==========================================
-   window.toggleAllRowCheckboxes = function (sourceCb) {
-        let selectedIds = new Set(window.getPersistedSelection());
+    window.toggleAllRowCheckboxes = function (sourceCb) {
+          let selectedIds = new Set(window.getPersistedSelection());
 
-        allRows.forEach(row => {
-            if (!row.classList.contains('filtered-out')) {
-                const cb = row.querySelector('.row-cb');
-                if (cb) {
-                    cb.checked = sourceCb.checked;
-                    const id = parseInt(cb.value);
-                    if (sourceCb.checked) selectedIds.add(id);
-                    else selectedIds.delete(id);
-                }
-            }
-        });
-        
-        window.savePersistedSelection(Array.from(selectedIds));
-        window.updateSelectedCount();
-    };
+          allRows.forEach(row => {
+              if (!row.classList.contains('filtered-out')) {
+                  const cb = row.querySelector('.row-cb');
+                  if (cb) {
+                      cb.checked = sourceCb.checked;
+                      const id = parseInt(cb.value);
+                      if (sourceCb.checked) selectedIds.add(id);
+                      else selectedIds.delete(id);
+                  }
+              }
+          });
+
+          window.savePersistedSelection(Array.from(selectedIds));
+          window.updateSelectedCountUIOnly();
+
+            const banner = document.getElementById('globalSelectBanner');
+          const confirmedBanner = document.getElementById('globalSelectedConfirmedBanner');
+          const pageSelectCount = document.getElementById('pageSelectCount');
+
+          isGlobalSelectionActive = false;
+          if (confirmedBanner) confirmedBanner.style.display = 'none';
+
+          // Only show banner if there are more matching records on the server than displayed on page
+          const visibleCheckedRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+          if (sourceCb.checked && totalServerRecords > visibleCheckedRows.length) {
+              if (banner) {
+                  pageSelectCount.innerText = visibleCheckedRows.length;
+                  banner.style.display = 'table-row';
+              }
+          } else {
+              if (banner) banner.style.display = 'none';
+          }
+      };
 
     // --- Session Storage Helper for Pagination ---
     const SELECTION_KEY = 'crm_task_selected_ids';
@@ -1868,29 +1905,78 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         sessionStorage.removeItem(SELECTION_KEY);
     };
 
-  window.updateSelectedCount = function () {
-        let selectedIds = new Set(window.getPersistedSelection());
-        
-        // Sync current page checkboxes with our saved Session memory
-        document.querySelectorAll('tbody .row-cb').forEach(cb => {
-            const id = parseInt(cb.value);
-            if (cb.checked) selectedIds.add(id);
-            else selectedIds.delete(id);
-        });
+    window.updateSelectedCount = function () {
+           let selectedIds = new Set(window.getPersistedSelection());
+           let anyUnchecked = false;
 
-        const idsArray = Array.from(selectedIds);
-        window.savePersistedSelection(idsArray);
+           // Sync current page checkboxes with our saved Session memory
+           document.querySelectorAll('tbody .row-cb').forEach(cb => {
+               const id = parseInt(cb.value);
+               if (cb.checked) {
+                   selectedIds.add(id);
+               } else {
+                   if (selectedIds.has(id)) anyUnchecked = true;
+                   selectedIds.delete(id);
+               }
+           });
 
-        // Update UI
-        const selectedCount = idsArray.length;
-        document.getElementById('selCount').innerText = selectedCount;
-        document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
+        // 🚀 If user manually unchecked a row, break out of Global Selection mode
+         if (anyUnchecked) {
+             isGlobalSelectionActive = false;
+             document.getElementById('globalSelectBanner').style.display = 'none';
+             document.getElementById('globalSelectedConfirmedBanner').style.display = 'none';
+             const selectAllCb = document.getElementById('selectAllCb');
+             if (selectAllCb) selectAllCb.checked = false;
+         }
 
-        const activeRows = allRows.filter(r => !r.classList.contains('filtered-out'));
-        const checkedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
-        const selectAllCb = document.getElementById('selectAllCb');
-        if (selectAllCb) selectAllCb.checked = (checkedOnPage > 0 && checkedOnPage === activeRows.length);
-    };
+         const idsArray = Array.from(selectedIds);
+         window.savePersistedSelection(idsArray);
+         window.updateSelectedCountUIOnly();
+
+         const activeRows = allRows.filter(r => !r.classList.contains('filtered-out'));
+         const checkedOnPage = document.querySelectorAll('tbody .row-cb:checked').length;
+         const selectAllCb = document.getElementById('selectAllCb');
+         if (selectAllCb && !anyUnchecked) {
+            selectAllCb.checked = (checkedOnPage > 0 && checkedOnPage === activeRows.length);
+         }
+     };
+
+      // Split UI update into a separate helper so we can reuse it without triggering loops
+     window.updateSelectedCountUIOnly = function () {
+         const selectedIds = window.getPersistedSelection();
+         const selectedCount = selectedIds.length;
+         document.getElementById('selCount').innerText = selectedCount;
+         document.getElementById('bulkActionsContainer').style.display = selectedCount > 0 ? 'flex' : 'none';
+     };
+
+      window.selectAllGlobalRecords = function () {
+         window.savePersistedSelection(allMatchingIdsFromServer);
+         isGlobalSelectionActive = true;
+
+         document.getElementById('globalSelectBanner').style.display = 'none';
+         document.getElementById('globalSelectedConfirmedBanner').style.display = 'table-row';
+
+         // Keep page UI visually checked
+         document.querySelectorAll('tbody .row-cb').forEach(cb => cb.checked = true);
+         const selectAllCb = document.getElementById('selectAllCb');
+         if (selectAllCb) selectAllCb.checked = true;
+
+         window.updateSelectedCountUIOnly();
+     };
+
+      window.clearGlobalSelection = function () {
+         isGlobalSelectionActive = false;
+         window.clearPersistedSelection();
+
+         document.querySelectorAll('tbody .row-cb').forEach(cb => cb.checked = false);
+         const selectAllCb = document.getElementById('selectAllCb');
+         if (selectAllCb) selectAllCb.checked = false;
+
+         document.getElementById('globalSelectBanner').style.display = 'none';
+         document.getElementById('globalSelectedConfirmedBanner').style.display = 'none';
+
+         window.updateSelectedCountUIOnly();
+     };
 
     window.deleteSelected = function () {
         const selectedIds = window.getPersistedSelection();

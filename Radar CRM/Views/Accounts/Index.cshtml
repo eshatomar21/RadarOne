@@ -2768,10 +2768,13 @@ function initializeTooltips() {
         const isDate = item.dataset.fieldType === "date";
         let val = isDate ? item.querySelector('.date-val-1').value : item.querySelector('.condition-val').value;
 
-        if(!val && condition !== 'is_empty' && condition !== 'is_not_empty') {
-            alert("Please enter a value before saving.");
-            return;
-        }
+      const specialDateConditions = ['today', 'tomorrow', 'yesterday', 'till yesterday', 'starting tomorrow', 'this week', 'this month', 'this year', 'previous week', 'previous month', 'previous year', 'current fy', 'previous fy', 'current fq'];
+const isSpecialDateCondition = isDate && specialDateConditions.includes(condition.toLowerCase());
+
+if(!val && condition !== 'is_empty' && condition !== 'is_not_empty' && !isSpecialDateCondition) {
+    alert("Please enter a value before saving.");
+    return;
+}
 
         let savedFilters = JSON.parse(localStorage.getItem('crm_saved_sidebar_filters') || '[]');
         savedFilters.push({ fieldName, condition, val, isDate, id: Date.now() });
@@ -2970,13 +2973,23 @@ document.addEventListener('mousedown', function(e) {
         });
     }
 
-    function toggleDateInputs(selectElement) {
-        const wrapper = selectElement.closest('.filter-expanded-area');
-        const val2 = wrapper.querySelector('.date-val-2');
-        if (val2) {
-            val2.style.display = selectElement.value === 'between' ? 'block' : 'none';
-        }
+   function toggleDateInputs(selectElement) {
+    const wrapper = selectElement.closest('.filter-expanded-area');
+    const val1 = wrapper.querySelector('.date-val-1');
+    const val2 = wrapper.querySelector('.date-val-2');
+    
+    const condition = selectElement.value.toLowerCase();
+    const specialDateConditions = ['today', 'tomorrow', 'yesterday', 'till yesterday', 'starting tomorrow', 'this week', 'this month', 'this year', 'previous week', 'previous month', 'previous year', 'current fy', 'previous fy', 'current fq'];
+
+    if (val1) {
+        // Hide the first date input if a special predefined date is selected
+        val1.style.display = specialDateConditions.includes(condition) ? 'none' : 'block';
     }
+    
+    if (val2) {
+        val2.style.display = (condition === 'between' || condition === 'not between') ? 'block' : 'none';
+    }
+}
 
     function parseTableDate(dateStr) {
         if(!dateStr) return new Date(NaN);
@@ -3167,7 +3180,12 @@ document.addEventListener('mousedown', function(e) {
                 if(val2) val1 = val1 + "|" + val2;
             }
 
-            if (!val1 && !condition.includes('empty')) return;
+// Add a check to bypass empty validation for special dynamic dates
+const specialDateConditions = ['today', 'tomorrow', 'yesterday', 'till yesterday', 'starting tomorrow', 'this week', 'this month', 'this year', 'previous week', 'previous month', 'previous year', 'current fy', 'previous fy', 'current fq'];
+
+const isSpecialDateCondition = isDate && specialDateConditions.includes(condition.toLowerCase());
+
+if (!val1 && !condition.includes('empty') && !isSpecialDateCondition) return;
             activeFilters.push({ LogicalOperator: "AND", ColumnName: colName, Condition: condition, Value: val1, IsDate: isDate });
         }
     });
