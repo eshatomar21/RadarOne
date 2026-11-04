@@ -1,11 +1,18 @@
 ﻿@model Radar_CRM.Models.Account
 @using System.Security.Claims
+@inject Radar_CRM.Data.ApplicationDbContext _context
 
 @{
     ViewData["Title"] = "Edit Account";
 
     // 🚀 FIX: Use FindFirst() instead of FindFirstValue() to avoid extension method errors
     string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+    // 🚀 NEW: Fetch current user and check if they are an Admin
+    var currentUser = _context.Users.Find(currentUserId);
+    bool isAdmin = currentUser != null && !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                   (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                    currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
     // 🚀 NEW: Check if Account is locked (i.e., it has at least one Lead)
     bool isLocked = ViewBag.RelatedLeads != null && ((IEnumerable<Radar_CRM.Models.Lead>)ViewBag.RelatedLeads).Any();
 
@@ -1128,7 +1135,15 @@
             <li onclick="openUniversalTimeline('Account', @Model.Id, '@Model.AccountName')">
                 <i class="fa-solid fa-clock-rotate-left"></i> Timeline
             </li>
+
+            @if (isAdmin)
+            {
+                <li onclick="confirmAccountDelete(@Model.Id)" style="color: #ef4444; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; padding-top: 15px;">
+                    <i class="fa-solid fa-trash-can"></i> Delete Account
+                </li>
+            }
         </ul>
+       
     </div>
 
 
@@ -3147,6 +3162,52 @@
                 saveBtn.disabled = false;
             });
     }
+
+       // =====================================
+       // 🚀 NEW: SWEETALERT DELETE CONFIRMATION
+       // =====================================
+       function confirmAccountDelete(accountId) {
+           Swal.fire({
+               title: 'Are you sure?',
+               text: "This will permanently delete this account and all related records (Tasks, Notes, Deals, Leads). You won't be able to revert this!",
+               icon: 'warning',
+               showCancelButton: true,
+               confirmButtonColor: '#dc2626', // Red color for delete
+               cancelButtonColor: '#64748b',  // Slate color for cancel
+               confirmButtonText: '<i class="fa-solid fa-trash-can me-1"></i> Yes, delete it!'
+           }).then((result) => {
+               if (result.isConfirmed) {
+                   // Grab the anti-forgery token from the existing Edit form on the page for security
+                   let tokenElement = document.querySelector('input[name="__RequestVerificationToken"]');
+                   let token = tokenElement ? tokenElement.value : '';
+
+                   // Dynamically create a form to POST to the controller's Delete method
+                   let form = document.createElement('form');
+                   form.method = 'POST';
+                   form.action = '@Url.Action("Delete", "Accounts")';
+
+                   // Append the Account ID
+                   let idInput = document.createElement('input');
+                   idInput.type = 'hidden';
+                   idInput.name = 'id';
+                   idInput.value = accountId;
+                   form.appendChild(idInput);
+
+                   // Append the Security Token
+                   if (token) {
+                       let tokenInput = document.createElement('input');
+                       tokenInput.type = 'hidden';
+                       tokenInput.name = '__RequestVerificationToken';
+                       tokenInput.value = token;
+                       form.appendChild(tokenInput);
+                   }
+
+                   // Add to body and submit (The controller handles the redirect to Index)
+                   document.body.appendChild(form);
+                   form.submit();
+               }
+           });
+       }
 </script>
 
                     <!-- 🚀 NEW: SCRIPT TO FREEZE ALL FIELDS IF LOCKED -->

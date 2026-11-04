@@ -4129,28 +4129,26 @@ window.triggerBackendExport = function (module, format, event) {
                 uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
                 uploadBtn.disabled = true;
 
-                fetch('@Url.Action("UploadFile", "Accounts")', {
+               fetch('@Url.Action("UploadFile", "Accounts")', { // 🚀 NOTE: This will be "Leads" on the Leads Index page
                     method: 'POST',
                     body: formData
                 })
-                .then(async response => {
+               .then(async response => {
                     if (response.ok) {
                         const data = await response.json();
 
-                        let msg = `✅ Successfully uploaded: ${data.insertedCount} records.\n`;
+                        let msg = `✅ Upload Process Completed!\n\n`;
+msg += `➕ Inserted: ${data.insertedCount} new records.\n`;
+msg += `🔄 Updated: ${data.updatedCount} existing records.\n`;
 
-                        if (data.skippedCount > 0) {
-                            msg += `⚠️ Skipped ${data.skippedCount} duplicate records.\n\n`;
+if (data.duplicatedCount > 0) {
+    msg += `⚠️ Duplicates merged/flagged: ${data.duplicatedCount} records.\n`;
+}
+if (data.skippedCount > 0) {
+    msg += `❌ Skipped: ${data.skippedCount} records.`;
+}
 
-                            if (data.skippedMessages && data.skippedMessages.length > 0) {
-                                msg += data.skippedMessages.slice(0, 10).join('\n');
-                                if (data.skippedCount > 10) {
-                                    msg += `\n...and ${data.skippedCount - 10} more.`;
-                                }
-                            }
-                        }
-
-                        alert(msg);
+alert(msg);
                         window.location.reload();
                     } else {
                         const errText = await response.text();
@@ -4553,7 +4551,7 @@ function setupExcelResizing() {
             sStartWidth = sidebar.offsetWidth;
             document.addEventListener('mousemove', sideMouseMove);
             document.addEventListener('mouseup', sideMouseUp);
-        });
+        }); 
 
         function sideMouseMove(e) {
             const newWidth = sStartWidth + (e.pageX - sStartX);

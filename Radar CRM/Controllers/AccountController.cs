@@ -1235,7 +1235,8 @@ namespace Radar_CRM.Controllers
                     if (existingAccount != null)
                     {
                         var timelineEvents = new List<TimelineEvent>();
-                        var excludedAuditFields = new[] { "ModifiedBy", "ModifiedTime", "CreatedBy", "DateOfEntry" };
+                        // 🚀 ADDED EXCLUSIONS so system timestamps don't clutter the timeline
+                        var excludedAuditFields = new[] { "ModifiedBy", "ModifiedDateAndTime", "CreatedBy", "DateOfEntry", "CreatedDateAndTime" };
 
                         // Dynamically compare every single property on the Account
                         var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -1246,12 +1247,35 @@ namespace Radar_CRM.Controllers
                             var oldObj = prop.GetValue(existingAccount);
                             var newObj = prop.GetValue(account);
 
-                            string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
-                            string newVal = newObj?.ToString()?.Trim() ?? "blank value";
+                            // 🚀 BULLETPROOF FIX: Treat nulls, empty strings, and white spaces as the exact same thing
+                            string oldStr = oldObj?.ToString()?.Trim() ?? "";
+                            string newStr = newObj?.ToString()?.Trim() ?? "";
 
-                            // If the field changed, log it!
-                            if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                            string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
+                            string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
+
+                            // If the field TRULY changed, log it!
+                            if (oldVal != newVal)
                             {
+                                string displayFieldName = prop.Name;
+
+                                // 🚀 RESOLVE OWNER ID TO ACTUAL NAME FOR TIMELINE
+                                if (prop.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || prop.Name == "CoOwnerId")
+                                {
+                                    displayFieldName = prop.Name.Replace("Id", ""); // e.g., "AccountOwnerId" -> "AccountOwner"
+
+                                    if (oldVal != "blank value")
+                                    {
+                                        var oldUser = await _context.Users.FindAsync(oldStr);
+                                        if (oldUser != null) oldVal = oldUser.fullName ?? oldUser.FirstName ?? oldVal;
+                                    }
+                                    if (newVal != "blank value")
+                                    {
+                                        var newUser = await _context.Users.FindAsync(newStr);
+                                        if (newUser != null) newVal = newUser.fullName ?? newUser.FirstName ?? newVal;
+                                    }
+                                }
+
                                 timelineEvents.Add(new TimelineEvent
                                 {
                                     EntityType = "Account",
@@ -1260,7 +1284,7 @@ namespace Radar_CRM.Controllers
                                     FieldName = prop.Name,
                                     OldValue = oldVal,
                                     NewValue = newVal,
-                                    ActionDescription = $"{prop.Name} was updated from {oldVal} to {newVal}",
+                                    ActionDescription = $"{displayFieldName} was updated from <b>{oldVal}</b> to <b>{newVal}</b>",
                                     CreatedById = currentUserId,
                                     CreatedByName = currentUser,
                                     CreatedDate = DateTime.Now
@@ -2481,9 +2505,6 @@ namespace Radar_CRM.Controllers
             return await query.Select(a => a.Id).ToListAsync();
         }
 
-        // ==========================================
-        // UPLOAD FILE (Supports BOTH .csv and .xlsx)
-        // ==========================================
         [HttpPost]
         [DisableRequestSizeLimit]
         [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = int.MaxValue)]
@@ -2497,8 +2518,12 @@ namespace Radar_CRM.Controllers
                 return BadRequest("Invalid file format. Please upload a .csv or .xlsx file.");
             }
 
-            var accountsToInsert = new List<Account>();
+            // 🚀 FIX: Changed to HashSets to prevent double-counting and EF tracking collisions
+            var accountsToInsert = new HashSet<Account>();
+            var accountsToUpdate = new HashSet<Account>();
             var skippedRecords = new List<string>();
+
+            int duplicatedCount = 0; // 🚀 FIX: Track explicit duplicates found in the file
             int currentRow = 1;
 
             // Load existing data for ultra-fast checking
@@ -2510,8 +2535,17 @@ namespace Radar_CRM.Controllers
                 .GroupBy(a => a.ZohoRecordId)
                 .ToDictionaryAsync(g => g.Key, g => g.First());
 
-            var existingMobiles = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.MobileNumber)).Select(a => a.MobileNumber).ToListAsync());
-            var existingEmails = new HashSet<string>(await _context.Accounts.Where(a => !string.IsNullOrEmpty(a.Email)).Select(a => a.Email.ToLower()).ToListAsync());
+            var existingMobiles = await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.MobileNumber))
+                .AsNoTracking()
+                .GroupBy(a => a.MobileNumber)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
+
+            var existingEmails = await _context.Accounts
+                .Where(a => !string.IsNullOrEmpty(a.Email))
+                .AsNoTracking()
+                .GroupBy(a => a.Email.ToLower())
+                .ToDictionaryAsync(g => g.Key, g => g.First());
 
             // Helpers
             string NormalizeCountry(string input)
@@ -2528,9 +2562,7 @@ namespace Radar_CRM.Controllers
                 return new string(input.Where(char.IsLetterOrDigit).ToArray()).ToLower();
             }
 
-            // 🚀 CENTRALIZED MAPPING LOGIC
-            // This local function prevents us from having to write the 70+ lines of mapping twice.
-            // 🚀 CENTRALIZED MAPPING LOGIC
+            // 🚀 CENTRALIZED MAPPING & UPSERT LOGIC
             void ProcessRow(Func<string, string> GetValSafe, int rowNum)
             {
                 decimal? GetDecimalSafe(string colName)
@@ -2545,20 +2577,36 @@ namespace Radar_CRM.Controllers
                 string mobile = GetValSafe("MobileNumber");
                 string email = GetValSafe("Email")?.ToLower();
 
-                bool isZohoDup = !string.IsNullOrEmpty(zohoRecordId) && existingAccountsDb.ContainsKey(zohoRecordId);
-                bool isMobileDup = !string.IsNullOrEmpty(mobile) && existingMobiles.Contains(mobile);
-                bool isEmailDup = !string.IsNullOrEmpty(email) && existingEmails.Contains(email);
+                bool isUpdate = false;
+                bool isDuplicateFlagged = false;
+                Account acc;
 
-                // Skip duplicates
-                if (isZohoDup || isMobileDup || isEmailDup)
+                // 🚀 REFINED UPSERT LOGIC
+                if (!string.IsNullOrEmpty(zohoRecordId) && existingAccountsDb.TryGetValue(zohoRecordId, out var existingByZoho))
                 {
-                    skippedRecords.Add($"Row {rowNum}: Skipped (Duplicate Record found)");
-                    return;
+                    acc = existingByZoho;
+                    isUpdate = true; // DB record exists
                 }
-
-                Account acc = new Account();
-                if (!string.IsNullOrEmpty(mobile)) existingMobiles.Add(mobile);
-                if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+                else if (!string.IsNullOrEmpty(mobile) && existingMobiles.TryGetValue(mobile, out var existingByMobile))
+                {
+                    acc = existingByMobile;
+                    isDuplicateFlagged = true;
+                    duplicatedCount++;
+                    if (acc.Id != 0) isUpdate = true; // Check if it's a real DB record vs. just created in this loop
+                }
+                else if (!string.IsNullOrEmpty(email) && existingEmails.TryGetValue(email, out var existingByEmail))
+                {
+                    acc = existingByEmail;
+                    isDuplicateFlagged = true;
+                    duplicatedCount++;
+                    if (acc.Id != 0) isUpdate = true;
+                }
+                else
+                {
+                    acc = new Account(); // Fresh record
+                    if (!string.IsNullOrEmpty(mobile)) existingMobiles[mobile] = acc;
+                    if (!string.IsNullOrEmpty(email)) existingEmails[email] = acc;
+                }
 
                 string rawCoOwnerId = GetValSafe("Co-Owner.id");
                 acc.ZohoRecordId = zohoRecordId;
@@ -2575,14 +2623,15 @@ namespace Radar_CRM.Controllers
                 acc.CurrentStatus = GetValSafe("CurrentStatus");
                 acc.AccountType = GetValSafe("AccountType");
 
-                // 🚀 FIX: Explicitly cast DateTime output to (DateTime?)
                 acc.DateOfEntry = DateTime.TryParse(GetValSafe("DateofEntry"), out DateTime doe) ? doe : DateTime.Now;
                 acc.CreatedDateAndTime = DateTime.TryParse(GetValSafe("Created Time"), out DateTime cdt) ? cdt : DateTime.Now;
                 acc.ModifiedDateAndTime = DateTime.TryParse(GetValSafe("Modified Time"), out DateTime mdt) ? mdt : DateTime.Now;
 
                 acc.CreatedBy = GetValSafe("CreatedBy");
                 acc.ModifiedBy = GetValSafe("ModifiedBy");
-                acc.IsDuplicated = bool.TryParse(GetValSafe("IsDuplicated"), out bool isDup) ? isDup : false;
+
+                bool csvDupVal = bool.TryParse(GetValSafe("IsDuplicated"), out bool isDup) ? isDup : false;
+                acc.IsDuplicated = csvDupVal || isDuplicateFlagged;
 
                 // --- Address 1 & 2 ---
                 acc.Addr1_Country = NormalizeCountry(GetValSafe("Address1-Country/Region"));
@@ -2628,7 +2677,6 @@ namespace Radar_CRM.Controllers
                 acc.ReferralSource = GetValSafe("ReferralSource");
                 acc.AveragePatientFee = GetDecimalSafe("AveragePatientFee");
 
-                // 🚀 FIX: Explicitly cast integers to (int?) to prevent compiler type resolution crash
                 acc.YearsOfPractice = int.TryParse(GetValSafe("YearsofParctice"), out int yop) ? (int?)yop : null;
                 acc.PatientsPerDay = int.TryParse(GetValSafe("PatientsperDay"), out int ppd) ? (int?)ppd : null;
                 acc.TotalExperience = int.TryParse(GetValSafe("Totalexperience"), out int te) ? (int?)te : null;
@@ -2641,18 +2689,9 @@ namespace Radar_CRM.Controllers
                                  ? (DateTime?)dob1
                                  : (DateTime.TryParse(rawDob, out DateTime dob2) ? (DateTime?)dob2 : null);
 
-                // =========================================================
-                // 🚀 AUTO-CALCULATE PROFILE STATUS & RATE ON UPLOAD (LIVE SERVER FIX)
-                // =========================================================
+                // --- Profile Status Calculation ---
                 int filledFieldsCount = 0;
-
-                bool IsFilled(string val)
-                {
-                    return !string.IsNullOrWhiteSpace(val)
-                        && !val.Equals("-None-", StringComparison.OrdinalIgnoreCase)
-                        && !val.Equals("false", StringComparison.OrdinalIgnoreCase);
-                }
-
+                bool IsFilled(string val) { return !string.IsNullOrWhiteSpace(val) && !val.Equals("-None-", StringComparison.OrdinalIgnoreCase) && !val.Equals("false", StringComparison.OrdinalIgnoreCase); }
                 if (IsFilled(acc.IsHomeopathicDoctor)) filledFieldsCount++;
                 if (IsFilled(acc.WorkType)) filledFieldsCount++;
                 if (IsFilled(acc.HasComputer)) filledFieldsCount++;
@@ -2669,27 +2708,15 @@ namespace Radar_CRM.Controllers
                 if (acc.PatientsPerDay.HasValue) filledFieldsCount++;
 
                 bool hasComputer = IsFilled(acc.HasComputer) && !acc.HasComputer.Equals("No", StringComparison.OrdinalIgnoreCase);
-                bool isHomeopath = IsFilled(acc.IsHomeopathicDoctor) &&
-                                   !acc.IsHomeopathicDoctor.Equals("No", StringComparison.OrdinalIgnoreCase) &&
-                                   !acc.IsHomeopathicDoctor.Equals("नहीं");
+                bool isHomeopath = IsFilled(acc.IsHomeopathicDoctor) && !acc.IsHomeopathicDoctor.Equals("No", StringComparison.OrdinalIgnoreCase) && !acc.IsHomeopathicDoctor.Equals("नहीं");
 
                 string profileStatus = "Not Completed";
-                if (filledFieldsCount > 4 && hasComputer && isHomeopath)
-                {
-                    profileStatus = "Strongly Completed";
-                }
-                else if (filledFieldsCount == 4 && hasComputer && isHomeopath)
-                {
-                    profileStatus = "Completed";
-                }
-                else if (filledFieldsCount >= 4 && (!hasComputer || !isHomeopath))
-                {
-                    profileStatus = "Not-Qualified";
-                }
+                if (filledFieldsCount > 4 && hasComputer && isHomeopath) profileStatus = "Strongly Completed";
+                else if (filledFieldsCount == 4 && hasComputer && isHomeopath) profileStatus = "Completed";
+                else if (filledFieldsCount >= 4 && (!hasComputer || !isHomeopath)) profileStatus = "Not-Qualified";
 
                 acc.Profilestatus = profileStatus;
                 acc.ProfileRate = filledFieldsCount;
-                // =========================================================
 
                 // --- Software & Purchases ---
                 acc.CurrentlyUsingSoftware = GetValSafe("CurrentlyUsingSoftware");
@@ -2701,11 +2728,10 @@ namespace Radar_CRM.Controllers
                 acc.PaymentStatus = GetValSafe("PaymentStatus");
                 acc.InvoiceNumber = GetValSafe("InvoiceNumber");
 
-                // 🚀 FIX: Explicit cast for Nullable Dates and Decimals
                 acc.PurchaseDate = DateTime.TryParse(GetValSafe("PurchaseDate"), out DateTime pd) ? (DateTime?)pd : null;
                 acc.PurchaseValue = GetDecimalSafe("PurchaseValue(â‚¹)");
 
-                // 🚀 --- AD & CAMPAIGN TRACKING --- 🚀
+                // --- AD & CAMPAIGN TRACKING ---
                 acc.MetaCampaignName = GetValSafe("MetaCampaignName");
                 acc.SocialLeadId = GetValSafe("SocialLeadID");
                 acc.LeadStage = GetValSafe("LeadStage");
@@ -2726,14 +2752,20 @@ namespace Radar_CRM.Controllers
                 acc.Gadconfigid = GetValSafe("GADCONFIGID");
                 acc.ConversionExportStatus = GetValSafe("ConversionExportStatus");
                 acc.ReasonForConversionFailure = GetValSafe("ReasonforConversionFailure");
-
-                // 🚀 FIX: Explicit cast for Nullable Dates and Decimals
                 acc.AdClickDate = DateTime.TryParse(GetValSafe("AdClickDate"), out DateTime acd) ? (DateTime?)acd : null;
                 acc.CostPerClick = GetDecimalSafe("CostperClick");
                 acc.CostPerConversion = GetDecimalSafe("CostperConversion");
                 acc.ConversionExportedOn = DateTime.TryParse(GetValSafe("ConversionExportedOn"), out DateTime ceo) ? (DateTime?)ceo : null;
 
-                accountsToInsert.Add(acc);
+                // 🚀 ROUTE TO CORRECT HASHSET (Prevents duplicates automatically)
+                if (isUpdate)
+                {
+                    accountsToUpdate.Add(acc);
+                }
+                else
+                {
+                    accountsToInsert.Add(acc);
+                }
             }
 
             try
@@ -2755,7 +2787,6 @@ namespace Radar_CRM.Controllers
 
                             var values = ParseCsvLine(line);
 
-                            // Create a CSV-specific GetValSafe function
                             string GetValSafeCsv(string colName)
                             {
                                 var idx = headers.IndexOf(CleanHeader(colName));
@@ -2783,7 +2814,6 @@ namespace Radar_CRM.Controllers
                         {
                             currentRow++;
 
-                            // Create an Excel-specific GetValSafe function
                             string GetValSafeExcel(string colName)
                             {
                                 var idx = headers.IndexOf(CleanHeader(colName));
@@ -2797,8 +2827,9 @@ namespace Radar_CRM.Controllers
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                // 🚀 Execute Inserts Only
-                if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert);
+                // 🚀 Execute Inserts & Updates
+                if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert.ToList());
+                if (accountsToUpdate.Any()) _context.Accounts.UpdateRange(accountsToUpdate.ToList());
 
                 await _context.SaveChangesAsync();
             }
@@ -2806,17 +2837,20 @@ namespace Radar_CRM.Controllers
             {
                 return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
             }
-            finally { _context.ChangeTracker.AutoDetectChangesEnabled = true; }
+            finally
+            {
+                _context.ChangeTracker.AutoDetectChangesEnabled = true;
+            }
 
             return Json(new
             {
                 success = true,
                 insertedCount = accountsToInsert.Count,
-                updatedCount = 0,
+                updatedCount = accountsToUpdate.Count,
+                duplicatedCount = duplicatedCount, // 🚀 Passed to frontend
                 skippedCount = skippedRecords.Count
             });
         }
-
 
 
         private string GetVal(string[] values, int index)
@@ -2913,14 +2947,38 @@ namespace Radar_CRM.Controllers
                     // 🚀 NEW: TIMELINE EVENT GENERATION FOR QUICK INFO
                     // =========================================================
                     var oldObj = propertyInfo.GetValue(account);
-                    string oldVal = oldObj?.ToString()?.Trim() ?? "blank value";
-                    string newVal = safeValue?.ToString()?.Trim() ?? "blank value";
 
-                    if (oldVal != newVal && !(oldVal == "blank value" && newVal == ""))
+                    // 🚀 BULLETPROOF FIX: Treat nulls, empty strings, and white spaces as the exact same thing
+                    string oldStr = oldObj?.ToString()?.Trim() ?? "";
+                    string newStr = safeValue?.ToString()?.Trim() ?? "";
+
+                    string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
+                    string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
+
+                    if (oldVal != newVal)
                     {
                         string currentUserIdForTimeline = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
                         string currentUserNameForTimeline = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
                             ? User.Identity.Name : "System User";
+
+                        string displayFieldName = propertyInfo.Name;
+
+                        // 🚀 RESOLVE OWNER ID TO ACTUAL NAME FOR TIMELINE
+                        if (propertyInfo.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || propertyInfo.Name == "CoOwnerId")
+                        {
+                            displayFieldName = propertyInfo.Name.Replace("Id", ""); // e.g., "AccountOwnerId" -> "AccountOwner"
+
+                            if (oldVal != "blank value")
+                            {
+                                var oldUser = await _context.Users.FindAsync(oldStr);
+                                if (oldUser != null) oldVal = oldUser.fullName ?? oldUser.FirstName ?? oldVal;
+                            }
+                            if (newVal != "blank value")
+                            {
+                                var newUser = await _context.Users.FindAsync(newStr);
+                                if (newUser != null) newVal = newUser.fullName ?? newUser.FirstName ?? newVal;
+                            }
+                        }
 
                         var timelineEvent = new TimelineEvent
                         {
@@ -2930,7 +2988,7 @@ namespace Radar_CRM.Controllers
                             FieldName = propertyInfo.Name,
                             OldValue = oldVal,
                             NewValue = newVal,
-                            ActionDescription = $"{propertyInfo.Name} was updated from {oldVal} to {newVal} via Quick Edit",
+                            ActionDescription = $"{displayFieldName} was updated from <b>{oldVal}</b> to <b>{newVal}</b> via Quick Edit",
                             CreatedById = currentUserIdForTimeline,
                             CreatedByName = currentUserNameForTimeline,
                             CreatedDate = DateTime.Now

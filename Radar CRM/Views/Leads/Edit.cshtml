@@ -1,11 +1,18 @@
 ﻿@model Radar_CRM.Models.Lead
 @using System.Security.Claims
+@inject Radar_CRM.Data.ApplicationDbContext _context
 
 @{
     ViewData["Title"] = "Edit Lead";
 
     // Get logged-in user to set defaults
     string currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+    // 🚀 NEW: Fetch current user and check if they are an Admin
+    var currentUser = _context.Users.Find(currentUserId);
+    bool isAdmin = currentUser != null && !string.IsNullOrWhiteSpace(currentUser.Profile) &&
+                   (currentUser.Profile.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                    currentUser.Profile.Equals("Administrator", StringComparison.OrdinalIgnoreCase));
 
     // Prepare Notes & Tasks for Detail View
     var allNotes = ViewBag.ExistingNotes as IEnumerable<Radar_CRM.Models.Notes> ?? new List<Radar_CRM.Models.Notes>();
@@ -442,7 +449,15 @@
             <li onclick="openUniversalTimeline('Lead', @Model.Id, '@Model.LeadName')">
                 <i class="fa-solid fa-clock-rotate-left"></i> Timeline
             </li>
+
+            @if (isAdmin)
+            {
+                <li onclick="confirmLeadDelete(@Model.Id)" style="color: #ef4444; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; padding-top: 15px;">
+                    <i class="fa-solid fa-trash-can"></i> Delete Lead
+                </li>
+            }
         </ul>
+       
     </div>
 
    <!-- Main Detail Content -->
@@ -1456,7 +1471,9 @@
 @section Scripts {
     <!-- Do NOT include jquery-3.6.0.min.js here. Let the Layout handle it. -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
    async function openUniversalTimeline(entityType, entityId, entityName) {
@@ -2717,6 +2734,52 @@
                 saveBtn.innerHTML = origText;
                 saveBtn.disabled = false;
             });
+    }
+
+    // =====================================
+    // 🚀 NEW: SWEETALERT DELETE CONFIRMATION (LEADS)
+    // =====================================
+    function confirmLeadDelete(leadId) {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "This will permanently delete this lead and all related notes. You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626', // Red color for delete
+            cancelButtonColor: '#64748b',  // Slate color for cancel
+            confirmButtonText: '<i class="fa-solid fa-trash-can me-1"></i> Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // We utilize your existing BulkDelete endpoint by passing a single ID in an array
+                fetch('@Url.Action("BulkDelete", "Leads")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([leadId])
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            title: 'Deleted!',
+                            text: 'The lead has been successfully deleted.',
+                            icon: 'success',
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => {
+                            window.location.href = '@Url.Action("Index", "Leads")'; // Redirect to list
+                        });
+                    } else {
+                        Swal.fire('Error', data.message || 'Could not delete the lead.', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error('Delete error:', err);
+                    Swal.fire('Error', 'A network error occurred.', 'error');
+                });
+            }
+        });
     }
    
 </script>
