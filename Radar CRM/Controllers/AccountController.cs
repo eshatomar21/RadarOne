@@ -2530,14 +2530,15 @@ namespace Radar_CRM.Controllers
 
             // 🚀 CENTRALIZED MAPPING LOGIC
             // This local function prevents us from having to write the 70+ lines of mapping twice.
+            // 🚀 CENTRALIZED MAPPING LOGIC
             void ProcessRow(Func<string, string> GetValSafe, int rowNum)
             {
                 decimal? GetDecimalSafe(string colName)
                 {
                     string raw = GetValSafe(colName);
-                    if (string.IsNullOrWhiteSpace(raw)) return null;
+                    if (string.IsNullOrWhiteSpace(raw) || raw.Equals("-None-", StringComparison.OrdinalIgnoreCase)) return null;
                     string clean = new string(raw.Where(c => char.IsDigit(c) || c == '.' || c == '-').ToArray());
-                    return decimal.TryParse(clean, out decimal result) ? result : null;
+                    return decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal result) ? result : null;
                 }
 
                 string zohoRecordId = GetValSafe("RecordId");
@@ -2560,14 +2561,10 @@ namespace Radar_CRM.Controllers
                 if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
 
                 string rawCoOwnerId = GetValSafe("Co-Owner.id");
-
                 acc.ZohoRecordId = zohoRecordId;
-
-                // 🚀 HARDCODE SITARA AS THE ACCOUNT OWNER
-                // Replace "SITARA-USER-ID-HERE" with Sitara's actual ID (GUID) from your AspNetUsers table
-                acc.AccountOwnerId = "zcrm_1092392000000518001";
-
+                acc.AccountOwnerId = "zcrm_1092392000000518001"; // Hardcoded Sitara ID
                 acc.CoOwnerId = validUserIds.Contains(rawCoOwnerId) ? rawCoOwnerId : null;
+
                 acc.AccountName = GetValSafe("AccountName");
                 acc.Email = GetValSafe("Email");
                 acc.AlternateEmailID = GetValSafe("AlternateEmailID");
@@ -2577,9 +2574,12 @@ namespace Radar_CRM.Controllers
                 acc.Description = GetValSafe("Description");
                 acc.CurrentStatus = GetValSafe("CurrentStatus");
                 acc.AccountType = GetValSafe("AccountType");
+
+                // 🚀 FIX: Explicitly cast DateTime output to (DateTime?)
                 acc.DateOfEntry = DateTime.TryParse(GetValSafe("DateofEntry"), out DateTime doe) ? doe : DateTime.Now;
                 acc.CreatedDateAndTime = DateTime.TryParse(GetValSafe("Created Time"), out DateTime cdt) ? cdt : DateTime.Now;
                 acc.ModifiedDateAndTime = DateTime.TryParse(GetValSafe("Modified Time"), out DateTime mdt) ? mdt : DateTime.Now;
+
                 acc.CreatedBy = GetValSafe("CreatedBy");
                 acc.ModifiedBy = GetValSafe("ModifiedBy");
                 acc.IsDuplicated = bool.TryParse(GetValSafe("IsDuplicated"), out bool isDup) ? isDup : false;
@@ -2620,32 +2620,46 @@ namespace Radar_CRM.Controllers
                 acc.QualificationStatus = GetValSafe("QualifiactionStatus");
                 acc.IsHomeopathicDoctor = GetValSafe("AreYouaHomeopathicDoctor");
                 acc.ClinicType = GetValSafe("ClinicType");
-                acc.YearsOfPractice = int.TryParse(GetValSafe("YearsofParctice"), out int yop) ? yop : null;
                 acc.Qualification = GetValSafe("Qualification");
                 acc.YearOfPassing = GetValSafe("Yearofpassing");
-                acc.AveragePatientFee = GetDecimalSafe("AveragePatientFee");
-                acc.DateOfBirth = DateTime.TryParse(GetValSafe("DateofBirth"), out DateTime dob) ? dob : null;
                 acc.WorkType = GetValSafe("WorkType");
                 acc.HasComputer = GetValSafe("HavingComputer/Laptop");
-                acc.PatientsPerDay = int.TryParse(GetValSafe("PatientsperDay"), out int ppd) ? ppd : null;
                 acc.CollegeName = GetValSafe("CollegeName");
-                acc.TotalExperience = int.TryParse(GetValSafe("Totalexperience"), out int te) ? te : null;
-                acc.NumberOfClinics = int.TryParse(GetValSafe("NumberofClinics"), out int noc) ? noc : null;
-                acc.Age = int.TryParse(GetValSafe("Age"), out int age) ? age : null;
-                acc.ProfileCompletionPercentage = int.TryParse(GetValSafe("Profilecompletion(%)"), out int pcp) ? pcp : null;
                 acc.ReferralSource = GetValSafe("ReferralSource");
+                acc.AveragePatientFee = GetDecimalSafe("AveragePatientFee");
+
+                // 🚀 FIX: Explicitly cast integers to (int?) to prevent compiler type resolution crash
+                acc.YearsOfPractice = int.TryParse(GetValSafe("YearsofParctice"), out int yop) ? (int?)yop : null;
+                acc.PatientsPerDay = int.TryParse(GetValSafe("PatientsperDay"), out int ppd) ? (int?)ppd : null;
+                acc.TotalExperience = int.TryParse(GetValSafe("Totalexperience"), out int te) ? (int?)te : null;
+                acc.NumberOfClinics = int.TryParse(GetValSafe("NumberofClinics"), out int noc) ? (int?)noc : null;
+                acc.Age = int.TryParse(GetValSafe("Age"), out int age) ? (int?)age : null;
+                acc.ProfileCompletionPercentage = int.TryParse(GetValSafe("Profilecompletion(%)"), out int pcp) ? (int?)pcp : null;
+
+                string rawDob = GetValSafe("DateofBirth");
+                acc.DateOfBirth = DateTime.TryParse(rawDob, new System.Globalization.CultureInfo("en-IN"), System.Globalization.DateTimeStyles.None, out DateTime dob1)
+                                 ? (DateTime?)dob1
+                                 : (DateTime.TryParse(rawDob, out DateTime dob2) ? (DateTime?)dob2 : null);
 
                 // =========================================================
-                // 🚀 AUTO-CALCULATE PROFILE STATUS & RATE ON UPLOAD
+                // 🚀 AUTO-CALCULATE PROFILE STATUS & RATE ON UPLOAD (LIVE SERVER FIX)
                 // =========================================================
                 int filledFieldsCount = 0;
-                if (!string.IsNullOrWhiteSpace(acc.IsHomeopathicDoctor)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.WorkType)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.HasComputer)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.ClinicType)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.Qualification)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.CollegeName)) filledFieldsCount++;
-                if (!string.IsNullOrWhiteSpace(acc.YearOfPassing)) filledFieldsCount++;
+
+                bool IsFilled(string val)
+                {
+                    return !string.IsNullOrWhiteSpace(val)
+                        && !val.Equals("-None-", StringComparison.OrdinalIgnoreCase)
+                        && !val.Equals("false", StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (IsFilled(acc.IsHomeopathicDoctor)) filledFieldsCount++;
+                if (IsFilled(acc.WorkType)) filledFieldsCount++;
+                if (IsFilled(acc.HasComputer)) filledFieldsCount++;
+                if (IsFilled(acc.ClinicType)) filledFieldsCount++;
+                if (IsFilled(acc.Qualification)) filledFieldsCount++;
+                if (IsFilled(acc.CollegeName)) filledFieldsCount++;
+                if (IsFilled(acc.YearOfPassing)) filledFieldsCount++;
                 if (acc.TotalExperience.HasValue) filledFieldsCount++;
                 if (acc.YearsOfPractice.HasValue) filledFieldsCount++;
                 if (acc.AveragePatientFee.HasValue) filledFieldsCount++;
@@ -2654,8 +2668,10 @@ namespace Radar_CRM.Controllers
                 if (acc.Age.HasValue) filledFieldsCount++;
                 if (acc.PatientsPerDay.HasValue) filledFieldsCount++;
 
-                bool hasComputer = acc.HasComputer != "No" && !string.IsNullOrWhiteSpace(acc.HasComputer);
-                bool isHomeopath = acc.IsHomeopathicDoctor != "No" && acc.IsHomeopathicDoctor != "नहीं" && !string.IsNullOrWhiteSpace(acc.IsHomeopathicDoctor);
+                bool hasComputer = IsFilled(acc.HasComputer) && !acc.HasComputer.Equals("No", StringComparison.OrdinalIgnoreCase);
+                bool isHomeopath = IsFilled(acc.IsHomeopathicDoctor) &&
+                                   !acc.IsHomeopathicDoctor.Equals("No", StringComparison.OrdinalIgnoreCase) &&
+                                   !acc.IsHomeopathicDoctor.Equals("नहीं");
 
                 string profileStatus = "Not Completed";
                 if (filledFieldsCount > 4 && hasComputer && isHomeopath)
@@ -2681,11 +2697,13 @@ namespace Radar_CRM.Controllers
                 acc.RadarOpusLicenseNo = GetValSafe("RadarOpusLicenseno");
                 acc.RadarOpusVersion = GetValSafe("RadarOpusversion");
                 acc.ProductPurchased = GetValSafe("Product/PackagePurchased");
-                acc.PurchaseDate = DateTime.TryParse(GetValSafe("PurchaseDate"), out DateTime pd) ? pd : null;
-                acc.PurchaseValue = GetDecimalSafe("PurchaseValue(â‚¹)");
                 acc.PaymentType = GetValSafe("PaymentType");
                 acc.PaymentStatus = GetValSafe("PaymentStatus");
                 acc.InvoiceNumber = GetValSafe("InvoiceNumber");
+
+                // 🚀 FIX: Explicit cast for Nullable Dates and Decimals
+                acc.PurchaseDate = DateTime.TryParse(GetValSafe("PurchaseDate"), out DateTime pd) ? (DateTime?)pd : null;
+                acc.PurchaseValue = GetDecimalSafe("PurchaseValue(â‚¹)");
 
                 // 🚀 --- AD & CAMPAIGN TRACKING --- 🚀
                 acc.MetaCampaignName = GetValSafe("MetaCampaignName");
@@ -2706,12 +2724,14 @@ namespace Radar_CRM.Controllers
                 acc.AdGroupName = GetValSafe("AdGroupName");
                 acc.Ad = GetValSafe("Ad");
                 acc.Gadconfigid = GetValSafe("GADCONFIGID");
-                acc.AdClickDate = DateTime.TryParse(GetValSafe("AdClickDate"), out DateTime acd) ? acd : null;
-                acc.CostPerClick = GetDecimalSafe("CostperClick");
-                acc.CostPerConversion = GetDecimalSafe("CostperConversion");
-                acc.ConversionExportedOn = DateTime.TryParse(GetValSafe("ConversionExportedOn"), out DateTime ceo) ? ceo : null;
                 acc.ConversionExportStatus = GetValSafe("ConversionExportStatus");
                 acc.ReasonForConversionFailure = GetValSafe("ReasonforConversionFailure");
+
+                // 🚀 FIX: Explicit cast for Nullable Dates and Decimals
+                acc.AdClickDate = DateTime.TryParse(GetValSafe("AdClickDate"), out DateTime acd) ? (DateTime?)acd : null;
+                acc.CostPerClick = GetDecimalSafe("CostperClick");
+                acc.CostPerConversion = GetDecimalSafe("CostperConversion");
+                acc.ConversionExportedOn = DateTime.TryParse(GetValSafe("ConversionExportedOn"), out DateTime ceo) ? (DateTime?)ceo : null;
 
                 accountsToInsert.Add(acc);
             }
