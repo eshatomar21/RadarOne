@@ -1306,7 +1306,6 @@ namespace Radar_CRM.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("City")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Country")
@@ -1337,18 +1336,15 @@ namespace Radar_CRM.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("State_Code")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("State_Name")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Tag")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ZipCode")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");

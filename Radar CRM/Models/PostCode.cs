@@ -27,11 +27,11 @@ namespace Radar_CRM.Models
         // LOCATION DATA
         // ==========================================
         [Name("Zipcodes", "ZipCode", "Zip Code")]
-        public string ZipCode { get; set; }
+        public string? ZipCode { get; set; }
 
-        public string City { get; set; }
-        public string State_Name { get; set; }
-        public string State_Code { get; set; }
+        public string? City { get; set; }
+        public string? State_Name { get; set; }
+        public string? State_Code { get; set; }
 
         // ==========================================
         // CONTACT INFO
