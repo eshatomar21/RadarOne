@@ -1978,7 +1978,7 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
          window.updateSelectedCountUIOnly();
      };
 
-    window.deleteSelected = function () {
+   window.deleteSelected = function () {
         const selectedIds = window.getPersistedSelection();
         if (selectedIds.length === 0) return;
 
@@ -1993,10 +1993,10 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
             confirmButtonText: 'Yes, delete them!'
         }).then((result) => {
             if (result.isConfirmed) {
-                fetch('/Tasks/BulkDelete', { 
+                // 🚀 FIX: Used @Url.Action to prevent 404 on live servers
+                fetch('@Url.Action("BulkDelete", "Tasks")', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // 🚀 FIX: Send the array directly to match the [FromBody] List<int>
                     body: JSON.stringify(selectedIds) 
                 })
                 .then(response => response.json())
@@ -2007,7 +2007,6 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
                             window.location.reload();
                         });
                     } else {
-                        // 🚀 FIX: Fallback string in case data.message is missing
                         Swal.fire('Error', data.message || "Failed to delete records.", 'error');
                     }
                 }).catch(() => Swal.fire('Error', "Network error occurred.", 'error'));
@@ -2102,7 +2101,7 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
         }
     };
 
-    window.executeMassUpdateAjax = function () {
+   window.executeMassUpdateAjax = function () {
         const fieldName = document.getElementById('massUpdateField').value;
         const newValueInput = document.getElementById('massUpdateValue');
         const newValue = newValueInput ? newValueInput.value : '';
@@ -2125,7 +2124,8 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
             IsGlobalSelectAll: false
         };
 
-        fetch('/Tasks/BulkUpdate', {
+        // 🚀 FIX: Used @Url.Action to prevent 404 on live servers
+        fetch('@Url.Action("BulkUpdate", "Tasks")', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
