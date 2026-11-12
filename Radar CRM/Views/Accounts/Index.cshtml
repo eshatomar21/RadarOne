@@ -1249,12 +1249,19 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                 </ul>
             </div>
             <!-- Hidden file input accepting CSV and Excel formats -->
-            <input type="file" id="fileUploadInput" accept=".csv, .xls, .xlsx" style="display: none;" onchange="this.form.submit();" />
+            <input type="file" id="fileUploadInput" accept=".csv, .xls, .xlsx" style="display: none;" />
 
-            <!-- Your existing button -->
-            <button type="button" class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
-                <i class="fa-solid fa-download"></i> Upload File
-            </button>
+<!-- Your existing upload button -->
+<button type="button" class="btn-saas" onclick="document.getElementById('fileUploadInput').click();">
+    <i class="fa-solid fa-cloud-arrow-up"></i> Upload File
+</button>
+
+<!-- 🚀 NEW: The Download Log Button (Hidden by default, revealed by JS after a successful update) -->
+<button id="btnDownloadUpdateLog" class="btn-saas" style="display: none; background-color: #fef3c7; color: #92400e; border-color: #fcd34d; font-weight: 600;" onclick="downloadUpdateLog()">
+    <i class="fa-solid fa-file-csv"></i> Download Records
+</button>
+
+           
            
             <div class="dropdown">
                 <button class="btn-saas" data-bs-toggle="dropdown" data-bs-auto-close="outside">
@@ -4129,7 +4136,7 @@ window.triggerBackendExport = function (module, format, event) {
                 uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
                 uploadBtn.disabled = true;
 
-               fetch('@Url.Action("UploadFile", "Accounts")', { // 🚀 NOTE: This will be "Leads" on the Leads Index page
+               fetch('@Url.Action("UploadFile", "Accounts")', { 
                     method: 'POST',
                     body: formData
                 })
@@ -4138,17 +4145,23 @@ window.triggerBackendExport = function (module, format, event) {
                         const data = await response.json();
 
                         let msg = `✅ Upload Process Completed!\n\n`;
-msg += `➕ Inserted: ${data.insertedCount} new records.\n`;
-msg += `🔄 Updated: ${data.updatedCount} existing records.\n`;
+                        msg += `➕ Inserted: ${data.insertedCount} new records.\n`;
+                        msg += `🔄 Updated: ${data.updatedCount} existing records.\n`;
 
-if (data.duplicatedCount > 0) {
-    msg += `⚠️ Duplicates merged/flagged: ${data.duplicatedCount} records.\n`;
-}
-if (data.skippedCount > 0) {
-    msg += `❌ Skipped: ${data.skippedCount} records.`;
-}
+                        if (data.duplicatedCount > 0) {
+                            msg += `⚠️ Duplicates merged/flagged: ${data.duplicatedCount} records.\n`;
+                        }
+                        if (data.skippedCount > 0) {
+                            msg += `❌ Skipped: ${data.skippedCount} records.`;
+                        }
 
-alert(msg);
+                        alert(msg);
+
+                        // 🚀 NEW: Save log filename to session storage before reloading so the button stays visible
+                        if (data.updateLogFile) {
+                            sessionStorage.setItem('crm_last_update_log', data.updateLogFile);
+                        }
+
                         window.location.reload();
                     } else {
                         const errText = await response.text();
@@ -4566,5 +4579,34 @@ function setupExcelResizing() {
             document.removeEventListener('mouseup', sideMouseUp);
         }
     }
+
+    // 🚀 NEW: Reveal the button on page load if an upload just happened
+document.addEventListener("DOMContentLoaded", function () {
+    const lastUpdateLog = sessionStorage.getItem('crm_last_update_log');
+    if (lastUpdateLog) {
+        const logBtn = document.getElementById('btnDownloadUpdateLog');
+        if (logBtn) {
+            logBtn.style.display = 'inline-flex';
+            logBtn.setAttribute('data-filename', lastUpdateLog);
+        }
+    }
+});
+
+// 🚀 NEW: Function to trigger the download and hide the button
+window.downloadUpdateLog = function() {
+    const btn = document.getElementById('btnDownloadUpdateLog');
+    const filename = btn.getAttribute('data-filename');
+    
+    if (filename) {
+        window.location.href = `/Accounts/DownloadUpdateLog?fileName=${encodeURIComponent(filename)}`;
+        
+        // Clear it so it doesn't show up on the next refresh
+        sessionStorage.removeItem('crm_last_update_log');
+        
+        setTimeout(() => {
+            btn.style.display = 'none';
+        }, 1000);
+    }
+};
 
 </script>
