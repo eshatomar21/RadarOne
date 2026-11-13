@@ -2650,7 +2650,10 @@ namespace Radar_CRM.Controllers
                 string rawCoOwnerId = GetValSafe("Co-Owner.id");
                 if (!string.IsNullOrWhiteSpace(zohoRecordId)) acc.ZohoRecordId = zohoRecordId;
 
-                acc.AccountOwnerId = "zcrm_1092392000000518001"; // Hardcoded Sitara ID
+                if (!isUpdate)
+                {
+                    acc.AccountOwnerId = "zcrm_1092392000000518001"; // Hardcoded Sitara ID
+                } // Hardcoded Sitara ID
                 if (!string.IsNullOrWhiteSpace(rawCoOwnerId) && validUserIds.Contains(rawCoOwnerId)) acc.CoOwnerId = rawCoOwnerId;
 
                 SetStr(v => acc.AccountName = v, "AccountName");
