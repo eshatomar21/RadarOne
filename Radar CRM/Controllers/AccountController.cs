@@ -734,6 +734,7 @@ namespace Radar_CRM.Controllers
                     return Json(new { success = false, message = "Field not found in database." });
 
                 var updatedAccountsList = new Dictionary<int, string>();
+                var failedValidations = new List<string>(); // 🚀 NEW: Track accounts that fail the profile validation
                 int chunkSize = 2000;
 
                 for (int i = 0; i < targetIds.Count; i += chunkSize)
@@ -743,6 +744,39 @@ namespace Radar_CRM.Controllers
 
                     foreach (var account in accountsToUpdate)
                     {
+
+                        // 🚀 NEW: Profile Validation Check before applying "Qualified" Status via Mass Update
+                        if (request.FieldName.Equals("QualificationStatus", StringComparison.OrdinalIgnoreCase) &&
+                            !string.IsNullOrWhiteSpace(request.NewValue) &&
+                            request.NewValue.Equals("Qualified", StringComparison.OrdinalIgnoreCase))
+                        {
+                            int filledFieldsCount = 0;
+                            if (!string.IsNullOrWhiteSpace(account.IsHomeopathicDoctor)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.WorkType)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.HasComputer)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.ClinicType)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.Qualification)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.CollegeName)) filledFieldsCount++;
+                            if (!string.IsNullOrWhiteSpace(account.YearOfPassing)) filledFieldsCount++;
+                            if (account.TotalExperience.HasValue) filledFieldsCount++;
+                            if (account.YearsOfPractice.HasValue) filledFieldsCount++;
+                            if (account.AveragePatientFee.HasValue) filledFieldsCount++;
+                            if (account.NumberOfClinics.HasValue) filledFieldsCount++;
+                            if (account.DateOfBirth.HasValue) filledFieldsCount++;
+                            if (account.Age.HasValue) filledFieldsCount++;
+                            if (account.PatientsPerDay.HasValue) filledFieldsCount++;
+
+                            bool hasComputer = account.HasComputer != "No";
+                            bool isHomeopath = account.IsHomeopathicDoctor != "No" && account.IsHomeopathicDoctor != "नहीं";
+
+                            // Must meet the threshold for "Completed" or "Strongly Completed"
+                            if (filledFieldsCount < 4 || !hasComputer || !isHomeopath)
+                            {
+                                failedValidations.Add(account.AccountName ?? "Unknown Account");
+                                continue; // Skip this account, do not update it to Qualified
+                            }
+                        }
+
                         object safeValue = null;
                         Type t = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
 
@@ -768,8 +802,20 @@ namespace Radar_CRM.Controllers
                         updatedAccountsList[account.Id] = account.AccountName ?? "Unknown Account";
                     }
 
-                    _context.UpdateRange(accountsToUpdate);
+                    // 🚀 Only update the ones that passed validation
+                    _context.UpdateRange(accountsToUpdate.Where(a => updatedAccountsList.ContainsKey(a.Id)));
                     await _context.SaveChangesAsync();
+
+                    // 🚀 NEW: If status was updated to Qualified, trigger the Lead conversion instantly
+                    if (request.FieldName.Equals("QualificationStatus", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(request.NewValue) &&
+                        request.NewValue.Equals("Qualified", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var account in accountsToUpdate.Where(a => updatedAccountsList.ContainsKey(a.Id)))
+                        {
+                            await CheckAndCreateContactFromAccountAsync(account);
+                        }
+                    }
                 }
 
                 // 🚀 TRIGGER EMAIL & TRANSFER TASKS IF OWNER WAS CHANGED
@@ -809,8 +855,8 @@ namespace Radar_CRM.Controllers
                     await NotifyNewOwnerAsync(request.NewValue, updatedAccountsList);
                 }
 
-                // 🚀 Return the count so the UI knows how many were processed
-                return Json(new { success = true, updatedCount = targetIds.Count });
+                // 🚀 Return the TRUE updated count and the failed Validations back to the UI
+                return Json(new { success = true, updatedCount = updatedAccountsList.Count, failedAccounts = failedValidations });
             }
             catch (Exception ex)
             {

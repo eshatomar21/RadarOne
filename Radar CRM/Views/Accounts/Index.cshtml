@@ -3732,7 +3732,7 @@ window.executeMassUpdateAjax = function() {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async response => {
+   .then(async response => {
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(errorText || `HTTP Error ${response.status}`);
@@ -3740,20 +3740,32 @@ window.executeMassUpdateAjax = function() {
         return response.json();
     })
     .then(data => {
-        if (data.success) {
-            try { bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide(); } catch(e){}
+    if (data.success) {
+        try { bootstrap.Modal.getInstance(document.getElementById('massUpdateModal')).hide(); } catch(e){}
 
-            // 🚀 FIX: Pull updated count from backend since C# processed it
-            alert(`Successfully updated ${data.updatedCount || (globalSelectActive ? 'all matching' : localIds.length)} records!`);
+        let alertMsg = `Successfully updated ${data.updatedCount} record(s)!`;
 
-            if (typeof window.clearGlobalSelection === 'function') window.clearGlobalSelection();
-            window.location.reload();
-        } else {
-            alert("Update failed: " + data.message);
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
-            btn.disabled = false;
+        // 🚀 Check if any accounts failed the qualification rules
+        if (data.failedAccounts && data.failedAccounts.length > 0) {
+            alertMsg += `\n\n⚠️ The following accounts could NOT be marked 'Qualified' because their Professional Profile & Software details are incomplete:\n`;
+            data.failedAccounts.forEach(name => {
+                alertMsg += `- ${name}\n`;
+            });
+            alertMsg += `\nPlease update their profile details before qualifying them.`;
         }
-    })
+
+        // Show the popup
+        alert(alertMsg);
+
+        if (typeof window.clearGlobalSelection === 'function') window.clearGlobalSelection();
+        window.location.reload();
+    } else {
+        alert("Update failed: " + data.message);
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Apply Update';
+        btn.disabled = false;
+    }
+})
+
     .catch((err) => {
         console.error("Mass Update Error:", err);
         alert("Connection error! Please check the browser console (F12) for exact details.");
