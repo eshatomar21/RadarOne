@@ -189,8 +189,17 @@ namespace Radar_CRM.Controllers
                         (a.AlternateMobile != null && a.AlternateMobile.Contains(last10Digits)));
 
                     int parsedDuration = 0;
-                    if (log.TryGetProperty("duration", out var durNode) && durNode.ValueKind == JsonValueKind.String)
-                        int.TryParse(durNode.GetString(), out parsedDuration);
+                    if (log.TryGetProperty("duration", out var durNode))
+                    {
+                        if (durNode.ValueKind == JsonValueKind.Number)
+                        {
+                            parsedDuration = durNode.GetInt32();
+                        }
+                        else if (durNode.ValueKind == JsonValueKind.String)
+                        {
+                            int.TryParse(durNode.GetString(), out parsedDuration);
+                        }
+                    }
 
                     string empNo = log.TryGetProperty("emp_number", out var eNum) ? eNum.GetString() : "";
                     string empName = "Unknown Agent";

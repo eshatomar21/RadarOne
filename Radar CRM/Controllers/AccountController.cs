@@ -1286,7 +1286,9 @@ namespace Radar_CRM.Controllers
 
                         // Dynamically compare every single property on the Account
                         var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                            .Where(p => !excludedAuditFields.Contains(p.Name) && (!p.PropertyType.IsGenericType || p.PropertyType.GetGenericTypeDefinition() != typeof(List<>)));
+                            .Where(p => !excludedAuditFields.Contains(p.Name) &&
+                                        (!p.PropertyType.IsClass || p.PropertyType == typeof(string)) &&
+                                        (!typeof(System.Collections.IEnumerable).IsAssignableFrom(p.PropertyType) || p.PropertyType == typeof(string)));
 
                         foreach (var prop in properties)
                         {
@@ -1297,12 +1299,14 @@ namespace Radar_CRM.Controllers
                             string oldStr = oldObj?.ToString()?.Trim() ?? "";
                             string newStr = newObj?.ToString()?.Trim() ?? "";
 
-                            string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
-                            string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
+                            if (oldStr.Equals("-None-", StringComparison.OrdinalIgnoreCase) || oldStr.Equals("None", StringComparison.OrdinalIgnoreCase)) oldStr = "";
+                            if (newStr.Equals("-None-", StringComparison.OrdinalIgnoreCase) || newStr.Equals("None", StringComparison.OrdinalIgnoreCase)) newStr = "";
 
-                            // If the field TRULY changed, log it!
-                            if (oldVal != newVal)
+                            // If the field TRULY changed (ignoring case differences like 'own' to 'Own'), log it!
+                            if (!string.Equals(oldStr, newStr, StringComparison.OrdinalIgnoreCase))
                             {
+                                string oldVal = string.IsNullOrEmpty(oldStr) ? "blank value" : oldStr;
+                                string newVal = string.IsNullOrEmpty(newStr) ? "blank value" : newStr;
                                 string displayFieldName = prop.Name;
 
                                 // 🚀 RESOLVE OWNER ID TO ACTUAL NAME FOR TIMELINE
@@ -2568,6 +2572,12 @@ namespace Radar_CRM.Controllers
             var accountsToUpdate = new HashSet<Account>();
             var skippedRecords = new List<string>();
 
+            // 🚀 NEW: Setup for Timeline Event Tracking during Upload
+            var bulkTimelineEvents = new List<TimelineEvent>();
+            string currentUserIdForUpload = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+            string currentUserNameForUpload = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                ? User.Identity.Name : "System Upload";
+
             int duplicatedCount = 0;
             int currentRow = 1;
 
@@ -2715,17 +2725,36 @@ namespace Radar_CRM.Controllers
                 SetStr(v => acc.AccountType = v, "AccountType");
 
                 // --- Tracking Dates ---
-                if (DateTime.TryParse(GetValSafe("DateofEntry"), out DateTime doe)) acc.DateOfEntry = doe;
-                else if (!isUpdate) acc.DateOfEntry = DateTime.Now;
+                // --- Tracking Dates ---
+                if (!isUpdate)
+                {
+                    // 🚀 FIX: ONLY set Creation Dates if it's a completely NEW record. 
+                    // If it's a duplicate (update), we leave the database's original Created Date completely untouched.
+                    if (DateTime.TryParse(GetValSafe("DateofEntry"), out DateTime doe)) acc.DateOfEntry = doe;
+                    else acc.DateOfEntry = DateTime.Now;
 
-                if (DateTime.TryParse(GetValSafe("Created Time"), out DateTime cdt)) acc.CreatedDateAndTime = cdt;
-                else if (!isUpdate) acc.CreatedDateAndTime = DateTime.Now;
+                    if (DateTime.TryParse(GetValSafe("Created Time"), out DateTime cdt)) acc.CreatedDateAndTime = cdt;
+                    else acc.CreatedDateAndTime = DateTime.Now;
 
-                if (DateTime.TryParse(GetValSafe("Modified Time"), out DateTime mdt)) acc.ModifiedDateAndTime = mdt;
-                else if (!isUpdate) acc.ModifiedDateAndTime = DateTime.Now;
+                    SetStr(v => acc.CreatedBy = v, "CreatedBy");
+                }
 
-                SetStr(v => acc.CreatedBy = v, "CreatedBy");
-                SetStr(v => acc.ModifiedBy = v, "ModifiedBy");
+                // 🚀 FIX: ALWAYS force the Modified Date to update to Right Now whenever an upload happens, especially for duplicates
+                acc.ModifiedDateAndTime = DateTime.Now;
+
+                string csvModifiedBy = GetValSafe("ModifiedBy");
+                if (!string.IsNullOrWhiteSpace(csvModifiedBy))
+                {
+                    acc.ModifiedBy = csvModifiedBy;
+                }
+                else if (isUpdate)
+                {
+                    // Auto-log who updated it via the upload
+                    string currentUserStr = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                        ? User.Identity.Name
+                        : "System Upload";
+                    acc.ModifiedBy = $"{currentUserStr} (Bulk Upload) on {DateTime.Now.ToString("MMM dd, yyyy - hh:mm tt")}";
+                }
 
                 string rawIsDup = GetValSafe("IsDuplicated");
                 if (bool.TryParse(rawIsDup, out bool isDup)) acc.IsDuplicated = isDup || isDuplicateFlagged;
@@ -2857,6 +2886,14 @@ namespace Radar_CRM.Controllers
                 SetDec(v => acc.CostPerConversion = v, "CostperConversion");
                 SetDate(v => acc.ConversionExportedOn = v, "ConversionExportedOn");
 
+                // 🚀 CRITICAL FIX: Ensure AccountName is NEVER null before it gets added to the Insert/Update lists
+                if (string.IsNullOrWhiteSpace(acc.AccountName))
+                {
+                    acc.AccountName = !string.IsNullOrWhiteSpace(acc.ContactPersonName)
+                        ? acc.ContactPersonName
+                        : "Unknown Account";
+                }
+
                 // 🚀 NEW: Compare old vs new and log changes to CSV
                 bool hasActualChanges = false;
 
@@ -2870,17 +2907,42 @@ namespace Radar_CRM.Controllers
 
                     foreach (var prop in typeof(Account).GetProperties().Where(p => p.CanWrite))
                     {
-                        // Skip system tracking fields and complex relational objects (like Lists or Virtual properties)
-                        if (ignoredFields.Contains(prop.Name) || (prop.PropertyType.IsClass && prop.PropertyType != typeof(string)))
+                        // 🚀 FIX: Completely block all virtual lists, interfaces, and relational collections (like PaymentRows)
+                        if (ignoredFields.Contains(prop.Name) ||
+                            (prop.PropertyType.IsClass && prop.PropertyType != typeof(string)) ||
+                            (typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType) && prop.PropertyType != typeof(string)))
                             continue;
 
                         string oldVal = oldValues.ContainsKey(prop.Name) ? (oldValues[prop.Name] ?? "").Trim() : "";
                         string newVal = (prop.GetValue(acc)?.ToString() ?? "").Trim();
 
+                        // 🚀 Treat "-None-" and "None" as blank
+                        if (oldVal.Equals("-None-", StringComparison.OrdinalIgnoreCase) || oldVal.Equals("None", StringComparison.OrdinalIgnoreCase)) oldVal = "";
+                        if (newVal.Equals("-None-", StringComparison.OrdinalIgnoreCase) || newVal.Equals("None", StringComparison.OrdinalIgnoreCase)) newVal = "";
+
                         // Compare them (ignoring case and whitespace differences)
                         if (!string.Equals(oldVal, newVal, StringComparison.OrdinalIgnoreCase))
                         {
                             changedFields.Add(prop.Name);
+
+                            // 🚀 TRACK UPDATED FIELDS FOR TIMELINE
+                            string oldValDisplay = string.IsNullOrEmpty(oldVal) ? "blank value" : oldVal;
+                            string newValDisplay = string.IsNullOrEmpty(newVal) ? "blank value" : newVal;
+                            string displayFieldName = prop.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) ? prop.Name.Replace("Id", "") : prop.Name;
+
+                            bulkTimelineEvents.Add(new TimelineEvent
+                            {
+                                EntityType = "Account",
+                                EntityId = acc.Id, // Exists because this is an update
+                                EventType = "FieldUpdate",
+                                FieldName = prop.Name,
+                                OldValue = oldValDisplay,
+                                NewValue = newValDisplay,
+                                ActionDescription = $"{displayFieldName} was updated from <b>{oldValDisplay}</b> to <b>{newValDisplay}</b> via Bulk Upload",
+                                CreatedById = currentUserIdForUpload,
+                                CreatedByName = currentUserNameForUpload,
+                                CreatedDate = DateTime.Now
+                            });
                         }
                     }
 
@@ -2970,15 +3032,98 @@ namespace Radar_CRM.Controllers
 
                 _context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-                // 🚀 Execute Inserts & Updates
+                // 1. Execute Inserts & Updates for Accounts
                 if (accountsToInsert.Any()) await _context.Accounts.AddRangeAsync(accountsToInsert.ToList());
                 if (accountsToUpdate.Any()) _context.Accounts.UpdateRange(accountsToUpdate.ToList());
 
                 await _context.SaveChangesAsync();
+
+                // 🚀 CRITICAL FIX: TURN THE TRACKER BACK ON HERE!
+                // Without this, Entity Framework will silently ignore all Timeline Events below.
+                _context.ChangeTracker.AutoDetectChangesEnabled = true;
+
+                // 🚀 NEW: Generate Creation Timeline Events for freshly inserted accounts (now that they have database IDs)
+                // 🚀 NEW: Generate Creation AND Field Population Events for freshly inserted accounts
+                if (accountsToInsert.Any())
+                {
+                    var excludedAuditFields = new HashSet<string> { "Id", "ModifiedDateAndTime", "ModifiedBy", "CreatedBy", "CreatedDateAndTime", "DateOfEntry", "ZohoRecordId", "IsDuplicated" };
+
+                    foreach (var newAcc in accountsToInsert)
+                    {
+                        // 1. Log the base Creation event
+                        bulkTimelineEvents.Add(new TimelineEvent
+                        {
+                            EntityType = "Account",
+                            EntityId = newAcc.Id,
+                            EventType = "Creation",
+                            FieldName = "Record",
+                            OldValue = "",
+                            NewValue = "",
+                            ActionDescription = "Account was created via Bulk Upload",
+                            CreatedById = currentUserIdForUpload,
+                            CreatedByName = currentUserNameForUpload,
+                            CreatedDate = DateTime.Now
+                        });
+
+                        // 2. 🚀 Log every individual field that was filled with a value from the CSV
+                        foreach (var prop in typeof(Account).GetProperties().Where(p => p.CanWrite))
+                        {
+                            // 🚀 FIX: Completely block all virtual lists, interfaces, and relational collections (like PaymentRows)
+                            if (excludedAuditFields.Contains(prop.Name) ||
+                                (prop.PropertyType.IsClass && prop.PropertyType != typeof(string)) ||
+                                (typeof(System.Collections.IEnumerable).IsAssignableFrom(prop.PropertyType) && prop.PropertyType != typeof(string)))
+                                continue;
+
+                            string newVal = (prop.GetValue(newAcc)?.ToString() ?? "").Trim();
+
+                            // Treat "None" as blank
+                            if (newVal.Equals("-None-", StringComparison.OrdinalIgnoreCase) || newVal.Equals("None", StringComparison.OrdinalIgnoreCase))
+                                newVal = "";
+
+                            // If the field actually has a value, log that it changed from blank to this value
+                            if (!string.IsNullOrEmpty(newVal))
+                            {
+                                string displayFieldName = prop.Name;
+
+                                // Resolve User ID to User Name for the timeline display
+                                if (prop.Name.EndsWith("OwnerId", StringComparison.OrdinalIgnoreCase) || prop.Name == "CoOwnerId")
+                                {
+                                    displayFieldName = prop.Name.Replace("Id", ""); // e.g., AccountOwnerId -> AccountOwner
+                                    var ownerUser = await _context.Users.FindAsync(newVal);
+                                    if (ownerUser != null) newVal = ownerUser.fullName ?? ownerUser.FirstName ?? newVal;
+                                }
+
+                                bulkTimelineEvents.Add(new TimelineEvent
+                                {
+                                    EntityType = "Account",
+                                    EntityId = newAcc.Id,
+                                    EventType = "FieldUpdate",
+                                    FieldName = prop.Name,
+                                    OldValue = "blank value",
+                                    NewValue = newVal,
+                                    ActionDescription = $"{displayFieldName} was updated from <b>blank value</b> to <b>{newVal}</b> via Bulk Upload",
+                                    CreatedById = currentUserIdForUpload,
+                                    CreatedByName = currentUserNameForUpload,
+                                    CreatedDate = DateTime.Now
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 🚀 NEW: Save all Bulk Timeline Events to DB
+                if (bulkTimelineEvents.Any())
+                {
+                    await _context.TimelineEvents.AddRangeAsync(bulkTimelineEvents);
+                    await _context.SaveChangesAsync();
+                }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Failed at Row {currentRow} -> {ex.Message}");
+                // 🚀 FIX: Unwrap the InnerException to reveal the TRUE SQL database error 
+                // (e.g., "String or binary data would be truncated in table 'Accounts', column 'Description'")
+                string trueError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, $"Upload DB Error -> {trueError}");
             }
             finally
             {

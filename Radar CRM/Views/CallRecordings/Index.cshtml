@@ -219,8 +219,16 @@
                                     <div class="fw-bold text-dark">
                                         <i class="fa-regular fa-clock text-muted me-1 small"></i> @call.CallDate.ToString("hh:mm tt")
                                     </div>
+
+                                    @{
+                                        TimeSpan time = TimeSpan.FromSeconds(call.DurationSeconds);
+                                        string formattedDuration = time.Hours > 0
+                                            ? $"{time.Hours}h {time.Minutes}m {time.Seconds}s"
+                                            : $"{time.Minutes}m {time.Seconds}s";
+                                    }
+
                                     <div class="text-muted mt-1 fw-semibold" style="font-size: 0.8rem;">
-                                        @(call.DurationSeconds / 60)m @(call.DurationSeconds % 60)s
+                                        <i class="fa-solid fa-stopwatch me-1"></i> @formattedDuration
                                     </div>
                                 </td>
                                 <td>
@@ -343,7 +351,7 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Syncing...';
             btn.disabled = true;
 
-            fetch('/api/webhook/import-historical-callyzer', { method: 'POST' })
+            fetch('@Url.Content("~/api/webhook/import-historical-callyzer")', { method: 'POST' })
                 .then(async response => {
                     if (!response.ok) {
                         const err = await response.text();
@@ -374,7 +382,7 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Queuing...';
             btn.disabled = true;
 
-            fetch('/api/webhook/fix-processing-records', { method: 'POST' })
+           fetch('@Url.Content("~/api/webhook/fix-processing-records")', { method: 'POST' })
                 .then(async response => {
                     if (!response.ok) {
                         const err = await response.text();
