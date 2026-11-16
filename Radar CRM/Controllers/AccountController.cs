@@ -912,8 +912,8 @@ namespace Radar_CRM.Controllers
                 string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 string finalOwnerId = string.IsNullOrWhiteSpace(ownerId) ? currentUserId : ownerId;
 
-                // 2. Safely resolve the correct Name for the UI
-                string ownerName = User.Identity?.Name ?? "System User"; // Default to identity name
+                // 2. Safely resolve the correct Name for the UI (Declared once here!)
+                string ownerName = User.Identity?.Name ?? "System User";
 
                 if (!string.IsNullOrWhiteSpace(finalOwnerId))
                 {
@@ -952,6 +952,25 @@ namespace Radar_CRM.Controllers
                 }
 
                 _context.Note.Add(note);
+
+                // 🚀 TIMELINE EVENT (Re-using the existing ownerName variable)
+                var timelineEvent = new TimelineEvent
+                {
+                    EntityType = "Account",
+                    EntityId = accountId,
+                    EventType = "Activity",
+                    FieldName = "Note",
+                    OldValue = "",
+                    NewValue = noteTitle ?? "New Note",
+                    ActionDescription = string.IsNullOrWhiteSpace(noteTitle)
+                        ? "A new note was added."
+                        : $"A new note was added: <b>{noteTitle}</b>",
+                    CreatedById = finalOwnerId,
+                    CreatedByName = ownerName,
+                    CreatedDate = DateTime.Now
+                };
+                _context.TimelineEvents.Add(timelineEvent);
+
                 await _context.SaveChangesAsync();
 
                 return Json(new
@@ -1487,6 +1506,26 @@ namespace Radar_CRM.Controllers
                         }
 
                         _context.Note.Add(newNote);
+
+                        // 🚀 NEW: Add Timeline Event for Bulk/Form Note Creation
+                        string currentUserIdForTimeline = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+                        string currentUserNameForTimeline = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                            ? User.Identity.Name : "System User";
+
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Account",
+                            EntityId = recordId,
+                            EventType = "Activity",
+                            FieldName = "Note",
+                            OldValue = "",
+                            NewValue = "New Note",
+                            ActionDescription = "A new note was attached to the account.",
+                            CreatedById = currentUserIdForTimeline,
+                            CreatedByName = currentUserNameForTimeline,
+                            CreatedDate = DateTime.Now
+                        };
+                        _context.TimelineEvents.Add(timelineEvent);
                     }
                 }
                 await _context.SaveChangesAsync();
@@ -2582,7 +2621,7 @@ namespace Radar_CRM.Controllers
             int currentRow = 1;
 
             // Load existing data for ultra-fast checking
-            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id).ToList());
+            var validUserIds = new HashSet<string>(_context.Users.Select(u => u.Id!).ToList());
 
             var existingAccountsDb = await _context.Accounts
                 .Where(a => !string.IsNullOrEmpty(a.ZohoRecordId))

@@ -395,7 +395,7 @@ namespace Radar_CRM.Controllers
             {
                 var note = new Notes
                 {
-                    TaskId = taskId, // Mapped specifically to Task
+                    TaskId = taskId,
                     NoteOwnerId = string.IsNullOrWhiteSpace(ownerId) ? null : ownerId,
                     NoteTitle = noteTitle ?? "",
                     NoteContent = description ?? "",
@@ -421,14 +421,34 @@ namespace Radar_CRM.Controllers
                 }
 
                 _context.Note.Add(note);
-                await _context.SaveChangesAsync();
 
+                // 🚀 RESOLVE OWNER NAME (Declared only ONCE here!)
                 string ownerName = "System User";
                 if (!string.IsNullOrEmpty(note.NoteOwnerId))
                 {
                     var user = await _context.Users.FindAsync(note.NoteOwnerId);
                     if (user != null) ownerName = user.fullName ?? user.FirstName;
                 }
+
+                // 🚀 TIMELINE EVENT
+                var timelineEvent = new TimelineEvent
+                {
+                    EntityType = "Task",
+                    EntityId = taskId,
+                    EventType = "Activity",
+                    FieldName = "Note",
+                    OldValue = "",
+                    NewValue = noteTitle ?? "New Note",
+                    ActionDescription = string.IsNullOrWhiteSpace(noteTitle)
+                        ? "A new note was added."
+                        : $"A new note was added: <b>{noteTitle}</b>",
+                    CreatedById = note.NoteOwnerId,
+                    CreatedByName = ownerName,
+                    CreatedDate = DateTime.Now
+                };
+                _context.TimelineEvents.Add(timelineEvent);
+
+                await _context.SaveChangesAsync();
 
                 return Json(new
                 {
@@ -531,6 +551,53 @@ namespace Radar_CRM.Controllers
 
                     _context.Tasks.Add(taskModel);
                     await _context.SaveChangesAsync();
+
+                    // =========================================================
+                    // 🚀 NEW: TIMELINE EVENT FOR TASK CREATION
+                    // =========================================================
+                    string currentUserIdForTimeline = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+                    string currentUserNameForTimeline = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                        ? User.Identity.Name : "System User";
+
+                    // Track on Account Timeline
+                    if (taskModel.AccountId.HasValue && taskModel.AccountId.Value > 0)
+                    {
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Account",
+                            EntityId = taskModel.AccountId.Value,
+                            EventType = "Activity",
+                            FieldName = "Task",
+                            OldValue = "",
+                            NewValue = taskModel.Subject ?? "New Task",
+                            ActionDescription = $"A new task was created: <b>{taskModel.Subject}</b>",
+                            CreatedById = currentUserIdForTimeline,
+                            CreatedByName = currentUserNameForTimeline,
+                            CreatedDate = DateTime.Now
+                        };
+                        _context.TimelineEvents.Add(timelineEvent);
+                    }
+                    // Track on Lead Timeline (if attached to a Lead instead of Account)
+                    else if (taskModel.LeadId.HasValue && taskModel.LeadId.Value > 0)
+                    {
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Lead",
+                            EntityId = taskModel.LeadId.Value,
+                            EventType = "Activity",
+                            FieldName = "Task",
+                            OldValue = "",
+                            NewValue = taskModel.Subject ?? "New Task",
+                            ActionDescription = $"A new task was created: <b>{taskModel.Subject}</b>",
+                            CreatedById = currentUserIdForTimeline,
+                            CreatedByName = currentUserNameForTimeline,
+                            CreatedDate = DateTime.Now
+                        };
+                        _context.TimelineEvents.Add(timelineEvent);
+                    }
+
+                    await _context.SaveChangesAsync(); // Save the timeline event
+                                                       // =========================================================
 
                     await SaveNotesAsync(taskModel.Id, SavedNoteDesc, SavedNoteDateTime);
 
@@ -1155,6 +1222,26 @@ namespace Radar_CRM.Controllers
                             NoteOwnerId = safeOwnerId
                         };
                         _context.Note.Add(newNote);
+
+                        // 🚀 NEW: Add Timeline Event for Bulk/Form Note Creation
+                        string currentUserIdForTimeline = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "System";
+                        string currentUserNameForTimeline = User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name)
+                            ? User.Identity.Name : "System User";
+
+                        var timelineEvent = new TimelineEvent
+                        {
+                            EntityType = "Task",
+                            EntityId = taskId,
+                            EventType = "Activity",
+                            FieldName = "Note",
+                            OldValue = "",
+                            NewValue = "New Note",
+                            ActionDescription = "A new note was attached to the task.",
+                            CreatedById = currentUserIdForTimeline,
+                            CreatedByName = currentUserNameForTimeline,
+                            CreatedDate = DateTime.Now
+                        };
+                        _context.TimelineEvents.Add(timelineEvent);
                     }
                 }
                 await _context.SaveChangesAsync();

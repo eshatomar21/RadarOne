@@ -1126,14 +1126,35 @@ namespace Radar_CRM.Controllers
                 }
 
                 _context.Note.Add(note);
-                await _context.SaveChangesAsync();
 
+                // 🚀 RESOLVE OWNER NAME (Declared only ONCE here!)
                 string ownerName = "System User";
                 if (!string.IsNullOrEmpty(note.NoteOwnerId))
                 {
                     var user = await _context.Users.FindAsync(note.NoteOwnerId);
                     if (user != null) ownerName = user.fullName ?? user.FirstName;
                 }
+
+                // 🚀 TIMELINE EVENT
+                var timelineEvent = new TimelineEvent
+                {
+                    EntityType = "Lead",
+                    EntityId = leadId,
+                    EventType = "Activity",
+                    FieldName = "Note",
+                    OldValue = "",
+                    NewValue = noteTitle ?? "New Note",
+                    ActionDescription = string.IsNullOrWhiteSpace(noteTitle)
+                        ? "A new note was added."
+                        : $"A new note was added: <b>{noteTitle}</b>",
+                    CreatedById = note.NoteOwnerId,
+                    CreatedByName = ownerName,
+                    CreatedDate = DateTime.Now
+                };
+                _context.TimelineEvents.Add(timelineEvent);
+
+                // 🚀 Save both the Note and the Timeline Event at the same time
+                await _context.SaveChangesAsync();
 
                 return Json(new
                 {
@@ -1181,6 +1202,7 @@ namespace Radar_CRM.Controllers
                     .ToListAsync();
 
                 var tasksToInsert = new List<CrmTaskModel>();
+                var timelineEventsToInsert = new List<TimelineEvent>(); // 🚀 NEW
 
                 foreach (var lead in selectedLeads)
                 {
@@ -1198,7 +1220,23 @@ namespace Radar_CRM.Controllers
                     };
 
                     tasksToInsert.Add(newTask);
+
+                    // 🚀 NEW: GENERATE TIMELINE EVENT FOR EACH TASK
+                    timelineEventsToInsert.Add(new TimelineEvent
+                    {
+                        EntityType = "Lead",
+                        EntityId = lead.Id,
+                        EventType = "Activity",
+                        FieldName = "Task",
+                        OldValue = "",
+                        NewValue = request.Subject.Trim(),
+                        ActionDescription = $"A new task was created: <b>{request.Subject.Trim()}</b>",
+                        CreatedById = currentUserId,
+                        CreatedByName = currentUserName,
+                        CreatedDate = DateTime.Now
+                    });
                 }
+            
 
                 if (tasksToInsert.Any())
                 {
@@ -1561,6 +1599,22 @@ namespace Radar_CRM.Controllers
                                     CreatedDateTime = DateTime.TryParse(newNoteDates.Count > i ? newNoteDates[i] : "", out DateTime dt) ? dt : DateTime.Now
                                 };
                                 _context.Note.Add(newNote);
+
+                                // 🚀 NEW: TIMELINE EVENT FOR FORM NOTE
+                                var timelineEvent = new TimelineEvent
+                                {
+                                    EntityType = "Lead",
+                                    EntityId = lead.Id,
+                                    EventType = "Activity",
+                                    FieldName = "Note",
+                                    OldValue = "",
+                                    NewValue = "New Note",
+                                    ActionDescription = "A new note was attached to the lead.",
+                                    CreatedById = currentUserId, // Grabbed from top of Edit method
+                                    CreatedByName = currentUser, // Grabbed from top of Edit method
+                                    CreatedDate = DateTime.Now
+                                };
+                                _context.TimelineEvents.Add(timelineEvent);
                             }
                         }
                         // Save the notes so they are immediately available for the Deal Transfer query
