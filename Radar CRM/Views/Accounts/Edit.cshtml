@@ -1781,27 +1781,17 @@
                 <div class="col-md-12 mt-3 mb-3"><h6 class="border-bottom pb-2 fw-bold text-muted">System & Tracking</h6></div>
 
                 <!-- 🚀 NEW: Is Duplicated & Description on a single row -->
-                <div class="col-md-6">
-                    <div class="z-field-row">
-                        <div class="z-label">Is Duplicated?</div>
-                        <div class="z-input-wrapper d-flex align-items-center">
-                            @if (Model.IsDuplicated)
-                            {
-                                <span class="badge px-3 py-2 shadow-sm" style="background-color: #fef2f2; color: #dc2626; border: 1px solid #f87171; font-size: 0.85rem;">
-                                    <i class="fa-solid fa-check me-1"></i> Yes, Duplicate
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="badge px-3 py-2 shadow-sm" style="background-color: #f0fdf4; color: #16a34a; border: 1px solid #4ade80; font-size: 0.85rem;">
-                                    <i class="fa-solid fa-xmark me-1"></i> No
-                                </span>
-                            }
-                            <!-- Hidden input ensures the database value isn't lost on save -->
-                            <input type="hidden" asp-for="IsDuplicated" />
-                        </div>
-                    </div>
-                </div>
+               <div class="col-md-6">
+    <div class="z-field-row">
+        <div class="z-label">Is Duplicated?</div>
+        <div class="z-input-wrapper">
+            <select asp-for="IsDuplicated" class="z-input">
+                <option value="true">Yes, Duplicate</option>
+                <option value="false">No</option>
+            </select>
+        </div>
+    </div>
+</div>
 
                 <div class="col-md-6">
                     <div class="z-field-row" style="align-items: flex-start;">

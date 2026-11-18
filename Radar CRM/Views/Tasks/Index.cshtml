@@ -639,6 +639,14 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
                         colIndex++;
                     }
                 }
+                        <th data-col-index="@tableProps.Length" data-col-name="Module">
+                            <div class="th-content d-flex justify-content-between align-items-center w-100">
+                                <span class="text-truncate flex-grow-1" title="Module">Module</span>
+                                <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                    <i class="fa-solid fa-sort text-muted header-action-icon" onclick="toggleSort(event, @tableProps.Length)" title="Sort"></i>
+                                </div>
+                            </div>
+                        </th>
                 <th class="dummy-filler-col"></th>
                 <th class="sticky-actions text-center">
                     <i class="fa-solid fa-bolt text-muted me-1"></i> Actions
@@ -791,6 +799,25 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
                                         tdIndex++;
                                     }
                                 }
+
+                                <td data-col-index="@tableProps.Length">
+                                    @{
+                                        var moduleDict = ViewBag.TaskModules as Dictionary<int, string>;
+                                        string moduleName = moduleDict != null && moduleDict.ContainsKey(item.Id) ? moduleDict[item.Id] : "General";
+                                    }
+                                    @if (moduleName == "Lead")
+                                    {
+                                        <span class="badge-soft-warning"><i class="fa-solid fa-user-tie me-1"></i> Lead</span>
+                                    }
+                                    else if (moduleName == "Account")
+                                    {
+                                        <span class="badge-soft-secondary" style="background-color: #e0e7ff; color: #3730a3;"><i class="fa-solid fa-building me-1"></i> Account</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-soft-secondary">@moduleName</span>
+                                    }
+                                </td>
                         <td class="dummy-filler-col"></td>
                         <td class="sticky-actions text-center" onclick="event.stopPropagation()">
                             <div class="d-flex align-items-center justify-content-center gap-2">
@@ -1085,7 +1112,7 @@ var excludedFields = new[] { "TaskOwnerId", "LeadId", "AccountId", "DealId", "Ac
     // ==========================================
     // 1. GLOBAL VARIABLES & INITIALIZATION
     // ==========================================
-    const defaultVisibleColumns = ["Subject", "TaskOwner", "DueDate", "Status", "Priority"];
+    const defaultVisibleColumns = ["Subject", "TaskOwner", "DueDate", "Status", "Priority", "Module"];
     let currentNoteTaskId = null;
 
     let allRows = [];

@@ -315,6 +315,12 @@ namespace Radar_CRM.Controllers
             // Add this right before return View(tasks);
             ViewBag.AllMatchingIds = await query.Select(t => t.Id).ToListAsync();
 
+            // Add this right before: return View(tasks);
+            ViewBag.TaskModules = tasks.ToDictionary(
+                t => t.Id,
+                t => t.LeadId.HasValue ? "Lead" : (t.AccountId.HasValue ? "Account" : "General")
+            );
+
             return View(tasks);
         }
 

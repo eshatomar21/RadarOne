@@ -356,13 +356,52 @@ namespace Radar_CRM.Controllers
                                     }
                                 }
                                 // 🚀 ADD THIS NEW BLOCK TO HANDLE TRUE/FALSE (BOOLEANS)
+                                // 🚀 FIX: HANDLE BOOLEANS, NULLS, AND COMMA-SEPARATED MULTI-SELECTS
                                 else if (propertyInfo.PropertyType == typeof(bool) || propertyInfo.PropertyType == typeof(bool?))
                                 {
-                                    if (bool.TryParse(safeValue, out bool boolVal))
+                                    var boolValues = safeValue.Split(',').Select(v => v.Trim()).ToList();
+                                    System.Linq.Expressions.Expression boolOrConditions = null;
+
+                                    foreach (var bStr in boolValues)
                                     {
-                                        var valExpr = System.Linq.Expressions.Expression.Constant(boolVal, propertyInfo.PropertyType);
-                                        if (f.Condition == "is") conditionExpr = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
-                                        else if (f.Condition == "is_not") conditionExpr = System.Linq.Expressions.Expression.NotEqual(propExpr, valExpr);
+                                        if (bool.TryParse(bStr, out bool boolVal))
+                                        {
+                                            System.Linq.Expressions.Expression singleCondition;
+
+                                            // If the database column allows NULLs
+                                            if (propertyInfo.PropertyType == typeof(bool?))
+                                            {
+                                                var valExpr = System.Linq.Expressions.Expression.Constant(boolVal, typeof(bool?));
+
+                                                if (boolVal == false)
+                                                {
+                                                    // 🚀 CRITICAL: If looking for "False", also include records where IsDuplicated is NULL
+                                                    var isNull = System.Linq.Expressions.Expression.Equal(propExpr, System.Linq.Expressions.Expression.Constant(null, typeof(bool?)));
+                                                    var isFalse = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                                    singleCondition = System.Linq.Expressions.Expression.OrElse(isNull, isFalse);
+                                                }
+                                                else
+                                                {
+                                                    singleCondition = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                                }
+                                            }
+                                            else // Standard non-nullable bool
+                                            {
+                                                var valExpr = System.Linq.Expressions.Expression.Constant(boolVal, typeof(bool));
+                                                singleCondition = System.Linq.Expressions.Expression.Equal(propExpr, valExpr);
+                                            }
+
+                                            // Chain multiple selections with OR (e.g. if they selected both True and False)
+                                            boolOrConditions = boolOrConditions == null ? singleCondition : System.Linq.Expressions.Expression.OrElse(boolOrConditions, singleCondition);
+                                        }
+                                    }
+
+                                    if (boolOrConditions != null)
+                                    {
+                                        if (f.Condition == "is_not")
+                                            conditionExpr = System.Linq.Expressions.Expression.Not(boolOrConditions);
+                                        else
+                                            conditionExpr = boolOrConditions;
                                     }
                                 }
                             }
@@ -2220,7 +2259,7 @@ namespace Radar_CRM.Controllers
                 {
                     var allRoles = await _context.Roles.ToListAsync();
                     var visibleRoleIds = new List<int>();
-                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId); // Assumes you have this method
+                    var subordinateIds = GetSubordinateRoleIds(allRoles, currentUser.RoleId);
                     visibleRoleIds.AddRange(subordinateIds);
 
                     var currentUserRoleModel = allRoles.FirstOrDefault(r => r.Id == currentUser.RoleId);
@@ -2255,8 +2294,6 @@ namespace Radar_CRM.Controllers
                     {
                         string jsonString = filters.Contains("%5B") ? Uri.UnescapeDataString(filters) : filters;
                         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-                        // Assuming FilterCriteria is defined in your project
                         var filterList = System.Text.Json.JsonSerializer.Deserialize<List<FilterCriteria>>(jsonString, options);
 
                         if (filterList != null && filterList.Any())
@@ -2314,6 +2351,12 @@ namespace Radar_CRM.Controllers
                 // 2. EXPORT LOGIC (CSV OR XLSX)
                 // ==========================================
 
+                // 🚀 NEW: Fetch User Dictionary for ultra-fast Owner ID -> Name lookup
+                var userDict = await _context.Users.AsNoTracking().ToDictionaryAsync(
+                    u => u.Id,
+                    u => !string.IsNullOrWhiteSpace(u.fullName) ? u.fullName : (u.FirstName ?? "Unknown")
+                );
+
                 var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
                 var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
                     .Where(p => !excludedFields.Contains(p.Name) &&
@@ -2324,24 +2367,32 @@ namespace Radar_CRM.Controllers
 
                 if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
                 {
-                    // --- EXCEL GENERATION ---
                     using var workbook = new XLWorkbook();
                     var worksheet = workbook.Worksheets.Add("Accounts");
 
                     // Write Headers
                     for (int i = 0; i < properties.Length; i++)
                     {
-                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        // 🚀 Rename header specifically for the UI
+                        string headerName = properties[i].Name == "AccountOwnerId" ? "Account Owner" : properties[i].Name;
+                        worksheet.Cell(1, i + 1).Value = headerName;
                         worksheet.Cell(1, i + 1).Style.Font.Bold = true;
                     }
 
                     int rowIdx = 2;
-                    // STREAM DATA to save RAM
                     await foreach (var acc in query.AsAsyncEnumerable())
                     {
                         for (int i = 0; i < properties.Length; i++)
                         {
-                            worksheet.Cell(rowIdx, i + 1).Value = properties[i].GetValue(acc, null)?.ToString() ?? "";
+                            var val = properties[i].GetValue(acc, null)?.ToString() ?? "";
+
+                            // 🚀 Swap ID for User Name
+                            if (properties[i].Name == "AccountOwnerId" && !string.IsNullOrEmpty(val))
+                            {
+                                if (userDict.TryGetValue(val, out string ownerName)) val = ownerName;
+                            }
+
+                            worksheet.Cell(rowIdx, i + 1).Value = val;
                         }
                         rowIdx++;
                     }
@@ -2355,22 +2406,27 @@ namespace Radar_CRM.Controllers
                 }
                 else
                 {
-                    // --- CSV STREAMING (ZERO RAM USAGE) ---
                     Response.Clear();
                     Response.ContentType = "text/csv";
                     Response.Headers.Add("Content-Disposition", $"attachment; filename=Accounts_All_{timestamp}.csv");
 
                     await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
 
-                    // Write Headers
-                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+                    // Write Headers (🚀 Apply 'Account Owner' rename here too)
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => p.Name == "AccountOwnerId" ? "\"Account Owner\"" : $"\"{p.Name}\"")));
 
-                    // Stream rows directly from SQL to HTTP Response
                     await foreach (var acc in query.AsAsyncEnumerable())
                     {
                         var rowValues = properties.Select(p =>
                         {
                             var val = p.GetValue(acc, null)?.ToString() ?? "";
+
+                            // 🚀 Swap ID for User Name
+                            if (p.Name == "AccountOwnerId" && !string.IsNullOrEmpty(val))
+                            {
+                                if (userDict.TryGetValue(val, out string ownerName)) val = ownerName;
+                            }
+
                             return $"\"{val.Replace("\"", "\"\"")}\"";
                         });
                         await writer.WriteLineAsync(string.Join(",", rowValues));
@@ -2399,8 +2455,14 @@ namespace Radar_CRM.Controllers
                     NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
                 };
                 var ids = JsonSerializer.Deserialize<List<int>>(selectedIds, options) ?? new List<int>();
-                
+
                 if (!ids.Any()) return BadRequest("No records selected.");
+
+                // 🚀 NEW: Fetch User Dictionary for ultra-fast Owner ID -> Name lookup
+                var userDict = await _context.Users.AsNoTracking().ToDictionaryAsync(
+                    u => u.Id,
+                    u => !string.IsNullOrWhiteSpace(u.fullName) ? u.fullName : (u.FirstName ?? "Unknown")
+                );
 
                 var excludedFields = new[] { "ZohoRecordId", "Notes", "Tasks", "Leads", "Deals", "DateOfEntry" };
                 var properties = typeof(Account).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
@@ -2417,7 +2479,9 @@ namespace Radar_CRM.Controllers
 
                     for (int i = 0; i < properties.Length; i++)
                     {
-                        worksheet.Cell(1, i + 1).Value = properties[i].Name;
+                        // 🚀 Rename header specifically for the UI
+                        string headerName = properties[i].Name == "AccountOwnerId" ? "Account Owner" : properties[i].Name;
+                        worksheet.Cell(1, i + 1).Value = headerName;
                         worksheet.Cell(1, i + 1).Style.Font.Bold = true;
                     }
 
@@ -2433,7 +2497,15 @@ namespace Radar_CRM.Controllers
                         {
                             for (int col = 0; col < properties.Length; col++)
                             {
-                                worksheet.Cell(rowIdx, col + 1).Value = properties[col].GetValue(acc, null)?.ToString() ?? "";
+                                var val = properties[col].GetValue(acc, null)?.ToString() ?? "";
+
+                                // 🚀 Swap ID for User Name
+                                if (properties[col].Name == "AccountOwnerId" && !string.IsNullOrEmpty(val))
+                                {
+                                    if (userDict.TryGetValue(val, out string ownerName)) val = ownerName;
+                                }
+
+                                worksheet.Cell(rowIdx, col + 1).Value = val;
                             }
                             rowIdx++;
                         }
@@ -2450,7 +2522,9 @@ namespace Radar_CRM.Controllers
                     Response.Headers.Add("Content-Disposition", $"attachment; filename=Accounts_Selected_{timestamp}.csv");
 
                     await using var writer = new StreamWriter(Response.Body, Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
-                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => $"\"{p.Name}\"")));
+
+                    // Write Headers (🚀 Apply 'Account Owner' rename here too)
+                    await writer.WriteLineAsync(string.Join(",", properties.Select(p => p.Name == "AccountOwnerId" ? "\"Account Owner\"" : $"\"{p.Name}\"")));
 
                     int chunkSize = 2000;
                     for (int i = 0; i < ids.Count; i += chunkSize)
@@ -2463,6 +2537,13 @@ namespace Radar_CRM.Controllers
                             var rowValues = properties.Select(p =>
                             {
                                 var val = p.GetValue(acc, null)?.ToString() ?? "";
+
+                                // 🚀 Swap ID for User Name
+                                if (p.Name == "AccountOwnerId" && !string.IsNullOrEmpty(val))
+                                {
+                                    if (userDict.TryGetValue(val, out string ownerName)) val = ownerName;
+                                }
+
                                 return $"\"{val.Replace("\"", "\"\"")}\"";
                             });
                             await writer.WriteLineAsync(string.Join(",", rowValues));
