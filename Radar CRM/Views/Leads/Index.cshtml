@@ -1766,8 +1766,9 @@ function renderCustomViews() {
                             User.Claims.Any(c => c.Type == "Profile" && (c.Value == "Administrator" || c.Value == "Admin" || c.Value == "SuperAdmin"))
                     ).ToString().ToLower());
 
-    // 🚀 Safely grab the logged-in User's exact text name
+ // 🚀 Grab BOTH the Name and the ID
     const currentUserName = '@Html.Raw(User.FindFirst("FullName")?.Value ?? User.FindFirst("Name")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "")';
+    const currentUserId = '@currentUserId';
 
     // 🚀 SYSTEM DEFINED VIEWS
     const systemViews = [];
@@ -1778,7 +1779,8 @@ function renderCustomViews() {
 
     systemViews.push({
         name: 'My Leads',
-        filters: [{ LogicalOperator: "", ColumnName: "LeadOwner", Condition: "is", Value: currentUserName, IsDate: false }]
+        // FIX: Use LeadOwnerId and currentUserId to perfectly match database records
+        filters: [{ LogicalOperator: "", ColumnName: "LeadOwnerId", Condition: "is", Value: currentUserId, IsDate: false }]
     });
 
     systemViews.push({
