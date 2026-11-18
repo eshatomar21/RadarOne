@@ -1408,12 +1408,20 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
                                             if (type.Name.Contains("User"))
                                             {
                                                 // 🚀 SPEED FIX: Use cached property info instead of querying it every loop
-                                                if (!userPropCache.ContainsKey(type)) {
+                                                if (!userPropCache.ContainsKey(type))
+                                                {
                                                     userPropCache[type] = type.GetProperty("fullName") ?? type.GetProperty("FirstName");
                                                 }
                                                 var nameProp = userPropCache[type];
                                                 value = nameProp?.GetValue(rawValue, null)?.ToString() ?? "Unknown User";
                                             }
+                                            // 👇 ADD THIS TO FIX LIVE SERVER DATE FORMATTING 👇
+                                            else if (rawValue is DateTime dateValue)
+                                            {
+                                                // Forces "Oct 14, 2026 10:39 AM" format universally so JS can always parse it
+                                                value = dateValue.ToString("MMM dd, yyyy hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+                                            }
+                                            // 👆 ------------------------------------------- 👆
                                             else
                                             {
                                                 value = rawValue.ToString();
@@ -2078,35 +2086,35 @@ var tableProps = typeof(Radar_CRM.Models.Account).GetProperties(System.Reflectio
             const tbody = document.getElementById("tableBody");
             let rowsToSort = Array.from(tbody.querySelectorAll('tr:not(#noRecordsRow)'));
 
-           rowsToSort.sort((a, b) => {
-    const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
-    const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
+              rowsToSort.sort((a, b) => {
+        const aCol = a.querySelector(`td[data-col-index="${colIndex}"]`);
+        const bCol = b.querySelector(`td[data-col-index="${colIndex}"]`);
 
-    const aText = aCol ? aCol.textContent.trim() : '';
-    const bText = bCol ? bCol.textContent.trim() : '';
+        const aText = aCol ? aCol.textContent.trim() : '';
+        const bText = bCol ? bCol.textContent.trim() : '';
 
-    // 🚀 FIX: Clean the " - " from the C# date format so JS can parse it
-    const dateA = new Date(aText.replace(' - ', ' '));
-    const dateB = new Date(bText.replace(' - ', ' '));
+        // 🚀 FIX: Attempt to parse as Date first
+        const dateA = new Date(aText);
+        const dateB = new Date(bText);
 
-    // If it's a valid date, sort chronologically
-    if (!isNaN(dateA) && !isNaN(dateB) && aText.includes(',')) {
-        return dir === 'asc' ? dateA - dateB : dateB - dateA;
-    }
+        // If it successfully parses as a real date (and isn't just a random number)
+        if (!isNaN(dateA) && !isNaN(dateB) && aText.includes(',')) {
+            return dir === 'asc' ? dateA - dateB : dateB - dateA;
+        }
 
-    // Fallback to numbers
-    const aNum = parseFloat(aText);
-    const bNum = parseFloat(bText);
+        // Fallback to numbers
+        const aNum = parseFloat(aText);
+        const bNum = parseFloat(bText);
 
-    if (!isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '') {
-        return dir === 'asc' ? aNum - bNum : bNum - aNum;
-    }
+        if (!isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '') {
+            return dir === 'asc' ? aNum - bNum : bNum - aNum;
+        }
 
-    // Fallback to alphabetical text
-    if (aText.toLowerCase() < bText.toLowerCase()) return dir === 'asc' ? -1 : 1;
-    if (aText.toLowerCase() > bText.toLowerCase()) return dir === 'asc' ? 1 : -1;
-    return 0;
-});
+        // Fallback to alphabetical text
+        if (aText.toLowerCase() < bText.toLowerCase()) return dir === 'asc' ? -1 : 1;
+        if (aText.toLowerCase() > bText.toLowerCase()) return dir === 'asc' ? 1 : -1;
+        return 0;
+    });
 
             rowsToSort.forEach(row => tbody.appendChild(row));
             allRows = rowsToSort;
@@ -3398,11 +3406,11 @@ if (!val1 && !condition.includes('empty') && !isSpecialDateCondition) return;
     const aText = aCol ? aCol.textContent.trim() : '';
     const bText = bCol ? bCol.textContent.trim() : '';
 
-    // 🚀 FIX: Clean the " - " from the C# date format so JS can parse it
-    const dateA = new Date(aText.replace(' - ', ' '));
-    const dateB = new Date(bText.replace(' - ', ' '));
+    // 🚀 FIX: Attempt to parse as Date first
+    const dateA = new Date(aText);
+    const dateB = new Date(bText);
 
-    // If it's a valid date, sort chronologically
+    // If it successfully parses as a real date (and isn't just a random number)
     if (!isNaN(dateA) && !isNaN(dateB) && aText.includes(',')) {
         return dir === 'asc' ? dateA - dateB : dateB - dateA;
     }
@@ -3420,7 +3428,6 @@ if (!val1 && !condition.includes('empty') && !isSpecialDateCondition) return;
     if (aText.toLowerCase() > bText.toLowerCase()) return dir === 'asc' ? 1 : -1;
     return 0;
 });
-
             rowsToSort.forEach(row => tbody.appendChild(row));
 
             allRows = rowsToSort;
