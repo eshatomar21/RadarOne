@@ -1331,24 +1331,46 @@ namespace Radar_CRM.Controllers
 
             try
             {
+                // 1. 🚀 BLOCK DELETION IF ANY LEAD HAS A RELATED DEAL
+                bool hasRelatedDeals = await _context.Deals.AnyAsync(d => d.LeadId != null && ids.Contains(d.LeadId.Value));
+                if (hasRelatedDeals)
+                {
+                    return Json(new { success = false, message = "Cannot delete: This lead has an associated Deal. Please delete or unlink the Deal first." });
+                }
+
                 var leadsToDelete = await _context.Leads
                                                   .Where(l => ids.Contains(l.Id))
                                                   .ToListAsync();
 
                 if (leadsToDelete != null && leadsToDelete.Any())
                 {
+                    // 2. 🚀 DELETE RELATED NOTES
                     if (_context.Note != null)
                     {
                         var relatedNotes = await _context.Note
                             .Where(n => n.LeadId != null && ids.Contains(n.LeadId.Value))
                             .ToListAsync();
 
-                        if (relatedNotes != null && relatedNotes.Any())
+                        if (relatedNotes.Any())
                         {
                             _context.Note.RemoveRange(relatedNotes);
                         }
                     }
 
+                    // 3. 🚀 DELETE RELATED TASKS (Fixes the Foreign Key Constraint Error)
+                    if (_context.Tasks != null)
+                    {
+                        var relatedTasks = await _context.Tasks
+                            .Where(t => t.LeadId != null && ids.Contains(t.LeadId.Value))
+                            .ToListAsync();
+
+                        if (relatedTasks.Any())
+                        {
+                            _context.Tasks.RemoveRange(relatedTasks);
+                        }
+                    }
+
+                    // 4. DELETE THE LEADS
                     _context.Leads.RemoveRange(leadsToDelete);
                     await _context.SaveChangesAsync();
                 }
