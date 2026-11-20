@@ -92,6 +92,10 @@
         margin: 0;
     }
 
+    .swal2-container {
+        z-index: 99999 !important;
+    }
+
         .related-list-menu li {
             padding: 10px 20px;
             font-size: 0.9rem;
@@ -2736,51 +2740,55 @@
             });
     }
 
-    // =====================================
-    // 🚀 NEW: SWEETALERT DELETE CONFIRMATION (LEADS)
-    // =====================================
-    function confirmLeadDelete(leadId) {
-        Swal.fire({
-            title: 'Are you sure?',
-            text: "This will permanently delete this lead and all related notes. You won't be able to revert this!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc2626', // Red color for delete
-            cancelButtonColor: '#64748b',  // Slate color for cancel
-            confirmButtonText: '<i class="fa-solid fa-trash-can me-1"></i> Yes, delete it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // We utilize your existing BulkDelete endpoint by passing a single ID in an array
-                fetch('@Url.Action("BulkDelete", "Leads")', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify([leadId])
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        Swal.fire({
-                            title: 'Deleted!',
-                            text: 'The lead has been successfully deleted.',
-                            icon: 'success',
-                            timer: 1500,
-                            showConfirmButton: false
-                        }).then(() => {
-                            window.location.href = '@Url.Action("Index", "Leads")'; // Redirect to list
-                        });
-                    } else {
-                        Swal.fire('Error', data.message || 'Could not delete the lead.', 'error');
-                    }
-                })
-                .catch(err => {
-                    console.error('Delete error:', err);
-                    Swal.fire('Error', 'A network error occurred.', 'error');
-                });
-            }
-        });
-    }
+            // =====================================
+        // SWEETALERT DELETE CONFIRMATION (LEAD + NOTES + TASKS + DEALS)
+        // =====================================
+        function confirmLeadDelete(leadId) {
+            Swal.fire({
+                title: 'Delete this Lead?',
+                html: 'This will permanently delete this <b>Lead</b> along with all connected <b>Notes, Tasks, and Deals</b>.<br><br>You won\'t be able to revert this!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '<i class="fa-solid fa-trash-can me-1"></i> Yes, delete all!',
+                cancelButtonText: 'Cancel',
+                showLoaderOnConfirm: true,
+                allowOutsideClick: () => !Swal.isLoading(),
+                preConfirm: () => {
+                    return fetch('@Url.Action("BulkDelete", "Leads")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([leadId])
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Server returned status ' + response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data.success) {
+                            throw new Error(data.message || 'Could not delete the lead.');
+                        }
+                        return data;
+                    })
+                    .catch(err => {
+                        Swal.showValidationMessage(`Delete failed: ${err.message}`);
+                    });
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'The lead and all connected notes, tasks, and deals have been deleted.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = '@Url.Action("Index", "Leads")';
+                    });
+                }
+            });
+        }
    
 </script>
 }

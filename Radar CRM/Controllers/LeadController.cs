@@ -1318,9 +1318,10 @@ namespace Radar_CRM.Controllers
         }
 
         // ==========================================
-        // BULK & SINGLE DELETE: AJAX POST
+        // BULK & SINGLE DELETE: AJAX POST (CASCADES DEALS, NOTES, TASKS)
         // ==========================================
         [HttpPost]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> BulkDelete([FromBody] List<int> ids)
         {
             if (ids == null || !ids.Any())
@@ -1331,20 +1332,39 @@ namespace Radar_CRM.Controllers
 
             try
             {
-                // 1. 🚀 BLOCK DELETION IF ANY LEAD HAS A RELATED DEAL
-                bool hasRelatedDeals = await _context.Deals.AnyAsync(d => d.LeadId != null && ids.Contains(d.LeadId.Value));
-                if (hasRelatedDeals)
-                {
-                    return Json(new { success = false, message = "Cannot delete: This lead has an associated Deal. Please delete or unlink the Deal first." });
-                }
-
                 var leadsToDelete = await _context.Leads
-                                                  .Where(l => ids.Contains(l.Id))
-                                                  .ToListAsync();
+                    .Include(l => l.PaymentRow)
+                    .Where(l => ids.Contains(l.Id))
+                    .ToListAsync();
 
-                if (leadsToDelete != null && leadsToDelete.Any())
+                if (leadsToDelete.Any())
                 {
-                    // 2. 🚀 DELETE RELATED NOTES
+                    // 1. DELETE RELATED DEALS (AND ANY NOTES LINKED TO THOSE DEALS)
+                    if (_context.Deals != null)
+                    {
+                        var relatedDeals = await _context.Deals
+                            .Where(d => d.LeadId != null && ids.Contains(d.LeadId.Value))
+                            .ToListAsync();
+
+                        if (relatedDeals.Any())
+                        {
+                            var dealIds = relatedDeals.Select(d => d.Id).ToList();
+
+                            if (_context.Note != null)
+                            {
+                                var dealNotes = await _context.Note
+                                    .Where(n => n.DealId != null && dealIds.Contains(n.DealId.Value))
+                                    .ToListAsync();
+
+                                if (dealNotes.Any())
+                                    _context.Note.RemoveRange(dealNotes);
+                            }
+
+                            _context.Deals.RemoveRange(relatedDeals);
+                        }
+                    }
+
+                    // 2. DELETE RELATED NOTES FOR THE LEAD
                     if (_context.Note != null)
                     {
                         var relatedNotes = await _context.Note
@@ -1352,12 +1372,10 @@ namespace Radar_CRM.Controllers
                             .ToListAsync();
 
                         if (relatedNotes.Any())
-                        {
                             _context.Note.RemoveRange(relatedNotes);
-                        }
                     }
 
-                    // 3. 🚀 DELETE RELATED TASKS (Fixes the Foreign Key Constraint Error)
+                    // 3. DELETE RELATED TASKS FOR THE LEAD
                     if (_context.Tasks != null)
                     {
                         var relatedTasks = await _context.Tasks
@@ -1365,12 +1383,19 @@ namespace Radar_CRM.Controllers
                             .ToListAsync();
 
                         if (relatedTasks.Any())
-                        {
                             _context.Tasks.RemoveRange(relatedTasks);
-                        }
                     }
 
-                    // 4. DELETE THE LEADS
+                    // 4. DELETE RELATED PRODUCT PAYMENT ROWS
+                    var relatedPaymentRows = leadsToDelete
+                        .Where(l => l.PaymentRow != null)
+                        .SelectMany(l => l.PaymentRow)
+                        .ToList();
+
+                    if (relatedPaymentRows.Any())
+                        _context.Set<ProductPaymentRow>().RemoveRange(relatedPaymentRows);
+
+                    // 5. DELETE THE LEADS
                     _context.Leads.RemoveRange(leadsToDelete);
                     await _context.SaveChangesAsync();
                 }
